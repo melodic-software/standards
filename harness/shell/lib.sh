@@ -16,8 +16,8 @@
 # Param order: subject (actual / haystack) before expected (needle), so calls
 # read as "in <subject>, expect <something>".
 
-[[ -n "${_STANDARDS_TEST_LIB_LOADED:-}" ]] && return 0
-readonly _STANDARDS_TEST_LIB_LOADED=1
+[[ -n "${_SH_TEST_LIB_LOADED:-}" ]] && return 0
+readonly _SH_TEST_LIB_LOADED=1
 
 : "${FAILED:=0}"
 : "${CASE_NUM:=0}"
