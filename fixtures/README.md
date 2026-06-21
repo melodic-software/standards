@@ -1,6 +1,6 @@
 # fixtures
 
-Sample inputs that prove each module's linter behaves: a *good* sample that must pass clean, and a *bad* sample that must produce the expected findings. Module tests run their linter against these and assert the outcome — this is how the standards are tested without any application or library code.
+Sample inputs that prove each module's linter behaves: a *good* sample that must pass clean, and a *bad* sample that must produce the expected findings. Module tests run their linter against these and assert the outcome — this is how the modules are tested without any application or library code.
 
 Layout (populated per module, starting in Phase 1):
 

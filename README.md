@@ -1,6 +1,6 @@
 # standards
 
-Curated, drop-in code-quality standards for `melodic-software` repositories — linting, static analysis, and repo hygiene that constrain both human contributors and agentic AI tools, consistently, across repos.
+Curated, drop-in code-quality standards — linting, static analysis, and repo hygiene — that constrain both human contributors and agentic AI tools, consistently, across any repository.
 
 This repo is the **single source of truth** (upstream). Consuming repos (downstream) adopt individual modules; they are never forced to take the whole thing, and they never couple back to this repo at runtime.
 
