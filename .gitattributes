@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repository and on checkout, on every
+# platform. Keeps shell scripts runnable under Git Bash on Windows and avoids
+# CRLF churn. Binary files are detected automatically by `text=auto`.
+* text=auto eol=lf
