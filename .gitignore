@@ -9,3 +9,6 @@ Thumbs.db
 
 # Claude Code worktrees (per-checkout; PR worktree workflow)
 .claude/worktrees/
+
+# Node
+node_modules/
