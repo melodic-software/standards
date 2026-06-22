@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Tests the typos module: the spell-checker passes the good fixture (including
-# an inline `spellchecker:disable-line` directive) and flags the bad fixture.
-# Skips cleanly when the engine is absent.
+# Tests the typos module: the spell-checker passes the good fixture and flags
+# the bad fixture. The good fixture plants a real misspelling under each of the
+# four blessed ignore directives (disable-line, ignore-next-line, the comment
+# block, and the HTML-comment block), so a good->exit-0 result conjunctively
+# proves every directive form still suppresses. Skips when the engine is absent.
 set -uo pipefail
 # shellcheck source=harness/shell/lib.sh
 source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
