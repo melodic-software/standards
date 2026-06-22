@@ -1,0 +1,6 @@
+The quick brown fox jumps over the lazy dog.
+This sentence is spelled correctly and should pass the spell checker.
+
+A separate concern is handled here, and the receipt is acknowledged.
+
+teh  # spellchecker:disable-line
