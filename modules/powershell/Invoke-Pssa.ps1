@@ -24,6 +24,10 @@
     Required minimum PSScriptAnalyzer version. Default 1.25.0 — the floor that
     fixes the Linux NRE under pwsh 7.4.14+.
 
+.PARAMETER ExcludePath
+    Path substrings to skip (matched against forward-slash-normalized full
+    paths). The .git directory is always skipped.
+
 .OUTPUTS
     Exit 0: no findings (or PSScriptAnalyzer not installed — see note below).
     Exit 1: findings present (printed to the host).
@@ -31,13 +35,40 @@
 #>
 [CmdletBinding()]
 param(
+    [Parameter(Position = 0)]
     [string[]]$Path = @('.'),
     [string]$Settings = (Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'),
-    [string]$AnalyzerVersion = '1.25.0'
+    [string]$AnalyzerVersion = '1.25.0',
+    [string[]]$ExcludePath = @()
 )
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
+
+function Test-PathExcluded {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$FullPath,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$Patterns
+    )
+
+    $normalized = $FullPath -replace '\\', '/'
+    if ($normalized -match '/\.git/') {
+        return $true
+    }
+    foreach ($pattern in $Patterns) {
+        $needle = ($pattern -replace '\\', '/').Trim('/')
+        if ($needle -and $normalized -like "*$needle*") {
+            return $true
+        }
+    }
+    return $false
+}
 
 # Self-skip when the analyzer is unavailable (a contributor box without it).
 # CI is the authoritative gate; a missing analyzer must not hard-fail local hooks.
@@ -58,11 +89,18 @@ if (-not (Test-Path -LiteralPath $Settings)) {
 $files = [System.Collections.Generic.List[string]]::new()
 foreach ($entry in $Path) {
     if (Test-Path -LiteralPath $entry -PathType Leaf) {
-        $files.Add((Resolve-Path -LiteralPath $entry).Path)
+        $resolved = (Resolve-Path -LiteralPath $entry).Path
+        if (-not (Test-PathExcluded -FullPath $resolved -Patterns $ExcludePath)) {
+            $files.Add($resolved)
+        }
     } elseif (Test-Path -LiteralPath $entry -PathType Container) {
         Get-ChildItem -LiteralPath $entry -Recurse -Force -File |
             Where-Object { $_.Extension -in '.ps1', '.psm1' } |
-            ForEach-Object { $files.Add($_.FullName) }
+            ForEach-Object {
+                if (-not (Test-PathExcluded -FullPath $_.FullName -Patterns $ExcludePath)) {
+                    $files.Add($_.FullName)
+                }
+            }
     } else {
         Write-Error "Path not found: $entry"
         exit 2

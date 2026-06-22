@@ -31,15 +31,7 @@ jobs:
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
 
       - name: Self-lint repository PowerShell (excludes intentionally-bad fixtures)
-        shell: bash
-        run: |
-          mapfile -t files < <(find . \( -name '*.ps1' -o -name '*.psm1' \) \
-            -not -path '*/.git/*' \
-            -not -path '*/fixtures/powershell/bad/*' \
-            -print | sort)
-          printf 'Linting %d PowerShell file(s)\n' "${#files[@]}"
-          [ "${#files[@]}" -eq 0 ] && exit 0
-          pwsh -NoProfile -File modules/powershell/Invoke-Pssa.ps1 -Path "${files[@]}"
+        run: pwsh -NoProfile -File modules/powershell/Invoke-Pssa.ps1 -Path . -ExcludePath 'fixtures/powershell/bad'
 
       - name: PowerShell module fixtures test
         shell: bash
