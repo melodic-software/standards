@@ -1,0 +1,38 @@
+name: powershell
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pssa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Ensure PSScriptAnalyzer 1.25.0
+        shell: pwsh
+        run: |
+          $required = '1.25.0'
+          $have = Get-Module -ListAvailable PSScriptAnalyzer |
+              Where-Object { $_.Version -eq [version]$required }
+          if (-not $have) {
+              try {
+                  Install-Module PSScriptAnalyzer -RequiredVersion $required -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+              } catch {
+                  Install-PSResource PSScriptAnalyzer -Version $required -Scope CurrentUser -TrustRepository -Reinstall -ErrorAction Stop
+              }
+          }
+          Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
+          Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
+
+      - name: Self-lint repository PowerShell (excludes intentionally-bad fixtures)
+        run: pwsh -NoProfile -File modules/powershell/Invoke-PSScriptAnalyzer.ps1 -Path . -ExcludePath 'fixtures/powershell/bad'
+
+      - name: PowerShell module fixtures test
+        shell: bash
+        run: bash harness/shell/run-tests.sh modules/powershell/pssa.test.sh
