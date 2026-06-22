@@ -2,11 +2,15 @@
   "name": "standards",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Curated, drop-in code-quality standards. Markdown linting via markdownlint-cli2.",
+  "engines": {
+    "node": ">=24"
+  },
   "devDependencies": {
     "markdownlint-cli2": "0.22.1"
   },
   "scripts": {
-    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/markdown/bad/**\""
+    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\""
   }
 }

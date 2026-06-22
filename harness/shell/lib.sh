@@ -9,12 +9,14 @@
 #   source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
 #
 # Each test file owns FAILED and CASE_NUM counters (auto-initialized below).
-# Assertions increment FAILED in the caller's scope on failure; PASS lines go
-# to stdout, FAIL lines to stderr. End every test file with:
+# Every assertion routes its result through pass()/fail(), which increment the
+# counters in the caller's scope; PASS lines go to stdout, FAIL lines to stderr.
+# End every test file with:
 #   [[ $FAILED -eq 0 ]] || exit 1
 #
-# Param order: subject (actual / haystack) before expected (needle), so calls
-# read as "in <subject>, expect <something>".
+# Param order: the label comes first. Equality and exit-code assertions take the
+# expected value then the actual; containment assertions take the subject
+# (haystack) then the needle.
 
 [[ -n "${_SH_TEST_LIB_LOADED:-}" ]] && return 0
 readonly _SH_TEST_LIB_LOADED=1
@@ -22,14 +24,16 @@ readonly _SH_TEST_LIB_LOADED=1
 : "${FAILED:=0}"
 : "${CASE_NUM:=0}"
 
+# pass <label> — record a passing case.
 pass() {
   CASE_NUM=$((CASE_NUM + 1))
   printf 'PASS: [%d] %s\n' "$CASE_NUM" "$1"
 }
 
+# fail <label> <detail> — record a failing case with a free-form detail message.
 fail() {
   CASE_NUM=$((CASE_NUM + 1))
-  printf 'FAIL: [%d] %s — expected %q got %q\n' "$CASE_NUM" "$1" "$2" "$3" >&2
+  printf 'FAIL: [%d] %s — %s\n' "$CASE_NUM" "$1" "$2" >&2
   FAILED=$((FAILED + 1))
 }
 
@@ -51,53 +55,45 @@ assert_eq() {
   if [[ "$actual" == "$expected" ]]; then
     pass "$label"
   else
-    fail "$label" "$expected" "$actual"
+    fail "$label" "expected $(printf '%q' "$expected") got $(printf '%q' "$actual")"
   fi
 }
 
 assert_contains() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" haystack="$2" needle="$3"
   if [[ "$haystack" == *"$needle"* ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — expected %q in: %s\n' "$CASE_NUM" "$label" "$needle" "$haystack" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected $(printf '%q' "$needle") in: $haystack"
   fi
 }
 
 assert_not_contains() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" haystack="$2" needle="$3"
   if [[ "$haystack" != *"$needle"* ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — forbidden %q present in: %s\n' "$CASE_NUM" "$label" "$needle" "$haystack" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "forbidden $(printf '%q' "$needle") present in: $haystack"
   fi
 }
 
 assert_silent() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" output="$2"
   local trimmed="${output#"${output%%[![:space:]]*}"}"
   trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
   if [[ -z "$trimmed" ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — expected empty/whitespace, got: %s\n' "$CASE_NUM" "$label" "$output" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected empty/whitespace, got: $output"
   fi
 }
 
 assert_exit() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" expected="$2" actual="$3"
   if [[ "$actual" == "$expected" ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — exit expected %s got %s\n' "$CASE_NUM" "$label" "$expected" "$actual" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "exit expected $expected got $actual"
   fi
 }
 
@@ -107,66 +103,58 @@ assert_stdout_contains() {
 }
 
 assert_file_exists() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" path="$2"
   if [[ -f "$path" ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — expected file %s\n' "$CASE_NUM" "$label" "$path" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected file $path"
   fi
 }
 
 assert_file_absent() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" path="$2"
   if [[ ! -f "$path" ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — expected absent, found %s\n' "$CASE_NUM" "$label" "$path" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected absent, found $path"
   fi
 }
 
 assert_line_count() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" path="$2" expected="$3"
   local got=0
   [[ -f "$path" ]] && got=$(wc -l <"$path" | tr -d ' ')
   if [[ "$got" == "$expected" ]]; then
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   else
-    printf 'FAIL: [%d] %s — expected %s lines got %s\n' "$CASE_NUM" "$label" "$expected" "$got" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected $expected lines got $got"
   fi
 }
 
 # assert_command_fails <label> <cmd...> — passes if <cmd> exits non-zero.
 # stdout/stderr discarded; capture earlier if you need to inspect output.
 assert_command_fails() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1"
   shift
   if "$@" >/dev/null 2>&1; then
-    printf 'FAIL: [%d] %s — expected non-zero exit, got 0\n' "$CASE_NUM" "$label" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected non-zero exit, got 0"
   else
-    printf 'PASS: [%d] %s\n' "$CASE_NUM" "$label"
+    pass "$label"
   fi
 }
 
 # assert_row_count <label> <output> <expected> <anchor_regex> — count lines in
 # <output> matching <anchor_regex>; pass if the count equals <expected>.
 assert_row_count() {
-  CASE_NUM=$((CASE_NUM + 1))
   local label="$1" out="$2" expected="$3" anchor="$4"
   local actual
-  actual=$(grep -cE "$anchor" <<<"$out" || echo 0)
+  # grep -c prints the count (0 on no match) and exits 1 when nothing matched;
+  # || true swallows that exit without appending a second line to the count.
+  actual=$(grep -cE "$anchor" <<<"$out" || true)
   if [[ "$actual" == "$expected" ]]; then
-    printf 'PASS: [%d] %s — %d rows\n' "$CASE_NUM" "$label" "$expected"
+    pass "$label — $expected rows"
   else
-    printf 'FAIL: [%d] %s — expected %d rows got %d\n%s\n' "$CASE_NUM" "$label" "$expected" "$actual" "$out" >&2
-    FAILED=$((FAILED + 1))
+    fail "$label" "expected $expected rows got $actual"$'\n'"$out"
   fi
 }
 

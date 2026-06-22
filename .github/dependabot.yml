@@ -9,3 +9,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Keep the markdownlint-cli2 dev-dependency (and its schema pin) current.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly

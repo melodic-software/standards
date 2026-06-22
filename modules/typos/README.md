@@ -13,9 +13,9 @@ that understands identifiers, code, and `.gitignore`.
 
 ## Engine
 
-[typos](https://github.com/crate-ci/typos) (`typos`). It exits `0` when clean,
-`2` when typos are found, and `1` on error. It is identifier-aware, so it rarely
-false-positives on code, hashes, or lockfiles.
+[typos](https://github.com/crate-ci/typos) (`typos`). It exits `0` when clean
+and `2` when typos are found; any other non-zero exit indicates an error. It is
+identifier-aware, so it rarely false-positives on code, hashes, or lockfiles.
 
 ## Inline ignore directives
 

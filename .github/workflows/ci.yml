@@ -7,13 +7,19 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Self-lint lanes run the ci-workflows composite actions (referenced by SHA,
 # bumped via Dependabot). The fixture-assertion lanes stay local — they prove
 # this repo's own configs flag the bad fixtures — and the ci-status gateway
-# aggregates everything into the single required check.
+# aggregates every lane into the single required check. link-check is the one
+# deliberate exception: it is advisory/scheduled and lives in its own workflow.
 jobs:
   markdown:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -23,7 +29,8 @@ jobs:
           globs: '**/*.md !fixtures/*/bad/**'
 
   powershell:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -33,7 +40,8 @@ jobs:
           exclude: fixtures/powershell/bad
 
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -43,7 +51,8 @@ jobs:
           exclude: fixtures/shellcheck/bad
 
   lychee:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -52,8 +61,67 @@ jobs:
         with:
           exclude: 'fixtures/[^/]+/bad'
 
+  editorconfig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up editorconfig-checker
+        uses: editorconfig-checker/action-editorconfig-checker@840e866d93b8e032123c23bac69dece044d4d84c # v2.2.0
+        with:
+          version: v3.6.1
+      - name: Self-lint repository (excludes intentionally-bad fixtures)
+        run: editorconfig-checker -config modules/editorconfig/.editorconfig-checker.json -exclude 'fixtures/[^/]+/bad/' .
+      - name: editorconfig module fixtures test
+        run: bash harness/shell/run-tests.sh modules/editorconfig/editorconfig.test.sh
+
+  gitleaks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # gitleaks-action requires an org license; install-action has no gitleaks
+      # manifest. Pin the release tarball by version + SHA256 instead.
+      - name: Install gitleaks
+        run: |
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL "$url" -o gitleaks.tar.gz
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks gitleaks.tar.gz
+          gitleaks version
+      - name: Scan repository for secrets
+        run: gitleaks dir . --config modules/gitleaks/.gitleaks.toml --no-banner
+      - name: gitleaks module fixtures test
+        run: bash harness/shell/run-tests.sh modules/gitleaks/gitleaks.test.sh
+
+  typos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Install the binary only (the crate-ci/typos action runs against the full
+      # tree and cannot pass --exclude, so the bad fixtures would fail it). We
+      # run typos ourselves so the published config stays adopter-clean.
+      - name: Set up typos
+        uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2.82.2
+        with:
+          tool: typos@1.47.2
+      - name: Spell-check repository (excludes intentionally-bad fixtures)
+        run: typos --config modules/typos/_typos.toml --exclude 'fixtures/*/bad/' .
+      - name: typos module fixtures test
+        run: bash harness/shell/run-tests.sh modules/typos/typos.test.sh
+
   markdown-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -68,7 +136,8 @@ jobs:
         run: bash harness/shell/run-tests.sh modules/markdown/markdown.test.sh
 
   powershell-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -88,10 +157,11 @@ jobs:
           Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
       - name: PowerShell module fixtures test
-        run: bash harness/shell/run-tests.sh modules/powershell/pssa.test.sh
+        run: bash harness/shell/run-tests.sh modules/powershell/powershell.test.sh
 
   shellcheck-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -111,7 +181,8 @@ jobs:
         run: bash harness/shell/run-tests.sh modules/shellcheck/shellcheck.test.sh
 
   lychee-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -131,10 +202,32 @@ jobs:
       - name: lychee module fixtures test
         run: bash harness/shell/run-tests.sh modules/lychee/lychee.test.sh
 
+  harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Harness self-test
+        run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
+
   ci-status:
     if: always()
-    needs: [markdown, powershell, shellcheck, lychee, markdown-fixtures, powershell-fixtures, shellcheck-fixtures, lychee-fixtures]
-    runs-on: ubuntu-latest
+    needs:
+      - markdown
+      - powershell
+      - shellcheck
+      - lychee
+      - editorconfig
+      - gitleaks
+      - typos
+      - markdown-fixtures
+      - powershell-fixtures
+      - shellcheck-fixtures
+      - lychee-fixtures
+      - harness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Aggregate lane results
         env:
@@ -143,10 +236,14 @@ jobs:
             ${{ needs.powershell.result }}
             ${{ needs.shellcheck.result }}
             ${{ needs.lychee.result }}
+            ${{ needs.editorconfig.result }}
+            ${{ needs.gitleaks.result }}
+            ${{ needs.typos.result }}
             ${{ needs.markdown-fixtures.result }}
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
             ${{ needs.lychee-fixtures.result }}
+            ${{ needs.harness.result }}
         run: |
           for r in $RESULTS; do
             case "$r" in

@@ -18,16 +18,17 @@ Requires PowerShell 7.4+ and the **PSScriptAnalyzer** module (>= 1.25.0).
 
 ## Adopt in a repo
 
-1. Copy `PSScriptAnalyzerSettings.psd1` into the consuming repo — canonical home
-   `modules/powershell/`; PSScriptAnalyzer and the VS Code PowerShell extension
-   also auto-discover a root-level copy.
+1. Copy `PSScriptAnalyzerSettings.psd1` to the consuming repo's **root** — that
+   is the only location PSScriptAnalyzer and the VS Code PowerShell extension
+   auto-discover (the analyzer reads settings from the `-Path` root). Placed
+   anywhere else, it must be passed explicitly via `-Settings`.
 2. Reference the `ci-workflows` PowerShell workflow from CI, pointing its
    settings input at the copied ruleset.
 
 ## Test
 
-`fixtures/powershell/{good,bad}` exercise the ruleset; `pssa.test.sh` asserts the
-good fixture is clean and the bad fixture is flagged, calling
+`fixtures/powershell/{good,bad}` exercise the ruleset; `powershell.test.sh` asserts
+the good fixture is clean and the bad fixture is flagged, calling
 `Invoke-ScriptAnalyzer` directly through the shell harness
 (`harness/shell/run-tests.sh`). The `bad` fixture is intentionally
 non-conforming and is excluded from the repo's own self-lint.

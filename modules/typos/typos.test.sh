@@ -19,7 +19,7 @@ fi
 FAILED=0
 CASE_NUM=0
 
-# typos exits 0 when clean, 2 when typos are found (1 is reserved for errors).
+# typos exits 0 when clean and 2 when typos are found; any other non-zero is an error.
 typos --config "$config" fixtures/typos/good >/dev/null 2>&1
 rc=$?
 assert_exit 'good fixture exits 0' 0 "$rc"

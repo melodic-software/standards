@@ -23,9 +23,10 @@ handling repo-specific findings per-repo:
 
 - **Inline** — append `# gitleaks:allow` to a line gitleaks should ignore (its
   native pragma; no config change).
-- **Repo-root `.gitleaksignore`** — list finding *fingerprints*
-  (`<file>:<rule-id>:<line>`) for known/intentional findings, e.g. test
-  fixtures. Regenerate with `gitleaks dir . -c <config> -f json --report-path -`.
+- **Repo-root `.gitleaksignore`** — list finding *fingerprints* for
+  known/intentional findings, e.g. test fixtures. A `gitleaks dir` scan emits
+  `file:rule-id:line`; a `gitleaks git` history scan prefixes a `commit:`
+  segment. Regenerate with `gitleaks dir . -c <config> -f json --report-path -`.
 - **Config `[[allowlists]]`** — only for genuinely repo-wide exemptions an
   adopter should inherit. Add to your own copy, not the shared base.
 

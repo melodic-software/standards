@@ -1,6 +1,6 @@
 # lychee module
 
-Link checking via [lychee](https://lychee.cli.rs/).
+Link checking via [lychee](https://github.com/lycheeverse/lychee).
 
 ## Contents
 

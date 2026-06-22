@@ -31,5 +31,6 @@ out="$(lychee --offline --config "$config" fixtures/lychee/bad/Violations.md 2>&
 rc=$?
 assert_exit 'bad fixture exits 2' 2 "$rc"
 assert_contains 'bad fixture flags the missing fragment' "$out" 'Cannot find fragment'
+assert_contains 'bad fixture flags the missing file' "$out" 'does-not-exist.md'
 
 [[ $FAILED -eq 0 ]] || exit 1
