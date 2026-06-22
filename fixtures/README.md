@@ -6,8 +6,9 @@ Layout (populated per module, starting in Phase 1):
 
 ```text
 fixtures/
-  markdown/   good/  bad/
-  powershell/ good/  bad/
+  markdown/     good/  bad/
+  powershell/   good/  bad/
+  editorconfig/ good/  bad/
 ```
 
 Bad fixtures are intentionally non-conforming. They are excluded from the repo's own self-lint so they don't fail CI as authored content.

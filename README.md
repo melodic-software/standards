@@ -6,15 +6,14 @@ This repo is the **single source of truth** (upstream). Consuming repos (downstr
 
 ## What lives here
 
-A modular catalog — each module is self-contained and independently adoptable:
+A modular catalog — each module is self-contained and independently adoptable.
+Configs sort into two channels by how the tool finds them:
 
-- `modules/base/` — language-agnostic config: editorconfig, git hygiene, secret scan, spell check, markdown lint, link check, shell lint
-- `modules/<language>/` — opt-in per-language static analysis: PowerShell, .NET, Python, TypeScript
-- `harness/` — the lint dispatcher and shell/Pester test runners the modules rely on
-- `hooks/` — git-hook (Lefthook) lanes
-- `ci/` — reusable CI workflows
-- `conventions/` — prose standards and review criteria that tooling cannot enforce
+- **Copy-only, at the repo root** — `.editorconfig`, `.gitattributes`, `.gitignore`. Editors and Git discover these only by walking the directory tree, so they cannot be referenced; the root files here *are* the published standard.
+- `modules/<tool>/` — **referenceable** drop-in configs a tool reads from an explicit path: Markdown, PowerShell, and the editorconfig checker today; per-language overlays (.NET, Python, TypeScript) and scanners (typos, gitleaks, shellcheck, lychee) as they land
+- `harness/` — the shell/Pester test runners the modules rely on
 - `fixtures/` — good/bad samples that prove each module behaves
+- `conventions/` — prose standards and review criteria that tooling cannot enforce (future)
 - `docs/` — the migration plan and decision records
 
 ## What does not live here
@@ -25,4 +24,4 @@ A modular catalog — each module is self-contained and independently adoptable:
 
 ## Status
 
-Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. The first modules are **Markdown** and **PowerShell**.
+Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, and **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker).
