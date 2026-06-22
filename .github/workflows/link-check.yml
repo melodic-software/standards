@@ -1,0 +1,17 @@
+name: link-check
+
+# Advisory online external-link check (not part of ci-status). Runs weekly and
+# on demand; files a rolling tracking issue on failure rather than gating merges.
+# Deterministic on-disk link integrity is the lychee lane in ci.yml.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  link-check:
+    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@99d0558e0ab9c28cc4a0f3f8c3e92bc01da389d9 # 99d0558 2026-06-22
