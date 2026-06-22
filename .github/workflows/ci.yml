@@ -18,7 +18,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@00245790fdb56f45b83fd4a38f8f74ff66c90328 # 0024579 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/markdown@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
         with:
           globs: '**/*.md !fixtures/markdown/bad/**'
 
@@ -28,9 +28,19 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@00245790fdb56f45b83fd4a38f8f74ff66c90328 # 0024579 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/powershell@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
         with:
           exclude: fixtures/powershell/bad
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Lint shell
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
+        with:
+          exclude: fixtures/shellcheck/bad
 
   markdown-fixtures:
     runs-on: ubuntu-latest
@@ -70,9 +80,29 @@ jobs:
       - name: PowerShell module fixtures test
         run: bash harness/shell/run-tests.sh modules/powershell/pssa.test.sh
 
+  shellcheck-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install ShellCheck 0.11.0
+        run: |
+          set -euo pipefail
+          ver=0.11.0
+          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
+          curl -fsSL "$url" -o shellcheck.tar.gz
+          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
+          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
+          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
+          shellcheck --version
+      - name: shellcheck module fixtures test
+        run: bash harness/shell/run-tests.sh modules/shellcheck/shellcheck.test.sh
+
   ci-status:
     if: always()
-    needs: [markdown, powershell, markdown-fixtures, powershell-fixtures]
+    needs: [markdown, powershell, shellcheck, markdown-fixtures, powershell-fixtures, shellcheck-fixtures]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate lane results
@@ -80,8 +110,10 @@ jobs:
           RESULTS: >-
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}
+            ${{ needs.shellcheck.result }}
             ${{ needs.markdown-fixtures.result }}
             ${{ needs.powershell-fixtures.result }}
+            ${{ needs.shellcheck-fixtures.result }}
         run: |
           for r in $RESULTS; do
             case "$r" in
