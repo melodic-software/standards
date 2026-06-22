@@ -6,3 +6,6 @@ Thumbs.db
 .vs/
 .vscode/*
 !.vscode/extensions.json
+
+# Claude Code worktrees (per-checkout; PR worktree workflow)
+.claude/worktrees/
