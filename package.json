@@ -1,0 +1,12 @@
+{
+  "name": "standards",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Curated, drop-in code-quality standards. Markdown linting via markdownlint-cli2.",
+  "devDependencies": {
+    "markdownlint-cli2": "0.22.1"
+  },
+  "scripts": {
+    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/markdown/bad/**\""
+  }
+}
