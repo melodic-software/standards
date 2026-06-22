@@ -29,6 +29,9 @@ assert_exit 'good fixture exits 0' 0 "$rc"
 out="$(shellcheck --rcfile="$rcfile" fixtures/shellcheck/bad/Violations.sh 2>&1)"
 rc=$?
 assert_exit 'bad fixture exits 1' 1 "$rc"
-assert_contains 'bad fixture reports a finding' "$out" 'SC2086'
+assert_contains 'bad fixture reports a default finding' "$out" 'SC2086'
+# SC2292 (require-double-brackets) is an rcfile-only optional check, so asserting
+# it proves the .shellcheckrc was actually loaded — not just that ShellCheck ran.
+assert_contains 'bad fixture reports an rcfile-enabled finding' "$out" 'SC2292'
 
 [[ $FAILED -eq 0 ]] || exit 1

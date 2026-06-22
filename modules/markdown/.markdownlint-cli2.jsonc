@@ -21,8 +21,7 @@
     "MD046": { "style": "fenced" }, // Fenced (not indented) code blocks
     "MD048": { "style": "backtick" }, // Backtick (not tilde) code fences
     "MD024": { "siblings_only": true }, // Allow duplicate headings under different parents
-    "MD055": { "style": "consistent" }, // Consistent table pipe style within a file
-    "MD060": false, // Don't enforce one table-column style across mixed compact/padded tables
+    "MD060": false, // Table column style — disabled; allows any pipe spacing (its default flags tables matching no supported style)
 
     // --- Relaxed for GFM / prose ---
     "MD013": false, // No hard line-length limit (tables and code exceed 80)

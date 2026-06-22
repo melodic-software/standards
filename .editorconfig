@@ -7,8 +7,7 @@ root = true
 # separate editorconfig.
 #
 # .gitattributes is the single authority for line endings (it transforms bytes
-# on checkout); end_of_line here is an editor hint only, and editorconfig-checker
-# leaves the end-of-line check disabled. See modules/editorconfig/.
+# on checkout); end_of_line here is an editor hint only.
 
 [*]
 indent_style = space

@@ -27,6 +27,9 @@ assert_exit 'good fixture exits 0' 0 "$rc"
 out="$(ml --config "$config" fixtures/markdown/bad/Violations.md 2>&1)"
 rc=$?
 assert_exit 'bad fixture exits 1' 1 "$rc"
-assert_contains 'bad fixture reports a rule' "$out" 'MD0'
+# Assert specific configured style rules fired, not merely that some rule did,
+# so the test proves the ruleset's intent rather than incidental output.
+assert_contains 'bad fixture flags list-bullet style (MD004)' "$out" 'MD004'
+assert_contains 'bad fixture flags emphasis style (MD049)' "$out" 'MD049'
 
 [[ $FAILED -eq 0 ]] || exit 1

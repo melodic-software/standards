@@ -21,7 +21,10 @@ else
 fi
 
 total=0 passed=0 failed=0 skipped=0
-for t in "${tests[@]}"; do
+# "${tests[@]+...}" guards the empty-array expansion under `set -u` (on bash
+# <= 4.3, including macOS's system bash 3.2, expanding an empty array otherwise
+# aborts with "unbound variable").
+for t in "${tests[@]+"${tests[@]}"}"; do
   [[ -f "$t" ]] || continue
   total=$((total + 1))
   rel="${t#"$root"/}"

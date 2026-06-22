@@ -29,7 +29,7 @@ standards/
   .editorconfig .gitattributes .gitignore   # copy-only configs, canonical at root
   modules/                                   # path-pointed configs, copied to consumers (one dir per tool)
     markdown/ powershell/ editorconfig/      # editorconfig/ holds the checker config; rules live at root
-    typos/ gitleaks/ shellcheck/ lychee/     # future scanner modules
+    typos/ gitleaks/ shellcheck/ lychee/     # scanner modules
     dotnet/ python/ typescript/              # future language overlays
   harness/         # shell-test runner + shared test lib
   fixtures/        # good/bad samples per module (the test inputs)
@@ -45,7 +45,7 @@ standards/
 
 - **Decoupling (every migrated file):** strip medley specifics — hardcoded paths, skill names, `.NET`/`Platform.*` references, and agent-harness pointers (`/quality-gate`, `.claude/rules`, …). Parameterize scopes.
 - **Test strategy (no application code needed):**
-  1. Unit tests — the `*.test.sh` and Pester suites via the ported shell harness.
+  1. Unit tests — the `*.test.sh` suites via the ported shell harness.
   2. Fixtures — committed good/bad `.md` and `.ps1` that CI asserts pass/fail.
   3. Self-dogfood — the repo lints itself in CI.
 
@@ -64,7 +64,7 @@ Create the repo (done); commit this plan; port the harness (`tools/lint`, `tools
 ### Phase 2 — Base hygiene
 
 - **Copy-only hygiene configs (done):** `.editorconfig`, `.gitattributes`, `.gitignore` canonical at root, plus the `editorconfig/` checker module + CI lane. `.gitattributes` is the single authority for line endings — `.ps1`/`.psm1`/`.psd1` pinned `lf` (verified to run on PowerShell 7 and Windows PowerShell 5.1), `.cmd`/`.bat` pinned `crlf`; editorconfig `end_of_line` is an editor hint and the checker's end-of-line check is disabled.
-- **Referenceable scanner modules (next):** typos, gitleaks (`--config`), shellcheck, lychee — each a vertical slice like markdown/powershell. Plus the base Lefthook lane and remaining base CI.
+- **Referenceable scanner modules (done):** typos, gitleaks (`--config`), shellcheck, and lychee — each a vertical slice like markdown/powershell. The base Lefthook lane and remaining base CI remain.
 - **Deferred:** `.dockerignore` and `.npmrc` placement — pick up with the relevant overlay (containers, Node) rather than the agnostic base.
 
 ### Phase 3 — Overlays plus remaining CI and hooks
@@ -78,7 +78,7 @@ Migrate the decoupled review criteria and engineering conventions into `conventi
 ## Out of scope (separate efforts, already mapped)
 
 - **Agent-guardrails repo** — `.claude/` hooks, agents, skills, and the plugin marketplace.
-- **`project-template` repo** — build scaffold (`Directory.Build.*`, `global.json`, `package.json`, …). It *depends on* this repo; never the reverse.
+- **`project-template` repo** — build scaffold (`Directory.Build.*`, `global.json`, a project `package.json`, …). It *depends on* this repo; never the reverse. (This repo carries its own minimal `package.json` solely to pin the markdownlint-cli2 dev-dependency for dogfooding — not application scaffold.)
 
 ## Upstream / downstream
 

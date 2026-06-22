@@ -12,8 +12,8 @@ include_fragments = "full"
 exclude_path = [
   'node_modules',
   '\.venv',
-  '/bin/',
-  '/obj/',
+  '(^|/)bin/',
+  '(^|/)obj/',
 ]
 
 # URL excludes for the online lane (the offline lane skips URLs entirely):

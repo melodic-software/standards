@@ -10,8 +10,8 @@ A modular catalog — each module is self-contained and independently adoptable.
 Configs sort into two channels by how the tool finds them:
 
 - **Copy-only, at the repo root** — `.editorconfig`, `.gitattributes`, `.gitignore`. Editors and Git discover these only by walking the directory tree, so they cannot be referenced; the root files here *are* the published standard.
-- `modules/<tool>/` — **referenceable** drop-in configs a tool reads from an explicit path: Markdown, PowerShell, and the editorconfig checker today; per-language overlays (.NET, Python, TypeScript) and scanners (typos, gitleaks, shellcheck, lychee) as they land
-- `harness/` — the shell/Pester test runners the modules rely on
+- `modules/<tool>/` — **referenceable** drop-in configs a tool reads from an explicit path: Markdown, PowerShell, the editorconfig checker, and the typos, gitleaks, shellcheck, and lychee scanners; per-language overlays (.NET, Python, TypeScript) as they land
+- `harness/` — the shell test runner the modules rely on
 - `fixtures/` — good/bad samples that prove each module behaves
 - `conventions/` — prose standards and review criteria that tooling cannot enforce (future)
 - `docs/` — the migration plan and decision records
