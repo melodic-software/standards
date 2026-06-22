@@ -2,6 +2,11 @@
 # Self-test for the assertion library: the PASS and FAIL paths of the core
 # assertions must themselves behave. Deliberate-failure paths run in isolated
 # subshells so they don't pollute this file's own FAILED counter.
+# The capture subshells below set FAILED=0 so a deliberate-failure assertion
+# does not pollute this file's own counter (see header). ShellCheck reads that
+# as a lost subshell modification; the isolation is intended, so disable the
+# pair file-wide (the directive must precede the first command to apply so).
+# shellcheck disable=SC2030,SC2031
 set -uo pipefail
 # shellcheck source=harness/shell/lib.sh
 source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"

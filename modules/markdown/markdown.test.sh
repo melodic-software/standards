@@ -9,7 +9,7 @@ root="$(git rev-parse --show-toplevel)"
 cd "$root" || exit 1
 config='modules/markdown/.markdownlint-cli2.jsonc'
 
-if [ -x node_modules/.bin/markdownlint-cli2 ]; then
+if [[ -x node_modules/.bin/markdownlint-cli2 ]]; then
   ml() { node_modules/.bin/markdownlint-cli2 "$@"; }
 elif command -v markdownlint-cli2 >/dev/null 2>&1; then
   ml() { markdownlint-cli2 "$@"; }
