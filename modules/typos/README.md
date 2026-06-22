@@ -46,8 +46,11 @@ typos --config modules/typos/_typos.toml .
 ```
 
 or drop `_typos.toml` at the consuming repo's root, where typos auto-discovers
-it. Extend it with repo-specific vocabulary and vendored paths:
+it. Extend it with repo-specific vocabulary and vendored paths (the block
+directive below is this module dogfooding its own escape hatch — the example
+words are deliberate near-misspellings that would otherwise flag self-lint):
 
+<!-- spellchecker:off -->
 ```toml
 [default.extend-words]
 ASO = "ASO"          # domain acronym, not a typo
@@ -58,6 +61,7 @@ seeked = "seeked"    # whole-token identifier (a DOM event name)
 [files]
 extend-exclude = ["vendor/", "*.min.*"]
 ```
+<!-- spellchecker:on -->
 
 ## Test
 
