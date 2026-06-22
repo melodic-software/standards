@@ -24,4 +24,4 @@ Configs sort into two channels by how the tool finds them:
 
 ## Status
 
-Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, and **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker).
+Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker), and **typos** (spell checking).
