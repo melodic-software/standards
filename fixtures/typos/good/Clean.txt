@@ -3,4 +3,21 @@ This sentence is spelled correctly and should pass the spell checker.
 
 A separate concern is handled here, and the receipt is acknowledged.
 
+Each block below plants a real misspelling that typos would normally flag, then
+silences it with one of the four blessed ignore directives. The whole fixture
+must still exit 0; if any directive stopped working, the planted misspelling
+would surface and fail this fixture.
+
 teh  # spellchecker:disable-line
+
+# spellchecker:ignore-next-line
+recieve
+
+# spellchecker:off
+seperate
+occured
+# spellchecker:on
+
+<!-- spellchecker:off -->
+definately
+<!-- spellchecker:on -->
