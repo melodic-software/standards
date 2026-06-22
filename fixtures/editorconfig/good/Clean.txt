@@ -1,0 +1,4 @@
+This file satisfies the base editorconfig rules.
+
+It is UTF-8, indented with spaces, has no trailing whitespace, and ends with a
+single final newline.

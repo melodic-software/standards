@@ -1,0 +1,4 @@
+This file violates the base editorconfig rules.
+
+	This line is indented with a tab, but indent_style is space.
+This file is also missing its final newline.

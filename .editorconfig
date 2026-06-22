@@ -1,0 +1,48 @@
+root = true
+
+# Language/framework-agnostic base. Covers universal defaults plus the
+# languages with a presence in this repo (Markdown, shell, PowerShell) and the
+# generic Windows-native batch class. Language overlays (.NET, Python, …) extend
+# this file with their own source sections when adopted; they do not ship a
+# separate editorconfig.
+#
+# .gitattributes is the single authority for line endings (it transforms bytes
+# on checkout); end_of_line here is an editor hint only, and editorconfig-checker
+# leaves the end-of-line check disabled. See modules/editorconfig/.
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+end_of_line = lf
+
+# Markdown — trailing whitespace is significant (two trailing spaces = a hard
+# line break); indentation is variable per CommonMark.
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+indent_size = unset
+
+# Config / serialization / data
+[*.{json,jsonc,yml,yaml,toml}]
+indent_size = 2
+
+# Shell
+[*.{sh,bash}]
+indent_size = 2
+
+# PowerShell — LF runs on both PowerShell 7 and Windows PowerShell 5.1 (verified
+# empirically). See the .gitattributes note before changing this to crlf.
+[*.{ps1,psm1,psd1}]
+indent_size = 4
+
+# Windows batch — cmd.exe requires CRLF.
+[*.{cmd,bat}]
+end_of_line = crlf
+
+# Lockfiles — generated; suppress formatting enforcement.
+[{package-lock.json,*.lock}]
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
