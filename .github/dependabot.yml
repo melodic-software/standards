@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Keep SHA-pinned actions current — including the cross-repo ci-workflows
+  # composite actions referenced from .github/workflows/ci.yml. Review every PR
+  # before merge; never auto-merge (a SHA bump is executable CI logic). Bumping
+  # the pin to the private ci-workflows repo requires the org-level "Grant
+  # Dependabot access to private repositories" setting to include ci-workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

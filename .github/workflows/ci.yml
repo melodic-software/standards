@@ -7,20 +7,30 @@ on:
 permissions:
   contents: read
 
-# Self-lint lanes are executed by the reusable workflows in ci-workflows
-# (referenced by SHA, bumped via Dependabot). The fixture-assertion lanes stay
-# local — they prove this repo's own configs flag the bad fixtures — and the
-# ci-status gateway aggregates everything into the single required check.
+# Self-lint lanes run the ci-workflows composite actions (referenced by SHA,
+# bumped via Dependabot). The fixture-assertion lanes stay local — they prove
+# this repo's own configs flag the bad fixtures — and the ci-status gateway
+# aggregates everything into the single required check.
 jobs:
   markdown:
-    uses: melodic-software/ci-workflows/.github/workflows/markdown.yml@6086ef9be991195e1a5b9000d01c85cb581ef171 # main 2026-06-22 (PR #1)
-    with:
-      globs: '**/*.md !fixtures/markdown/bad/**'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Lint markdown
+        uses: melodic-software/ci-workflows/.github/actions/markdown@00245790fdb56f45b83fd4a38f8f74ff66c90328 # 0024579 2026-06-22
+        with:
+          globs: '**/*.md !fixtures/markdown/bad/**'
 
   powershell:
-    uses: melodic-software/ci-workflows/.github/workflows/powershell.yml@6086ef9be991195e1a5b9000d01c85cb581ef171 # main 2026-06-22 (PR #1)
-    with:
-      exclude: fixtures/powershell/bad
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Analyze PowerShell
+        uses: melodic-software/ci-workflows/.github/actions/powershell@00245790fdb56f45b83fd4a38f8f74ff66c90328 # 0024579 2026-06-22
+        with:
+          exclude: fixtures/powershell/bad
 
   markdown-fixtures:
     runs-on: ubuntu-latest
