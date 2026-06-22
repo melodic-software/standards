@@ -10,8 +10,12 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   link-check:
+    # issues: write is scoped to this job (least privilege) — only the called
+    # workflow files the rolling tracking issue.
+    permissions:
+      contents: read
+      issues: write
     uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@99d0558e0ab9c28cc4a0f3f8c3e92bc01da389d9 # 99d0558 2026-06-22
