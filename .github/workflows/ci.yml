@@ -18,9 +18,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/markdown@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
         with:
-          globs: '**/*.md !fixtures/markdown/bad/**'
+          globs: '**/*.md !fixtures/*/bad/**'
 
   powershell:
     runs-on: ubuntu-latest
@@ -28,7 +28,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/powershell@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
         with:
           exclude: fixtures/powershell/bad
 
@@ -38,9 +38,19 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@44f4c2c2e69c11769f621e0472e1e28b895dc035 # 44f4c2c 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
         with:
           exclude: fixtures/shellcheck/bad
+
+  lychee:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Check links (offline)
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        with:
+          exclude: 'fixtures/[^/]+/bad'
 
   markdown-fixtures:
     runs-on: ubuntu-latest
@@ -100,9 +110,30 @@ jobs:
       - name: shellcheck module fixtures test
         run: bash harness/shell/run-tests.sh modules/shellcheck/shellcheck.test.sh
 
+  lychee-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install lychee 0.24.2
+        run: |
+          set -euo pipefail
+          ver=0.24.2
+          sha=1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
+          asset=lychee-x86_64-unknown-linux-gnu
+          url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${ver}/${asset}.tar.gz"
+          curl -fsSL "$url" -o lychee.tar.gz
+          echo "${sha}  lychee.tar.gz" | sha256sum -c -
+          tar -xzf lychee.tar.gz --strip-components=1 "${asset}/lychee"
+          sudo install lychee /usr/local/bin/lychee
+          rm -f lychee.tar.gz lychee
+          lychee --version
+      - name: lychee module fixtures test
+        run: bash harness/shell/run-tests.sh modules/lychee/lychee.test.sh
+
   ci-status:
     if: always()
-    needs: [markdown, powershell, shellcheck, markdown-fixtures, powershell-fixtures, shellcheck-fixtures]
+    needs: [markdown, powershell, shellcheck, lychee, markdown-fixtures, powershell-fixtures, shellcheck-fixtures, lychee-fixtures]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate lane results
@@ -111,9 +142,11 @@ jobs:
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}
             ${{ needs.shellcheck.result }}
+            ${{ needs.lychee.result }}
             ${{ needs.markdown-fixtures.result }}
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
+            ${{ needs.lychee-fixtures.result }}
         run: |
           for r in $RESULTS; do
             case "$r" in

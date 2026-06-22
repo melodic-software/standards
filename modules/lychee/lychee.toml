@@ -1,0 +1,16 @@
+# lychee ruleset — repo-agnostic link-checking config.
+# The offline CI lane runs with --offline (external URLs skipped); the online
+# advisory lane reuses this file with the network enabled.
+# Ref: https://github.com/lycheeverse/lychee/blob/master/lychee.example.toml
+
+# Verify #fragment/anchor targets resolve, not just the file path ("full"
+# checks both anchor and text fragments).
+include_fragments = "full"
+
+# Build/dependency trees — not authored content. Values are regular expressions.
+exclude_path = [
+  "node_modules",
+  "\\.venv",
+  "/bin/",
+  "/obj/",
+]
