@@ -14,7 +14,11 @@
 #   https://github.com/PoshCode/PowerShellPracticeAndStyle
 
 @{
-    Severity = @('Error', 'Warning')
+    # Include Information so the Information-severity rules enabled below
+    # (PSUseCorrectCasing, PSProvideCommentHelp,
+    # PSAvoidUsingDoubleQuotesForConstantString) actually gate — a top-level
+    # Severity filter discards any severity not listed here.
+    Severity = @('Error', 'Warning', 'Information')
 
     ExcludeRules = @(
         # New-* helper functions that construct data objects (not system state

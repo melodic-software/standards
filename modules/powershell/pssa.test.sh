@@ -6,7 +6,7 @@ set -uo pipefail
 source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
 
 root="$(git rev-parse --show-toplevel)"
-runner="$root/modules/powershell/Invoke-Pssa.ps1"
+runner="$root/modules/powershell/Invoke-PSScriptAnalyzer.ps1"
 
 command -v pwsh >/dev/null 2>&1 || skip_suite 'pwsh not installed'
 # The single-quoted argument is a PowerShell command — $_ is PowerShell syntax,

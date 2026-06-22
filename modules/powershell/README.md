@@ -5,7 +5,7 @@ Opinionated PowerShell static analysis via [PSScriptAnalyzer](https://github.com
 ## Contents
 
 - `PSScriptAnalyzerSettings.psd1` — the ruleset: OTBS (One True Brace Style), targets PowerShell 7.4/7.6, cross-platform, every rule justified inline.
-- `Invoke-Pssa.ps1` — a runner that analyzes files in a fresh `pwsh` subprocess **per file**, which avoids the PSScriptAnalyzer cache/runspace race that otherwise surfaces (notably on Linux) when many files are analyzed in one process.
+- `Invoke-PSScriptAnalyzer.ps1` — a runner that analyzes files in a fresh `pwsh` subprocess **per file**, which avoids the PSScriptAnalyzer cache/runspace race that otherwise surfaces (notably on Linux) when many files are analyzed in one process.
 
 ## Engine
 
@@ -17,7 +17,7 @@ Requires PowerShell 7.4+ and the **PSScriptAnalyzer** module (≥ 1.25.0) — pr
 2. Run the analyzer:
 
    ```powershell
-   pwsh -File Invoke-Pssa.ps1 -Path .
+   pwsh -File Invoke-PSScriptAnalyzer.ps1 -Path .
    ```
 
    Exit `0` = clean, `1` = findings, `2` = configuration error / analyzer crash. Wire it into a git hook (pass staged files via `-Path`) and/or a CI lane.

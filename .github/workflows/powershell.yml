@@ -31,7 +31,7 @@ jobs:
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
 
       - name: Self-lint repository PowerShell (excludes intentionally-bad fixtures)
-        run: pwsh -NoProfile -File modules/powershell/Invoke-Pssa.ps1 -Path . -ExcludePath 'fixtures/powershell/bad'
+        run: pwsh -NoProfile -File modules/powershell/Invoke-PSScriptAnalyzer.ps1 -Path . -ExcludePath 'fixtures/powershell/bad'
 
       - name: PowerShell module fixtures test
         shell: bash

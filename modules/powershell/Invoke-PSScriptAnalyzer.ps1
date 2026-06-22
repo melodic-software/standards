@@ -81,7 +81,8 @@ if (-not $module) {
 }
 
 if (-not (Test-Path -LiteralPath $Settings)) {
-    Write-Error "Settings file not found: $Settings"
+    # Non-terminating so the exit-2 contract holds under $ErrorActionPreference='Stop'.
+    Write-Error "Settings file not found: $Settings" -ErrorAction Continue
     exit 2
 }
 
@@ -90,7 +91,9 @@ $files = [System.Collections.Generic.List[string]]::new()
 foreach ($entry in $Path) {
     if (Test-Path -LiteralPath $entry -PathType Leaf) {
         $resolved = (Resolve-Path -LiteralPath $entry).Path
-        if (-not (Test-PathExcluded -FullPath $resolved -Patterns $ExcludePath)) {
+        $ext = [System.IO.Path]::GetExtension($resolved)
+        # Filter leaf inputs by extension too — a hook may pass a mixed file list.
+        if (($ext -in '.ps1', '.psm1') -and -not (Test-PathExcluded -FullPath $resolved -Patterns $ExcludePath)) {
             $files.Add($resolved)
         }
     } elseif (Test-Path -LiteralPath $entry -PathType Container) {
@@ -102,7 +105,7 @@ foreach ($entry in $Path) {
                 }
             }
     } else {
-        Write-Error "Path not found: $entry"
+        Write-Error "Path not found: $entry" -ErrorAction Continue
         exit 2
     }
 }
@@ -120,13 +123,13 @@ foreach ($file in $files) {
     # Single-quoted here-string: variables expand in the child from its
     # inherited environment, not here.
     $output = pwsh -NoProfile -NonInteractive -Command @'
-Import-Module PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION -ErrorAction Stop
+Import-Module PSScriptAnalyzer -MinimumVersion $env:PSSA_VERSION -ErrorAction Stop
 Invoke-ScriptAnalyzer -Path $env:PSSA_FILE -Settings $env:PSSA_SETTINGS |
     ForEach-Object { '{0}:{1}:{2} {3} [{4}]' -f $_.ScriptName, $_.Line, $_.Column, $_.Message, $_.RuleName }
 '@
     $childExit = $LASTEXITCODE
     if ($childExit -ne 0) {
-        Write-Error "PSScriptAnalyzer subprocess crashed for ${file} (exit $childExit)."
+        Write-Error "PSScriptAnalyzer subprocess crashed for ${file} (exit $childExit)." -ErrorAction Continue
         exit 2
     }
     if ($output) {
