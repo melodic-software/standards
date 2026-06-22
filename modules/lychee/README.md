@@ -4,8 +4,9 @@ Link checking via [lychee](https://lychee.cli.rs/).
 
 ## Contents
 
-- `lychee.toml` — the ruleset: fragment checking (`include_fragments = "full"`)
-  and repo-agnostic path excludes. Shared by both CI lanes.
+- `lychee.toml` — the ruleset: fragment checking (`include_fragments = "full"`),
+  repo-agnostic path excludes, and URL excludes for the online lane (auth-walled
+  hosts, loopback, placeholders). Shared by both CI lanes.
 
 lychee is a single binary with no runner script. Two CI lanes in `ci-workflows`
 consume this config:
