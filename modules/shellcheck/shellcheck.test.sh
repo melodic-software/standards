@@ -12,6 +12,12 @@ rcfile='modules/shellcheck/.shellcheckrc'
 if ! command -v shellcheck >/dev/null 2>&1; then
   skip_suite 'shellcheck not installed'
 fi
+# --rcfile and the rcfile's optional checks require 0.11.0+; older engines
+# (e.g. the distro shellcheck on some CI images) reject --rcfile outright.
+have="$(shellcheck --version | awk '/^version:/ { print $2 }')"
+if [[ "$(printf '%s\n0.11.0\n' "$have" | sort -V | head -n1)" != "0.11.0" ]]; then
+  skip_suite "shellcheck $have < 0.11.0"
+fi
 
 FAILED=0
 CASE_NUM=0
