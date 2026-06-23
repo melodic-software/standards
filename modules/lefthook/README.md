@@ -50,7 +50,10 @@ config, the per-module fixtures lanes own proving it, these lanes only invoke.
   top-level settings (`min_version`, `assert_lefthook_installed`,
   `glob_matcher: doublestar`, `pre-commit` parallel + skip on merge/rebase).
 - `lefthook-powershell.yml` — opt-in [PowerShell](../powershell/) lane
-  (PSScriptAnalyzer).
+  (PSScriptAnalyzer). It calls `psscriptanalyzer-staged.ps1` via `pwsh -File`
+  rather than an inline `-Command` (a complex inline command is split incorrectly
+  by the shells Lefthook spawns on Windows); the runner resolves the repo-root
+  `PSScriptAnalyzerSettings.psd1` itself and is copied alongside the fragment.
 - `lefthook-python.yml` — opt-in [Python](../python/) lanes (`ruff check`,
   `ruff format --check`).
 - `lefthook-typescript.yml` — opt-in [TypeScript](../typescript/) lane (Biome).
@@ -86,7 +89,8 @@ the EditorConfig checker as `ec` (or `ec-windows-amd64` via winget) rather than
 
 1. Copy `base.yml` (and any overlay fragments for languages you use) into the
    consuming repo at `modules/lefthook/` — `extends` resolves relative to the
-   repo root, so keep this path.
+   repo root, so keep this path. The PowerShell overlay also ships
+   `psscriptanalyzer-staged.ps1`; copy it alongside the fragment, same path.
 2. Author a root `lefthook.yml` that composes them and adds your project scope:
 
    ```yaml
