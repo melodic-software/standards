@@ -1,21 +1,20 @@
 # PowerShell overlay — opt-in. Extend it alongside base.yml from a consumer root
-# that has PowerShell sources and PSScriptAnalyzer installed. The analyzer
-# auto-discovers PSScriptAnalyzerSettings.psd1 from the working directory, which
-# is the repo root where lefthook runs commands — so no -Settings path is needed.
+# that has PowerShell sources and PSScriptAnalyzer installed.
 #
-# This lane inlines a small analyzer loop rather than calling a runner script:
-# the platform's reusable PSScriptAnalyzer runner (per-file subprocess isolation)
-# is owned by the ci-workflows pwsh action and must not be copied here (that would
-# couple a consumer's local hook to ci-workflows). The loop is deliberately
-# minimal — staged-file fast feedback, with CI as the authoritative gate.
+# The lane calls a small module-owned runner via `pwsh -File` rather than an inline
+# `-Command "..."`: a complex inline command is split incorrectly by the shells
+# Lefthook spawns on Windows (nested quoting), whereas a script file invokes
+# portably. The runner resolves the repo-root PSScriptAnalyzerSettings.psd1 itself,
+# so the consumer needs no path here. It stays minimal — it does not copy the
+# ci-workflows pwsh action's reusable runner (that would couple a consumer's local
+# hook to ci-workflows). Fast staged-file feedback; CI is the authoritative gate.
 #
-# Note: the staged-file list is split on whitespace, so paths containing spaces
-# are not supported by this lane (rare for source files; CI scans the full tree).
+# Copy psscriptanalyzer-staged.ps1 alongside this fragment (keep the
+# modules/lefthook/ path, which `extends` resolves from the repo root).
 
 pre-commit:
   commands:
     psscriptanalyzer:
       glob: "**/*.{ps1,psm1,psd1}"
-      run: |
-        pwsh -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $files = '{staged_files}' -split '\s+' | Where-Object { $_ }; $findings = @($files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ }); if ($findings.Count) { $findings | ForEach-Object { $_.ScriptName + ':' + $_.Line + ': ' + $_.RuleName + ' - ' + $_.Message } | Write-Host; exit 1 }"
+      run: pwsh -NoProfile -NonInteractive -File modules/lefthook/psscriptanalyzer-staged.ps1 {staged_files}
       fail_text: "PSScriptAnalyzer findings. Fix them, or suppress a justified rule per the PowerShell module's settings."
