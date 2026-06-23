@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/markdown@e27929e2efb4856d320a96337227486db1e0fa2e # e27929e 2026-06-22
         with:
           globs: '**/*.md !fixtures/*/bad/**'
 
@@ -40,7 +40,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/powershell@e27929e2efb4856d320a96337227486db1e0fa2e # e27929e 2026-06-22
         with:
           exclude: fixtures/powershell/bad
 
@@ -53,7 +53,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@e27929e2efb4856d320a96337227486db1e0fa2e # e27929e 2026-06-22
         with:
           exclude: fixtures/shellcheck/bad
 
@@ -66,7 +66,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@e27929e2efb4856d320a96337227486db1e0fa2e # e27929e 2026-06-22
         with:
           exclude: 'fixtures/[^/]+/bad'
 
