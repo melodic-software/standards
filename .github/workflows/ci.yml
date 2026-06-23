@@ -416,6 +416,54 @@ jobs:
       - name: Harness self-test
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
+  exec-bit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Verify shebang files are executable
+        uses: melodic-software/ci-workflows/.github/actions/exec-bit@da704fff53a016cc1512fea193a3ff92452052bf # da704ff 2026-06-23
+
+  machine-specific-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Check for machine-specific paths
+        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@da704fff53a016cc1512fea193a3ff92452052bf # da704ff 2026-06-23
+
+  eol-renormalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Check index-level EOL drift
+        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@da704fff53a016cc1512fea193a3ff92452052bf # da704ff 2026-06-23
+
+  comment-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Scan comment hygiene (excludes intentionally-bad fixtures + module)
+        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@04a6dac99d14da48636b627bcb99fd2762619e1a # 04a6dac 2026-06-23
+        with:
+          exclude: ':(exclude)fixtures/*/bad/** :(exclude)modules/comment-hygiene/**'
+      - name: comment-hygiene module fixtures test
+        run: bash harness/shell/run-tests.sh modules/comment-hygiene/comment-hygiene.test.sh
+
   ci-status:
     if: always()
     needs:
@@ -440,6 +488,10 @@ jobs:
       - dotnet-format
       - dotnet-fixtures
       - harness
+      - exec-bit
+      - machine-specific-paths
+      - eol-renormalize
+      - comment-hygiene
       - actionlint
       - zizmor
       - osv-scanner
@@ -470,6 +522,10 @@ jobs:
             ${{ needs.dotnet-format.result }}
             ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.exec-bit.result }}
+            ${{ needs.machine-specific-paths.result }}
+            ${{ needs.eol-renormalize.result }}
+            ${{ needs.comment-hygiene.result }}
             ${{ needs.actionlint.result }}
             ${{ needs.zizmor.result }}
             ${{ needs.osv-scanner.result }}
