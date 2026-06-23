@@ -225,12 +225,43 @@ jobs:
       - name: lychee module fixtures test
         run: bash harness/shell/run-tests.sh modules/lychee/lychee.test.sh
 
-  python:
+  ruff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Lint and format-check Python
+        uses: melodic-software/ci-workflows/.github/actions/ruff@c1e0ebd047810122d3d619c02ab3b211f17f9c9a # c1e0ebd 2026-06-23
+        with:
+          exclude: fixtures/python/bad
+
+  pyright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Type-check Python
+        # The shipped ruleset carries no project-scope `include`, so scope Pyright
+        # at the conforming fixture explicitly (the bad fixture is non-conforming
+        # by design).
+        uses: melodic-software/ci-workflows/.github/actions/pyright@c1e0ebd047810122d3d619c02ab3b211f17f9c9a # c1e0ebd 2026-06-23
+        with:
+          paths: fixtures/python/good
+
+  python-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Pinned inline (no ci-workflows Python action yet), mirroring the other
-      # inline-installed tool lanes. Bump in lockstep with ci-workflows/medley.
+      # Inline install — the fixtures suite asserts specific rule codes fire on
+      # the bad fixture, which needs the tools on PATH (the ruff/pyright actions
+      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
+      # and with medley.
       RUFF_VERSION: 0.15.14
       PYRIGHT_VERSION: 1.1.409
     steps:
@@ -280,7 +311,9 @@ jobs:
       - powershell-fixtures
       - shellcheck-fixtures
       - lychee-fixtures
-      - python
+      - ruff
+      - pyright
+      - python-fixtures
       - harness
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -299,7 +332,9 @@ jobs:
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
             ${{ needs.lychee-fixtures.result }}
-            ${{ needs.python.result }}
+            ${{ needs.ruff.result }}
+            ${{ needs.pyright.result }}
+            ${{ needs.python-fixtures.result }}
             ${{ needs.harness.result }}
         run: |
           for r in $RESULTS; do
