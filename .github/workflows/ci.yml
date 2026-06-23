@@ -464,6 +464,42 @@ jobs:
       - name: comment-hygiene module fixtures test
         run: bash harness/shell/run-tests.sh modules/comment-hygiene/comment-hygiene.test.sh
 
+  lefthook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Put npm bin on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install ShellCheck 0.11.0
+        # The module test drives the shellcheck lane as its representative tool,
+        # so the engine must be on PATH (kept in lockstep with shellcheck-fixtures).
+        run: |
+          set -euo pipefail
+          ver=0.11.0
+          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
+          curl -fsSL "$url" -o shellcheck.tar.gz
+          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
+          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
+          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
+          shellcheck --version
+      - name: Validate the merged hook config (root + all fragments)
+        run: lefthook validate
+      - name: lefthook module test (hooks fire and skip correctly)
+        run: bash harness/shell/run-tests.sh modules/lefthook/lefthook.test.sh
+
   ci-status:
     if: always()
     needs:
@@ -488,6 +524,7 @@ jobs:
       - dotnet-format
       - dotnet-fixtures
       - harness
+      - lefthook
       - exec-bit
       - machine-specific-paths
       - eol-renormalize
@@ -522,6 +559,7 @@ jobs:
             ${{ needs.dotnet-format.result }}
             ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.lefthook.result }}
             ${{ needs.exec-bit.result }}
             ${{ needs.machine-specific-paths.result }}
             ${{ needs.eol-renormalize.result }}

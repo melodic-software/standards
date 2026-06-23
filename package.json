@@ -8,10 +8,12 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "lefthook": "2.1.9",
     "markdownlint-cli2": "0.22.1"
   },
   "scripts": {
-    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\""
+    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\"",
+    "lint:hooks": "lefthook validate"
   },
   "overrides": {
     "markdownlint-cli2": {

@@ -27,14 +27,15 @@ A catalog you migrate *from*, organized by module — not a clone-and-go templat
 ```text
 standards/
   .editorconfig .gitattributes .gitignore   # copy-only configs, canonical at root
+  lefthook.yml                               # dogfood root hook config (extends the lefthook module fragments)
   modules/                                   # path-pointed configs, copied to consumers (one dir per tool)
     markdown/ powershell/ editorconfig/      # editorconfig/ holds the checker config; rules live at root
     typos/ gitleaks/ shellcheck/ lychee/     # scanner modules
     dotnet/ python/ typescript/              # language overlays
+    lefthook/                                # local git-hook fragments (base + per-language overlays), composed via extends
   harness/         # shell-test runner + shared test lib
   fixtures/        # good/bad samples per module (the test inputs)
   .github/workflows/   # dogfood CI: jobs that use the ci-workflows composite actions (execution lives there, not here)
-  hooks/           # future: Lefthook lanes
   conventions/     # future: decoupled prose (review criteria + engineering standards)
   docs/            # this plan + ADRs
 ```
@@ -64,7 +65,7 @@ Create the repo (done); commit this plan; port the harness (`tools/lint`, `tools
 ### Phase 2 — Base hygiene
 
 - **Copy-only hygiene configs (done):** `.editorconfig`, `.gitattributes`, `.gitignore` canonical at root, plus the `editorconfig/` checker module + CI lane. `.gitattributes` is the single authority for line endings — `.ps1`/`.psm1`/`.psd1` pinned `lf` (verified to run on PowerShell 7 and Windows PowerShell 5.1), `.cmd`/`.bat` pinned `crlf`; editorconfig `end_of_line` is an editor hint and the checker's end-of-line check is disabled.
-- **Referenceable scanner modules (done):** typos, gitleaks (`--config`), shellcheck, and lychee — each a vertical slice like markdown/powershell. The base Lefthook lane and remaining base CI remain.
+- **Referenceable scanner modules (done):** typos, gitleaks (`--config`), shellcheck, and lychee — each a vertical slice like markdown/powershell. Local git hooks (Lefthook) land in Phase 3.
 - **Deferred:** `.dockerignore` and `.npmrc` placement — pick up with the relevant overlay (containers, Node) rather than the agnostic base.
 
 ### Phase 3 — Overlays plus remaining CI and hooks
@@ -74,6 +75,7 @@ Create the repo (done); commit this plan; port the harness (`tools/lint`, `tools
 - **Python overlay (done):** `modules/python/` carries strict, re-derived `ruff.toml` (lint + format) and `pyrightconfig.json` (type-checking, ruleset-only — project-scope keys are consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane (standards has no `.py` source, so there is no self-lint). Ruff and Pyright are split so they never double-report: Ruff owns unused-symbol findings, Pyright owns types. Execution now lives in `ci-workflows` as the `ruff` and `pyright` composite actions (referenced by SHA): the self-lint `ruff` and `pyright` lanes consume them, while a `python-fixtures` lane keeps installing pinned engines inline because its rule-code assertions need the tools on `PATH`.
 - **TypeScript overlay (done):** `modules/typescript/` carries strict, re-derived `biome.json` (lint + format, `root: false` so it loads from a nested path) and `tsconfig.json` (type-checking ruleset-only — project-scope and runtime-floor keys are consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane. Biome and `tsc` are split so they never double-report: Biome owns lint + format + import sorting (and unused-symbol findings), `tsc` owns types. Execution lives in `ci-workflows` as the `biome` and `tsc` composite actions (referenced by SHA): the self-lint `biome` and `tsc` lanes consume them, while a `typescript-fixtures` lane installs pinned engines inline because its rule/error-code assertions need the tools on `PATH`.
 - **.NET overlay (done):** `modules/dotnet/` carries a strict, re-derived `Directory.Build.props` (the MSBuild posture: `Nullable`, `EnableNETAnalyzers` + `AnalysisMode=All`, `EnforceCodeStyleInBuild`, `TreatWarningsAsErrors`) and `dotnet.globalconfig` (code-style severities; ruleset-only — `TargetFramework`/`LangVersion` stay consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane. Analysis is first-party only — the analyzers ship in the SDK, so there are no analyzer `PackageReference`s and no NuGet manifest. The build and `dotnet format` are split so they never double-report: the build owns code-quality (CAxxxx) + code-style (IDExxxx) + nullable, `dotnet format whitespace` owns whitespace. Execution lives in `ci-workflows` as the `dotnet-build` and `dotnet-format` composite actions (referenced by SHA): the self-lint lanes consume them, while a `dotnet-fixtures` lane installs the pinned SDK inline because its rule-code assertions need the toolchain on `PATH`.
+- **Lefthook hooks (done):** `modules/lefthook/` carries a strict, re-derived `base.yml` (cross-cutting hygiene lanes — typos, gitleaks, editorconfig, shellcheck, markdownlint) plus opt-in per-language overlay fragments (powershell, python, typescript, dotnet) + a behavioral `*.test.sh`. Distribution stays decoupled and *config-only* in keeping with the no-runtime-coupling principle: hooks are **copied** and composed via Lefthook's `extends:` from a consumer's own root `lefthook.yml` (the open/closed extensibility point), never pulled at hook-run time via `remotes:` (which is a live clone of this repo — the coupling the platform forbids). Lanes are check-only and path-free — each invokes a tool and lets it auto-discover its standards config from the repo root, so the hooks reference the existing `modules/*` rulesets rather than forking or re-configuring them (single owner: the module owns the config, the fixtures lanes own proving it, the hook only invokes). Type-checkers (Pyright, `tsc`) and the .NET analyzer build stay CI-only — they need whole-project context and would double-report against their CI lanes. No `ci-workflows` action is warranted: Lefthook is local-dev tooling, and the only CI use (a `lefthook validate` + behavioral-test lane) runs inline here against a pinned `lefthook` npm devDependency. standards dogfoods via a root `lefthook.yml` that `extends` every fragment.
 
 ### Phase 4 — Prose
 
