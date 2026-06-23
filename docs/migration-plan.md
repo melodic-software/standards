@@ -16,9 +16,9 @@ The standard is delivered by a small repo family, each owning one concern with o
 
 - **`standards`** (this repo) — source of truth for code-quality **config** (linter/analyzer rulesets) + fixtures + dogfood CI. Adopted by *copy*. No runtime coupling to it.
 - **`ci-workflows`** — configurable CI **execution**: composite actions that install and run each tool, bundling any runner script (such as `Invoke-Pssa.ps1`) alongside the action. Consumed by reference from a consumer job (`uses: melodic-software/ci-workflows/.github/actions/<tool>@<sha>`), SHA-pinned and kept current by Dependabot (reviewed PRs, never auto-merged). A composite action is pulled cross-repo via GitHub's scoped, read-only installation token — distinct from the caller's repo-scoped `GITHUB_TOKEN` — so `ci-workflows` stays private with no PAT, and the action's bundled script is reached via `$GITHUB_ACTION_PATH` with no checkout. High churn lives here.
-- **`github-config`** — governance-as-code (org rulesets + custom properties). Its `ci-gate` ruleset *requires* the `ci-status` check.
+- **`github-iac`** — governance as Pulumi (C#) IaC (org rulesets + custom properties). Its `ci-gate` ruleset *requires* the `ci-status` check.
 
-They meet at stable contracts, not by merging: `github-config` requires `ci-status` → each repo produces it via a thin **local `ci-status` gateway job** that `needs:` the per-tool lane jobs (each a checkout plus the referenced composite action) and aggregates their results; kept local so the required-check name stays un-nested → the composite actions run the tools against the consumer's *copied* `standards` config.
+They meet at stable contracts, not by merging: `github-iac` requires `ci-status` → each repo produces it via a thin **local `ci-status` gateway job** that `needs:` the per-tool lane jobs (each a checkout plus the referenced composite action) and aggregates their results; kept local so the required-check name stays un-nested → the composite actions run the tools against the consumer's *copied* `standards` config.
 
 ## Repo shape (modular catalog)
 
