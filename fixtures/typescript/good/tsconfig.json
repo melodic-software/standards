@@ -1,0 +1,4 @@
+{
+  "extends": "../../../modules/typescript/tsconfig.json",
+  "include": ["example.ts"]
+}

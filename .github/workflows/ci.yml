@@ -233,6 +233,38 @@ jobs:
         with:
           paths: fixtures/python/good
 
+  biome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Lint and format-check JS/TS
+        # Biome has no CLI exclude, so scope at the conforming fixture (the repo
+        # carries no other JS/TS source; the bad fixture is non-conforming by
+        # design).
+        uses: melodic-software/ci-workflows/.github/actions/biome@01b34dc9c32a50b2e0314f74af958217107f3b27 # 01b34dc 2026-06-23
+        with:
+          paths: fixtures/typescript/good
+
+  tsc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Type-check TypeScript
+        # The shipped ruleset carries no project-scope `include`, so point tsc at
+        # the conforming fixture's project, which extends the base and supplies
+        # `include` (the bad fixture is non-conforming by design).
+        uses: melodic-software/ci-workflows/.github/actions/tsc@01b34dc9c32a50b2e0314f74af958217107f3b27 # 01b34dc 2026-06-23
+        with:
+          project: fixtures/typescript/good/tsconfig.json
+
   python-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -265,6 +297,34 @@ jobs:
       - name: python module fixtures test
         run: bash harness/shell/run-tests.sh modules/python/python.test.sh
 
+  typescript-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Inline install — the fixtures suite asserts specific rule/error codes on
+      # the bad fixture, which needs the tools on PATH (the biome/tsc actions
+      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
+      # and with medley.
+      BIOME_VERSION: 2.5.1
+      TYPESCRIPT_VERSION: 6.0.3
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+      - name: Install biome and tsc
+        run: npm install -g "@biomejs/biome@${BIOME_VERSION}" "typescript@${TYPESCRIPT_VERSION}"
+      - name: Verify toolchain
+        run: |
+          biome --version
+          tsc --version
+      - name: typescript module fixtures test
+        run: bash harness/shell/run-tests.sh modules/typescript/typescript.test.sh
+
   harness:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -293,6 +353,9 @@ jobs:
       - ruff
       - pyright
       - python-fixtures
+      - biome
+      - tsc
+      - typescript-fixtures
       - harness
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -314,6 +377,9 @@ jobs:
             ${{ needs.ruff.result }}
             ${{ needs.pyright.result }}
             ${{ needs.python-fixtures.result }}
+            ${{ needs.biome.result }}
+            ${{ needs.tsc.result }}
+            ${{ needs.typescript-fixtures.result }}
             ${{ needs.harness.result }}
         run: |
           for r in $RESULTS; do
