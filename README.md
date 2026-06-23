@@ -14,7 +14,7 @@ Configs sort into two channels by how the tool finds them:
 - `modules/lefthook/` — **local git hooks** (Lefthook): copy-and-`extends` fragments that run the same standardized tools as fast, staged-only pre-commit checks; a consumer's own root `lefthook.yml` composes them
 - `harness/` — the shell test runner the modules rely on
 - `fixtures/` — good/bad samples that prove each module behaves
-- `conventions/` — prose standards and review criteria that tooling cannot enforce (future)
+- `conventions/` — **prose standards tooling cannot enforce**: engineering conventions and code-review criteria. The reasoning-only counterpart to the modules; adopted by copy or pointer, with no runtime coupling
 - `docs/` — the migration plan and decision records
 
 ## What does not live here
@@ -25,4 +25,4 @@ Configs sort into two channels by how the tool finds them:
 
 ## Status
 
-Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker), **typos** (spell checking), **gitleaks** (secret scanning), **shellcheck** (shell-script analysis), **lychee** (offline link/anchor integrity), the **.NET / Python / TypeScript** overlays, and **local git hooks** (Lefthook).
+Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker), **typos** (spell checking), **gitleaks** (secret scanning), **shellcheck** (shell-script analysis), **lychee** (offline link/anchor integrity), the **.NET / Python / TypeScript** overlays, **local git hooks** (Lefthook), and the **conventions** prose (engineering conventions + code-review criteria).
