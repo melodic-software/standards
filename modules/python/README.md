@@ -22,9 +22,10 @@ which it can autofix), Pyright owns type correctness.
     the single owner of unused-symbol findings.
   - It carries **no project-scope keys** — see adoption below.
 
-Neither tool ships a runner here; the CI lane that installs pinned engines and
-runs them lives in the `ci-workflows` repo (execution). For Pyright, run it with
-`--warnings` there so even residual warnings fail the build.
+Neither tool ships a runner here; the CI lanes that install pinned engines and
+run them live in the `ci-workflows` repo (execution) as the `ruff` and `pyright`
+composite actions. Pyright runs there with `--warnings` so even residual warnings
+fail the build.
 
 ## Engine
 
@@ -40,7 +41,7 @@ base is correct for any Python floor.
 1. **Ruff** — copy `ruff.toml` to the consuming repo's root (canonical home
    `modules/python/`). Extend it with `extend = "ruff.toml"` + `extend-select`;
    do not use `select`, which replaces the inherited list rather than adding to
-   it. Reference the `ci-workflows` Python action from CI.
+   it. Reference the `ci-workflows` `ruff` and `pyright` actions from CI.
 2. **Pyright** — copy `pyrightconfig.json` to the consuming repo's root, then add
    the project-scope keys the base omits:
    - `include` — the source roots to check, e.g. `["src", "tests", "tools"]`.
