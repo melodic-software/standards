@@ -20,8 +20,8 @@ keys on.
 | Repo | Stack | Workflows | Consumes | Gate | standards configs | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `melodic/standards` | multi (configs) | 2 | ✅ full | ✅ inline | full (`modules/`) | **Integrated** — model consumer; all lanes incl. Phase 3 hygiene |
-| `melodic/ci-workflows` | platform | 4 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
-| `melodic/medley` | .NET + polyglot | 26 | ❌ all inline | ✅ | full | **Harvest source** → Phase 6 cutover |
+| `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
+| `melodic/medley` | .NET + polyglot | 27 | ◐ `claude-review` | ✅ | full | **Harvest source** → Phase 6 cutover (first reference adopted: `claude-review`) |
 | `melodic/claude-code-plugins` | markdown + JSON | 0 | ❌ | ❌ | `.gitattributes` only | **Greenfield** — bundle candidate (D3) |
 | `melodic/github-iac` | C# (Pulumi) | 1 (`deploy.yml`) | ❌ | ❌ | none | **Bare** — no quality CI |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 1 (`deploy.yml`) | ❌ | ❌ | none | **Bare** — no quality CI |
@@ -57,7 +57,10 @@ gateway job aggregating its lanes (D2).
   opinionated quality bundle (D3), built from the granular units.
 - **`medley`** — Phase 6 cutover: replace each overlapping inline lane with a
   SHA-pinned reference, lane-by-lane, verifying `ci-status` parity. Repo-specific
-  lanes stay local. Tracked in [plan.md](plan.md) Phase 6.
+  lanes stay local. Tracked in [plan.md](plan.md) Phase 6. Already consumes the
+  out-of-band `claude-review` reusable workflow — its first `ci-workflows`
+  reference, with the interactive `@claude` assistant split into a local lane (see
+  [plan.md](plan.md) out-of-band additions).
 
 ## Sequence
 

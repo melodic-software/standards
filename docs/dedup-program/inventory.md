@@ -98,8 +98,12 @@ dependency-review.
 
 ### REPO-SPECIFIC (stays local)
 
-medley: `recurring-issues`, `onboard-drift`, `claude-review`,
-`agent-automation-automerge`, `html-no-remote-fetch`, `tool-version-drift-check`.
+medley: `recurring-issues`, `onboard-drift`, `claude-assistant` (interactive
+`@claude` follow-up), `agent-automation-automerge`, `html-no-remote-fetch`,
+`tool-version-drift-check`. Automated `claude-review` is no longer local — it was
+lifted out-of-band to a `ci-workflows` reusable workflow that medley now consumes
+by SHA-pin (see [plan.md](plan.md)); only the interactive `claude-assistant` lane
+stays repo-specific.
 standards: per-module fixture-assertion lanes.
 
 ## Lift ordering rationale
