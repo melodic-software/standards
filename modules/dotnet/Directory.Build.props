@@ -1,0 +1,47 @@
+<Project>
+  <!--
+    Strict MSBuild posture for the .NET overlay: the switches that turn the
+    Roslyn analyzers and code-style rules into build errors. Copied into a
+    consuming repo (root Directory.Build.props, or imported into an existing
+    one); the consumer supplies project scope (TargetFramework, package
+    versions, layout). The runtime floor is intentionally NOT pinned here — no
+    TargetFramework and no LangVersion — so the base is correct for any
+    consumer's floor (Microsoft discourages LangVersion=latest, and pinning a
+    TFM would couple the ruleset to one runtime).
+
+    Single owner per concern: this file + dotnet.globalconfig make the build the
+    sole owner of code-quality (CAxxxx) and code-style (IDExxxx); `dotnet format
+    whitespace` owns whitespace/layout. The two never double-report.
+  -->
+  <PropertyGroup>
+    <!-- Nullable reference types on; treat the flow-analysis findings as part of
+         the warnings-as-errors posture below. -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- CAxxxx code-quality analyzers (EnableNETAnalyzers defaults true on
+         net5+; set explicitly). AnalysisMode=All is the strictest preset — every
+         rule on as a warning — mirroring the strict baseline the other overlays
+         pick. Consumers relax a context-specific rule (e.g. CA2007, CA1062,
+         CA1303) in their own .globalconfig rather than weakening this base. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisMode>All</AnalysisMode>
+
+    <!-- IDExxxx code-style rules run during build (default off). Their
+         severities live in dotnet.globalconfig. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Warnings-as-errors. Roslyn applies this to compiler AND analyzer (CA +
+         IDE) warnings, so the whole strict surface fails the build. Consumers
+         carve out a justified exception with WarningsNotAsErrors, recorded at
+         the site. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Wire the severity ruleset. GlobalAnalyzerConfigFiles (not
+         EditorConfigFiles) is the item for a renamed global AnalyzerConfig; it
+         must sit next to this file so $(MSBuildThisFileDirectory) resolves it. -->
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)dotnet.globalconfig" />
+  </ItemGroup>
+</Project>

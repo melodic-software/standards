@@ -265,6 +265,35 @@ jobs:
         with:
           project: fixtures/typescript/good/tsconfig.json
 
+  dotnet-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Build .NET (analyzers + code-style as errors)
+        # The shipped base carries no project scope, so scope the build at the
+        # conforming fixture, which imports the base props (the bad fixture is
+        # non-conforming by design).
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@0c00056055483581bd2ce7b64b607f1c1a564918 # 0c00056 2026-06-23
+        with:
+          project: fixtures/dotnet/good/good.csproj
+
+  dotnet-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Verify .NET whitespace
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@0c00056055483581bd2ce7b64b607f1c1a564918 # 0c00056 2026-06-23
+        with:
+          project: fixtures/dotnet/good/good.csproj
+
   actionlint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -353,6 +382,29 @@ jobs:
       - name: typescript module fixtures test
         run: bash harness/shell/run-tests.sh modules/typescript/typescript.test.sh
 
+  dotnet-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Inline install — the fixtures suite asserts specific rule codes fire on
+      # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
+      # actions only pass/fail). Keep in lockstep with the action defaults in
+      # ci-workflows and with medley.
+      DOTNET_VERSION: 10.0.301
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up .NET
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Verify toolchain
+        run: dotnet --version
+      - name: dotnet module fixtures test
+        run: bash harness/shell/run-tests.sh modules/dotnet/dotnet.test.sh
+
   harness:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -384,6 +436,9 @@ jobs:
       - biome
       - tsc
       - typescript-fixtures
+      - dotnet-build
+      - dotnet-format
+      - dotnet-fixtures
       - harness
       - actionlint
       - zizmor
@@ -411,6 +466,9 @@ jobs:
             ${{ needs.biome.result }}
             ${{ needs.tsc.result }}
             ${{ needs.typescript-fixtures.result }}
+            ${{ needs.dotnet-build.result }}
+            ${{ needs.dotnet-format.result }}
+            ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
             ${{ needs.actionlint.result }}
             ${{ needs.zizmor.result }}

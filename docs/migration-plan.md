@@ -30,7 +30,7 @@ standards/
   modules/                                   # path-pointed configs, copied to consumers (one dir per tool)
     markdown/ powershell/ editorconfig/      # editorconfig/ holds the checker config; rules live at root
     typos/ gitleaks/ shellcheck/ lychee/     # scanner modules
-    dotnet/ python/ typescript/              # future language overlays
+    dotnet/ python/ typescript/              # language overlays
   harness/         # shell-test runner + shared test lib
   fixtures/        # good/bad samples per module (the test inputs)
   .github/workflows/   # dogfood CI: jobs that use the ci-workflows composite actions (execution lives there, not here)
@@ -73,7 +73,7 @@ Create the repo (done); commit this plan; port the harness (`tools/lint`, `tools
 
 - **Python overlay (done):** `modules/python/` carries strict, re-derived `ruff.toml` (lint + format) and `pyrightconfig.json` (type-checking, ruleset-only — project-scope keys are consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane (standards has no `.py` source, so there is no self-lint). Ruff and Pyright are split so they never double-report: Ruff owns unused-symbol findings, Pyright owns types. Execution now lives in `ci-workflows` as the `ruff` and `pyright` composite actions (referenced by SHA): the self-lint `ruff` and `pyright` lanes consume them, while a `python-fixtures` lane keeps installing pinned engines inline because its rule-code assertions need the tools on `PATH`.
 - **TypeScript overlay (done):** `modules/typescript/` carries strict, re-derived `biome.json` (lint + format, `root: false` so it loads from a nested path) and `tsconfig.json` (type-checking ruleset-only — project-scope and runtime-floor keys are consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane. Biome and `tsc` are split so they never double-report: Biome owns lint + format + import sorting (and unused-symbol findings), `tsc` owns types. Execution lives in `ci-workflows` as the `biome` and `tsc` composite actions (referenced by SHA): the self-lint `biome` and `tsc` lanes consume them, while a `typescript-fixtures` lane installs pinned engines inline because its rule/error-code assertions need the tools on `PATH`.
-- **Remaining overlays:** .NET, same vertical-slice shape.
+- **.NET overlay (done):** `modules/dotnet/` carries a strict, re-derived `Directory.Build.props` (the MSBuild posture: `Nullable`, `EnableNETAnalyzers` + `AnalysisMode=All`, `EnforceCodeStyleInBuild`, `TreatWarningsAsErrors`) and `dotnet.globalconfig` (code-style severities; ruleset-only — `TargetFramework`/`LangVersion` stay consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane. Analysis is first-party only — the analyzers ship in the SDK, so there are no analyzer `PackageReference`s and no NuGet manifest. The build and `dotnet format` are split so they never double-report: the build owns code-quality (CAxxxx) + code-style (IDExxxx) + nullable, `dotnet format whitespace` owns whitespace. Execution lives in `ci-workflows` as the `dotnet-build` and `dotnet-format` composite actions (referenced by SHA): the self-lint lanes consume them, while a `dotnet-fixtures` lane installs the pinned SDK inline because its rule-code assertions need the toolchain on `PATH`.
 
 ### Phase 4 — Prose
 

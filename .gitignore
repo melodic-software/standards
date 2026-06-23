@@ -16,3 +16,7 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# .NET — build output from the dotnet fixtures
+bin/
+obj/

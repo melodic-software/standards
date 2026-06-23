@@ -1,0 +1,82 @@
+# Strict code-style + code-quality severities for the .NET overlay. A global
+# AnalyzerConfig (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/configuration-files):
+# path-independent, so it carries severities/preferences without a directory
+# section the way .editorconfig does. Wired via GlobalAnalyzerConfigFiles in the
+# sibling Directory.Build.props; copied into a consumer alongside that props.
+#
+# Scope split (single owner per concern):
+#   - Code-quality (CAxxxx) is turned on wholesale by AnalysisMode=All in the
+#     props, so individual CA rules are NOT enumerated here.
+#   - This file escalates the high-value code-style (IDExxxx) rules — which
+#     AnalysisMode does not touch — to warning (TreatWarningsAsErrors makes them
+#     errors). It pins the matching style PREFERENCES so the rule knows the
+#     intended form.
+#   - Whitespace/layout is owned by `dotnet format whitespace`; IDE0055 is held
+#     off the build so the two never double-report.
+#
+# Editor keys (indent_size, trim_trailing_whitespace, end_of_line, …) cannot live
+# in a global config — they stay in .editorconfig, which already covers C# via
+# its language-agnostic defaults.
+
+is_global = true
+
+# Whitespace is owned by `dotnet format`; keep the formatting rule off the build.
+dotnet_diagnostic.IDE0055.severity = none
+
+# 'this.'/'Me.' qualification not preferred (modern C#).
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+# Language keyword (int, string) over the framework type name (Int32, String).
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+
+# var only where the type is already apparent from the right-hand side.
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:warning
+
+# Prefer modern expression forms.
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:warning
+dotnet_style_object_initializer = true:warning
+dotnet_style_collection_initializer = true:warning
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_prefer_switch_expression = true:warning
+
+# Braces always; file-scoped namespaces; usings outside the namespace, System first.
+csharp_prefer_braces = true:warning
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Explicit accessibility modifiers; readonly fields where possible.
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+
+# Naming: PascalCase types/interfaces (I-prefixed), _camelCase private fields.
+dotnet_diagnostic.IDE1006.severity = warning
+
+dotnet_naming_rule.interfaces_begin_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_begin_with_i.style = begins_with_i
+dotnet_naming_rule.interfaces_begin_with_i.severity = warning
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.begins_with_i.required_prefix = I
+dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+dotnet_naming_rule.types_pascal.symbols = types
+dotnet_naming_rule.types_pascal.style = pascal
+dotnet_naming_rule.types_pascal.severity = warning
+dotnet_naming_symbols.types.applicable_kinds = class,struct,interface,enum
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
