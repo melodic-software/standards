@@ -106,11 +106,13 @@ checkboxes below mirror it.
 
 ## Later — ecosystem lanes (separate decision)
 
-`.NET`, TypeScript, Python, Playwright, CodeQL build/test. Higher per-repo
-configurability and coupling; lift as configurable reusable workflows in a
-dedicated phase once the quality layer is proven. Opt-in by reference, so repos
-that do not use a stack simply never call it. Scope and approach to be planned
-when Phase 6 is underway.
+The lint/format/type-check/build slice already shipped out-of-band as composite
+actions (see Out-of-band additions below); what remains here is the heavier
+`.NET` / TypeScript / Python test + E2E + coverage work plus Playwright and
+CodeQL. Higher per-repo configurability and coupling; lift in a dedicated phase
+once the quality layer is proven. Opt-in by reference, so repos that do not use a
+stack simply never call it. Scope and approach to be planned when Phase 6 is
+underway.
 
 ## Out-of-band additions
 
@@ -128,6 +130,12 @@ history stays accurate.
   not a de-duplication of a copied lane but a new shared platform capability; its
   security rationale and pin/permission rules live with the workflow itself, not
   here.
+- [x] Ecosystem static-analysis composite actions — `ruff` + `pyright` (Python),
+  `biome` + `tsc` (JS/TS), `dotnet-build` + `dotnet-format` (.NET). The
+  lint/format/type-check/build slice of the ecosystem lanes the "Later" section
+  defers, built and dogfooded here ahead of that sequence (each per D1/D4, config
+  supplied by the caller; no `research/` note was filed). The heavier per-stack
+  test / E2E / coverage / security-scan lanes remain future work.
 
 ## Out of scope
 

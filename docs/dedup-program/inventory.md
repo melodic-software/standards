@@ -6,22 +6,28 @@ live repos before acting on any row (they change).
 
 ## What `ci-workflows` provides today
 
-Composite actions: `markdown` (markdownlint-cli2), `powershell` (PSScriptAnalyzer
-via bundled `Invoke-Pssa.ps1`), `shellcheck`, `lychee-offline` (offline
-link/anchor integrity). One reusable workflow: `link-check.yml` (online,
-advisory, scheduled, files a rolling tracking issue).
+Composite actions (19): `markdown`, `shellcheck`, `powershell` (PSScriptAnalyzer
+via bundled `Invoke-Pssa.ps1`); `editorconfig`, `typos`, `gitleaks`; `actionlint`,
+`check-jsonschema`; `lychee-offline` (offline link/anchor integrity); the
+repo-hygiene set `exec-bit`, `machine-specific-paths`, `comment-hygiene`,
+`eol-renormalize`; and the ecosystem static-analysis set `ruff`, `pyright`
+(Python), `biome`, `tsc` (JS/TS), `dotnet-build`, `dotnet-format` (.NET).
+
+Reusable workflows (4): `link-check` (online, advisory, scheduled, files a rolling
+tracking issue), `zizmor` (Actions security lint, advisory), `osv-scanner`
+(dependency vuln scan, advisory, event-split), and `claude-review` (automated PR
+code review, advisory).
 
 ## Consumers
 
 ### standards
 
-Already a model consumer. Its `ci.yml` references the four composite actions and
-its `link-check.yml` is a thin caller of the reusable workflow, all pinned by
-SHA (Dependabot-bumped). It also runs lanes `ci-workflows` does not yet provide,
-all inline today: `editorconfig`, `gitleaks`, `typos`, plus per-module fixture
-tests (which are standards-specific and stay local). Owns the upstream config
-modules (`modules/<tool>/`) for markdown, powershell, editorconfig, typos,
-gitleaks, shellcheck, lychee.
+The model consumer. Its `ci.yml` references nearly every `ci-workflows` composite
+action (18 of 19 — all but `check-jsonschema`) plus the `zizmor` and `osv-scanner`
+reusable workflows, and its `link-check.yml` is a thin caller of the `link-check`
+reusable workflow — all pinned by SHA (Dependabot-bumped). The only lanes that
+stay local are its per-module fixture tests (standards-specific). Owns the
+upstream `modules/<tool>/` config that the config-driven actions consume.
 
 ### claude-code-plugins
 
@@ -30,11 +36,13 @@ quality bundle rather than hand-wired lanes.
 
 ### medley
 
-The largest consumer and the main duplication target. ~40 lanes across ~26
+The largest consumer and the main duplication target. ~40 lanes across ~27
 workflow files, orchestrated by `ci-status.yml` (inline change-detection via
 `git diff` + regex per ecosystem; cross-cutting checks always run). Pins all
-marketplace actions by SHA. Consumes `ci-workflows` for **nothing** today —
-every overlapping lane is reimplemented inline or via a third-party action.
+marketplace actions by SHA. Consumes `ci-workflows` only for the `claude-review`
+reusable workflow today (its first reference); every overlapping **quality** lane
+is still reimplemented inline or via a third-party action — the Phase 6 cutover
+target.
 
 ### Greenfield / bare consumers
 
@@ -95,6 +103,10 @@ Whole-job concerns (→ reusable workflow):
 `.NET` format + OpenAPI-freshness, NuGet lockfile regen, TypeScript (Biome,
 `npm audit`, `tsc`), Python (ruff, pyright, pytest, pip-audit), CodeQL,
 dependency-review.
+
+The lint/format/type-check/build slice of these already shipped out-of-band as
+composite actions (see [plan.md](plan.md) out-of-band additions); only the
+heavier test / E2E / coverage / security-scan lanes here remain future work.
 
 ### REPO-SPECIFIC (stays local)
 
