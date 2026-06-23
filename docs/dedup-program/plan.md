@@ -112,6 +112,23 @@ dedicated phase once the quality layer is proven. Opt-in by reference, so repos
 that do not use a stack simply never call it. Scope and approach to be planned
 when Phase 6 is underway.
 
+## Out-of-band additions
+
+Capabilities added outside the phased sequence above, recorded here so the build
+history stays accurate.
+
+- [x] `claude-review` reusable workflow — automated PR code review wrapping
+  `anthropics/claude-code-action`. A peer of the Phase 2 `zizmor` / `osv-scanner`
+  reusable workflows (a whole-job concern per [D1](architecture.md): job-level
+  `permissions` plus a `secrets` interface, SHA-pinned per D5, org-private
+  consumption per D6). Built and dogfooded here (the repo is its own first
+  caller), then adopted by `medley`, which split its prior single review workflow
+  into a thin caller of this workflow plus a repo-local interactive `@claude`
+  assistant lane. Unlike the [inventory.md](inventory.md) lift targets, this was
+  not a de-duplication of a copied lane but a new shared platform capability; its
+  security rationale and pin/permission rules live with the workflow itself, not
+  here.
+
 ## Out of scope
 
 Repo-specific lanes listed in [inventory.md](inventory.md) stay local. Tool
