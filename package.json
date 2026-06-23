@@ -12,5 +12,11 @@
   },
   "scripts": {
     "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\""
+  },
+  "overrides": {
+    "markdownlint-cli2": {
+      "js-yaml": "^4.2.0",
+      "markdown-it": "^14.2.0"
+    }
   }
 }
