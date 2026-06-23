@@ -76,10 +76,11 @@ set** — the four lanes by SHA-pin, with the **canonical** `comment-hygiene`
 config module landed upstream in `standards` (this repo keeps the vendored copy
 in lockstep). Phase 3 is complete.
 
-Out of band, a `claude-review` reusable workflow (automated PR code review) was
-added as a peer of the Phase 2 `zizmor` / `osv-scanner` reusable workflows,
-dogfooded here and adopted by `medley` — a new shared capability, not a lifted
-duplicate. See [plan.md](plan.md) out-of-band additions.
+Out of band — outside the phased sequence — two capability sets also landed: the
+`claude-review` reusable workflow (automated PR code review, a peer of the
+Phase 2 `zizmor` / `osv-scanner` workflows, dogfooded here and adopted by
+`medley`), and the ecosystem static-analysis composite actions for Python, JS/TS,
+and .NET. Both are recorded under [plan.md](plan.md) out-of-band additions.
 
 Next is constellation onboarding of the greenfield repos (`github-iac` ×2,
 `provisioning`, `claude-code-plugins`), then `medley`'s Phase 6 cutover — tracked
