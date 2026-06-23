@@ -1,0 +1,98 @@
+# Strict shared base for Ruff (linter + formatter). Copied into a consuming
+# repo's root; consumers EXTEND it, they do not edit it in place.
+#
+# Extend in a downstream ruff.toml:
+#   extend = "ruff.toml"          # path to this copied base
+#   [lint]
+#   extend-select = ["PT"]        # ADD rules — never `select`, which REPLACES
+#   [lint.per-file-ignores]
+#   "tests/**" = ["S101"]
+# Ruff does not merge configs: a child `select` replaces the parent's entirely;
+# only `extend` + `extend-select` compose.
+# Ref: https://docs.astral.sh/ruff/configuration/
+
+line-length = 88
+
+# target-version is intentionally omitted: each repo's `requires-python` drives
+# it, so the base stays correct for any consumer's Python floor. Pinning a
+# version here would let `UP` rewrite to syntax newer than a consumer supports.
+# Ref: https://docs.astral.sh/ruff/settings/#target-version
+
+# `fix` is intentionally omitted (defaults to false): the base is check-only.
+# Fix locally with `ruff check --fix`; CI runs plain `ruff check`, which exits
+# non-zero on any finding rather than silently mutating files.
+
+[lint]
+# Preview is scoped to lint (not format) and paired with explicit-preview-rules
+# so only exactly-named preview codes activate — category selectors never sweep
+# in other unstable rules. Required because PLW1514 is a preview rule.
+# Ref: https://docs.astral.sh/ruff/preview/
+preview = true
+explicit-preview-rules = true
+
+select = [
+  "F",        # Pyflakes — correctness
+  "E", "W",   # pycodestyle — style errors/warnings
+  "I",        # isort — import ordering
+  "N",        # pep8-naming
+  "UP",       # pyupgrade — modernize syntax (bounded by requires-python)
+  "B",        # flake8-bugbear — likely bugs
+  "C4",       # flake8-comprehensions
+  "SIM",      # flake8-simplify
+  "PTH",      # flake8-use-pathlib
+  "S",        # flake8-bandit — security
+  "ASYNC",    # flake8-async — blocking calls in async code
+  "DTZ",      # flake8-datetimez — naive datetimes (owns the datetime checks)
+  "ARG",      # flake8-unused-arguments
+  "RET",      # flake8-return
+  "TID",      # flake8-tidy-imports — relative-import + banned-api rules below
+  "PIE",      # flake8-pie — misc anti-patterns
+  "PERF",     # Perflint — performance anti-patterns
+  "LOG",      # flake8-logging
+  "G",        # flake8-logging-format
+  "PLE",      # Pylint errors — high-value, low-noise
+  "PLW1514",  # Pylint: unspecified-encoding on open() (preview)
+  "FIX",      # flake8-fixme — surface TODO/FIXME/HACK markers
+  "ERA",      # eradicate — commented-out code
+  "RUF",      # Ruff-specific rules
+]
+
+ignore = [
+  # The formatter owns line wrapping and may exceed line-length on long
+  # strings/URLs; enforcing E501 would produce unfixable noise.
+  # Ref: https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "E501",
+]
+
+[lint.per-file-ignores]
+# Re-exports in package __init__.py. Native __init__.py F401 handling is still
+# in preview; revisit (prefer explicit `as` / __all__) once it stabilizes.
+"__init__.py" = ["F401"]
+# bandit: asserts and test-only credential fixtures are expected in tests.
+"tests/**" = ["S101", "S105", "S106", "S107"]
+"**/conftest.py" = ["S101"]
+
+[lint.flake8-tidy-imports]
+# Absolute imports are unambiguous and refactor-safe.
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+# os.path / glob are import-level bans complementing the PTH usage-site rules.
+# datetime is deliberately NOT banned here — DTZ owns datetime-awareness and
+# permits the correct tz-aware forms; banning datetime.now would also flag them.
+"os.path".msg = "Use pathlib.Path."
+"glob.glob".msg = "Use pathlib.Path.glob."
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+# Opt-in per consumer (deliberately not in the base — high false-positive rate
+# or context-specific). Add via `[lint] extend-select = [...]`:
+#   PT   — flake8-pytest-style (only when using pytest)
+#   TC   — flake8-type-checking (breaks Pydantic/SQLAlchemy/FastAPI runtime refs)
+#   FBT  — flake8-boolean-trap (conflicts with FastAPI Depends and many APIs)
+#   INP  — flake8-no-pep420 (wrong for PEP 420 namespace packages)
+#   D    — pydocstyle (set [lint.pydocstyle] convention)

@@ -1,6 +1,6 @@
 # Migration plan
 
-Phased plan to populate this repo by extracting the language-agnostic quality tooling from the `melodic-software/medley` sandbox (branch `chore/reset-to-template`), decoupled from medley specifics.
+Phased plan to populate this repo by extracting the language-agnostic quality tooling from the `melodic-software/medley` repo (branch `main`), decoupled from medley specifics. Configs are not ported verbatim — each is re-derived against the tool's official documentation, leaning strict (warnings-as-errors) and consistent across the toolchain.
 
 ## Principles
 
@@ -70,6 +70,9 @@ Create the repo (done); commit this plan; port the harness (`tools/lint`, `tools
 ### Phase 3 — Overlays plus remaining CI and hooks
 
 .NET, Python, TypeScript modules (config + fixtures here); split medley's multi-stack workflows (`shell-lint`, `yaml-ci`, `markdown-ci`, `security-codeql`) into per-lane **composite actions in `ci-workflows`**, and `lefthook.yml` into per-lane pieces. This is the bulk lift-and-shift from medley: harvest each lane, strip medley specifics, parameterize via inputs.
+
+- **Python overlay (done):** `modules/python/` carries strict, re-derived `ruff.toml` (lint + format) and `pyrightconfig.json` (type-checking, ruleset-only — project-scope keys are consumer-supplied) + good/bad fixtures + a fixtures-only dogfood lane (standards has no `.py` source, so there is no self-lint). Ruff and Pyright are split so they never double-report: Ruff owns unused-symbol findings, Pyright owns types. No `ci-workflows` Python action exists yet, so the lane installs pinned engines inline via `uv`; the composite action is the remaining execution work for that repo.
+- **Remaining overlays:** .NET and TypeScript, same vertical-slice shape.
 
 ### Phase 4 — Prose
 
