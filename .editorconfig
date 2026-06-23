@@ -46,6 +46,12 @@ indent_size = 4
 [*.{cmd,bat}]
 end_of_line = crlf
 
+# Git config — git writes (and idiomatically uses) tab indentation under each
+# section, so the space default does not apply. Covers the plain file, gitconfig
+# includes, and chezmoi-style source forms (dot_gitconfig, dot_gitconfig.tmpl).
+[{.gitconfig,*.gitconfig,dot_gitconfig*}]
+indent_style = tab
+
 # Lockfiles — generated; suppress formatting enforcement.
 [{package-lock.json,*.lock}]
 indent_size = unset
