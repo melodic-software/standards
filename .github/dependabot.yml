@@ -14,7 +14,8 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-  # Keep the markdownlint-cli2 dev-dependency (and its schema pin) current.
+  # Keep the npm dev-dependencies current — the markdownlint-cli2 pin (and its
+  # schema overrides) and the lefthook pin that the local git hooks run on.
   - package-ecosystem: npm
     directory: /
     schedule:
