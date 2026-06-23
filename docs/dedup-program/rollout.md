@@ -23,8 +23,8 @@ keys on.
 | `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
 | `melodic/medley` | .NET + polyglot | 27 | ◐ `claude-review` | ✅ | full | **Harvest source** → Phase 6 cutover (first reference adopted: `claude-review`) |
 | `melodic/claude-code-plugins` | markdown + JSON | 0 | ❌ | ❌ | `.gitattributes` only | **Greenfield** — bundle candidate (D3) |
-| `melodic/github-iac` | C# (Pulumi) | 1 (`deploy.yml`) | ❌ | ❌ | none | **Bare** — no quality CI |
-| `kyle-sexton/github-iac` | C# (Pulumi) | 1 (`deploy.yml`) | ❌ | ❌ | none | **Bare** — no quality CI |
+| `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcement pending the `requires-ci` tag (PR #16) |
+| `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
 | `kyle-sexton/provisioning` | PowerShell | 0 | ❌ | ❌ | `.gitattributes` only | **Bare** — no CI |
 
 (`chezmoi` dotfiles live under `~/.local/share/chezmoi`, outside `D:\repos`, and
@@ -42,11 +42,15 @@ gateway job aggregating its lanes (D2).
   `machine-specific-paths`, `eol-renormalize`, `comment-hygiene` by SHA-pin;
   landed the canonical `comment-hygiene` module upstream (`ci-workflows` holds
   the vendored copy). 15 shebang scripts fixed to mode 100755 along the way.
-- **`github-iac` (both org + personal, near-identical C# Pulumi)** — lanes:
-  `dotnet-build`, `dotnet-format`, `editorconfig`, `typos`, `gitleaks`,
-  `actionlint`, `check-jsonschema` (dependabot + workflows), `markdown`, the four
-  hygiene lanes, `zizmor`, `osv-scanner`. Onboard one as the template, then mirror
-  to the other.
+- **`github-iac` (both org + personal, near-identical C# Pulumi)** — **done**: both
+  onboarded all lanes — `dotnet-build`, `dotnet-format`, `editorconfig`, `typos`,
+  `gitleaks`, `actionlint`, `check-jsonschema` (dependabot + workflows), `markdown`,
+  the four hygiene lanes, `zizmor`, `osv-scanner` — into a local `ci-status` gateway,
+  plus Dependabot (7-day cooldown) and the standards configs. The two differ only in
+  config placement: org copies them to the repo root and passes explicit `config`
+  inputs; personal vendors them under `modules/` and relies on the actions' defaults.
+  Personal already self-gates via a per-repo `ci-gate` ruleset; org gate enforcement
+  lands with the `requires-ci` tag (PR #16).
 - **`provisioning` (PowerShell)** — lanes: `powershell` (PSScriptAnalyzer),
   `editorconfig`, `typos`, `gitleaks`, `actionlint`, `markdown`, the four hygiene
   lanes. No `shellcheck` (no `.sh`).
@@ -67,9 +71,9 @@ gateway job aggregating its lanes (D2).
 Onboarding proceeds incrementally; this is the intended order, not a hard gate.
 
 1. ~~**`standards`** Phase 3 adoption~~ — **done** (PR #25).
-2. **`github-iac`** — stand up CI on one as the reusable onboarding template,
-   then apply to the second. ← next
-3. **`provisioning`**.
+2. ~~**`github-iac`** — stand up CI on one as the reusable onboarding template,
+   then apply to the second.~~ — **done** (org gate enforcement: PR #16).
+3. **`provisioning`**. ← next
 4. **`claude-code-plugins`** — greenfield CI, bundle candidate.
 5. **`medley`** Phase 6 cutover (largest; sequenced last).
 

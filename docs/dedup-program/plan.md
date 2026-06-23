@@ -95,7 +95,7 @@ Deploy the blocks across every constellation repo. Per-repo status, recommended
 lanes, and the live sequence are tracked in [rollout.md](rollout.md); the
 checkboxes below mirror it.
 
-- [ ] `github-iac` (org + personal, C# Pulumi): stand up CI from the building
+- [x] `github-iac` (org + personal, C# Pulumi): stand up CI from the building
   blocks; onboard one as the template, then mirror to the other
 - [ ] `provisioning` (PowerShell): stand up CI from the building blocks
 - [ ] claude-code-plugins: stand up CI from the building blocks (greenfield;
