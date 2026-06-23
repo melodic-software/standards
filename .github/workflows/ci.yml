@@ -265,6 +265,34 @@ jobs:
         with:
           project: fixtures/typescript/good/tsconfig.json
 
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Lint workflows
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@62235bb7b77b483459dbc4034982451accabaf92 # 62235bb 2026-06-23
+
+  zizmor:
+    permissions:
+      contents: read
+    # Advisory Actions security lint; findings annotate without blocking.
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@c59411f929120a00fee213797a9e8c9fc2a2031c # c59411f 2026-06-23
+    with:
+      paths: .
+
+  osv-scanner:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    # Advisory dependency vuln scan; reports against package-lock.json without
+    # blocking (fail-on-vuln defaults false).
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@c59411f929120a00fee213797a9e8c9fc2a2031c # c59411f 2026-06-23
+
   python-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -357,6 +385,9 @@ jobs:
       - tsc
       - typescript-fixtures
       - harness
+      - actionlint
+      - zizmor
+      - osv-scanner
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -381,6 +412,9 @@ jobs:
             ${{ needs.tsc.result }}
             ${{ needs.typescript-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.actionlint.result }}
+            ${{ needs.zizmor.result }}
+            ${{ needs.osv-scanner.result }}
         run: |
           for r in $RESULTS; do
             case "$r" in

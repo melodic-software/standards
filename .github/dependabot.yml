@@ -5,12 +5,19 @@ updates:
   # before merge; never auto-merge (a SHA bump is executable CI logic). Bumping
   # the pin to the private ci-workflows repo requires the org-level "Grant
   # Dependabot access to private repositories" setting to include ci-workflows.
+  # Delay version bumps so a compromised or yanked release is caught before we
+  # adopt it; security updates bypass cooldown. Defense-in-depth for the
+  # SHA-rewrite supply-chain risk that motivates SHA-pinning.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   # Keep the markdownlint-cli2 dev-dependency (and its schema pin) current.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
