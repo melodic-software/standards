@@ -225,6 +225,36 @@ jobs:
       - name: lychee module fixtures test
         run: bash harness/shell/run-tests.sh modules/lychee/lychee.test.sh
 
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Pinned inline (no ci-workflows Python action yet), mirroring the other
+      # inline-installed tool lanes. Bump in lockstep with ci-workflows/medley.
+      RUFF_VERSION: 0.15.14
+      PYRIGHT_VERSION: 1.1.409
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+      - name: Install ruff and pyright
+        run: |
+          uv tool install "ruff==${RUFF_VERSION}"
+          uv tool install "pyright==${PYRIGHT_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify toolchain
+        # Also warms pyright's first-run Node download so the test step is fast.
+        run: |
+          ruff --version
+          pyright --version
+      - name: python module fixtures test
+        run: bash harness/shell/run-tests.sh modules/python/python.test.sh
+
   harness:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -250,6 +280,7 @@ jobs:
       - powershell-fixtures
       - shellcheck-fixtures
       - lychee-fixtures
+      - python
       - harness
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -268,6 +299,7 @@ jobs:
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
             ${{ needs.lychee-fixtures.result }}
+            ${{ needs.python.result }}
             ${{ needs.harness.result }}
         run: |
           for r in $RESULTS; do
