@@ -1,10 +1,21 @@
 # comment-hygiene module
 
 Detection policy for the **comment-hygiene** gate: code comments must not carry
-deferred-work markers (`TODO`/`FIXME`/`HACK`/`XXX`) or issue-tracker references
-(`issue`/`fixes`/`closes #N`, `PR #N`). Outstanding work belongs in the issue
-tracker, where it stays visible, not in a comment that rots silently in the
-source.
+deferred-work markers (`TODO`/`FIXME`/`HACK`/`XXX`) or issue-tracker references.
+Outstanding work belongs in the issue tracker, where it stays visible, not in a
+comment that rots silently in the source.
+
+Tracker references caught: `cc-issue`; GitHub closing keywords paired with a
+number (`fix`/`fixes`/`fixed`, `close`/`closes`/`closed`, `resolve`/`resolves`/
+`resolved` + `#N`); `issue`/`issues`/`tracked #N`; `owner/repo#N`; `GH-N`; and
+`PR #N`. Comment lines are recognized by `//`, `#`, `/*`, `*` (block
+continuation), and `<!--` prefixes.
+
+Closing keywords require the `#` (so "fix 3 bugs" stays clean), and Jira-style
+`PROJ-123` keys are intentionally **not** matched — the bare letters-number
+shape collides with technical tokens (`UTF-8`, `SHA-256`, `ISO-8601`,
+`RFC-2119`, `CVE-2025-…`, `P-256`) that POSIX ERE cannot exclude. Jira matching
+is deferred until a Jira-using consumer supplies an explicit project-key list.
 
 ## Why the split
 
