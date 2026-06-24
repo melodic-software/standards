@@ -75,40 +75,44 @@ config (new `standards` modules where a ruleset is involved).
 Extend existing actions / add siblings so medley loses no coverage when it
 switches markdown/shell/powershell/lychee to references.
 
-> **Status (2026-06-24):** medley's Phase 6 cutover ran under **option b** — cut
-> over every lane with a working equivalent now, leave the rest inline (no
-> coverage lost, `ci-status` green). Phase 4 was **not** built first, so the gap
-> blocks below stay inline in medley. They are all single-consumer (medley-only)
-> today; trigger to build: a second consumer needs the block, or an explicit
-> decision to fully collapse medley's inline CI. Building these **plus** the
-> action enhancements surfaced by the cutover (below) is what a future
-> *lossless-by-reference* medley cutover requires.
+> **Status (2026-06-24):** medley's first cutover wave ran under **option b** —
+> cut over every lane with a working equivalent, leave the rest inline (no
+> coverage lost, `ci-status` green; PRs #1156–#1160). The **action enhancements**
+> the parity-gap lanes needed were then built (`ci-workflows` #25–#28) and medley
+> ran a **second wave** consuming them — six more lanes cut over by reference
+> (PR #1161; see [rollout.md](rollout.md)). The remaining unbuilt **gap blocks**
+> below (no `ci-workflows` equivalent yet) stay inline in medley; they are
+> single-consumer (medley-only) today, the trigger to build being a second
+> consumer or an explicit decision to fully collapse medley's inline CI.
 
-Gap blocks (not built):
+Gap blocks:
 
-- [ ] `shfmt` (own composite action, or optional step on a shell action — decide
-  during research)
+- [x] `shfmt` composite action (`ci-workflows` #25) — own action; medley's bash
+  lane adopted it in the second wave (#1161)
 - [ ] `reference-integrity` heading-cite resolver (pairs with `lychee-offline`)
 - [ ] `Pester` reusable workflow (Windows runner)
 - [ ] `skill-governance` reusable workflow (path inputs)
 
-Action parity/strictness gaps surfaced by the medley cutover — each keeps one
-medley lane inline because the action cannot yet match the repo's tuned lane:
+Action parity/strictness gaps surfaced by the first cutover wave — each kept a
+medley lane inline because the action could not match the repo's tuned lane. Most
+are now built (`ci-workflows` #25–#28) and consumed by medley's second wave
+(#1161); the rest stay deferred:
 
-- [ ] `editorconfig`: default `paths: .` makes editorconfig-checker do a raw
-  filesystem walk that gates generated artifacts (no-final-newline:
-  `.lycheecache`, `.work/<slug>/baselines/*`) which git-aware discovery (`ec`
-  with no path) skips. Add a git-aware mode or default `paths` to empty.
-- [ ] `shellcheck`: no severity input. medley runs `-S warning`; the action runs
-  default `style` (stricter). Add a `severity` input.
-- [ ] `pyright`: forces `--warnings` (warnings-as-errors). medley runs bare
-  strict-mode pyright (tolerates `reportMissingTypeStubs: "warning"`). Add a
-  toggle to not force `--warnings`.
+- [x] `editorconfig`: now defaults to git-tracked discovery (`ec` with no path),
+  so generated artifacts that a raw filesystem walk would gate (no-final-newline:
+  `.lycheecache`, `.work/<slug>/baselines/*`) are skipped (`ci-workflows` #26).
+- [x] `shellcheck`: added a `severity` input (medley runs `-S warning`; the
+  action's default is `style`) (`ci-workflows` #25).
+- [x] `pyright`: added a `warnings-as-errors` toggle so the lane need not force
+  `--warnings` (medley runs bare strict-mode pyright, tolerating
+  `reportMissingTypeStubs: "warning"`) (`ci-workflows` #25).
 - [ ] `comment-hygiene`: hardcoded coarse prefilter is narrower than medley's
   (misses `cc-issue` / `tracked: #` / `melodic/medley#`). Make it configurable
   or widen it and re-sync the standards SSOT.
-- [ ] `gitleaks`: scans the working tree only (`gitleaks dir`). medley's
-  `secret-scan` scans full history (`gitleaks git`). Add a history-scan mode.
+- [x] `gitleaks`: added a `scan-mode` input (`git` full-history vs `dir`
+  working-tree) plus a `redact` input to mask findings; medley's `secret-scan`
+  cut over to `scan-mode: git` + `redact: true` (`ci-workflows` #25 scan-mode,
+  #28 redact).
 - [ ] `lychee-offline` consumption: medley has no `lychee.toml` and the action's
   default `config` path does not exist in a consumer. Ship a sane default or
   document the config a consumer must add.
@@ -116,8 +120,10 @@ medley lane inline because the action cannot yet match the repo's tuned lane:
 Confirmed during the cutover:
 
 - [x] `powershell` action input parity with medley's `Invoke-Pssa.ps1` usage —
-  confirmed (same per-file pattern + settings). Cutover deferred only for the
-  zero-file tripwire guard and the heavy shell lane, not parity.
+  confirmed (same per-file pattern + settings). The zero-file tripwire guard is
+  now a `fail-on-no-files` input and the transient PSScriptAnalyzer #1708 NRE
+  gets an in-action retry (`ci-workflows` #25, #27); medley's PowerShell lane cut
+  over with `fail-on-no-files: true` in the second wave (#1161).
 - [x] `markdown` action input parity with medley's usage — confirmed (lint lane
   cut over green). `link-check` reusable-workflow parity not yet exercised
   (medley's scheduled docs-link-check and offline lychee stay inline).
@@ -141,8 +147,9 @@ checkboxes below mirror it.
   greenfield consumer)
 - [x] medley: cut over each overlapping inline lane **that has a working
   equivalent** to a SHA-pinned reference, verifying `ci-status` parity
-  lane-by-lane (option b — PRs #1156–#1160, 2026-06-24). Gap/parity lanes stay
-  inline pending the Phase 4 backfill above; details in [rollout.md](rollout.md).
+  lane-by-lane (option b — first wave PRs #1156–#1160, second wave PR #1161,
+  2026-06-24). Remaining gap blocks stay inline pending the unbuilt Phase 4
+  blocks above; details in [rollout.md](rollout.md).
 - [ ] standards: keep current as new blocks land
 
 ## Later — ecosystem lanes (separate decision)
