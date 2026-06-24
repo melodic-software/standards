@@ -320,7 +320,7 @@ jobs:
       security-events: write
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false).
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@c59411f929120a00fee213797a9e8c9fc2a2031c # c59411f 2026-06-23
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@fb60ebeb6ab0907e47a4f8d0c309577252dee218 # fb60ebe 2026-06-24
 
   python-fixtures:
     runs-on: ubuntu-latest
