@@ -21,7 +21,7 @@ keys on.
 | --- | --- | --- | --- | --- | --- | --- |
 | `melodic/standards` | multi (configs) | 2 | ✅ full | ✅ inline | full (`modules/`) | **Integrated** — model consumer; all lanes incl. Phase 3 hygiene |
 | `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
-| `melodic/medley` | .NET + polyglot | 27 | ◐ many | ✅ | full | **Harvest source** — Phase 6 cutover landed for cleanly-referenceable lanes (PRs #1156–#1160); gap/parity lanes stay inline (see note) |
+| `melodic/medley` | .NET + polyglot | 27 | ◐ many | ✅ | full | **Harvest source** — first cutover wave (PRs #1156–#1160) + second wave consuming the new action enhancements (PR #1161); only unbuilt gap blocks stay inline (see note) |
 | `melodic/claude-code-plugins` | markdown + JSON + shell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes incl. shellcheck + advisory zizmor; org `ci-gate` enforcing (requires-ci applied, PR #17) |
 | `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcing (requires-ci applied, PR #16) |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
@@ -70,31 +70,32 @@ gateway job aggregating its lanes (D2).
   it). Org `ci-gate` enforcing via the `requires-ci` custom property (github-iac
   PR #17), which also reconciled `ci-workflows` to its live `public` visibility so
   this public repo can reference it.
-- **`medley`** — Phase 6 cutover **landed for the cleanly-referenceable lanes**
-  (PRs #1156–#1160, 2026-06-24), per the **option-b** decision: cut over every
-  lane that has a working `ci-workflows` equivalent now and leave the rest inline
-  — no coverage lost, `ci-status` green throughout (the cutover is lossless in
-  coverage, not lossless-by-reference). Cut over: `typos`, `actionlint`,
-  `check-jsonschema`, `eol-renormalize`, `exec-bit`, `machine-specific-paths`,
-  `markdown` (lint), `ruff`, plus advisory `zizmor` + `osv-scanner` (reusable
-  workflows). Also re-synced `.editorconfig-checker.json` `Version` to `""` (the
-  standards canonical). The `claude-review` reusable workflow and the interactive
-  `@claude` lane were adopted/split out-of-band earlier.
-  **Still inline (coverage preserved):** the four Phase-4 gap blocks not built
-  under option b (`shfmt`, `reference-integrity` heading-cite, `skill-governance`,
-  `Pester`), plus lanes blocked by `ci-workflows` action parity/strictness gaps —
-  `editorconfig-check` (the action's `paths` filesystem walk gates generated
-  artifacts the repo excludes; the `eol-renormalize` half did cut over),
-  `shellcheck` (no severity input vs medley's `-S warning`), `pyright` (forces
-  `--warnings` vs medley's tolerated `reportMissingTypeStubs`), `comment-hygiene`
-  (coarse prefilter narrower than medley's), `secret-scan`/`gitleaks`
-  (working-tree-only vs medley's full-history scan), `powershell` (cuttable but
-  bundled in the shell lane with `shellcheck`), `typescript` (biome + tsc need the
-  monorepo `node_modules`), and `dotnet` (build too customized; `dotnet-format`
-  would narrow scope). Repo-specific lanes (the `ci-status` gateway, automerge
-  bots, issue labeling, recurring issues, CodeQL, dependency-review, E2E, visual,
-  drift detectors) stay local by design. The action enhancements the parity-gap
-  lanes need are tracked in [plan.md](plan.md) Phase 4.
+- **`medley`** — cut over in **two waves** (2026-06-24), per the **option-b**
+  decision: cut over every lane with a working `ci-workflows` equivalent and
+  leave the rest inline — no coverage lost, `ci-status` green throughout.
+  **First wave** (PRs #1156–#1160): `typos`, `actionlint`, `check-jsonschema`,
+  `eol-renormalize`, `exec-bit`, `machine-specific-paths`, `markdown` (lint),
+  `ruff`, plus advisory `zizmor` + `osv-scanner` (reusable workflows); also
+  re-synced `.editorconfig-checker.json` `Version` to `""` (the standards
+  canonical). **Second wave** (PR #1161): the six lanes the first wave had left
+  inline behind action parity/strictness gaps, now consuming the enhancements
+  built in `ci-workflows` #25–#28 — `editorconfig-check` (git-tracked discovery,
+  #26; the `eol-renormalize` half had cut over in the first wave), `shellcheck`
+  (`severity: warning`, #25), `shfmt` (new action, #25), `powershell` PSSA
+  (`fail-on-no-files: true` + the transient #1708 retry, #25/#27),
+  `secret-scan`/`gitleaks` (`scan-mode: git` + `redact: true`, #25/#28), and
+  `pyright` (`warnings-as-errors: false`, #25). Versions are inherited
+  (platform-owns convention). The `claude-review` reusable workflow and the
+  interactive `@claude` lane were adopted/split out-of-band earlier.
+  **Still inline (coverage preserved):** the unbuilt Phase-4 gap blocks
+  (`reference-integrity` heading-cite, `skill-governance`, `Pester`),
+  `comment-hygiene` (the action's coarse prefilter is still narrower than
+  medley's — deferred), `typescript` (biome + tsc need the monorepo
+  `node_modules`), and `dotnet` (build too customized; `dotnet-format` would
+  narrow scope). Repo-specific lanes (the `ci-status` gateway, automerge bots,
+  issue labeling, recurring issues, CodeQL, dependency-review, E2E, visual, drift
+  detectors) stay local by design. The remaining unbuilt blocks are tracked in
+  [plan.md](plan.md) Phase 4.
 
 ## Sequence
 
@@ -106,9 +107,10 @@ Onboarding proceeds incrementally; this is the intended order, not a hard gate.
 3. ~~**`provisioning`**~~ — **done** (self-gated via per-repo `ci-gate` ruleset).
 4. ~~**`claude-code-plugins`** — greenfield CI, bundle candidate~~ — **done**
    (PR #4; org `ci-gate` enforcing via github-iac PR #17).
-5. ~~**`medley`** Phase 6 cutover (largest; sequenced last).~~ — **done for the
-   cleanly-referenceable lanes** (PRs #1156–#1160); gap/parity lanes stay inline
-   (see the `medley` note above + [plan.md](plan.md) Phase 4).
+5. ~~**`medley`** Phase 6 cutover (largest; sequenced last).~~ — **done** in two
+   waves: cleanly-referenceable lanes (PRs #1156–#1160) + the parity-gap lanes
+   consuming `ci-workflows` #25–#28 (PR #1161). Only the unbuilt gap blocks stay
+   inline (see the `medley` note above + [plan.md](plan.md) Phase 4).
 
 Each is its own sizeable PR, dogfooded green before merge. Governance reminder:
 once a repo emits `ci-status` and is tagged `requires-ci`, the org `ci-gate`
