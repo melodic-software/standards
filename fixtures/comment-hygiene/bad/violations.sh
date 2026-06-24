@@ -5,5 +5,10 @@
 # FIXME this path is broken
 # resolves issue #42
 # superseded by PR #7
+# cc-issue 17
+# fixes #99
+# tracked: #5
+# see melodic-software/app#123
+# GH-42
 value="bad"
 printf '%s\n' "$value"
