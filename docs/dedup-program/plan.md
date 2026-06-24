@@ -97,7 +97,7 @@ checkboxes below mirror it.
 
 - [x] `github-iac` (org + personal, C# Pulumi): stand up CI from the building
   blocks; onboard one as the template, then mirror to the other
-- [ ] `provisioning` (PowerShell): stand up CI from the building blocks
+- [x] `provisioning` (PowerShell): stand up CI from the building blocks
 - [ ] claude-code-plugins: stand up CI from the building blocks (greenfield;
   candidate for an opinionated bundle per D3)
 - [ ] medley: replace each overlapping inline lane with a SHA-pinned reference,
