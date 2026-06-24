@@ -23,7 +23,7 @@ keys on.
 | `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
 | `melodic/medley` | .NET + polyglot | 27 | ◐ `claude-review` | ✅ | full | **Harvest source** → Phase 6 cutover (first reference adopted: `claude-review`) |
 | `melodic/claude-code-plugins` | markdown + JSON | 0 | ❌ | ❌ | `.gitattributes` only | **Greenfield** — bundle candidate (D3) |
-| `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcement pending the live `pulumi up` apply (requires-ci tag merged, PR #16) |
+| `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcing (requires-ci applied, PR #16) |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
 | `kyle-sexton/provisioning` | PowerShell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all PowerShell-appropriate lanes; self-gated via per-repo `ci-gate` ruleset |
 
@@ -49,8 +49,8 @@ gateway job aggregating its lanes (D2).
   plus Dependabot (7-day cooldown) and the standards configs. The two differ only in
   config placement: org copies them to the repo root and passes explicit `config`
   inputs; personal vendors them under `modules/` and relies on the actions' defaults.
-  Personal already self-gates via a per-repo `ci-gate` ruleset; org gate enforcement
-  lands with the `requires-ci` tag (PR #16).
+  Personal self-gates via a per-repo `ci-gate` ruleset; org now enforces via the
+  `requires-ci` custom property (PR #16, applied).
 - **`provisioning` (PowerShell)** — **done**: onboarded all PowerShell-appropriate
   lanes — `powershell` (PSScriptAnalyzer), `editorconfig`, `typos`, `gitleaks`,
   `actionlint`, `markdown`, `lychee` (offline), the four hygiene lanes — into a
