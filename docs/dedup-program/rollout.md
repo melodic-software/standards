@@ -23,9 +23,9 @@ keys on.
 | `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
 | `melodic/medley` | .NET + polyglot | 27 | ◐ `claude-review` | ✅ | full | **Harvest source** → Phase 6 cutover (first reference adopted: `claude-review`) |
 | `melodic/claude-code-plugins` | markdown + JSON | 0 | ❌ | ❌ | `.gitattributes` only | **Greenfield** — bundle candidate (D3) |
-| `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcement pending the `requires-ci` tag (PR #16) |
+| `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcement pending the live `pulumi up` apply (requires-ci tag merged, PR #16) |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
-| `kyle-sexton/provisioning` | PowerShell | 0 | ❌ | ❌ | `.gitattributes` only | **Bare** — no CI |
+| `kyle-sexton/provisioning` | PowerShell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all PowerShell-appropriate lanes; self-gated via per-repo `ci-gate` ruleset |
 
 (`chezmoi` dotfiles live under `~/.local/share/chezmoi`, outside `D:\repos`, and
 are out of scope here.)
@@ -51,9 +51,11 @@ gateway job aggregating its lanes (D2).
   inputs; personal vendors them under `modules/` and relies on the actions' defaults.
   Personal already self-gates via a per-repo `ci-gate` ruleset; org gate enforcement
   lands with the `requires-ci` tag (PR #16).
-- **`provisioning` (PowerShell)** — lanes: `powershell` (PSScriptAnalyzer),
-  `editorconfig`, `typos`, `gitleaks`, `actionlint`, `markdown`, the four hygiene
-  lanes. No `shellcheck` (no `.sh`).
+- **`provisioning` (PowerShell)** — **done**: onboarded all PowerShell-appropriate
+  lanes — `powershell` (PSScriptAnalyzer), `editorconfig`, `typos`, `gitleaks`,
+  `actionlint`, `markdown`, `lychee` (offline), the four hygiene lanes — into a
+  `ci-status` gateway, plus standards configs at root and Lefthook. No `shellcheck`
+  (no `.sh`). Self-gated via a per-repo `ci-gate` ruleset.
 - **`claude-code-plugins` (greenfield, markdown + plugin JSON today)** — lanes:
   `markdown`, `typos`, `gitleaks`, `editorconfig`, `check-jsonschema` (plugin
   manifests), `actionlint`, the four hygiene lanes, `link-check`. Grows
@@ -73,8 +75,8 @@ Onboarding proceeds incrementally; this is the intended order, not a hard gate.
 1. ~~**`standards`** Phase 3 adoption~~ — **done** (PR #25).
 2. ~~**`github-iac`** — stand up CI on one as the reusable onboarding template,
    then apply to the second.~~ — **done** (org gate enforcement: PR #16).
-3. **`provisioning`**. ← next
-4. **`claude-code-plugins`** — greenfield CI, bundle candidate.
+3. ~~**`provisioning`**~~ — **done** (self-gated via per-repo `ci-gate` ruleset).
+4. **`claude-code-plugins`** — greenfield CI, bundle candidate. ← next
 5. **`medley`** Phase 6 cutover (largest; sequenced last).
 
 Each is its own sizeable PR, dogfooded green before merge. Governance reminder:
