@@ -98,8 +98,9 @@ checkboxes below mirror it.
 - [x] `github-iac` (org + personal, C# Pulumi): stand up CI from the building
   blocks; onboard one as the template, then mirror to the other
 - [x] `provisioning` (PowerShell): stand up CI from the building blocks
-- [ ] claude-code-plugins: stand up CI from the building blocks (greenfield;
-  candidate for an opinionated bundle per D3)
+- [x] claude-code-plugins: stand up CI from the building blocks (greenfield;
+  granular lanes adopted, the D3 opinionated bundle deferred to a second
+  greenfield consumer)
 - [ ] medley: replace each overlapping inline lane with a SHA-pinned reference,
   customizing via inputs; verify `ci-status` parity lane-by-lane
 - [ ] standards: keep current as new blocks land

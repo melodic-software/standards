@@ -22,7 +22,7 @@ keys on.
 | `melodic/standards` | multi (configs) | 2 | ✅ full | ✅ inline | full (`modules/`) | **Integrated** — model consumer; all lanes incl. Phase 3 hygiene |
 | `melodic/ci-workflows` | platform | 6 | self-dogfoods | ✅ inline | full (`modules/`) | **Platform** (this repo) |
 | `melodic/medley` | .NET + polyglot | 27 | ◐ `claude-review` | ✅ | full | **Harvest source** → Phase 6 cutover (first reference adopted: `claude-review`) |
-| `melodic/claude-code-plugins` | markdown + JSON | 0 | ❌ | ❌ | `.gitattributes` only | **Greenfield** — bundle candidate (D3) |
+| `melodic/claude-code-plugins` | markdown + JSON + shell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes incl. shellcheck + advisory zizmor; org `ci-gate` enforcing (requires-ci applied, PR #17) |
 | `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcing (requires-ci applied, PR #16) |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
 | `kyle-sexton/provisioning` | PowerShell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all PowerShell-appropriate lanes; self-gated via per-repo `ci-gate` ruleset |
@@ -56,11 +56,20 @@ gateway job aggregating its lanes (D2).
   `actionlint`, `markdown`, `lychee` (offline), the four hygiene lanes — into a
   `ci-status` gateway, plus standards configs at root and Lefthook. No `shellcheck`
   (no `.sh`). Self-gated via a per-repo `ci-gate` ruleset.
-- **`claude-code-plugins` (greenfield, markdown + plugin JSON today)** — lanes:
-  `markdown`, `typos`, `gitleaks`, `editorconfig`, `check-jsonschema` (plugin
-  manifests), `actionlint`, the four hygiene lanes, `link-check`. Grows
-  `shellcheck`/`biome`/`tsc` as skills/hooks/agents land. Candidate for the
-  opinionated quality bundle (D3), built from the granular units.
+- **`claude-code-plugins` (greenfield, public)** — **done** (PR #4): onboarded
+  `markdown`, `typos`, `gitleaks`, `editorconfig`, `shellcheck`, `actionlint`,
+  `check-jsonschema` (plugin manifests via schemastore + dependabot + workflows),
+  the four hygiene lanes, and advisory `zizmor` into a local `ci-status` gateway,
+  plus scheduled advisory `link-check`, Dependabot (`github-actions`, 7-day
+  cooldown), and the standards configs at root. `shellcheck` was included on day
+  one (not deferred) because the repo already tracks shell hooks; `osv-scanner`
+  was skipped (no dependency lockfiles). Adopting `exec-bit` required dropping a
+  vestigial shebang from the sourced `hook-utils.sh` to match the standards
+  sourced-library convention. The D3 opinionated bundle was deferred in favour of
+  granular lanes (trigger to build it: a second greenfield consumer to amortise
+  it). Org `ci-gate` enforcing via the `requires-ci` custom property (github-iac
+  PR #17), which also reconciled `ci-workflows` to its live `public` visibility so
+  this public repo can reference it.
 - **`medley`** — Phase 6 cutover: replace each overlapping inline lane with a
   SHA-pinned reference, lane-by-lane, verifying `ci-status` parity. Repo-specific
   lanes stay local. Tracked in [plan.md](plan.md) Phase 6. Already consumes the
@@ -76,8 +85,9 @@ Onboarding proceeds incrementally; this is the intended order, not a hard gate.
 2. ~~**`github-iac`** — stand up CI on one as the reusable onboarding template,
    then apply to the second.~~ — **done** (org gate enforcement: PR #16).
 3. ~~**`provisioning`**~~ — **done** (self-gated via per-repo `ci-gate` ruleset).
-4. **`claude-code-plugins`** — greenfield CI, bundle candidate. ← next
-5. **`medley`** Phase 6 cutover (largest; sequenced last).
+4. ~~**`claude-code-plugins`** — greenfield CI, bundle candidate~~ — **done**
+   (PR #4; org `ci-gate` enforcing via github-iac PR #17).
+5. **`medley`** Phase 6 cutover (largest; sequenced last). ← next
 
 Each is its own sizeable PR, dogfooded green before merge. Governance reminder:
 once a repo emits `ci-status` and is tagged `requires-ci`, the org `ci-gate`

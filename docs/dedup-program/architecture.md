@@ -105,9 +105,16 @@ checkout of the provider needed. Constraints that bound the whole program:
 - There is no per-consumer allow-list; org access exposes the provider to any
   private/internal repo in the org.
 
-Implication: keep `ci-workflows` access set to the org and keep all consumers
-private or internal. This is the basis of the visibility watch-item in the
-[README](README.md).
+Resolution (2026-06-23): the visibility watch-item was resolved by making
+`ci-workflows` **public**, because `claude-code-plugins` (a public consumer)
+must reference it and a public caller can only `uses:` public repos. A public
+provider's actions are universally consumable, so no org-access setting is
+needed and any consumer — public, private, or out-of-org — can reference it.
+The tradeoff accepted: a public `ci-workflows` loses the private-repo blast-radius
+limit, so its hardening (SHA-pinned inner actions, the `claude-review` safe-handling
+rules) carries that weight; see `ci-workflows/CLAUDE.md`. Private providers still
+require the org-access grant and still break for public/out-of-org consumers, so
+the constraints above remain the rule for any provider kept private.
 
 - https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository
 
