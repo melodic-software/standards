@@ -80,18 +80,35 @@ switches markdown/shell/powershell/lychee to references.
 > coverage lost, `ci-status` green; PRs #1156–#1160). The **action enhancements**
 > the parity-gap lanes needed were then built (`ci-workflows` #25–#28) and medley
 > ran a **second wave** consuming them — six more lanes cut over by reference
-> (PR #1161; see [rollout.md](rollout.md)). The remaining unbuilt **gap blocks**
-> below (no `ci-workflows` equivalent yet) stay inline in medley; they are
-> single-consumer (medley-only) today, the trigger to build being a second
-> consumer or an explicit decision to fully collapse medley's inline CI.
+> (PR #1161; see [rollout.md](rollout.md)). A **third wave** then made the
+> explicit decision to collapse medley's remaining inline CI: the gap blocks were
+> built (`reference-integrity` #36/#38, `Pester` #37), `comment-hygiene` was
+> widened (standards #39) + re-synced with a superset prefilter (`ci-workflows`
+> #34/#39), and medley cut over its comment-hygiene, heading-cite, and
+> git-tracked shellcheck/powershell lanes (PR #1167). What remains inline in
+> medley is now inline **by decision**, not for want of a platform block:
+> `skill-governance` (medley-specific contract), the `Pester` job (bespoke
+> runners + a failure-comment a thin reusable workflow cannot host), and
+> `dotnet`/`typescript` (full build+test+coverage+SARIF / monorepo matrix
+> pipelines the single-tool actions cannot host).
 
 Gap blocks:
 
 - [x] `shfmt` composite action (`ci-workflows` #25) — own action; medley's bash
   lane adopted it in the second wave (#1161)
-- [ ] `reference-integrity` heading-cite resolver (pairs with `lychee-offline`)
-- [ ] `Pester` reusable workflow (Windows runner)
-- [ ] `skill-governance` reusable workflow (path inputs)
+- [x] `reference-integrity` heading-cite resolver (`ci-workflows` #36; corpus
+  pathspec-glob fix #38) — pairs with `lychee-offline`. medley's heading-cite
+  lane cut over by reference (#1167); the awk core is byte-identical to medley's
+  inline script and the corpus exclusions select the identical 1081-file corpus,
+  so the lift is lossless. The offline-lychee half stays inline.
+- [x] `Pester` reusable workflow (Windows runner) (`ci-workflows` #37) — built and
+  dogfooded (windows runner + pinned Pester + checkout; caller passes a `run`
+  command). medley's Pester job **stays inline by decision**: two custom runners
+  with discovery pre-checks + a `pull-requests: write` failure-comment a thin
+  reusable-workflow-call job cannot host, so a cutover would be lossy for near-zero
+  dedup. Available for a simpler PowerShell consumer.
+- [ ] `skill-governance` reusable workflow (path inputs) — **stays keep-local**:
+  a medley-specific skill-portability contract, deliberately not lifted.
 
 Action parity/strictness gaps surfaced by the first cutover wave — each kept a
 medley lane inline because the action could not match the repo's tuned lane. Most
@@ -106,9 +123,16 @@ are now built (`ci-workflows` #25–#28) and consumed by medley's second wave
 - [x] `pyright`: added a `warnings-as-errors` toggle so the lane need not force
   `--warnings` (medley runs bare strict-mode pyright, tolerating
   `reportMissingTypeStubs: "warning"`) (`ci-workflows` #25).
-- [ ] `comment-hygiene`: hardcoded coarse prefilter is narrower than medley's
-  (misses `cc-issue` / `tracked: #` / `melodic/medley#`). Make it configurable
-  or widen it and re-sync the standards SSOT.
+- [x] `comment-hygiene`: the standards policy validator was widened to the
+  org-default superset — `cc-issue`, `tracked:`, owner/repo#N, the GitHub closing
+  keywords (with `#`), `GH-N`, and `/* * <!--` comment styles (Jira-style
+  deliberately excluded: the bare `LETTERS-NUMBER` shape collides with
+  `UTF-8`/`SHA-256`/`ISO-8601`/`CVE-…` and POSIX ERE cannot exclude them;
+  deferred behind a per-repo project-key list) (standards #39). The vendored copy
+  was re-synced and the coarse prefilter widened to a superset of **any**
+  consumer's policy, including bare closing keywords (`ci-workflows` #34, #39).
+  medley cut its full-tree lane over (#1167), keeping its own policy library and
+  passing its extension + path scoping as inputs.
 - [x] `gitleaks`: added a `scan-mode` input (`git` full-history vs `dir`
   working-tree) plus a `redact` input to mask findings; medley's `secret-scan`
   cut over to `scan-mode: git` + `redact: true` (`ci-workflows` #25 scan-mode,
@@ -167,6 +191,21 @@ underway.
 Capabilities added outside the phased sequence above, recorded here so the build
 history stays accurate.
 
+- [x] **Post-cutover platform follow-ups** (`ci-workflows` #30–#39) — closed the
+  backlog the two-wave medley cutover surfaced: `shellcheck`/`powershell` default
+  to git-tracked discovery (#30, mirroring editorconfig #26); a `tool-version-
+  drift-check` workflow that introspects each action's `version:` default and
+  files a rolling advisory issue when an upstream release lands (#31) — Dependabot
+  cannot track those strings, and README/CLAUDE.md were corrected to say so;
+  `ruff`/`pyright` defaults absorbed to current (#32); inline PR annotations for
+  `typos` (json→`::warning` shim, #33) and `markdown` (a self-contained problem
+  matcher, #35). The `reference-integrity` action carried a corpus-enumeration
+  glob bug fixed in #38, and the `comment-hygiene` prefilter was made a superset
+  of any consumer policy in #39. **Decision recorded:** the `dotnet`/`typescript`
+  input backfills were assessed against medley's live lanes and **not built** —
+  its .NET pipeline (build+test+coverage+SARIF+OpenAPI+Aspire) and TypeScript
+  matrix (per-package `npm ci` + Biome module graph) are far beyond what the
+  single-tool actions express, so speculative inputs were skipped.
 - [x] `claude-review` reusable workflow — automated PR code review wrapping
   `anthropics/claude-code-action`. A peer of the Phase 2 `zizmor` / `osv-scanner`
   reusable workflows (a whole-job concern per [D1](architecture.md): job-level
