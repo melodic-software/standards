@@ -30,6 +30,18 @@ keys on.
 (`chezmoi` dotfiles live under `~/.local/share/chezmoi`, outside `D:\repos`, and
 are out of scope here.)
 
+**Comment-hygiene policy widening — propagated 2026-06-24.** The org-default
+comment-hygiene policy was widened at the `standards` SSOT
+(`modules/comment-hygiene/comment-hygiene-patterns.sh`): it now also flags
+`cc-issue`, GitHub closing-keyword+`#N`, `issue`/`issues`/`tracked`,
+`owner/repo#N` and `GH-N` references, and scans block (`/* *`) and HTML (`<!--`)
+comment lines. No Dependabot covers vendored configs, so the four config-vendoring
+consumers were re-synced byte-identical to the SSOT and re-pinned to current
+`ci-workflows` main (`9567b8b`): `claude-code-plugins` (#9), `github-iac` org
+(#21), `kyle-sexton/github-iac` (#15), `provisioning` (#18). `standards` (SSOT —
+re-pin only, #42) and `medley` (re-pin only, #1169) were brought to the same
+`ci-workflows` SHA. Every repo re-verified clean under the widened policy.
+
 ## Per-repo onboarding scope
 
 Recommended lanes are grounded in each repo's actual tracked file types
