@@ -40,7 +40,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@9780be3d05b30e06dd6e5b038ff3c7135c530b36 # 9780be3 2026-06-22
+        uses: melodic-software/ci-workflows/.github/actions/powershell@fb60ebeb6ab0907e47a4f8d0c309577252dee218 # fb60ebe 2026-06-24
         with:
           exclude: fixtures/powershell/bad
 
