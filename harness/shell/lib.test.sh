@@ -61,7 +61,7 @@ assert_contains "require_min_version skips when have < min" "$out" "SKIP:"
 out="$(require_min_version tool 1.9.0 1.10.0 2>&1)"
 assert_contains "require_min_version compares by version, not lexically" "$out" "SKIP:"
 out="$(require_min_version tool "" 1.0.0 2>&1)"; rc=$?
-assert_contains "require_min_version errors on an unparseable (empty) version" "$out" "ERROR:"
+assert_contains "require_min_version errors on an unparsable (empty) version" "$out" "ERROR:"
 assert_nonzero "require_min_version exits non-zero on an empty version" "$rc"
 out="$(require_min_version tool nightly 1.0.0 2>&1)"; rc=$?
 assert_contains "require_min_version errors on a non-numeric version token" "$out" "ERROR:"

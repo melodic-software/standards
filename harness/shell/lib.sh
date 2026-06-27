@@ -68,9 +68,9 @@ require_min_version() {
   # <have> must look like a version (lead with a digit). Empty or a non-version
   # token means the caller's --version parse broke — a harness defect, not an
   # environmental skip — so fail loudly rather than let `sort -V` order garbage
-  # and silently mis-gate or drop the suite.
+  # and silently gate on the wrong version or drop the suite.
   if [[ ! "$have" =~ ^[0-9] ]]; then
-    printf 'ERROR: %s reported an unparseable version: %q (fix the --version parse)\n' "$label" "$have" >&2
+    printf 'ERROR: %s reported an unparsable version: %q (fix the --version parse)\n' "$label" "$have" >&2
     exit 1
   fi
   if [[ "$(printf '%s\n%s\n' "$have" "$min" | sort -V | head -n1)" != "$min" ]]; then
