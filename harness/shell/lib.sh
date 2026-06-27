@@ -58,22 +58,32 @@ skip_case() {
 }
 
 # require_min_version <label> <have> <min> — skip the whole suite when the tool's
-# reported version <have> is below <min>. `sort -V` compares by version semantics
-# (so 1.9 < 1.10), and <label> names the tool in the skip message. An empty <have>
-# means the caller's version-parse broke (the tool's --version format changed):
-# that is a harness defect, not an environmental skip, so fail loudly rather than
-# letting `sort -V` read the empty line as "below min" and silently drop coverage.
+# reported version <have> is below <min> (compared numerically, so 1.9 < 1.10).
+# <label> names the tool in the skip message. An empty or non-version <have> means
+# the caller's version-parse broke (the tool's --version format changed): that is a
+# harness defect, not an environmental skip, so fail loudly rather than silently
+# gating on the wrong version or dropping the suite.
 require_min_version() {
   local label="$1" have="$2" min="$3"
   # <have> must look like a version (lead with a digit). Empty or a non-version
-  # token means the caller's --version parse broke — a harness defect, not an
-  # environmental skip — so fail loudly rather than let `sort -V` order garbage
-  # and silently gate on the wrong version or drop the suite.
+  # token means the caller's --version parse broke — fail loudly (see above).
   if [[ ! "$have" =~ ^[0-9] ]]; then
     printf 'ERROR: %s reported an unparsable version: %q (fix the --version parse)\n' "$label" "$have" >&2
     exit 1
   fi
-  if [[ "$(printf '%s\n%s\n' "$have" "$min" | sort -V | head -n1)" != "$min" ]]; then
+  # Dotted-numeric compare in awk rather than `sort -V`: the version-sort flag is a
+  # GNU extension that BSD/macOS sort lacks, and the self-test exercises this path
+  # unconditionally (no tool gate), so it must run on the macOS system toolchain.
+  if awk -v a="$have" -v b="$min" 'BEGIN {
+    na = split(a, aa, "."); nb = split(b, bb, ".");
+    n = (na > nb) ? na : nb;
+    for (i = 1; i <= n; i++) {
+      x = aa[i] + 0; y = bb[i] + 0;
+      if (x < y) exit 0;   # have < min  -> below
+      if (x > y) exit 1;   # have > min  -> at/above
+    }
+    exit 1;                # equal       -> at/above
+  }'; then
     skip_suite "$label $have < $min"
   fi
 }
