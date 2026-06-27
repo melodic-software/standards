@@ -56,21 +56,26 @@ cat >"$work/scratch.csproj" <<XML
   </PropertyGroup>
 </Project>
 XML
-# All-resolvable usings, System.Text before System — only the import order is
-# wrong, so only the organize-imports gate should fire.
+# A non-System using (Microsoft.* sorts alphabetically BEFORE System) placed
+# before System. Plain alphabetical order would accept this, so flagging it
+# proves System-first specifically — the test still fails if
+# dotnet_sort_system_directives_first is removed, not just on generic sorting.
+# Both namespaces resolve (dotnet format skips files with unresolvable usings),
+# and the types are used so organize-imports cannot drop them as unnecessary.
 cat >"$work/Unsorted.cs" <<'CS'
-using System.Text;
+using Microsoft.Win32.SafeHandles;
 using System;
 
 namespace Scratch;
 
 public static class S
 {
-    public static string Go() => new StringBuilder(string.Empty).ToString();
+    public static string Go(SafeFileHandle? h) => h?.ToString() ?? string.Empty;
+    public static int N() => Environment.ProcessId;
 }
 CS
 cd "$work" || exit 1
 dotnet format style --diagnostics IDE0055 --verify-no-changes >/dev/null 2>&1
-assert_nonzero 'dotnet format style: unsorted usings are flagged' "$?"
+assert_nonzero 'dotnet format style: System-first using order is enforced' "$?"
 
 [[ $FAILED -eq 0 ]] || exit 1
