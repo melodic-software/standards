@@ -5,10 +5,10 @@
 # analyzer (per-file subprocess isolation) lives in the ci-workflows repo and is
 # dogfooded there. Skips cleanly when the engine is absent.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 settings="$root/modules/powershell/PSScriptAnalyzerSettings.psd1"
 
 command -v pwsh >/dev/null 2>&1 || skip_suite 'pwsh not installed'
@@ -35,9 +35,6 @@ run_pssa() {
       if ($findings) { exit 1 } else { exit 0 }
     '
 }
-
-FAILED=0
-CASE_NUM=0
 
 out="$(run_pssa "$root/fixtures/powershell/good/Clean.ps1")"; rc=$?
 assert_exit 'good fixture has no findings' 0 "$rc"
