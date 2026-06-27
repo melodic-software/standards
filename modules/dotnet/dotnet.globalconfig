@@ -30,6 +30,8 @@ dotnet_style_qualification_for_method = false:warning
 dotnet_style_qualification_for_event = false:warning
 
 # Language keyword (int, string) over the framework type name (Int32, String).
+# IDE0049 surfaces this in the IDE only — by design it never fires on build, so
+# this is editor / `dotnet format` guidance, not a build gate.
 dotnet_style_predefined_type_for_locals_parameters_members = true:warning
 dotnet_style_predefined_type_for_member_access = true:warning
 
@@ -47,17 +49,26 @@ csharp_style_pattern_matching_over_is_with_cast_check = true:warning
 csharp_style_pattern_matching_over_as_with_null_check = true:warning
 csharp_style_prefer_switch_expression = true:warning
 
-# Braces always; file-scoped namespaces; usings outside the namespace, System first.
+# Braces always; file-scoped namespaces; usings outside the namespace. These three
+# (IDE0011 / IDE0161 / IDE0065) are build-enforced.
 csharp_prefer_braces = true:warning
 csharp_style_namespace_declarations = file_scoped:warning
 csharp_using_directive_placement = outside_namespace:warning
+# System-first using sort. This is an IDE0055 organize-imports option, but the
+# OrganizeImports pass in `dotnet format` runs regardless of IDE0055's severity,
+# so the CI `dotnet format style --diagnostics IDE0055` lane gates the reorder
+# while IDE0055 stays none (the build still owns IDE/CA; `dotnet format whitespace`
+# still owns whitespace — none of the three double-report).
 dotnet_sort_system_directives_first = true
 
 # Explicit accessibility modifiers; readonly fields where possible.
 dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 dotnet_style_readonly_field = true:warning
 
-# Naming: PascalCase types/interfaces (I-prefixed), _camelCase private fields.
+# Naming: PascalCase types (incl. delegate) + I-prefixed interfaces, PascalCase
+# constants, _camelCase private fields. Build enforcement comes from
+# IDE1006.severity below; the per-rule `.severity` lines are IDE-only display (the
+# compiler ignores them), but are kept so editors surface each rule consistently.
 dotnet_diagnostic.IDE1006.severity = warning
 
 dotnet_naming_rule.interfaces_begin_with_i.symbols = interfaces
@@ -70,8 +81,20 @@ dotnet_naming_style.begins_with_i.capitalization = pascal_case
 dotnet_naming_rule.types_pascal.symbols = types
 dotnet_naming_rule.types_pascal.style = pascal
 dotnet_naming_rule.types_pascal.severity = warning
-dotnet_naming_symbols.types.applicable_kinds = class,struct,interface,enum
+dotnet_naming_symbols.types.applicable_kinds = class,struct,interface,enum,delegate
 dotnet_naming_style.pascal.capitalization = pascal_case
+
+# Constants are PascalCase (Microsoft convention). `const` is implicitly static, so
+# without this more-specific rule the private_fields rule below would force a const
+# to _camelCase. required_modifiers = const makes this rule win by specificity
+# (Roslyn orders naming rules by specificity, not file order); accessibilities = *
+# also covers public/internal const, which otherwise have no rule.
+dotnet_naming_rule.const_pascal.symbols = const_fields
+dotnet_naming_rule.const_pascal.style = pascal
+dotnet_naming_rule.const_pascal.severity = warning
+dotnet_naming_symbols.const_fields.applicable_kinds = field
+dotnet_naming_symbols.const_fields.applicable_accessibilities = *
+dotnet_naming_symbols.const_fields.required_modifiers = const
 
 dotnet_naming_rule.private_fields_underscore.symbols = private_fields
 dotnet_naming_rule.private_fields_underscore.style = underscore_camel

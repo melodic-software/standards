@@ -3,10 +3,10 @@
 # and flags the bad fixture against the repo-root .editorconfig. Skips cleanly
 # when the engine is absent.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 cd "$root" || exit 1
 config='modules/editorconfig/.editorconfig-checker.json'
 
@@ -22,9 +22,6 @@ elif command -v ec-windows-amd64 >/dev/null 2>&1; then
 else
   skip_suite 'editorconfig-checker not installed'
 fi
-
-FAILED=0
-CASE_NUM=0
 
 run_ec -config "$config" fixtures/editorconfig/good >/dev/null 2>&1
 rc=$?

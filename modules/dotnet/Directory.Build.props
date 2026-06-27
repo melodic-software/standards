@@ -20,10 +20,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- CAxxxx code-quality analyzers (EnableNETAnalyzers defaults true on
-         net5+; set explicitly). AnalysisMode=All is the strictest preset — every
-         rule on as a warning — mirroring the strict baseline the other overlays
-         pick. Consumers relax a context-specific rule (e.g. CA2007, CA1062,
-         CA1303) in their own .globalconfig rather than weakening this base. -->
+         net5+; set explicitly). AnalysisMode=All is the strictest preset — nearly
+         every rule on as a warning (a few legacy CA rules and the code-metrics
+         rules stay opt-in even under All) — mirroring the strict baseline the
+         other overlays pick. Consumers relax a context-specific rule (e.g.
+         CA2007, CA1062, CA1303) in their own .globalconfig rather than weakening
+         this base. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisMode>All</AnalysisMode>
 

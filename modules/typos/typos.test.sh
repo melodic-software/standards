@@ -5,19 +5,16 @@
 # block, and the HTML-comment block), so a good->exit-0 result conjunctively
 # proves every directive form still suppresses. Skips when the engine is absent.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 cd "$root" || exit 1
 config='modules/typos/_typos.toml'
 
 if ! command -v typos >/dev/null 2>&1; then
   skip_suite 'typos not installed'
 fi
-
-FAILED=0
-CASE_NUM=0
 
 # typos exits 0 when clean and 2 when typos are found; any other non-zero is an error.
 typos --config "$config" fixtures/typos/good >/dev/null 2>&1

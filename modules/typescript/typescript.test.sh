@@ -3,10 +3,10 @@
 # and flag the bad fixture. Each tool's cases skip cleanly when its engine is
 # absent; the suite skips only when neither is installed.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 cd "$root" || exit 1
 
 biome_cfg='modules/typescript/biome.json'
@@ -22,9 +22,6 @@ command -v tsc >/dev/null 2>&1 && have_tsc=1
 if [[ $have_biome -eq 0 && $have_tsc -eq 0 ]]; then
   skip_suite 'neither biome nor tsc installed'
 fi
-
-FAILED=0
-CASE_NUM=0
 
 if [[ $have_biome -eq 1 ]]; then
   # `biome ci` runs lint + format + import sorting in one read-only pass.
@@ -50,9 +47,8 @@ if [[ $have_tsc -eq 1 ]]; then
   assert_exit 'tsc: good fixture type-checks clean' 0 "$?"
 
   out="$(tsc --noEmit -p "$bad_proj" 2>&1)"
-  rc=$?
   # tsc exits 1 or 2 depending on the diagnostic mix; assert non-zero.
-  assert_exit 'tsc: bad fixture exits non-zero' 1 "$((rc != 0 ? 1 : 0))"
+  assert_nonzero 'tsc: bad fixture exits non-zero' "$?"
   # TS7006 (implicit-any parameter) is an error only under the strict family.
   assert_contains 'tsc: bad fixture enforces strict (TS7006)' "$out" 'TS7006'
   # TS2532 (object possibly undefined) comes from noUncheckedIndexedAccess,

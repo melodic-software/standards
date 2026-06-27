@@ -10,19 +10,16 @@
 # Each scan sets -i to the temp dir (no .gitleaksignore there) so nothing masks
 # the detection under test. Skips cleanly when the engine is absent.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 cd "$root" || exit 1
 config='modules/gitleaks/.gitleaks.toml'
 
 if ! command -v gitleaks >/dev/null 2>&1; then
   skip_suite 'gitleaks not installed'
 fi
-
-FAILED=0
-CASE_NUM=0
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

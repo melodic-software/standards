@@ -10,9 +10,6 @@ set -uo pipefail
 # shellcheck source=harness/shell/lib.sh
 source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
 
-FAILED=0
-CASE_NUM=0
-
 # --- assert_eq ---
 out="$(FAILED=0 CASE_NUM=0; assert_eq "eq" foo foo)"
 assert_contains "assert_eq emits PASS on match" "$out" "PASS:"
@@ -35,6 +32,12 @@ assert_contains "assert_exit passes on equal codes" "$out" "PASS:"
 out="$(FAILED=0 CASE_NUM=0; assert_exit "ex" 0 1 2>&1)"
 assert_contains "assert_exit fails on differing codes" "$out" "FAIL:"
 
+# --- assert_nonzero ---
+out="$(FAILED=0 CASE_NUM=0; assert_nonzero "nz" 2)"
+assert_contains "assert_nonzero passes on non-zero rc" "$out" "PASS:"
+out="$(FAILED=0 CASE_NUM=0; assert_nonzero "nz" 0 2>&1)"
+assert_contains "assert_nonzero fails on zero rc" "$out" "FAIL:"
+
 # --- assert_silent ---
 out="$(FAILED=0 CASE_NUM=0; assert_silent "s" "   ")"
 assert_contains "assert_silent passes on whitespace-only" "$out" "PASS:"
@@ -43,6 +46,26 @@ assert_contains "assert_silent fails on output" "$out" "FAIL:"
 
 # --- assert_command_fails ---
 assert_command_fails "false exits non-zero" false
+# errexit immunity: the failing subject must not abort a `set -e` caller before
+# the assertion records (regression guard for the run-bare refactor).
+out="$(set -e; assert_command_fails "errexit-safe" false)"
+assert_contains "assert_command_fails is safe under set -e" "$out" "PASS:"
+
+# --- require_min_version (skip_suite exits 0, so run each in a subshell) ---
+out="$(require_min_version tool 1.2.3 1.2.0 2>&1)"
+assert_silent "require_min_version is silent when have > min" "$out"
+out="$(require_min_version tool 1.2.0 1.2.0 2>&1)"
+assert_silent "require_min_version allows the exact minimum" "$out"
+out="$(require_min_version tool 1.2.0 1.10.0 2>&1)"
+assert_contains "require_min_version skips when have < min" "$out" "SKIP:"
+out="$(require_min_version tool 1.9.0 1.10.0 2>&1)"
+assert_contains "require_min_version compares by version, not lexically" "$out" "SKIP:"
+out="$(require_min_version tool "" 1.0.0 2>&1)"; rc=$?
+assert_contains "require_min_version errors on an unparsable (empty) version" "$out" "ERROR:"
+assert_nonzero "require_min_version exits non-zero on an empty version" "$rc"
+out="$(require_min_version tool nightly 1.0.0 2>&1)"; rc=$?
+assert_contains "require_min_version errors on a non-numeric version token" "$out" "ERROR:"
+assert_nonzero "require_min_version exits non-zero on a non-numeric version" "$rc"
 
 # --- assert_file_exists / assert_file_absent ---
 tmp="$(mktemp)"

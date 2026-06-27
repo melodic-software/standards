@@ -7,17 +7,14 @@
 # the other base lanes are isolated out with `--command`. Skips cleanly when
 # either tool (lefthook or the shellcheck engine) is absent.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 base="$root/modules/lefthook/base.yml"
 
 command -v lefthook >/dev/null 2>&1 || skip_suite 'lefthook not installed'
 command -v shellcheck >/dev/null 2>&1 || skip_suite 'shellcheck not installed'
-
-FAILED=0
-CASE_NUM=0
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -56,12 +53,7 @@ git rm --cached -q clean.sh
 # Case 2: it fires on a non-conforming staged file.
 git add bad.sh
 out="$(lefthook run pre-commit --command shellcheck 2>&1)"
-rc=$?
-if [[ "$rc" -ne 0 ]]; then
-  pass 'non-conforming staged file fails the lane'
-else
-  fail 'non-conforming staged file fails the lane' "expected non-zero, got 0"
-fi
+assert_nonzero 'non-conforming staged file fails the lane' "$?"
 assert_contains 'failure surfaces a ShellCheck code' "$out" 'SC1046'
 
 # Case 3: a consumer disables the lane from its own root config (skip: true merges

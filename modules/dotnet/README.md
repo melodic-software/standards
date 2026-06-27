@@ -16,8 +16,9 @@ one thing the build does not enforce by default.
 - `Directory.Build.props` — the strict MSBuild posture: the switches that turn
   the analyzers and code-style rules into build errors. Self-documents its
   rationale inline. Notable choices:
-  - `AnalysisMode=All` is the strictest code-quality preset (every CA rule on as
-    a warning); `EnforceCodeStyleInBuild` runs the IDExxxx rules on build;
+  - `AnalysisMode=All` is the strictest code-quality preset (nearly every CA rule
+    on as a warning — a few legacy CA and code-metrics rules stay opt-in even
+    under `All`); `EnforceCodeStyleInBuild` runs the IDExxxx rules on build;
     `TreatWarningsAsErrors` escalates compiler **and** analyzer warnings to
     errors. `Nullable` is on.
   - It carries **no `TargetFramework` and no `LangVersion`** — the runtime floor
@@ -32,7 +33,10 @@ one thing the build does not enforce by default.
     (IDExxxx) rules that `AnalysisMode` does not touch, and pins the matching
     style preferences.
   - `IDE0055` (formatting) is set to `none` so the build does not report
-    whitespace — `dotnet format` is its single owner.
+    whitespace — `dotnet format` is its single owner. The CI format lane still
+    gates using-directive organization (`dotnet format style --diagnostics
+    IDE0055`): that pass runs regardless of the `none` severity, so System-first
+    import sorting is enforced without the build re-reporting whitespace.
   - Editor keys (`indent_size`, `trim_trailing_whitespace`, …) cannot live in a
     global config; they stay in the repo-root `.editorconfig`, which already
     covers C# via its language-agnostic defaults.
@@ -40,7 +44,8 @@ one thing the build does not enforce by default.
 Neither tool ships a runner here; the CI lanes that install the pinned SDK and
 run them live in the `ci-workflows` repo (execution) as the `dotnet-build` and
 `dotnet-format` composite actions. `dotnet-build` builds with warnings-as-errors;
-`dotnet-format` runs `dotnet format whitespace --verify-no-changes`.
+`dotnet-format` runs `dotnet format whitespace --verify-no-changes` and
+`dotnet format style --diagnostics IDE0055 --verify-no-changes` (import ordering).
 
 ## Engine
 
@@ -65,8 +70,9 @@ overlay omits `target`).
    tree rather than weakening this base. Reference the `ci-workflows`
    `dotnet-build` action from CI, pointing its `project` input at your solution.
 2. **Formatting** — reference the `ci-workflows` `dotnet-format` action from CI.
-   Locally, `dotnet format` (no subcommand) auto-fixes whitespace and code-style;
-   CI gates on the build (style + quality) and `dotnet format whitespace`.
+   Locally, `dotnet format` (no subcommand) auto-fixes whitespace, code-style, and
+   import ordering; CI gates on the build (style + quality), `dotnet format
+   whitespace`, and `dotnet format style --diagnostics IDE0055` (import ordering).
 
 ## Test
 
