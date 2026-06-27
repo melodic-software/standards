@@ -42,4 +42,20 @@ clean_inline="$(printf '%s\n' \
 chp::scan_text "$clean_inline" >/dev/null
 assert_exit 'technical tokens and unanchored keywords are not flagged' 0 "$?"
 
+# A dotted or hyphenated URL host with a numeric fragment must not be misread as
+# owner/repo#N (the host's '.' or a '-' before it previously satisfied the rule's
+# leading boundary).
+clean_url="$(printf '%s\n' \
+  '// see https://example.com/page#2 for the rationale' \
+  '# docs at https://host.example.org/guide#3' \
+  '// see https://foo-example.com/page#2 for details' \
+  '# ref https://my-cdn.example-host.net/asset#9')"
+chp::scan_text "$clean_url" >/dev/null
+assert_exit 'dotted/hyphenated URL host with #fragment is not a repo-issue ref' 0 "$?"
+
+# A genuine owner/repo#N — including an owner with a hyphen — is still flagged.
+flagged_ref="$(printf '%s\n' '// tracked in owner-name/repo#7')"
+chp::scan_text "$flagged_ref" >/dev/null
+assert_exit 'hyphenated owner/repo#N is still flagged' 1 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1
