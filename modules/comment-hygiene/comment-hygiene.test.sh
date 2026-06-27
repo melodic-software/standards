@@ -42,4 +42,12 @@ clean_inline="$(printf '%s\n' \
 chp::scan_text "$clean_inline" >/dev/null
 assert_exit 'technical tokens and unanchored keywords are not flagged' 0 "$?"
 
+# A dotted URL host with a numeric fragment must not be misread as owner/repo#N
+# (the host's '.' previously satisfied the rule's leading boundary).
+clean_url="$(printf '%s\n' \
+  '// see https://example.com/page#2 for the rationale' \
+  '# docs at https://host.example.org/guide#3')"
+chp::scan_text "$clean_url" >/dev/null
+assert_exit 'dotted URL host with #fragment is not a repo-issue ref' 0 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1
