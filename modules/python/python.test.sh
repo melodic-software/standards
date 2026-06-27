@@ -3,10 +3,10 @@
 # flag the bad fixture. Each tool's cases skip cleanly when its engine is absent;
 # the suite skips only when neither is installed.
 set -uo pipefail
-# shellcheck source=harness/shell/lib.sh
-source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
-
 root="$(git rev-parse --show-toplevel)"
+# shellcheck source=harness/shell/lib.sh
+source "$root/harness/shell/lib.sh"
+
 cd "$root" || exit 1
 
 ruff_cfg='modules/python/ruff.toml'
@@ -22,9 +22,6 @@ if [[ $have_ruff -eq 0 && $have_pyright -eq 0 ]]; then
   skip_suite 'neither ruff nor pyright installed'
 fi
 
-FAILED=0
-CASE_NUM=0
-
 if [[ $have_ruff -eq 1 ]]; then
   ruff check --config "$ruff_cfg" "$good" >/dev/null 2>&1
   assert_exit 'ruff: good fixture lints clean' 0 "$?"
@@ -32,7 +29,10 @@ if [[ $have_ruff -eq 1 ]]; then
   ruff format --check --config "$ruff_cfg" "$good" >/dev/null 2>&1
   assert_exit 'ruff: good fixture is already formatted' 0 "$?"
 
-  out="$(ruff check --config "$ruff_cfg" "$bad" 2>&1)"
+  # Assert against the JSON `code` field, not the human output: ruff's default
+  # text format now prints rule NAMES (banned-api) rather than codes, but the
+  # codes stay the canonical stable identifiers in the json interface.
+  out="$(ruff check --config "$ruff_cfg" --output-format json "$bad" 2>&1)"
   assert_exit 'ruff: bad fixture exits 1' 1 "$?"
   # banned-api is config-only, so TID251 proves the ruleset actually loaded.
   assert_contains 'ruff: bad fixture reports banned-api (TID251)' "$out" 'TID251'
