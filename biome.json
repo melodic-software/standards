@@ -1,0 +1,5 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "root": true,
+  "extends": ["./modules/typescript/biome.json"]
+}

@@ -1,0 +1,6 @@
+# Dogfood stub — not the ruleset. The ruff ruleset SSOT is the catalog copy at
+# modules/python/ruff.toml; CI lints with `--config modules/python/ruff.toml`.
+# This root stub only exists so local auto-discovery (lefthook, editors) inherits
+# that same ruleset via `extend`, keeping local and CI in agreement. Edit the
+# ruleset in the module, never here.
+extend = "modules/python/ruff.toml"

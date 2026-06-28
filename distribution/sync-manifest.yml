@@ -1,0 +1,142 @@
+# Track B distribution manifest — DRAFT, NOT YET WIRED.
+#
+# Consumed by the first-party sync workflow (ci-workflows: standards-sync.yml),
+# which is inert until its GitHub App auth is provisioned (a gated step — see
+# docs/dedup-program/config-distribution-plan.md). Layer-2 files only; Layer-1
+# configs (biome, tsconfig, .NET globalconfig/analyzers) are distributed via
+# extends/packages, never listed here.
+#
+# Re-confirm every target's layout AND include list AT ACTIVATION — the live
+# repos drift (rollout.md is a dated snapshot). Layouts below are taken from
+# rollout.md; include lists are a researched starting point, not verified per
+# current repo contents.
+#
+# Layouts:
+#   root    = file copied to the consumer repo root (consumer passes explicit
+#             config inputs to the ci-workflows actions)
+#   modules = file vendored under modules/<tool>/ (consumer relies on action
+#             defaults; also needs the root extend-stubs, below)
+#
+# Per-file destinations: a `null`/absent dest for a layout means "not applicable
+# to that layout" and the engine skips it (e.g. the *-stub files apply only to
+# the modules layout; root-layout consumers have the real config at root).
+
+files:
+  gitleaks:
+    source: modules/gitleaks/.gitleaks.toml
+    root: .gitleaks.toml
+    modules: modules/gitleaks/.gitleaks.toml
+  typos:
+    source: modules/typos/_typos.toml
+    root: _typos.toml
+    modules: modules/typos/_typos.toml
+  shellcheck:
+    source: modules/shellcheck/.shellcheckrc
+    root: .shellcheckrc
+    modules: modules/shellcheck/.shellcheckrc
+  ruff:
+    source: modules/python/ruff.toml
+    root: ruff.toml
+    modules: modules/python/ruff.toml
+  pyright:
+    source: modules/python/pyrightconfig.json
+    root: pyrightconfig.json
+    modules: modules/python/pyrightconfig.json
+  editorconfig-checker:
+    source: modules/editorconfig/.editorconfig-checker.json
+    root: .editorconfig-checker.json
+    modules: modules/editorconfig/.editorconfig-checker.json
+  psscriptanalyzer:
+    source: modules/powershell/PSScriptAnalyzerSettings.psd1
+    root: PSScriptAnalyzerSettings.psd1
+    modules: modules/powershell/PSScriptAnalyzerSettings.psd1
+  lychee:
+    source: modules/lychee/lychee.toml
+    root: lychee.toml
+    modules: modules/lychee/lychee.toml
+  # markdown is a Layer-1 candidate (extends) once the module is refactored; until
+  # then its config is synced as a whole file (Layer-2). See the plan doc.
+  markdown:
+    source: modules/markdown/.markdownlint-cli2.jsonc
+    root: .markdownlint-cli2.jsonc
+    modules: modules/markdown/.markdownlint-cli2.jsonc
+  # comment-hygiene patterns are path-referenced by the action (not discovered),
+  # so they sit under modules/ in both layouts. This is the file whose manual
+  # re-sync motivated Track B (rollout.md). medley keeps its own policy — exclude
+  # it from medley's include list.
+  comment-hygiene:
+    source: modules/comment-hygiene/comment-hygiene-patterns.sh
+    root: modules/comment-hygiene/comment-hygiene-patterns.sh
+    modules: modules/comment-hygiene/comment-hygiene-patterns.sh
+  # Always-root files (no modules/ variant):
+  editorconfig:
+    source: .editorconfig
+    root: .editorconfig
+    modules: .editorconfig
+  gitattributes:
+    source: .gitattributes
+    root: .gitattributes
+    modules: .gitattributes
+  # Root extend-stubs — modules-layout ONLY (root-layout has the real config at
+  # root, so `root:` is omitted and the engine skips it there). These mirror the
+  # stubs standards carries for its own dogfooding.
+  ruff-stub:
+    source: ruff.toml
+    modules: ruff.toml
+  gitleaks-stub:
+    source: .gitleaks.toml
+    modules: .gitleaks.toml
+  # Layer-1 / per-file-choice (NOT synced by default — listed for reference):
+  #   biome.json, tsconfig.json        -> Layer 1 (@melodic/* package extends)
+  #   dotnet.globalconfig, analyzers   -> Layer 1 (NuGet config package)
+  #   Directory.Build.props            -> NuGet if hands-off, else sync (add here)
+
+# Consumers and what each receives. `layout` per rollout.md; `include` is a
+# researched starting point — CONFIRM against each repo's current tracked file
+# types at activation. standards (source) and any repo with no overlap are omitted.
+targets:
+  - repo: melodic-software/provisioning           # PowerShell
+    layout: root
+    include:
+      - editorconfig
+      - gitattributes
+      - typos
+      - gitleaks
+      - psscriptanalyzer
+      - lychee
+      - markdown
+      - comment-hygiene
+  - repo: kyle-sexton/github-iac                   # C# Pulumi, modules layout
+    layout: modules
+    include:
+      - editorconfig
+      - gitattributes
+      - typos
+      - gitleaks
+      - markdown
+      - comment-hygiene
+      - ruff-stub
+      - gitleaks-stub
+  - repo: melodic-software/github-iac              # C# Pulumi, root layout
+    layout: root
+    include:
+      - editorconfig
+      - gitattributes
+      - typos
+      - gitleaks
+      - markdown
+      - comment-hygiene
+  - repo: melodic-software/claude-code-plugins     # markdown + JSON + shell
+    layout: root
+    include:
+      - editorconfig
+      - gitattributes
+      - typos
+      - gitleaks
+      - shellcheck
+      - markdown
+      - comment-hygiene
+  # melodic-software/medley — root; keeps its OWN comment-hygiene policy, so
+  # exclude comment-hygiene. Large/complex; confirm includes carefully.
+  # melodic-software/ci-workflows — modules; platform peer that also vendors the
+  # configs. Confirm whether it should receive syncs or stay self-managed.

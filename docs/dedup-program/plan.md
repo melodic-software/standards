@@ -227,5 +227,7 @@ history stays accurate.
 ## Out of scope
 
 Repo-specific lanes listed in [inventory.md](inventory.md) stay local. Tool
-*config* (rulesets) stays upstream in `standards`; this program only moves
-execution.
+*config* (rulesets) stays upstream in `standards`. This plan (Track A) only moves
+execution; distributing the config/files themselves to consumers without manual
+copy is **Track B**, planned in
+[config-distribution-plan.md](config-distribution-plan.md).
