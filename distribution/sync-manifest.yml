@@ -102,7 +102,7 @@ files:
 # researched starting point — CONFIRM against each repo's current tracked file
 # types at activation. standards (source) and any repo with no overlap are omitted.
 targets:
-  - repo: melodic-software/provisioning           # PowerShell
+  - repo: kyle-sexton/provisioning                 # PowerShell (personal acct)
     layout: root
     include:
       - editorconfig
