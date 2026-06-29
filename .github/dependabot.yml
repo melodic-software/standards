@@ -18,6 +18,11 @@ updates:
       # own ci-workflows fixes propagate without the cooldown delay.
       exclude:
         - "melodic-software/*"
+    # Collapse all action bumps into one PR to cut review noise.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   # Keep the npm dev-dependencies current — the markdownlint-cli2 pin (and its
   # schema overrides) and the lefthook pin that the local git hooks run on.
   - package-ecosystem: npm
