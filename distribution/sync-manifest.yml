@@ -106,6 +106,7 @@ targets:
     layout: root
     include:
       - editorconfig
+      - editorconfig-checker
       - gitattributes
       - typos
       - gitleaks
@@ -117,6 +118,7 @@ targets:
     layout: modules
     include:
       - editorconfig
+      - editorconfig-checker
       - gitattributes
       - typos
       - gitleaks
@@ -128,6 +130,7 @@ targets:
     layout: root
     include:
       - editorconfig
+      - editorconfig-checker
       - gitattributes
       - typos
       - gitleaks
@@ -137,6 +140,7 @@ targets:
     layout: root
     include:
       - editorconfig
+      - editorconfig-checker
       - gitattributes
       - typos
       - gitleaks
