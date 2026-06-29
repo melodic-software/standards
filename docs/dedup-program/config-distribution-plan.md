@@ -81,6 +81,13 @@ Two pieces, each its own PR, dogfooded, SHA-pinned (architecture
    ```yaml
    name: standards-sync
    on:
+     push:
+       branches: [main]
+       paths:  # cascade when a distributed file changes upstream
+         - modules/**
+         - .editorconfig
+         - .gitattributes
+         - distribution/sync-manifest.yml
      workflow_dispatch:
        inputs:
          dry-run:
