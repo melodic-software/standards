@@ -187,8 +187,10 @@ verified to parity with the CI `--config` run:
   fixture, both ways).
 - `.gitleaks.toml` → `[extend] path = "modules/gitleaks/.gitleaks.toml"` (loads
   the chain stub→module→defaults).
-- `biome.json` → `"extends": ["./modules/typescript/biome.json"]`, `root: true`
-  over the module's `root: false` (2/2 errors, both ways).
+- `biome.jsonc` → `"extends": ["./modules/typescript/biome.json"]`, `root: true`
+  over the module's `root: false` (2/2 errors, both ways). It is `.jsonc`, not
+  `.json`, because Biome **silently** ignores a commented `biome.json` (falls
+  back to defaults with no error), so a commented stub must use `.jsonc`.
 
 Not stubbable — documented as **reference-mode** (CI `--config` is authoritative;
 local auto-discovery uses defaults, so author to the stricter default, a safe

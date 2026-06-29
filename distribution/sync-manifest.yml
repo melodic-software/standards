@@ -21,6 +21,10 @@
 # to that layout" and the engine skips it (e.g. the *-stub files apply only to
 # the modules layout; root-layout consumers have the real config at root).
 
+# Schema version — the engine validates against this so format changes (new
+# layout names, new keys, new behavior) stay backward-compatible.
+version: 1
+
 files:
   gitleaks:
     source: modules/gitleaks/.gitleaks.toml
@@ -79,7 +83,10 @@ files:
     modules: .gitattributes
   # Root extend-stubs — modules-layout ONLY (root-layout has the real config at
   # root, so `root:` is omitted and the engine skips it there). These mirror the
-  # stubs standards carries for its own dogfooding.
+  # stubs standards carries for its own dogfooding. PAIRING RULE: include a
+  # `*-stub` only in a target that also includes its base tool AND actually uses
+  # that tool — the stub's `extend` points at modules/<tool>/..., so without the
+  # base file present the tool errors (e.g. ruff-stub needs Python + `ruff`).
   ruff-stub:
     source: ruff.toml
     modules: ruff.toml
@@ -115,8 +122,8 @@ targets:
       - gitleaks
       - markdown
       - comment-hygiene
-      - ruff-stub
-      - gitleaks-stub
+      - gitleaks-stub        # paired with gitleaks (used). No Python here, so
+                             # no ruff / ruff-stub (would break the extend).
   - repo: melodic-software/github-iac              # C# Pulumi, root layout
     layout: root
     include:
