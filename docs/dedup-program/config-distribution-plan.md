@@ -87,6 +87,8 @@ Two pieces, each its own PR, dogfooded, SHA-pinned (architecture
          - modules/**
          - .editorconfig
          - .gitattributes
+         - ruff.toml          # root stub source (ruff-stub)
+         - .gitleaks.toml     # root stub source (gitleaks-stub)
          - distribution/sync-manifest.yml
      workflow_dispatch:
        inputs:
