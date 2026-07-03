@@ -54,16 +54,14 @@ files:
     source: modules/powershell/PSScriptAnalyzerSettings.psd1
     root: PSScriptAnalyzerSettings.psd1
     modules: modules/powershell/PSScriptAnalyzerSettings.psd1
-  # lychee: only sync to a consumer that passes its own `--config <root>/lychee.toml`
-  # to the link-check reusable workflow. A consumer that calls link-check without
-  # overriding `args` uses ci-workflows' bundled modules/lychee/lychee.toml and
-  # tracks ruleset changes through its pinned ci-workflows @SHA (Track A), so a
-  # synced local copy would be inert. No current consumer overrides `args`
-  # (verified 2026-07-03), hence lychee is in no target include below — add it at
-  # activation only for a repo that adopts a local lychee config.
+  # lychee lands under modules/lychee/ in BOTH layouts (not repo root): the
+  # ci-workflows link-check reusable workflow checks out the caller and defaults
+  # to `--config modules/lychee/lychee.toml`, so a consumer that calls it without
+  # overriding `args` reads its own vendored copy at that path regardless of the
+  # repo's general layout. Sync it to every consumer that runs the link-check lane.
   lychee:
     source: modules/lychee/lychee.toml
-    root: lychee.toml
+    root: modules/lychee/lychee.toml
     modules: modules/lychee/lychee.toml
   # markdown is a Layer-1 candidate (extends) once the module is refactored; until
   # then its config is synced as a whole file (Layer-2). See the plan doc.
@@ -118,10 +116,9 @@ targets:
       - typos
       - gitleaks
       - psscriptanalyzer
+      - lychee
       - markdown
       - comment-hygiene
-      # lychee omitted: link-check uses ci-workflows' default config (no local
-      # lychee.toml / no `args` override) — see the lychee note above.
   - repo: kyle-sexton/github-iac                   # C# Pulumi, modules layout
     layout: modules
     include:
@@ -153,6 +150,7 @@ targets:
       - typos
       - gitleaks
       - shellcheck
+      - lychee
       - markdown
       - comment-hygiene
   # melodic-software/medley — root; keeps its OWN comment-hygiene policy, so
