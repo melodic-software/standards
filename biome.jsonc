@@ -1,0 +1,15 @@
+{
+  // Dogfood stub — not the ruleset. The Biome ruleset SSOT is the catalog copy
+  // at modules/typescript/biome.json (root: false); CI lints with
+  // --config-path=modules/typescript/biome.json. This root stub only exists so
+  // local auto-discovery (lefthook, editors) inherits that ruleset via extends,
+  // keeping local and CI in agreement. Edit the ruleset in the module, never
+  // here. Keep $schema in lockstep with modules/typescript/biome.json on a bump.
+  //
+  // This is .jsonc, not .json, on purpose: Biome silently ignores a biome.json
+  // that contains comments (no error — it just falls back to defaults), so a
+  // commented stub MUST use the .jsonc extension.
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "root": true,
+  "extends": ["./modules/typescript/biome.json"]
+}

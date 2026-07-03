@@ -1,0 +1,7 @@
+# Dogfood stub — not the ruleset. The gitleaks ruleset SSOT is the catalog copy
+# at modules/gitleaks/.gitleaks.toml; CI scans with
+# `--config modules/gitleaks/.gitleaks.toml`. This root stub only exists so local
+# auto-discovery (the lefthook git hook) inherits that same ruleset via [extend],
+# keeping local and CI in agreement. Edit the ruleset in the module, never here.
+[extend]
+path = "modules/gitleaks/.gitleaks.toml"

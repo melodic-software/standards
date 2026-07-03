@@ -1,9 +1,23 @@
-# CI de-duplication program
+# De-duplication program
 
-Working folder for the multi-phase effort to make `ci-workflows` the single
-de-duplication layer for CI **execution** across the melodic-software
-constellation: lift duplicated CI logic out of consumer repos into configurable,
-composable units here, then have every repo reference and customize them.
+Working folder for the multi-phase effort to kill duplication across the
+melodic-software constellation. It runs on **two tracks**:
+
+- **Track A — CI execution.** Make `ci-workflows` the single de-duplication
+  layer for CI execution: lift duplicated CI logic out of consumer repos into
+  configurable, composable units, then have every repo reference and customize
+  them. This is the original program (Phases 0–6 below) and is largely complete.
+- **Track B — config & file distribution.** Stop manually copy/syncing the
+  drop-in *files* `standards` owns (tool configs, prose conventions, harness,
+  fixtures) into consumers. Research and plan:
+  [research/config-distribution.md](research/config-distribution.md) (findings)
+  and [config-distribution-plan.md](config-distribution-plan.md) (build).
+
+The tracks are siblings of one mission; Track B was opened 2026-06-28 once
+Track A proved the constellation pattern. The motivating pain is recorded in
+[rollout.md](rollout.md): when the org-default comment-hygiene policy changed,
+four config-vendoring consumers had to be re-synced **by hand** (no Dependabot
+covers vendored configs) — the cascade Track B automates.
 
 This folder is the durable plan-of-record. It spans phases and sessions; treat
 it as the working source of truth and keep it current as work lands.
@@ -17,10 +31,14 @@ and override repo-specific scope through inputs instead of carrying their own
 copy. Behavior is preserved: lift-and-shift as-is first, then backfill any
 capability a consumer needs so it can switch over without losing coverage.
 
-Config (tool rulesets) is out of scope here — it lives upstream in `standards`
-and is adopted by copy. This program is about the *execution* side only.
+The "Goal" above and the phases below are **Track A** (execution). Config
+distribution — getting the tool rulesets that live upstream in `standards` into
+consumers without manual copy — is **Track B**, planned separately in
+[config-distribution-plan.md](config-distribution-plan.md).
 
 ## Documents
+
+Track A (execution):
 
 - [inventory.md](inventory.md) — current-state audit of every CI lane across the
   constellation, with a classification of what to lift.
@@ -29,6 +47,18 @@ and is adopted by copy. This program is about the *execution* side only.
   consumption), each backed by cited research.
 - [plan.md](plan.md) — the phased roadmap: sequencing, per-phase exit criteria,
   and progress checklists.
+
+Track B (config & file distribution):
+
+- [research/config-distribution.md](research/config-distribution.md) — cited
+  findings: the two-layer strategy (native `extends`/packages where supported,
+  first-party sync for the rest) and the mechanism evaluation behind it.
+- [config-distribution-plan.md](config-distribution-plan.md) — the build &
+  activation plan: manifest schema, the first-party sync workflow, auth, the
+  GitHub Packages decision, and the gated activation checklist.
+
+Both tracks:
+
 - [rollout.md](rollout.md) — constellation adoption tracker: per-repo integration
   status and the onboarding sequence (deploying the blocks, vs. plan.md's
   building of them).
@@ -50,6 +80,15 @@ and is adopted by copy. This program is about the *execution* side only.
   inputs so advancing a pinned SHA never breaks an existing call.
 
 ## Status
+
+**Track B (config & file distribution) — opened 2026-06-28.** Research complete
+(two-layer strategy: native `extends`/packages where supported, first-party sync
+for the rest); decisions taken (maximum single-source; build the sync mechanism
+first-party in `ci-workflows`). Next is the build, planned in
+[config-distribution-plan.md](config-distribution-plan.md), whose activation has
+cost/secret/IaC gates (GitHub Packages visibility, a cross-repo write token,
+repo access) that need explicit approval before they land. Everything below is
+Track A.
 
 Phases 0–2 complete: plan-of-record established; the config-ready trio
 (`typos`, `editorconfig-checker`, `gitleaks`) built, dogfooded, and adopted in

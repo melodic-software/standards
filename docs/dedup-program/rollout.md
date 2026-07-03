@@ -42,6 +42,13 @@ consumers were re-synced byte-identical to the SSOT and re-pinned to current
 re-pin only, #42) and `medley` (re-pin only, #1169) were brought to the same
 `ci-workflows` SHA. Every repo re-verified clean under the widened policy.
 
+> **This hand re-sync is the motivating pain for Track B.** Automating the
+> upstream→downstream config cascade (and detecting drift) is planned in
+> [config-distribution-plan.md](config-distribution-plan.md). Until it lands, the
+> "standards configs" column below reflects **manually** copied/vendored files,
+> and the two placements (`full (root)` vs `full (modules/)`) are the two
+> destination layouts the Track B manifest must map to.
+
 ## Per-repo onboarding scope
 
 Recommended lanes are grounded in each repo's actual tracked file types
