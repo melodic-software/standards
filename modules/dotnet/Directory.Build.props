@@ -38,6 +38,14 @@
          carve out a justified exception with WarningsNotAsErrors, recorded at
          the site. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- NuGet lock files. A committed packages.lock.json is the only NuGet
+         input OSV-Scanner reads that carries the full transitive closure —
+         PackageReference-only projects scan as empty — and it makes restore
+         reproducible. Consumers commit the generated lock file; enforcing it
+         at restore time (RestoreLockedMode, i.e. locked-mode restore) is a CI
+         concern owned by the ci-workflows restore step, not set here. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

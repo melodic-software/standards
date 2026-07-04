@@ -26,6 +26,13 @@ one thing the build does not enforce by default.
     to one runtime, and Microsoft discourages `LangVersion=latest`.
   - It wires the severity ruleset via `GlobalAnalyzerConfigFiles`, so the two
     files must travel together.
+  - `RestorePackagesWithLockFile` turns on
+    [NuGet lock files](https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies):
+    every restore writes a per-project `packages.lock.json` capturing the full
+    transitive closure. That file is the only committable NuGet input
+    [OSV-Scanner reads](https://google.github.io/osv-scanner/supported-languages-and-lockfiles/)
+    that covers transitive dependencies — `PackageReference`-only projects scan
+    as empty — and it makes restore reproducible.
 - `dotnet.globalconfig` — the analyzer/code-style severities, as a global
   AnalyzerConfig (path-independent, no directory section). Notable choices:
   - Code-quality (CAxxxx) is turned on wholesale by `AnalysisMode`, so CA rules
@@ -69,7 +76,24 @@ overlay omits `target`).
    `CA1062`, `CA1303`) in your **own** `.globalconfig` / `.editorconfig` for one
    tree rather than weakening this base. Reference the `ci-workflows`
    `dotnet-build` action from CI, pointing its `project` input at your solution.
-2. **Formatting** — reference the `ci-workflows` `dotnet-format` action from CI.
+2. **Lock files** — run `dotnet restore` once after adopting the props and
+   **commit** every generated `packages.lock.json`; an uncommitted lock file
+   gives OSV-Scanner nothing to read and makes nothing reproducible. Caveats:
+   - **Enforcement is a CI concern, not a props switch.** `RestoreLockedMode`
+     (`dotnet restore --locked-mode`) fails restore with `NU1004` when the
+     resolved graph drifts from the committed lock file. It belongs in the
+     `ci-workflows` restore step — tracked as
+     [ci-workflows#42](https://github.com/melodic-software/ci-workflows/issues/42)
+     (locked-mode restore, OSV coverage, Dependabot lock-file regeneration) —
+     so this overlay only generates the lock file.
+   - **Pin the SDK.** Implicit framework dependencies vary across SDK versions,
+     so an unpinned SDK can fail a locked-mode restore on graph drift alone.
+     Pin via `global.json` with `rollForward: disable` in the consuming repo.
+   - **Dependabot** updates `packages.lock.json` for direct `PackageReference`
+     bumps but has gaps (Central Package Management, transitive-via-
+     `ProjectReference`); the linked ci-workflows issue coordinates the
+     `dotnet restore --force-evaluate` fallback for those PRs.
+3. **Formatting** — reference the `ci-workflows` `dotnet-format` action from CI.
    Locally, `dotnet format` (no subcommand) auto-fixes whitespace, code-style, and
    import ordering; CI gates on the build (style + quality), `dotnet format
    whitespace`, and `dotnet format style --diagnostics IDE0055` (import ordering).
