@@ -128,9 +128,30 @@ not in place.
 The default `GITHUB_TOKEN` cannot write to other repos, so the sync needs a
 cross-repo write credential. Use a **GitHub App** (installation token), not a PAT:
 least-privilege (`contents: write`, `pull_requests: write`), rotatable — aligns
-with the secrets policy. The App and its repo access are GitHub config the Pulumi
-provider can express, so create/grant them via `github-iac` (Pulumi) and
-deploy — never by hand. GitHub Apps are free.
+with the secrets policy. GitHub Apps are free.
+
+**Provider limitation — App creation is manual.** The Pulumi GitHub provider
+cannot create a GitHub App: it only exposes
+[authentication *as* an existing App](https://www.pulumi.com/registry/packages/github/api-docs/provider/)
+(app ID / installation ID / private key) and
+[`AppInstallationRepository`](https://www.pulumi.com/registry/packages/github/api-docs/appinstallationrepository/)
+for granting an **already-installed** App access to repos; App creation is
+unsupported upstream
+([terraform-provider-github#2389](https://github.com/integrations/terraform-provider-github/issues/2389)).
+Gating activation on "provision the App via Pulumi" would stall at step 1, so
+the flow is a one-time manual bootstrap that hands off to IaC:
+
+1. **Bootstrap (manual, once per account):** register the App by hand — or via
+   the [App-manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest),
+   which keeps the permission set reviewable as code — with `contents: write` +
+   `pull_requests: write` only; install it on the account; generate a private
+   key. Record the app ID / installation ID; store the private key per the
+   secrets policy.
+2. **IaC from there (`github-iac` / Pulumi):** feed the IDs and key to Pulumi as
+   config secrets, manage the App's per-repo grants with
+   `AppInstallationRepository`, and wire the caller-workflow secrets. Everything
+   after registration stays IaC-managed; the manual registration itself is
+   recorded here as the one step the provider cannot express.
 
 **Cross-account caveat.** A GitHub App is installed **per account**. The starter
 targets span both the org (`melodic-software/*`) and the personal account
@@ -165,19 +186,26 @@ Ungated (author now, inert until wired):
 
 Gated (need explicit approval before they land):
 
+- [ ] **Re-confirm targets against the live repos** — immediately before wiring,
+  re-verify every manifest target's `layout` and `include` list against the live
+  repo contents, per the manifest's own header. rollout.md (which seeded the
+  manifest) is a dated snapshot; consumers drift between authoring and
+  activation, so the authoring-time pass above does not stand in for this one.
 - [ ] **GitHub Packages visibility** — confirm public (free) vs private
   (billable) for `@melodic/*` and the .NET config package.
-- [ ] **GitHub App + access** — create and grant via `github-iac` (Pulumi),
-  least-privilege; wire its token into the caller workflow. Install on **both**
-  the org and the personal account if targets span both (per-account App + secret;
-  see the cross-account caveat above).
+- [ ] **GitHub App + access** — bootstrap the App manually once per account
+  (the Pulumi provider cannot create it — see Auth above), then manage its repo
+  grants and secrets via `github-iac` (Pulumi), least-privilege; wire its token
+  into the caller workflow. Install on **both** the org and the personal account
+  if targets span both (per-account App + secret; see the cross-account caveat
+  above).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
   - [ ] `@melodic/biome-config` MUST carry the enforced `organizeImports` `groups`
     config (`level: on`, URL → node/bun → packages → aliases → relative, blank-line
     separated) currently live in `modules/typescript/biome.json` — NOT Biome's plain
-    `"organizeImports": "on"`. Extract the base from the current module verbatim so
-    `extends` consumers inherit the enforced grouping rather than silently reverting
-    to the unenforced default.
+    `"organizeImports": "on"`. Extract the base from the current module verbatim
+    so `extends` consumers inherit the enforced grouping rather than silently
+    reverting to the unenforced default.
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
   then roll out per [rollout.md](rollout.md).
 
@@ -194,12 +222,18 @@ omits `--config` by design and **cannot be overridden from a consumer's root
 `lefthook.yml`** (verified empirically: an extended file's settings win over the
 root file), so the only committed fix is a root-discoverable config.
 
-Fix applied — a tiny root **stub** that `extends` the module SSOT (zero
-duplication), for the tools whose format supports a path-based extend, each
-verified to parity with the CI `--config` run:
+Fix applied — a tiny root **stub** that `extends` the module SSOT (no duplicated
+rules; ruff additionally re-anchors one ignore block, below), for the tools whose
+format supports a path-based extend, each verified to parity with the CI
+`--config` run:
 
-- `ruff.toml` → `extend = "modules/python/ruff.toml"` (8/8 errors on the bad
-  fixture, both ways).
+- `ruff.toml` → `extend = "modules/python/ruff.toml"`, plus a
+  `[lint.extend-per-file-ignores]` block re-anchoring the module's path-anchored
+  ignores (`tests/**`) at the repo root. Ruff resolves an extended file's
+  relative patterns against that file's own directory but against the CWD under
+  `--config`, so a pure-extend stub silently narrows the test ignores to
+  `modules/python/tests/**` while CI ignores repo-root `tests/**` (8/8 errors on
+  the bad fixture and test-file ignore parity, verified both ways).
 - `.gitleaks.toml` → `[extend] path = "modules/gitleaks/.gitleaks.toml"` (loads
   the chain stub→module→defaults).
 - `biome.jsonc` → `"extends": ["./modules/typescript/biome.json"]`, `root: true`
