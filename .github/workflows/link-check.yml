@@ -19,3 +19,17 @@ jobs:
       contents: read
       issues: write
     uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+    with:
+      # The called workflow's defaults plus one repo-specific addition: the
+      # online lane also verifies local file links, so the intentionally-broken
+      # lychee fixture must be excluded here (the offline lane in ci.yml already
+      # excludes it). `args` is a single input, so overriding it restates the
+      # defaults.
+      args: >-
+        --cache
+        --max-cache-age 7d
+        --no-progress
+        --accept-timeouts
+        --exclude-path 'fixtures/[^/]+/bad'
+        --config modules/lychee/lychee.toml
+        './**/*.md'
