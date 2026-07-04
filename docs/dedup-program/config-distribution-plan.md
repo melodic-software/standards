@@ -147,11 +147,14 @@ the flow is a one-time manual bootstrap that hands off to IaC:
    `pull_requests: write` only; install it on the account; generate a private
    key. Record the app ID / installation ID; store the private key per the
    secrets policy.
-2. **IaC from there (`github-iac` / Pulumi):** feed the IDs and key to Pulumi as
-   config secrets, manage the App's per-repo grants with
-   `AppInstallationRepository`, and wire the caller-workflow secrets. Everything
-   after registration stays IaC-managed; the manual registration itself is
-   recorded here as the one step the provider cannot express.
+2. **IaC from there (`github-iac` / Pulumi):** wire the app ID / installation ID
+   / private key into the caller-workflow secrets (they mint installation tokens
+   at sync time), and manage the App's per-repo grants with
+   `AppInstallationRepository` — under `github-iac`'s **regular provider
+   credential**, not by authenticating as the sync App: the resource's docs note
+   it is not compatible with the GitHub App Installation authentication method.
+   Everything after registration stays IaC-managed; the manual registration
+   itself is recorded here as the one step the provider cannot express.
 
 **Cross-account caveat.** A GitHub App is installed **per account**. The starter
 targets span both the org (`melodic-software/*`) and the personal account
