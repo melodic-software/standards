@@ -172,6 +172,12 @@ Gated (need explicit approval before they land):
   the org and the personal account if targets span both (per-account App + secret;
   see the cross-account caveat above).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
+  - [ ] `@melodic/biome-config` MUST carry the enforced `organizeImports` `groups`
+    config (`level: on`, URL → node/bun → packages → aliases → relative, blank-line
+    separated) currently live in `modules/typescript/biome.json` — NOT Biome's plain
+    `"organizeImports": "on"`. Extract the base from the current module verbatim so
+    `extends` consumers inherit the enforced grouping rather than silently reverting
+    to the unenforced default.
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
   then roll out per [rollout.md](rollout.md).
 
