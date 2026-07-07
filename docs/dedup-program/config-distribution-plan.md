@@ -75,48 +75,16 @@ Two pieces, each its own PR, dogfooded, SHA-pinned (architecture
    pinned `create-pull-request`. PR-per-repo is the review surface and the
    out-of-sync signal (drift). A sync run is *execution*, so it belongs in
    `ci-workflows` next to Track A — consistent with the seam rules.
-2. **Caller workflow in `standards`** (`.github/workflows/sync.yml`): triggers on
-   push to `main` (paths: the distributed files) and on a schedule; calls the
-   reusable workflow with the manifest and the auth token. Added **at activation**
-   — not committed earlier, because an unpinned ref to a not-yet-merged reusable
-   workflow would fail standards' own zizmor/actionlint lanes. Ready-to-paste,
-   pin the `@SHA` once the engine merges in `ci-workflows`:
-
-   ```yaml
-   name: standards-sync
-   on:
-     push:
-       branches: [main]
-       paths:  # cascade when a distributed file changes upstream
-         - modules/**
-         - .editorconfig
-         - .gitattributes
-         - ruff.toml          # root stub source (ruff-stub)
-         - .gitleaks.toml     # root stub source (gitleaks-stub)
-         - distribution/sync-manifest.yml
-     workflow_dispatch:
-       inputs:
-         dry-run:
-           type: boolean
-           default: true
-     schedule:
-       - cron: "0 6 * * 1"  # weekly; the run opens/refreshes a PR per target
-   permissions:
-     contents: read
-   jobs:
-     sync:
-       # TODO pin @SHA once ci-workflows standards-sync.yml merges (D5).
-       uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@<SHA>
-       with:
-         # Schedule runs for real (inputs.dry-run is unset on schedule, so
-         # `|| false` makes it a real run); manual dispatch keeps its default
-         # preview. Do NOT flip to `== 'schedule'` — that inverts it and the
-         # weekly cascade would silently never fire.
-         dry-run: ${{ inputs.dry-run || false }}
-       secrets:
-         app-id: ${{ secrets.STANDARDS_SYNC_APP_ID }}
-         app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
-   ```
+2. **Caller workflow in `standards`**: live at
+   [`.github/workflows/sync.yml`](../../.github/workflows/sync.yml) (the source
+   of truth — the snippet this section used to carry is superseded). Triggers on
+   push to `main` (paths: the distributed files), a weekly schedule, and manual
+   dispatch (dry-run by default, with a `targets` allowlist for pilots/staged
+   rollout); calls the reusable engine SHA-pinned (D5) with the App secrets.
+   It was added at activation — not earlier, because an unpinned ref to a
+   not-yet-merged reusable workflow would fail standards' own zizmor/actionlint
+   lanes — and activated in two stages (dispatch-only until the single-target
+   pilot passed, then the push + schedule triggers).
 
 The reusable engine itself is authored (inert) at
 `ci-workflows/.github/workflows/standards-sync.yml` — `dry-run` defaults true, so
