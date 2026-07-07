@@ -1,15 +1,16 @@
-# Track B distribution manifest — DRAFT, NOT YET WIRED.
+# Track B distribution manifest — LIVE.
 #
 # Consumed by the first-party sync workflow (ci-workflows: standards-sync.yml),
-# which is inert until its GitHub App auth is provisioned (a gated step — see
+# activated 2026-07-06 (App auth provisioned, caller wired — see
 # docs/dedup-program/config-distribution-plan.md). Layer-2 files only; Layer-1
 # configs (biome, tsconfig, .NET globalconfig/analyzers) are distributed via
 # extends/packages, never listed here.
 #
-# Re-confirm every target's layout AND include list AT ACTIVATION — the live
-# repos drift (rollout.md is a dated snapshot). Layouts below are taken from
-# rollout.md; include lists are a researched starting point, not verified per
-# current repo contents.
+# Targets below were confirmed against the live repos at activation
+# (2026-07-06): every target is root-layout — no consumer vendors tool configs
+# under modules/<tool>/ anymore. The modules layout stays supported in the
+# engine and the per-file dests below in case a modules-layout consumer
+# returns.
 #
 # Layouts:
 #   root    = file copied to the consumer repo root (consumer passes explicit
@@ -103,9 +104,9 @@ files:
   #   dotnet.globalconfig, analyzers   -> Layer 1 (NuGet config package)
   #   Directory.Build.props            -> NuGet if hands-off, else sync (add here)
 
-# Consumers and what each receives. `layout` per rollout.md; `include` is a
-# researched starting point — CONFIRM against each repo's current tracked file
-# types at activation. standards (source) and any repo with no overlap are omitted.
+# Consumers and what each receives. `include` = the files the repo carries
+# today plus what its CI lanes consume — confirmed against the live repos
+# 2026-07-06. standards (source) and any repo with no overlap are omitted.
 targets:
   - repo: kyle-sexton/provisioning                 # PowerShell (personal acct)
     layout: root
@@ -119,8 +120,10 @@ targets:
       - lychee
       - markdown
       - comment-hygiene
-  - repo: kyle-sexton/github-iac                   # C# Pulumi, modules layout
-    layout: modules
+  # Migrated off the modules-vendored layout to root (mirror of the org
+  # github-iac); no Python, so no ruff.
+  - repo: kyle-sexton/github-iac                   # C# Pulumi
+    layout: root
     include:
       - editorconfig
       - editorconfig-checker
@@ -129,9 +132,7 @@ targets:
       - gitleaks
       - markdown
       - comment-hygiene
-      - gitleaks-stub        # paired with gitleaks (used). No Python here, so
-                             # no ruff / ruff-stub (would break the extend).
-  - repo: melodic-software/github-iac              # C# Pulumi, root layout
+  - repo: melodic-software/github-iac              # C# Pulumi
     layout: root
     include:
       - editorconfig
@@ -153,7 +154,47 @@ targets:
       - lychee
       - markdown
       - comment-hygiene
+  # shellcheck has no CI lane here (yet) but the repo carries .shellcheckrc for
+  # the local lefthook lanes, so it stays synced.
+  - repo: kyle-sexton/dotfiles                     # chezmoi + PowerShell + shell
+    layout: root
+    include:
+      - editorconfig
+      - editorconfig-checker
+      - gitattributes
+      - typos
+      - gitleaks
+      - shellcheck
+      - psscriptanalyzer
+      - lychee
+      - markdown
+      - comment-hygiene
+  # lychee inclusion assumes the repo's root lychee.toml moves to the
+  # constellation-standard modules/lychee/lychee.toml (companion PR there).
+  - repo: melodic-software/.github                 # org meta/community files
+    layout: root
+    include:
+      - editorconfig
+      - editorconfig-checker
+      - gitattributes
+      - typos
+      - gitleaks
+      - lychee
+      - markdown
+  # Markdown is its only config-bearing CI lane; editorconfig/gitattributes are
+  # universal repo hygiene (synced in even though absent today).
+  - repo: kyle-sexton/.github                      # personal meta files
+    layout: root
+    include:
+      - editorconfig
+      - gitattributes
+      - markdown
+  # Platform peer: only its ROOT hygiene files sync; the configs it vendors
+  # under modules/ are its own dogfooding copies and stay self-managed.
+  - repo: melodic-software/ci-workflows            # platform (execution layer)
+    layout: root
+    include:
+      - editorconfig
+      - gitattributes
   # melodic-software/medley — root; keeps its OWN comment-hygiene policy, so
   # exclude comment-hygiene. Large/complex; confirm includes carefully.
-  # melodic-software/ci-workflows — modules; platform peer that also vendors the
-  # configs. Confirm whether it should receive syncs or stay self-managed.

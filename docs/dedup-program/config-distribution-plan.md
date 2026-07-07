@@ -183,25 +183,27 @@ suits JS/TS-bearing repos, not pure .NET/PowerShell ones.
 
 Ungated (author now, inert until wired):
 
-- [ ] Finalize the manifest against the live consumer repos.
-- [ ] Author the `ci-workflows` reusable sync workflow (PR, dogfooded).
-- [ ] Author the `standards` caller workflow (PR).
+- [x] Finalize the manifest against the live consumer repos.
+- [x] Author the `ci-workflows` reusable sync workflow (PR, dogfooded;
+  ci-workflows #50, plus #56 for the `targets` pilot/rollout filter).
+- [x] Author the `standards` caller workflow (PR #63 — dispatch-only until the
+  pilot confirms; push + schedule triggers follow).
 
 Gated (need explicit approval before they land):
 
-- [ ] **Re-confirm targets against the live repos** — immediately before wiring,
-  re-verify every manifest target's `layout` and `include` list against the live
-  repo contents, per the manifest's own header. rollout.md (which seeded the
-  manifest) is a dated snapshot; consumers drift between authoring and
-  activation, so the authoring-time pass above does not stand in for this one.
+- [x] **Re-confirm targets against the live repos** — done 2026-07-06: every
+  consumer is root-layout now (`kyle-sexton/github-iac` had migrated off
+  `modules/` since the rollout.md snapshot — exactly the drift this gate
+  exists to catch); dotfiles, both `.github` repos, and ci-workflows' root
+  hygiene files added as targets.
 - [ ] **GitHub Packages visibility** — confirm public (free) vs private
-  (billable) for `@melodic/*` and the .NET config package.
-- [ ] **GitHub App + access** — bootstrap the App manually once per account
-  (the Pulumi provider cannot create it — see Auth above), then manage its repo
-  grants and secrets via `github-iac` (Pulumi), least-privilege; wire its token
-  into the caller workflow. Install on **both** the org and the personal account
-  if targets span both (per-account App + secret; see the cross-account caveat
-  above).
+  (billable) for `@melodic-software/*` and the .NET config package.
+- [x] **GitHub App + access** — org side done 2026-07-06: `melodic-standards-sync`
+  (App ID 4233369) registered + installed with exactly `contents: write` +
+  `pull_requests: write`, secrets on `standards`. Still open: the **personal
+  account** installation (kyle-sexton targets cannot mint tokens until then),
+  and moving the installation from "all repositories" to Pulumi-managed
+  per-repo grants (`AppInstallationRepository` needs "selected repositories").
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
   - [ ] `@melodic/biome-config` MUST carry the enforced `organizeImports` `groups`
     config (`level: on`, URL → node/bun → packages → aliases → relative, blank-line
@@ -210,7 +212,11 @@ Gated (need explicit approval before they land):
     so `extends` consumers inherit the enforced grouping rather than silently
     reverting to the unenforced default.
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
-  then roll out per [rollout.md](rollout.md).
+  then roll out per [rollout.md](rollout.md). Pilot ran green 2026-07-06
+  against `melodic-software/github-iac` (its PR #37 carried exactly the drift
+  accumulated since the last hand re-sync). Still open before checking this
+  off: the **read-only marking** (upstream-owned header comment + consumer
+  CODEOWNERS) and the wider rollout itself.
 
 ## Self-dogfooding: standards' own configs (the modules/ vs root gap)
 
