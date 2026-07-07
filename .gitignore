@@ -24,3 +24,9 @@ lefthook-local.yml
 # .NET — build output from the dotnet fixtures
 bin/
 obj/
+
+# Layer-1 packages — the configs are staged in from modules/typescript/ at
+# publish time (see publish-packages.yml), never committed here
+packages/biome-config/biome.json
+packages/tsconfig/tsconfig.json
+packages/*/*.tgz

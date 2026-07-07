@@ -1,0 +1,46 @@
+name: standards-sync
+
+# Track B config distribution — calls the reusable sync engine in ci-workflows,
+# which reads distribution/sync-manifest.yml and opens a PR per target repo.
+# See docs/dedup-program/config-distribution-plan.md.
+on:
+  push:
+    branches: [main]
+    paths:  # cascade when a distributed file changes upstream
+      - modules/**
+      - .editorconfig
+      - .gitattributes
+      - ruff.toml          # root stub source (ruff-stub)
+      - .gitleaks.toml     # root stub source (gitleaks-stub)
+      - distribution/sync-manifest.yml
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Plan only — log the per-target file set; no PRs opened.
+        type: boolean
+        default: true
+      targets:
+        description: >-
+          Comma-separated allowlist of manifest targets (owner/name) to sync;
+          empty means all. Pilot / staged-rollout control.
+        type: string
+        default: ''
+  schedule:
+    - cron: "0 6 * * 1"  # weekly; the run opens/refreshes a PR per target
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@7c296411e2113ee0648f5352481bc702dcc26d1e # 7c29641 2026-07-06
+    with:
+      # Schedule and push run for real (inputs is empty on those events, so
+      # `|| false` makes them real runs); manual dispatch keeps its dry-run
+      # preview default. Do NOT flip to `== 'schedule'` — that inverts it and
+      # the weekly cascade would silently never fire.
+      dry-run: ${{ inputs.dry-run || false }}
+      targets: ${{ inputs.targets || '' }}
+    secrets:
+      app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
