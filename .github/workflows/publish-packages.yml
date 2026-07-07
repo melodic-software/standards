@@ -70,7 +70,19 @@ jobs:
           set -euo pipefail
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
-          if published_tarball="$(npm view "$name@$version" dist.tarball 2>/dev/null)"; then
+          # Only a definitive E404 means "not published" — any other npm view
+          # failure (auth, registry outage) must abort rather than fall through
+          # to a publish attempt that would skip the drift tripwire below.
+          set +e
+          view_out="$(npm view "$name@$version" dist.tarball 2>&1)"
+          view_rc=$?
+          set -e
+          if [ "$view_rc" -ne 0 ] && ! grep -q "E404" <<<"$view_out"; then
+            echo "::error::npm view failed for $name@$version (not a 404): $view_out"
+            exit 1
+          fi
+          if [ "$view_rc" -eq 0 ]; then
+            published_tarball="$view_out"
             # Version already published — verify the registry copy still matches
             # the SSOT, else demand a version bump.
             curl -fsSL -H "Authorization: Bearer $NODE_AUTH_TOKEN" "$published_tarball" -o /tmp/published.tgz
