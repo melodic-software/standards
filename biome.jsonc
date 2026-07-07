@@ -11,5 +11,13 @@
   // commented stub MUST use the .jsonc extension.
   "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
   "root": true,
-  "extends": ["./modules/typescript/biome.json"]
+  "extends": ["./modules/typescript/biome.json"],
+  // File scope is per-repo, NOT part of the shared ruleset: Biome UNIONS
+  // files.includes across extends (verified empirically), so anything the base
+  // included would override every consumer's attempt to scan narrower. The
+  // NuGet-lockfile exclusion therefore lives here (this repo's dotnet fixtures
+  // carry packages.lock.json), and each consumer scopes its own files block.
+  "files": {
+    "includes": ["**", "!**/packages.lock.json"]
+  }
 }
