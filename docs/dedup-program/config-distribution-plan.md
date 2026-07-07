@@ -181,19 +181,23 @@ Gated (need explicit approval before they land):
 - [x] **GitHub Packages visibility** — public (free) confirmed 2026-07-06 for
   `@melodic-software/*`; the .NET config package inherits the same call when it
   is built.
-- [x] **GitHub App + access** — org side done 2026-07-06: `melodic-standards-sync`
+- [x] **GitHub App + access** — done 2026-07-06/07: `melodic-standards-sync`
   (App ID 4233369) registered + installed with exactly `contents: write` +
-  `pull_requests: write`, secrets on `standards`. Still open (manual UI, see
-  Auth): flip the org installation from "all repositories" to "only select
-  repositories" (the 4 org targets), make the App public, and install it on
-  the **personal account** (kyle-sexton targets cannot mint tokens until then).
+  `pull_requests: write`, secrets on `standards`; org installation flipped to
+  "only select repositories" (verified `repository_selection: selected` via
+  API), App made public, and installed on the personal account (verified by
+  all four kyle-sexton sync legs minting tokens). The local private-key copy
+  was deleted after the secret proved out (regenerable in App settings; per
+  GitHub's key-hygiene guidance, no more copies than needed).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
-  Package sources + the idempotent publish workflow landed and both packages
-  published (`@1.0.0`) 2026-07-06 ([`packages/`](../../packages/),
-  `publish-packages.yml`); still open: the public-visibility flip (manual UI —
-  no API), then the pilot consumer conversion (medley, the JS/TS-bearing
-  consumer), which is blocked on that flip (a private package is unreadable
-  from medley's CI token).
+  Package sources + the idempotent publish workflow landed 2026-07-06
+  ([`packages/`](../../packages/), `publish-packages.yml`); both packages
+  published and flipped public (`biome-config@1.0.1` after #70 moved file
+  scope out of the base — Biome unions `files.includes` across `extends`, so
+  a shared base must not ship one; `tsconfig@1.0.0`). The pilot consumer
+  conversion is medley PR #1243 (verified behavior-equivalent: identical
+  biome-check fingerprint, tsc clean across all extending packages) — check
+  this item off when it merges.
   - [x] `@melodic-software/biome-config` MUST carry the enforced `organizeImports`
     `groups` config (`level: on`, URL → node/bun → packages → aliases → relative,
     blank-line separated) currently live in `modules/typescript/biome.json` — NOT
@@ -204,12 +208,14 @@ Gated (need explicit approval before they land):
   then roll out per [rollout.md](rollout.md). Pilot ran green 2026-07-06
   against `melodic-software/github-iac` (its PR #37 carried exactly the drift
   accumulated since the last hand re-sync — merged, signed by the App bot),
-  and the org-side rollout completed the same day: all four org targets
-  synced and merged (`github-iac` #37, `claude-code-plugins` #27, `.github`
-  #8, `ci-workflows` #61). Still open before checking this off: the
-  **read-only marking** (upstream-owned header comment + consumer CODEOWNERS)
-  and the personal-account legs (blocked on the App install, see the App
-  checklist item).
+  and the **full-fleet rollout completed 2026-07-06/07**: every manifest
+  target on both accounts synced and merged. The first fleet pass also proved
+  the customization seam: local consumer edits the overwrite would have
+  destroyed were routed upstream first (typos identifier union, dotfiles
+  shellcheck exclusion with its FU4 re-add trigger, the #58 lychee excludes).
+  The single remaining sub-item before checking this off is the **read-only
+  marking** (upstream-owned header comment where the format allows, plus
+  consumer CODEOWNERS) — an engine feature, not a rollout step.
 
 ## Self-dogfooding: standards' own configs (the modules/ vs root gap)
 
