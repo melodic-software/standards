@@ -188,10 +188,12 @@ Gated (need explicit approval before they land):
   repositories" (the 4 org targets), make the App public, and install it on
   the **personal account** (kyle-sexton targets cannot mint tokens until then).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
-  Package sources + the idempotent publish workflow landed 2026-07-06
-  ([`packages/`](../../packages/), `publish-packages.yml`); still open: the
-  first publish (fires on merge), the public-visibility flip (UI), and the
-  pilot consumer conversion (medley, the JS/TS-bearing consumer).
+  Package sources + the idempotent publish workflow landed and both packages
+  published (`@1.0.0`) 2026-07-06 ([`packages/`](../../packages/),
+  `publish-packages.yml`); still open: the public-visibility flip (manual UI —
+  no API), then the pilot consumer conversion (medley, the JS/TS-bearing
+  consumer), which is blocked on that flip (a private package is unreadable
+  from medley's CI token).
   - [x] `@melodic-software/biome-config` MUST carry the enforced `organizeImports`
     `groups` config (`level: on`, URL → node/bun → packages → aliases → relative,
     blank-line separated) currently live in `modules/typescript/biome.json` — NOT
@@ -201,9 +203,13 @@ Gated (need explicit approval before they land):
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
   then roll out per [rollout.md](rollout.md). Pilot ran green 2026-07-06
   against `melodic-software/github-iac` (its PR #37 carried exactly the drift
-  accumulated since the last hand re-sync). Still open before checking this
-  off: the **read-only marking** (upstream-owned header comment + consumer
-  CODEOWNERS) and the wider rollout itself.
+  accumulated since the last hand re-sync — merged, signed by the App bot),
+  and the org-side rollout completed the same day: all four org targets
+  synced and merged (`github-iac` #37, `claude-code-plugins` #27, `.github`
+  #8, `ci-workflows` #61). Still open before checking this off: the
+  **read-only marking** (upstream-owned header comment + consumer CODEOWNERS)
+  and the personal-account legs (blocked on the App install, see the App
+  checklist item).
 
 ## Self-dogfooding: standards' own configs (the modules/ vs root gap)
 
