@@ -119,14 +119,17 @@ the flow is a one-time manual bootstrap that hands off to IaC:
    `pull_requests: write` only; install it on the account; generate a private
    key. Record the app ID / installation ID; store the private key per the
    secrets policy.
-2. **IaC from there (`github-iac` / Pulumi):** wire the app ID / installation ID
-   / private key into the caller-workflow secrets (they mint installation tokens
-   at sync time), and manage the App's per-repo grants with
-   `AppInstallationRepository` — under `github-iac`'s **regular provider
-   credential**, not by authenticating as the sync App: the resource's docs note
-   it is not compatible with the GitHub App Installation authentication method.
-   Everything after registration stays IaC-managed; the manual registration
-   itself is recorded here as the one step the provider cannot express.
+2. **Repo grants stay UI-managed (decision 2026-07-06, superseding the
+   original "manage grants via Pulumi" intent).** `AppInstallationRepository`
+   turned out to be unusable here: the grants API rejects GitHub App
+   installation tokens, and `github-iac`'s provider authenticates as exactly
+   that (its deploy model deliberately stores no PAT-class secret — adding one
+   just for grants was weighed and declined; see the closed
+   melodic-software/github-iac#38). So the installation's repository access is
+   "Only select repositories", edited in the UI when the manifest's target set
+   changes — recorded here as provider-inexpressible for this credential model,
+   the same class as App registration/installation. A forgotten grant is
+   self-signaling: that target's sync leg fails to mint a token.
 
 **Cross-account caveat.** A GitHub App is installed **per account**. The starter
 targets span both the org (`melodic-software/*`) and the personal account
@@ -180,10 +183,10 @@ Gated (need explicit approval before they land):
   is built.
 - [x] **GitHub App + access** — org side done 2026-07-06: `melodic-standards-sync`
   (App ID 4233369) registered + installed with exactly `contents: write` +
-  `pull_requests: write`, secrets on `standards`. Still open: the **personal
-  account** installation (kyle-sexton targets cannot mint tokens until then),
-  and moving the installation from "all repositories" to Pulumi-managed
-  per-repo grants (`AppInstallationRepository` needs "selected repositories").
+  `pull_requests: write`, secrets on `standards`. Still open (manual UI, see
+  Auth): flip the org installation from "all repositories" to "only select
+  repositories" (the 4 org targets), make the App public, and install it on
+  the **personal account** (kyle-sexton targets cannot mint tokens until then).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
   Package sources + the idempotent publish workflow landed 2026-07-06
   ([`packages/`](../../packages/), `publish-packages.yml`); still open: the
