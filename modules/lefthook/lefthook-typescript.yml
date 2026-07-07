@@ -12,5 +12,11 @@ pre-commit:
       # npx resolves the consumer's pinned Biome from node_modules (node_modules/.bin
       # is not on a hook's PATH). `check` runs lint + format + import-sort.
       glob: "**/*.{ts,tsx,cts,mts,js,jsx,cjs,mjs,json,jsonc}"
+      # NuGet lock files are already exempt in the shared ruleset
+      # (files.includes), but Biome exits non-zero when every path it is handed
+      # is ignored — so a commit staging only packages.lock.json would fail
+      # spuriously without this lane-level exclude.
+      exclude:
+        - "**/packages.lock.json"
       run: npx @biomejs/biome check {staged_files}
       fail_text: "Biome findings. Run: npx @biomejs/biome check --write <files>"

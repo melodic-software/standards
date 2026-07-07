@@ -5,10 +5,18 @@
 #   extend = "ruff.toml"          # path to this copied base
 #   [lint]
 #   extend-select = ["PT"]        # ADD rules — never `select`, which REPLACES
-#   [lint.per-file-ignores]
-#   "tests/**" = ["S101"]
-# Ruff does not merge configs: a child `select` replaces the parent's entirely;
-# only `extend` + `extend-select` compose.
+#   [lint.extend-per-file-ignores]
+#   "docs/**" = ["ERA001"]        # ADD ignores — a plain `per-file-ignores`
+#                                 # table REPLACES this file's map entirely
+# Ruff does not merge configs: a child `select` (or `per-file-ignores`) replaces
+# the parent's entirely; only `extend` + the `extend-*` settings compose.
+#
+# Path anchoring: relative per-file-ignores patterns resolve against THIS
+# file's directory when the file is reached via extend/auto-discovery, but
+# against the working directory when it is passed with --config. A root stub
+# extending this file from another directory must therefore re-anchor the
+# path-anchored keys (see the shipped root ruff.toml stub); unanchored keys
+# ("__init__.py", "**/conftest.py") match either way.
 # Ref: https://docs.astral.sh/ruff/configuration/
 
 line-length = 88

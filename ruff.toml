@@ -4,3 +4,15 @@
 # that same ruleset via `extend`, keeping local and CI in agreement. Edit the
 # ruleset in the module, never here.
 extend = "modules/python/ruff.toml"
+
+# Re-anchor the module's path-anchored per-file ignores at the repo root. Ruff
+# resolves a config file's relative paths against that file's own directory
+# (discovery/extend), but against the CWD when the file is passed via --config —
+# so the module's "tests/**" means modules/python/tests/** here via `extend`,
+# yet repo-root tests/** in CI. Without this block, local auto-discovered Ruff
+# rejects test files the CI run accepts (verified empirically both ways).
+# Unanchored patterns ("__init__.py", "**/conftest.py") match either way and are
+# not repeated. Keep these keys in lockstep with the module's
+# [lint.per-file-ignores]. Ref: https://docs.astral.sh/ruff/configuration/
+[lint.extend-per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S107"]

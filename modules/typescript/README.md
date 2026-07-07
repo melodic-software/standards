@@ -21,10 +21,16 @@ unused-symbol findings, which it can autofix), `tsc` owns type correctness.
     path (e.g. `modules/typescript/`) without a project-root config above it, and
     so a consumer can `extends` it from their own root `biome.json`. Biome 2.x
     rejects a nested `root: true` config.
-  - It carries **no `files.includes`** — scope is consumer/project-scope (see
-    adoption below). Biome has no CLI exclude and treats path arguments as
-    literal, so narrow via `files.includes` (with `!` negation) or the action's
-    `paths` input.
+  - It carries **no project scope** — which sources to check is
+    consumer/project-scope (see adoption below). Biome has no CLI exclude and
+    treats path arguments as literal, so narrow via `files.includes` (with `!`
+    negation) or the action's `paths` input. The one `files.includes` entry it
+    does ship is the universal generated-file exemption `!**/packages.lock.json`
+    (NuGet's lock file — Biome
+    [protects](https://biomejs.dev/guides/configure-biome/#specifying-files-to-process)
+    the npm/yarn/composer lockfiles natively but not NuGet's); a consumer
+    defining its own `files.includes` replaces the list wholesale and must
+    carry that negation forward.
   - Several nursery / type-aware rules are named explicitly. Nursery rules are
     not under semver and graduate or get renamed between minors, so the Biome
     version is pinned and the rule set is re-audited on each bump.
