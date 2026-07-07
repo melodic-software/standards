@@ -154,8 +154,10 @@ targets:
       - lychee
       - markdown
       - comment-hygiene
-  # shellcheck has no CI lane here (yet) but the repo carries .shellcheckrc for
-  # the local lefthook lanes, so it stays synced.
+  # shellcheck is deliberately NOT synced: the repo's .shellcheckrc is a
+  # documented minimal divergence (the SSOT's require-double-brackets would
+  # flag its statusline's intentional `[ ]` idiom), tracked as follow-up FU4 in
+  # dot_claude/statusline/README.md — add shellcheck here when FU4 lands.
   - repo: kyle-sexton/dotfiles                     # chezmoi + PowerShell + shell
     layout: root
     include:
@@ -164,7 +166,6 @@ targets:
       - gitattributes
       - typos
       - gitleaks
-      - shellcheck
       - psscriptanalyzer
       - lychee
       - markdown
