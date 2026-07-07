@@ -24,7 +24,7 @@ single required `ci-status` check the org `ci-gate` ruleset keys on.
 | `melodic/medley` | .NET + polyglot | 27 | ◐ many | ✅ | full | **Harvest source** — cut over in three waves (PRs #1156–#1160, #1161, #1162+#1167); remaining inline lanes are inline by decision (skill-governance, Pester, dotnet/ts), not for want of a platform block (see note) |
 | `melodic/claude-code-plugins` | markdown + JSON + shell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes incl. shellcheck + advisory zizmor; org `ci-gate` enforcing (requires-ci applied, PR #17) |
 | `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcing (requires-ci applied, PR #16) |
-| `melodic/.github` | org meta files | 3 | ✅ full | ✅ | partial (root) | **Integrated** — markdown/typos/gitleaks/editorconfig/lychee + hygiene lanes |
+| `melodic/.github` | org meta files | 3 | ✅ full | ✅ | partial (root) | **Integrated** — markdown/typos/gitleaks/editorconfig/lychee + eol-renormalize (no comment-hygiene lane) |
 | `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset; migrated off `modules/` to root ahead of Track B activation |
 | `kyle-sexton/provisioning` | PowerShell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all PowerShell-appropriate lanes; self-gated via per-repo `ci-gate` ruleset |
 | `kyle-sexton/dotfiles` | chezmoi + PS + shell | 1 | ✅ full | ✅ | full (root) | **Integrated** — editorconfig/typos/gitleaks/markdown/lychee/PSSA + hygiene lanes |
