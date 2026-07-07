@@ -1,6 +1,6 @@
 {
   "name": "@melodic-software/biome-config",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Melodic Software's shared Biome ruleset (Layer-1 distribution of modules/typescript/biome.json).",
   "license": "UNLICENSED",
   "type": "module",

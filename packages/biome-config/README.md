@@ -39,6 +39,11 @@ The specifier must stay `@melodic-software/biome-config/biome` (the package
 `exports` entry); a path ending in `.json` is treated as a relative path and
 will not resolve from `node_modules`.
 
+The base deliberately ships **no `files` block**: Biome unions
+`files.includes` across `extends` (verified empirically), so anything the base
+included would defeat a consumer's narrower scan scope. Own your repo's
+`files` block in the extending config.
+
 ## Changing the rules
 
 This package is read-only downstream. Change
