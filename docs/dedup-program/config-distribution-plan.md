@@ -20,8 +20,12 @@ From the 2026-06-28 research (do not re-litigate; see the research doc):
 ## Layer assignment
 
 - **Layer 1 — `extends`/package (build the base once, consumer carries a stub):**
-  - `biome.json`, `tsconfig.json` → publish `@melodic/biome-config` /
-    `@melodic/tsconfig` to GitHub Packages; consumers extend the package.
+  - `biome.json`, `tsconfig.json` → publish `@melodic-software/biome-config` /
+    `@melodic-software/tsconfig` to GitHub Packages (the npm scope must equal
+    the org login); consumers extend the package. Sources live under
+    [`packages/`](../../packages/), which carry only the package manifest — the
+    config is staged in from `modules/typescript/` at publish time, so the
+    module stays the single committed source.
   - `markdownlint` → package `extends` if confirmed, else Layer 2 **[re-verify]**.
   - `.NET` (`dotnet.globalconfig` + analyzer ruleset; optionally
     `Directory.Build.props`) → NuGet config package. Note: package-delivered
@@ -71,48 +75,16 @@ Two pieces, each its own PR, dogfooded, SHA-pinned (architecture
    pinned `create-pull-request`. PR-per-repo is the review surface and the
    out-of-sync signal (drift). A sync run is *execution*, so it belongs in
    `ci-workflows` next to Track A — consistent with the seam rules.
-2. **Caller workflow in `standards`** (`.github/workflows/sync.yml`): triggers on
-   push to `main` (paths: the distributed files) and on a schedule; calls the
-   reusable workflow with the manifest and the auth token. Added **at activation**
-   — not committed earlier, because an unpinned ref to a not-yet-merged reusable
-   workflow would fail standards' own zizmor/actionlint lanes. Ready-to-paste,
-   pin the `@SHA` once the engine merges in `ci-workflows`:
-
-   ```yaml
-   name: standards-sync
-   on:
-     push:
-       branches: [main]
-       paths:  # cascade when a distributed file changes upstream
-         - modules/**
-         - .editorconfig
-         - .gitattributes
-         - ruff.toml          # root stub source (ruff-stub)
-         - .gitleaks.toml     # root stub source (gitleaks-stub)
-         - distribution/sync-manifest.yml
-     workflow_dispatch:
-       inputs:
-         dry-run:
-           type: boolean
-           default: true
-     schedule:
-       - cron: "0 6 * * 1"  # weekly; the run opens/refreshes a PR per target
-   permissions:
-     contents: read
-   jobs:
-     sync:
-       # TODO pin @SHA once ci-workflows standards-sync.yml merges (D5).
-       uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@<SHA>
-       with:
-         # Schedule runs for real (inputs.dry-run is unset on schedule, so
-         # `|| false` makes it a real run); manual dispatch keeps its default
-         # preview. Do NOT flip to `== 'schedule'` — that inverts it and the
-         # weekly cascade would silently never fire.
-         dry-run: ${{ inputs.dry-run || false }}
-       secrets:
-         app-id: ${{ secrets.STANDARDS_SYNC_APP_ID }}
-         app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
-   ```
+2. **Caller workflow in `standards`**: live at
+   [`.github/workflows/sync.yml`](../../.github/workflows/sync.yml) (the source
+   of truth — the snippet this section used to carry is superseded). Triggers on
+   push to `main` (paths: the distributed files), a weekly schedule, and manual
+   dispatch (dry-run by default, with a `targets` allowlist for pilots/staged
+   rollout); calls the reusable engine SHA-pinned (D5) with the App secrets.
+   It was added at activation — not earlier, because an unpinned ref to a
+   not-yet-merged reusable workflow would fail standards' own zizmor/actionlint
+   lanes — and activated in two stages (dispatch-only until the single-target
+   pilot passed, then the push + schedule triggers).
 
 The reusable engine itself is authored (inert) at
 `ci-workflows/.github/workflows/standards-sync.yml` — `dry-run` defaults true, so
@@ -147,14 +119,17 @@ the flow is a one-time manual bootstrap that hands off to IaC:
    `pull_requests: write` only; install it on the account; generate a private
    key. Record the app ID / installation ID; store the private key per the
    secrets policy.
-2. **IaC from there (`github-iac` / Pulumi):** wire the app ID / installation ID
-   / private key into the caller-workflow secrets (they mint installation tokens
-   at sync time), and manage the App's per-repo grants with
-   `AppInstallationRepository` — under `github-iac`'s **regular provider
-   credential**, not by authenticating as the sync App: the resource's docs note
-   it is not compatible with the GitHub App Installation authentication method.
-   Everything after registration stays IaC-managed; the manual registration
-   itself is recorded here as the one step the provider cannot express.
+2. **Repo grants stay UI-managed (decision 2026-07-06, superseding the
+   original "manage grants via Pulumi" intent).** `AppInstallationRepository`
+   turned out to be unusable here: the grants API rejects GitHub App
+   installation tokens, and `github-iac`'s provider authenticates as exactly
+   that (its deploy model deliberately stores no PAT-class secret — adding one
+   just for grants was weighed and declined; see the closed
+   melodic-software/github-iac#38). So the installation's repository access is
+   "Only select repositories", edited in the UI when the manifest's target set
+   changes — recorded here as provider-inexpressible for this credential model,
+   the same class as App registration/installation. A forgotten grant is
+   self-signaling: that target's sync leg fails to mint a token.
 
 **Cross-account caveat.** A GitHub App is installed **per account**. The starter
 targets span both the org (`melodic-software/*`) and the personal account
@@ -170,11 +145,18 @@ installation reachable for each target's owner.
 
 Layer 1 for JS/TS (and the .NET NuGet package) publishes to GitHub Packages.
 
-- **Public packages are free.** If `@melodic/biome-config` / `@melodic/tsconfig`
-  (and the .NET config package) may be public, this is the free path — surface it
-  as the question and default to it.
+- **Public packages are free.** If `@melodic-software/biome-config` /
+  `@melodic-software/tsconfig` (and the .NET config package) may be public, this
+  is the free path — surface it as the question and default to it.
 - **Private packages are billable** (storage/transfer on the Team plan) — do not
   default here; only if the configs must stay private, and only with approval.
+
+**Decision 2026-07-06: public.** A package first published from this (private)
+repo starts private; flip its visibility to public in the package settings UI
+right after first publish — there is no API for the flip, and the interim
+private storage (a few kB) sits within the plan's free allowance. Note the DX
+caveat either way: GitHub Packages npm requires auth **even for public
+installs** (`GITHUB_TOKEN` in Actions; a `read:packages` token locally).
 
 Consumer cost of Layer 1: package `extends` pulls a `node_modules` install, so it
 suits JS/TS-bearing repos, not pure .NET/PowerShell ones.
@@ -183,34 +165,51 @@ suits JS/TS-bearing repos, not pure .NET/PowerShell ones.
 
 Ungated (author now, inert until wired):
 
-- [ ] Finalize the manifest against the live consumer repos.
-- [ ] Author the `ci-workflows` reusable sync workflow (PR, dogfooded).
-- [ ] Author the `standards` caller workflow (PR).
+- [x] Finalize the manifest against the live consumer repos.
+- [x] Author the `ci-workflows` reusable sync workflow (PR, dogfooded;
+  ci-workflows #50, plus #56 for the `targets` pilot/rollout filter).
+- [x] Author the `standards` caller workflow (PR #63 — dispatch-only until the
+  pilot confirms; push + schedule triggers follow).
 
 Gated (need explicit approval before they land):
 
-- [ ] **Re-confirm targets against the live repos** — immediately before wiring,
-  re-verify every manifest target's `layout` and `include` list against the live
-  repo contents, per the manifest's own header. rollout.md (which seeded the
-  manifest) is a dated snapshot; consumers drift between authoring and
-  activation, so the authoring-time pass above does not stand in for this one.
-- [ ] **GitHub Packages visibility** — confirm public (free) vs private
-  (billable) for `@melodic/*` and the .NET config package.
-- [ ] **GitHub App + access** — bootstrap the App manually once per account
-  (the Pulumi provider cannot create it — see Auth above), then manage its repo
-  grants and secrets via `github-iac` (Pulumi), least-privilege; wire its token
-  into the caller workflow. Install on **both** the org and the personal account
-  if targets span both (per-account App + secret; see the cross-account caveat
-  above).
+- [x] **Re-confirm targets against the live repos** — done 2026-07-06: every
+  consumer is root-layout now (`kyle-sexton/github-iac` had migrated off
+  `modules/` since the rollout.md snapshot — exactly the drift this gate
+  exists to catch); dotfiles, both `.github` repos, and ci-workflows' root
+  hygiene files added as targets.
+- [x] **GitHub Packages visibility** — public (free) confirmed 2026-07-06 for
+  `@melodic-software/*`; the .NET config package inherits the same call when it
+  is built.
+- [x] **GitHub App + access** — org side done 2026-07-06: `melodic-standards-sync`
+  (App ID 4233369) registered + installed with exactly `contents: write` +
+  `pull_requests: write`, secrets on `standards`. Still open (manual UI, see
+  Auth): flip the org installation from "all repositories" to "only select
+  repositories" (the 4 org targets), make the App public, and install it on
+  the **personal account** (kyle-sexton targets cannot mint tokens until then).
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
-  - [ ] `@melodic/biome-config` MUST carry the enforced `organizeImports` `groups`
-    config (`level: on`, URL → node/bun → packages → aliases → relative, blank-line
-    separated) currently live in `modules/typescript/biome.json` — NOT Biome's plain
-    `"organizeImports": "on"`. Extract the base from the current module verbatim
-    so `extends` consumers inherit the enforced grouping rather than silently
-    reverting to the unenforced default.
+  Package sources + the idempotent publish workflow landed and both packages
+  published (`@1.0.0`) 2026-07-06 ([`packages/`](../../packages/),
+  `publish-packages.yml`); still open: the public-visibility flip (manual UI —
+  no API), then the pilot consumer conversion (medley, the JS/TS-bearing
+  consumer), which is blocked on that flip (a private package is unreadable
+  from medley's CI token).
+  - [x] `@melodic-software/biome-config` MUST carry the enforced `organizeImports`
+    `groups` config (`level: on`, URL → node/bun → packages → aliases → relative,
+    blank-line separated) currently live in `modules/typescript/biome.json` — NOT
+    Biome's plain `"organizeImports": "on"`. Guaranteed structurally: the package
+    stages the module file itself at publish time (never a re-authored copy), so
+    consumers inherit the enforced grouping by construction.
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
-  then roll out per [rollout.md](rollout.md).
+  then roll out per [rollout.md](rollout.md). Pilot ran green 2026-07-06
+  against `melodic-software/github-iac` (its PR #37 carried exactly the drift
+  accumulated since the last hand re-sync — merged, signed by the App bot),
+  and the org-side rollout completed the same day: all four org targets
+  synced and merged (`github-iac` #37, `claude-code-plugins` #27, `.github`
+  #8, `ci-workflows` #61). Still open before checking this off: the
+  **read-only marking** (upstream-owned header comment + consumer CODEOWNERS)
+  and the personal-account legs (blocked on the App install, see the App
+  checklist item).
 
 ## Self-dogfooding: standards' own configs (the modules/ vs root gap)
 
