@@ -111,7 +111,9 @@
             Enable = $true
         }
 
-        # Unused variables are bugs in automation scripts — promote to Error.
+        # Unused variables are bugs in automation scripts. A settings file
+        # cannot re-map a rule's severity, so findings surface at the shipped
+        # Warning — which the top-level Severity filter above lets block.
         PSUseDeclaredVarsMoreThanAssignments = @{
             Enable = $true
         }
