@@ -12,10 +12,10 @@ phases land. A repo does not need to wait for the whole program to start.
 
 ## Adoption status
 
-Snapshot 2026-06-24; re-verify against the live repos before acting (they
-change). "Consumes" = references `ci-workflows` actions/workflows by pinned SHA.
-"Gate" = emits the single required `ci-status` check the org `ci-gate` ruleset
-keys on.
+Snapshot 2026-06-24, rows re-verified 2026-07-06 at Track B activation;
+re-verify against the live repos before acting (they change). "Consumes" =
+references `ci-workflows` actions/workflows by pinned SHA. "Gate" = emits the
+single required `ci-status` check the org `ci-gate` ruleset keys on.
 
 | Repo | Stack | Workflows | Consumes | Gate | standards configs | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -24,11 +24,11 @@ keys on.
 | `melodic/medley` | .NET + polyglot | 27 | ◐ many | ✅ | full | **Harvest source** — cut over in three waves (PRs #1156–#1160, #1161, #1162+#1167); remaining inline lanes are inline by decision (skill-governance, Pester, dotnet/ts), not for want of a platform block (see note) |
 | `melodic/claude-code-plugins` | markdown + JSON + shell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes incl. shellcheck + advisory zizmor; org `ci-gate` enforcing (requires-ci applied, PR #17) |
 | `melodic/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; org `ci-gate` enforcing (requires-ci applied, PR #16) |
-| `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (`modules/`) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset |
+| `melodic/.github` | org meta files | 3 | ✅ full | ✅ | partial (root) | **Integrated** — markdown/typos/gitleaks/editorconfig/lychee + hygiene lanes |
+| `kyle-sexton/github-iac` | C# (Pulumi) | 2 | ✅ full | ✅ | full (root) | **Integrated** — all lanes; self-gated via per-repo `ci-gate` ruleset; migrated off `modules/` to root ahead of Track B activation |
 | `kyle-sexton/provisioning` | PowerShell | 2 | ✅ full | ✅ | full (root) | **Integrated** — all PowerShell-appropriate lanes; self-gated via per-repo `ci-gate` ruleset |
-
-(`chezmoi` dotfiles live under `~/.local/share/chezmoi`, outside `D:\repos`, and
-are out of scope here.)
+| `kyle-sexton/dotfiles` | chezmoi + PS + shell | 1 | ✅ full | ✅ | full (root) | **Integrated** — editorconfig/typos/gitleaks/markdown/lychee/PSSA + hygiene lanes |
+| `kyle-sexton/.github` | personal meta files | 1 | ✅ | ✅ | markdown only | **Integrated** — markdown lane |
 
 **Comment-hygiene policy widening — propagated 2026-06-24.** The org-default
 comment-hygiene policy was widened at the `standards` SSOT
@@ -42,12 +42,15 @@ consumers were re-synced byte-identical to the SSOT and re-pinned to current
 re-pin only, #42) and `medley` (re-pin only, #1169) were brought to the same
 `ci-workflows` SHA. Every repo re-verified clean under the widened policy.
 
-> **This hand re-sync is the motivating pain for Track B.** Automating the
-> upstream→downstream config cascade (and detecting drift) is planned in
-> [config-distribution-plan.md](config-distribution-plan.md). Until it lands, the
-> "standards configs" column below reflects **manually** copied/vendored files,
-> and the two placements (`full (root)` vs `full (modules/)`) are the two
-> destination layouts the Track B manifest must map to.
+> **This hand re-sync was the motivating pain for Track B — now automated.**
+> The upstream→downstream config cascade landed 2026-07-06
+> ([config-distribution-plan.md](config-distribution-plan.md)): the sync engine
+> opens a PR per target from the distribution manifest, piloted green against
+> `melodic/github-iac` (its PR #37 carried exactly the drift accumulated since
+> the last hand re-sync). Every consumer is root-layout now — the `modules/`
+> vendoring convention is retired downstream (`modules/<tool>/` paths remain
+> only for files the actions reference by explicit path: comment-hygiene,
+> lychee, lefthook fragments, dotnet Layer-1 props).
 
 ## Per-repo onboarding scope
 
