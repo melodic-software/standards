@@ -1,0 +1,86 @@
+name: publish-packages
+
+# Layer-1 (Track B) package publishing: stages each package's SSOT config from
+# modules/typescript/ into the package dir (the config is never committed under
+# packages/ — single source, no drift) and publishes to GitHub Packages when the
+# version in packages/<name>/package.json is new. If the staged config differs
+# from what the published version carries, the run fails loudly: that is the
+# "config changed upstream, version not bumped" drift signal.
+# See docs/dedup-program/config-distribution-plan.md (Layer 1).
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/**
+      - modules/typescript/biome.json
+      - modules/typescript/tsconfig.json
+      - .github/workflows/publish-packages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-packages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: biome-config
+            source: modules/typescript/biome.json
+            artifact: biome.json
+          - package: tsconfig
+            source: modules/typescript/tsconfig.json
+            artifact: tsconfig.json
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node with the GitHub Packages registry
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          registry-url: https://npm.pkg.github.com
+          scope: '@melodic-software'
+
+      - name: Stage the SSOT config into the package
+        env:
+          SOURCE: ${{ matrix.source }}
+          PACKAGE: ${{ matrix.package }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: cp "$SOURCE" "packages/$PACKAGE/$ARTIFACT"
+
+      - name: Publish if the version is new; fail on unbumped drift
+        working-directory: packages/${{ matrix.package }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          if published_tarball="$(npm view "$name@$version" dist.tarball 2>/dev/null)"; then
+            # Version already published — verify the registry copy still matches
+            # the SSOT, else demand a version bump.
+            curl -fsSL -H "Authorization: Bearer $NODE_AUTH_TOKEN" "$published_tarball" -o /tmp/published.tgz
+            tar -xzOf /tmp/published.tgz "package/$ARTIFACT" > /tmp/published-artifact
+            if ! diff -u /tmp/published-artifact "$ARTIFACT"; then
+              echo "::error::$name@$version is published but its $ARTIFACT no longer matches the SSOT — bump the version in packages/ to release the change"
+              exit 1
+            fi
+            echo "$name@$version already published and up to date — nothing to do"
+          else
+            npm publish
+            echo "published $name@$version"
+          fi

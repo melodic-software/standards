@@ -20,8 +20,12 @@ From the 2026-06-28 research (do not re-litigate; see the research doc):
 ## Layer assignment
 
 - **Layer 1 — `extends`/package (build the base once, consumer carries a stub):**
-  - `biome.json`, `tsconfig.json` → publish `@melodic/biome-config` /
-    `@melodic/tsconfig` to GitHub Packages; consumers extend the package.
+  - `biome.json`, `tsconfig.json` → publish `@melodic-software/biome-config` /
+    `@melodic-software/tsconfig` to GitHub Packages (the npm scope must equal
+    the org login); consumers extend the package. Sources live under
+    [`packages/`](../../packages/), which carry only the package manifest — the
+    config is staged in from `modules/typescript/` at publish time, so the
+    module stays the single committed source.
   - `markdownlint` → package `extends` if confirmed, else Layer 2 **[re-verify]**.
   - `.NET` (`dotnet.globalconfig` + analyzer ruleset; optionally
     `Directory.Build.props`) → NuGet config package. Note: package-delivered
@@ -170,11 +174,18 @@ installation reachable for each target's owner.
 
 Layer 1 for JS/TS (and the .NET NuGet package) publishes to GitHub Packages.
 
-- **Public packages are free.** If `@melodic/biome-config` / `@melodic/tsconfig`
-  (and the .NET config package) may be public, this is the free path — surface it
-  as the question and default to it.
+- **Public packages are free.** If `@melodic-software/biome-config` /
+  `@melodic-software/tsconfig` (and the .NET config package) may be public, this
+  is the free path — surface it as the question and default to it.
 - **Private packages are billable** (storage/transfer on the Team plan) — do not
   default here; only if the configs must stay private, and only with approval.
+
+**Decision 2026-07-06: public.** A package first published from this (private)
+repo starts private; flip its visibility to public in the package settings UI
+right after first publish — there is no API for the flip, and the interim
+private storage (a few kB) sits within the plan's free allowance. Note the DX
+caveat either way: GitHub Packages npm requires auth **even for public
+installs** (`GITHUB_TOKEN` in Actions; a `read:packages` token locally).
 
 Consumer cost of Layer 1: package `extends` pulls a `node_modules` install, so it
 suits JS/TS-bearing repos, not pure .NET/PowerShell ones.
@@ -196,8 +207,9 @@ Gated (need explicit approval before they land):
   `modules/` since the rollout.md snapshot — exactly the drift this gate
   exists to catch); dotfiles, both `.github` repos, and ci-workflows' root
   hygiene files added as targets.
-- [ ] **GitHub Packages visibility** — confirm public (free) vs private
-  (billable) for `@melodic-software/*` and the .NET config package.
+- [x] **GitHub Packages visibility** — public (free) confirmed 2026-07-06 for
+  `@melodic-software/*`; the .NET config package inherits the same call when it
+  is built.
 - [x] **GitHub App + access** — org side done 2026-07-06: `melodic-standards-sync`
   (App ID 4233369) registered + installed with exactly `contents: write` +
   `pull_requests: write`, secrets on `standards`. Still open: the **personal
@@ -205,12 +217,16 @@ Gated (need explicit approval before they land):
   and moving the installation from "all repositories" to Pulumi-managed
   per-repo grants (`AppInstallationRepository` needs "selected repositories").
 - [ ] Publish the Layer-1 packages; convert pilot consumers to `extends` stubs.
-  - [ ] `@melodic/biome-config` MUST carry the enforced `organizeImports` `groups`
-    config (`level: on`, URL → node/bun → packages → aliases → relative, blank-line
-    separated) currently live in `modules/typescript/biome.json` — NOT Biome's plain
-    `"organizeImports": "on"`. Extract the base from the current module verbatim
-    so `extends` consumers inherit the enforced grouping rather than silently
-    reverting to the unenforced default.
+  Package sources + the idempotent publish workflow landed 2026-07-06
+  ([`packages/`](../../packages/), `publish-packages.yml`); still open: the
+  first publish (fires on merge), the public-visibility flip (UI), and the
+  pilot consumer conversion (medley, the JS/TS-bearing consumer).
+  - [x] `@melodic-software/biome-config` MUST carry the enforced `organizeImports`
+    `groups` config (`level: on`, URL → node/bun → packages → aliases → relative,
+    blank-line separated) currently live in `modules/typescript/biome.json` — NOT
+    Biome's plain `"organizeImports": "on"`. Guaranteed structurally: the package
+    stages the module file itself at publish time (never a re-authored copy), so
+    consumers inherit the enforced grouping by construction.
 - [ ] Pilot the Layer-2 sync on one consumer; verify PR + read-only marking;
   then roll out per [rollout.md](rollout.md). Pilot ran green 2026-07-06
   against `melodic-software/github-iac` (its PR #37 carried exactly the drift
