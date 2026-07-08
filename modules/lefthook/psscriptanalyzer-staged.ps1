@@ -78,14 +78,15 @@ $findings = @($findings | Where-Object { $_ })
 #     that targets the analyzer engine object rather than the scanned file; built-in-rule errors do not.
 # Every other analyzer error - a custom rule that throws an NRE, an NRE while PSUseCompatibleSyntax is
 # disabled, or any rule that failed to load - is surfaced so a broken ruleset can never pass as clean.
+$engineTypeName = 'Microsoft.Windows.PowerShell.ScriptAnalyzer.ScriptAnalyzer'
 $realErrors = @($saErrors | Where-Object {
-    $isNullRefError = $_.Exception.Message -match 'Object reference not set'
-    $fromExternalRule =
-        ($_.FullyQualifiedErrorId -match '^80131501') -or
+        $isNullRefError = $_.Exception.Message -match 'Object reference not set'
+        $target = $_.TargetObject
+        $fromExternalRule = ($_.FullyQualifiedErrorId -match '^80131501') -or
         ($_.Exception.StackTrace -match 'GetExternalRecord') -or
-        ($null -ne $_.TargetObject -and $_.TargetObject.GetType().FullName -eq 'Microsoft.Windows.PowerShell.ScriptAnalyzer.ScriptAnalyzer')
-    -not ($isNullRefError -and $compatSyntaxEffective -and -not $fromExternalRule)
-})
+        ($null -ne $target -and $target.GetType().FullName -eq $engineTypeName)
+        -not ($isNullRefError -and $compatSyntaxEffective -and -not $fromExternalRule)
+    })
 if ($realErrors) {
     $realErrors | ForEach-Object { Write-Output "PSScriptAnalyzer error: $($_.Exception.Message)" }
     exit 1
