@@ -31,15 +31,29 @@ Import-Module PSScriptAnalyzer -ErrorAction Stop
 # loudly here instead of being silently swallowed - which would drop the consumer's ruleset and let the
 # scan report clean while running unruled.
 $analyzerArgs = @{}
+$settingsData = $null
 $settings = "$PWD/PSScriptAnalyzerSettings.psd1"
 if (Test-Path -LiteralPath $settings) {
     try {
-        Import-PowerShellDataFile -LiteralPath $settings -ErrorAction Stop | Out-Null
+        $settingsData = Import-PowerShellDataFile -LiteralPath $settings -ErrorAction Stop
     } catch {
         Write-Output "PSScriptAnalyzerSettings.psd1 could not be parsed: $($_.Exception.Message)"
         exit 1
     }
     $analyzerArgs['Settings'] = $settings
+}
+
+# PSUseCompatibleSyntax ships in the default rule set, so it runs unless the consumer's settings turn it
+# off: an ExcludeRules entry drops it, or an explicit IncludeRules list that omits it. Only while it is
+# actually in effect is its benign NullReferenceException (handled after the scan) tolerable; if the
+# consumer disabled it, any NRE must originate elsewhere and has to surface.
+$compatSyntaxRule = 'PSUseCompatibleSyntax'
+$compatSyntaxEffective = $true
+if ($settingsData) {
+    $excludeRules = @($settingsData.ExcludeRules | Where-Object { $_ })
+    $includeRules = @($settingsData.IncludeRules | Where-Object { $_ })
+    if ($excludeRules -contains $compatSyntaxRule) { $compatSyntaxEffective = $false }
+    if ($includeRules.Count -and ($includeRules -notcontains $compatSyntaxRule)) { $compatSyntaxEffective = $false }
 }
 
 # Capture non-terminating analyzer errors rather than blanket-swallowing them. PSUseCompatibleSyntax can
@@ -54,9 +68,24 @@ $findings = foreach ($file in $targets) {
 }
 $findings = @($findings | Where-Object { $_ })
 
-# Re-surface any non-benign analyzer error as a failure (only the benign PSUseCompatibleSyntax NRE
-# above is tolerated), so a broken ruleset or rule can never masquerade as a clean scan.
-$realErrors = @($saErrors | Where-Object { $_.Exception.Message -notmatch 'Object reference not set' })
+# Re-surface every analyzer error as a failure, tolerating ONLY the one known-benign case: the
+# NullReferenceException thrown by the built-in PSUseCompatibleSyntax rule itself. An error is treated as
+# benign strictly when ALL of these hold:
+#   * its message is the NRE signature ("Object reference not set"), AND
+#   * PSUseCompatibleSyntax is actually effective for this scan (see $compatSyntaxEffective above), AND
+#   * it did NOT originate from an external/custom rule. Custom rules execute via a separate engine path
+#     (Invoke-ScriptAnalyzer's GetExternalRecord), surfacing as a RuntimeException with error id 80131501
+#     that targets the analyzer engine object rather than the scanned file; built-in-rule errors do not.
+# Every other analyzer error - a custom rule that throws an NRE, an NRE while PSUseCompatibleSyntax is
+# disabled, or any rule that failed to load - is surfaced so a broken ruleset can never pass as clean.
+$realErrors = @($saErrors | Where-Object {
+    $isNullRefError = $_.Exception.Message -match 'Object reference not set'
+    $fromExternalRule =
+        ($_.FullyQualifiedErrorId -match '^80131501') -or
+        ($_.Exception.StackTrace -match 'GetExternalRecord') -or
+        ($null -ne $_.TargetObject -and $_.TargetObject.GetType().FullName -eq 'Microsoft.Windows.PowerShell.ScriptAnalyzer.ScriptAnalyzer')
+    -not ($isNullRefError -and $compatSyntaxEffective -and -not $fromExternalRule)
+})
 if ($realErrors) {
     $realErrors | ForEach-Object { Write-Output "PSScriptAnalyzer error: $($_.Exception.Message)" }
     exit 1
