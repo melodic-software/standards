@@ -52,7 +52,7 @@ $findings = foreach ($file in $targets) {
     Invoke-ScriptAnalyzer -Path $file @analyzerArgs -ErrorAction SilentlyContinue -ErrorVariable err
     if ($err) { $saErrors.AddRange(@($err)) }
 }
-$findings = @($findings)
+$findings = @($findings | Where-Object { $_ })
 
 # Re-surface any non-benign analyzer error as a failure (only the benign PSUseCompatibleSyntax NRE
 # above is tolerated), so a broken ruleset or rule can never masquerade as a clean scan.
