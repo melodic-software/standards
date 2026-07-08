@@ -62,4 +62,10 @@ flagged_ref="$(printf '%s\n' '// tracked in owner-name/repo#7')"
 chp::scan_text "$flagged_ref" >/dev/null
 assert_exit 'hyphenated owner/repo#N is still flagged' 1 "$?"
 
+# A GitHub Enterprise Managed User owner login carries an '_SHORTCODE' suffix, so
+# an owner containing '_' must still be flagged as a repo-issue ref.
+emu_ref="$(printf '%s\n' '// see mona-cat_octo/scratch#12')"
+chp::scan_text "$emu_ref" >/dev/null
+assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1

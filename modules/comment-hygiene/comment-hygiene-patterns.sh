@@ -79,13 +79,15 @@ chp::scan_text() {
     fi
 
     # owner/repo#N — same- or cross-repo issue reference (e.g. org/app#123). The
-    # owner segment allows only the characters a GitHub owner can contain
-    # (alphanumerics and hyphens — no '.' or '_'), so a bare domain host (e.g.
-    # foo.com/bar#3 or example.com/page#2) is not misread as owner/repo: a dotted
-    # host cannot be an owner. The repo segment keeps '.' and '_' because
-    # repository names allow them; the leading boundary still excludes '.'/'-' so
-    # a host embedded mid-token is not a match start either.
-    if [[ "$line" =~ (^|[^[:alnum:]_/.-])[A-Za-z0-9-]+/[A-Za-z0-9._-]+#[0-9]+ ]]; then
+    # owner segment excludes '.' — the only character needed to keep a bare domain
+    # host (e.g. foo.com/bar#3 or example.com/page#2) from being misread as
+    # owner/repo, since a dotted host cannot be an owner. '_' stays in the owner
+    # class because GitHub Enterprise Managed User logins carry an '_SHORTCODE'
+    # suffix (e.g. mona-cat_octo), so dropping it would miss real owner refs in
+    # EMU repos. The repo segment also keeps '.' and '_' because repository names
+    # allow them; the leading boundary still excludes '.'/'-' so a host embedded
+    # mid-token is not a match start either.
+    if [[ "$line" =~ (^|[^[:alnum:]_/.-])[A-Za-z0-9_-]+/[A-Za-z0-9._-]+#[0-9]+ ]]; then
       printf '%s:tracker-ref:repo-issue\n' "$lineno"
       violations=$((violations + 1))
       continue
