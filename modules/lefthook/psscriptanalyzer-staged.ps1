@@ -43,17 +43,27 @@ if (Test-Path -LiteralPath $settings) {
     $analyzerArgs['Settings'] = $settings
 }
 
-# PSUseCompatibleSyntax ships in the default rule set, so it runs unless the consumer's settings turn it
-# off: an ExcludeRules entry drops it, or an explicit IncludeRules list that omits it. Only while it is
-# actually in effect is its benign NullReferenceException (handled after the scan) tolerable; if the
-# consumer disabled it, any NRE must originate elsewhere and has to surface.
+# PSUseCompatibleSyntax ships in the default rule set, so it runs - and can emit the benign NRE handled
+# after the scan - unless the consumer's settings turn it off. Treat it as NOT effective (so any NRE must
+# then originate elsewhere and has to surface) when any of these disables or omits it:
+#   * Rules.PSUseCompatibleSyntax.Enable = $false explicitly disables the rule;
+#   * an ExcludeRules pattern matches it; or
+#   * an explicit IncludeRules list has no pattern that matches it.
+# IncludeRules/ExcludeRules accept wildcards (e.g. 'PSUseCompatible*'), so match with -like, not equality.
 $compatSyntaxRule = 'PSUseCompatibleSyntax'
 $compatSyntaxEffective = $true
 if ($settingsData) {
+    if ($settingsData.Rules.$compatSyntaxRule.Enable -eq $false) {
+        $compatSyntaxEffective = $false
+    }
     $excludeRules = @($settingsData.ExcludeRules | Where-Object { $_ })
     $includeRules = @($settingsData.IncludeRules | Where-Object { $_ })
-    if ($excludeRules -contains $compatSyntaxRule) { $compatSyntaxEffective = $false }
-    if ($includeRules.Count -and ($includeRules -notcontains $compatSyntaxRule)) { $compatSyntaxEffective = $false }
+    if ($excludeRules | Where-Object { $compatSyntaxRule -like $_ }) {
+        $compatSyntaxEffective = $false
+    }
+    if ($includeRules.Count -and -not ($includeRules | Where-Object { $compatSyntaxRule -like $_ })) {
+        $compatSyntaxEffective = $false
+    }
 }
 
 # Capture non-terminating analyzer errors rather than blanket-swallowing them. PSUseCompatibleSyntax can
