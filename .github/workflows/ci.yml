@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/markdown@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           globs: '**/*.md !fixtures/*/bad/**'
 
@@ -40,7 +40,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/powershell@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: fixtures/powershell/bad
 
@@ -53,7 +53,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: fixtures/shellcheck/bad
 
@@ -66,7 +66,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: 'fixtures/[^/]+/bad'
 
@@ -79,7 +79,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/editorconfig@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/editorconfig@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: 'fixtures/[^/]+/bad/'
       - name: editorconfig module fixtures test
@@ -94,7 +94,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
-        uses: melodic-software/ci-workflows/.github/actions/gitleaks@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/gitleaks@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
       - name: gitleaks module fixtures test
         run: bash harness/shell/run-tests.sh modules/gitleaks/gitleaks.test.sh
 
@@ -107,7 +107,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/typos@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/typos@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: 'fixtures/*/bad/'
       - name: typos module fixtures test
@@ -213,7 +213,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/ruff@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: fixtures/python/bad
 
@@ -229,7 +229,7 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/pyright@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           paths: fixtures/python/good
 
@@ -245,7 +245,7 @@ jobs:
         # Biome has no CLI exclude, so scope at the conforming fixture (the repo
         # carries no other JS/TS source; the bad fixture is non-conforming by
         # design).
-        uses: melodic-software/ci-workflows/.github/actions/biome@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/biome@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           paths: fixtures/typescript/good
 
@@ -261,7 +261,7 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so point tsc at
         # the conforming fixture's project, which extends the base and supplies
         # `include` (the bad fixture is non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/tsc@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/tsc@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           project: fixtures/typescript/good/tsconfig.json
 
@@ -277,7 +277,7 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           project: fixtures/dotnet/good/good.csproj
 
@@ -290,7 +290,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           project: fixtures/dotnet/good/good.csproj
 
@@ -303,13 +303,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
 
   zizmor:
     permissions:
       contents: read
     # Advisory Actions security lint; findings annotate without blocking.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
     with:
       paths: .
 
@@ -320,7 +320,7 @@ jobs:
       security-events: write
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false).
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
 
   python-fixtures:
     runs-on: ubuntu-latest
@@ -397,7 +397,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up .NET
-        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Verify toolchain
@@ -425,7 +425,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/exec-bit@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/exec-bit@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
 
   machine-specific-paths:
     runs-on: ubuntu-latest
@@ -436,7 +436,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check for machine-specific paths
-        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
 
   eol-renormalize:
     runs-on: ubuntu-latest
@@ -447,7 +447,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
 
   comment-hygiene:
     runs-on: ubuntu-latest
@@ -458,7 +458,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan comment hygiene (excludes intentionally-bad fixtures + module)
-        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@0c5a0654b8a53937ef9ed189c77e47ece923877e # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@2bb57ddba29c7fec1db643a577aae54bef5a1dc2 # b6431a1 2026-06-26
         with:
           exclude: ':(exclude)fixtures/*/bad/** :(exclude)modules/comment-hygiene/**'
       - name: comment-hygiene module fixtures test
