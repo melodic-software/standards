@@ -4,7 +4,7 @@ GitHub Flavored Markdown linting via [markdownlint-cli2](https://github.com/Davi
 
 ## Contents
 
-- `.markdownlint-cli2.jsonc` — the GFM ruleset: ATX headings, dash bullets, asterisk emphasis, fenced backtick code, GFM table rules. Schema-pinned to markdownlint-cli2 0.22.1.
+- `.markdownlint-cli2.jsonc` — the GFM ruleset: ATX headings, dash bullets, asterisk emphasis, fenced backtick code, GFM table rules. Schema-pinned to markdownlint-cli2 0.23.0.
 
 ## Engine
 
