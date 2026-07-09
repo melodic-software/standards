@@ -33,9 +33,11 @@ From the 2026-06-28 research (do not re-litigate; see the research doc):
     enforcement; keep any file an agent must edit locally on Layer 2 instead.
 - **Layer 2 — sync the real file (read-only downstream):** `ruff.toml`,
   `pyrightconfig.json`, `.gitleaks.toml`, `.shellcheckrc`, `_typos.toml`,
-  `.editorconfig-checker.json`, `PSScriptAnalyzerSettings.psd1`,
-  `modules/lefthook/*.yml`, root `.editorconfig`, `.gitattributes`, and the
-  `harness/` + `fixtures/` directories (only into repos that run them).
+  `.editorconfig-checker.json`, `PSScriptAnalyzerSettings.psd1`, root
+  `.editorconfig`, `.gitattributes`, and the `harness/` + `fixtures/`
+  directories (only into repos that run them). `modules/lefthook/*.yml` is
+  **deferred** from directory sync (see below); do not add it to the
+  activation/manifest Layer-2 set until the revisit trigger fires.
 
 ## The distribution manifest (Layer 2)
 
@@ -60,9 +62,24 @@ consumers need — plus every known consumer with its rollout.md layout. **Confi
 each target's include list against the live repo at activation** (rollout.md is
 a dated snapshot).
 
-Still open for activation: whether `lefthook` fragments and the `harness/` +
-`fixtures/` directories ride this manifest (they need directory, not per-file,
-sync) or a separate stanza, since not every consumer runs the harness.
+Directory sync (`lefthook` fragments, `harness/`, `fixtures/`) — **`lefthook`
+deferred (2026-07-09); `harness/` + `fixtures/` still open.** All three need
+directory, not per-file, sync, which the engine (below) does not have: each
+`include` entry copies exactly one file, so directory sync is a schema-and-engine
+change (manifest `version` bump + a new entry type in the ci-workflows sync
+workflow), not a manifest edit.
+
+For `lefthook` that cost is not justified: its purpose — a local secret/hygiene
+gate before code leaves the machine — is already met on every private consumer,
+each running its own `gitleaks` pre-commit hook (github-iac extends the vendored
+`modules/lefthook/base.yml`; medley runs its own richer `.lefthook/` scripts;
+standards dogfoods the fragments). Syncing the fragments would be drift-management
+of an already-present control, not a new one, and only github-iac vendors them —
+medley is deliberately self-managed and would not adopt them, leaving a single
+beneficiary. Revisit when a second modules-layout `lefthook` consumer appears, or
+fold it in when `harness/`/`fixtures/` directory sync is built (same engine
+primitive — do them together). Those two stay open on their own merits: not every
+consumer runs the harness.
 
 ## The sync mechanism (Layer 2, first-party)
 
