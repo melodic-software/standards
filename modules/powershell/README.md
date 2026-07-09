@@ -5,7 +5,7 @@ Opinionated PowerShell static analysis via [PSScriptAnalyzer](https://github.com
 ## Contents
 
 - `PSScriptAnalyzerSettings.psd1` — the ruleset: OTBS (One True Brace Style),
-  targets PowerShell 7.4/7.6, cross-platform, every rule justified inline.
+  targets PowerShell 7.4+, cross-platform, every rule justified inline.
 
 This module ships the ruleset only. The CI runner that executes the analyzer
 (per-file subprocess isolation, to dodge the analyzer's multi-file cache race)

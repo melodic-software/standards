@@ -42,26 +42,30 @@ if (Test-Path -LiteralPath $settings) {
     $analyzerArgs['Settings'] = $settings
 }
 
-# Exclude PSUseCompatibleSyntax from this fast staged-file lane. That built-in rule can throw a benign
-# NullReferenceException in a fresh -NoProfile host; excluding it means the rule never runs here, so the
-# NRE never arises and this runner does not have to guess which errors are benign. -ExcludeRule is honored
-# alongside any ExcludeRules in the consumer's settings. The rule stays enforced authoritatively in CI
-# (the gate); this lane only trades it away for fast, non-silent feedback.
-$analyzerArgs['ExcludeRule'] = 'PSUseCompatibleSyntax'
-
 # Collect analyzer/engine errors instead of letting SilentlyContinue swallow them: SilentlyContinue
 # suppresses the console spew while -ErrorVariable captures the errors, and a foreach statement (not
 # ForEach-Object) keeps them in this scope so they accumulate across files.
+#
+# Retry a file once when its analysis reports an error: the analyzer runs rules in parallel over a
+# shared, non-thread-safe CommandInfo cache and can throw a benign, intermittent NullReferenceException
+# (https://github.com/PowerShell/PSScriptAnalyzer/issues/1867) - observed only on a
+# fresh host's first analysis, with an immediate in-session retry reliably clean. The
+# retry's result replaces the first attempt's (an errored run's findings may be
+# incomplete). An error that survives the retry is real - a rule failed to load or a
+# broken ruleset ran - and must fail the hook.
 $saErrors = [System.Collections.Generic.List[object]]::new()
 $findings = foreach ($file in $targets) {
-    Invoke-ScriptAnalyzer -Path $file @analyzerArgs -ErrorAction SilentlyContinue -ErrorVariable err
-    if ($err) { $saErrors.AddRange(@($err)) }
+    $result = Invoke-ScriptAnalyzer -Path $file @analyzerArgs -ErrorAction SilentlyContinue -ErrorVariable err
+    if ($err) {
+        $result = Invoke-ScriptAnalyzer -Path $file @analyzerArgs -ErrorAction SilentlyContinue -ErrorVariable err
+        if ($err) { $saErrors.AddRange(@($err)) }
+    }
+    $result
 }
 $findings = @($findings | Where-Object { $_ })
 
-# Surface every analyzer error as a failure - nothing is suppressed. With PSUseCompatibleSyntax excluded
-# above no benign NRE reaches here, so any error means a rule failed to load or a broken ruleset ran, and
-# the scan must never pass as clean.
+# Surface every persistent analyzer error as a failure - nothing else is suppressed, and the scan must
+# never pass as clean when a rule failed to load or a broken ruleset ran.
 $realErrors = @($saErrors | Where-Object { $_ })
 if ($realErrors) {
     $realErrors | ForEach-Object { Write-Output "PSScriptAnalyzer error: $($_.Exception.Message)" }

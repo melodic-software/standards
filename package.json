@@ -9,16 +9,10 @@
   },
   "devDependencies": {
     "lefthook": "2.1.9",
-    "markdownlint-cli2": "0.22.1"
+    "markdownlint-cli2": "0.23.0"
   },
   "scripts": {
     "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\"",
     "lint:hooks": "lefthook validate"
-  },
-  "overrides": {
-    "markdownlint-cli2": {
-      "js-yaml": "^4.2.0",
-      "markdown-it": "^14.2.0"
-    }
   }
 }

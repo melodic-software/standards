@@ -1,6 +1,6 @@
 # PSScriptAnalyzer settings — repo-agnostic PowerShell quality ruleset.
 # OTBS (One True Brace Style) with strict, cross-platform rules. Targets
-# PowerShell 7.4+ (LTS) and 7.6+ (current).
+# PowerShell 7.4+ (the platform floor; no Windows PowerShell 5.1 consumers).
 #
 # Adopt by copying this file to a consuming repo's root; PSScriptAnalyzer
 # discovers a root-level PSScriptAnalyzerSettings.psd1 automatically, and
@@ -93,12 +93,14 @@
             Enable = $true
         }
 
-        # --- Compatibility ---
-
-        PSUseCompatibleSyntax = @{
-            Enable         = $true
-            TargetVersions = @('7.4', '7.6')
-        }
+        # PSUseCompatibleSyntax is deliberately absent: it only flags syntax
+        # NEWER than a targeted version (the rule doc's own example flags
+        # ??/ternary only when 5.1-or-earlier targets are present), so with
+        # this ruleset's 7.4+ floor and no 5.1/6.x consumers it can never
+        # fire — verified empirically: a ??/ternary probe is flagged with a
+        # 5.1 target and silent with 7.4/7.6. Re-add with TargetVersions if
+        # a consumer ever needs a floor below the newest syntax-bearing
+        # PowerShell release.
 
         # --- Best practices ---
 
