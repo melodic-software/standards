@@ -33,9 +33,11 @@ From the 2026-06-28 research (do not re-litigate; see the research doc):
     enforcement; keep any file an agent must edit locally on Layer 2 instead.
 - **Layer 2 — sync the real file (read-only downstream):** `ruff.toml`,
   `pyrightconfig.json`, `.gitleaks.toml`, `.shellcheckrc`, `_typos.toml`,
-  `.editorconfig-checker.json`, `PSScriptAnalyzerSettings.psd1`,
-  `modules/lefthook/*.yml`, root `.editorconfig`, `.gitattributes`, and the
-  `harness/` + `fixtures/` directories (only into repos that run them).
+  `.editorconfig-checker.json`, `PSScriptAnalyzerSettings.psd1`, root
+  `.editorconfig`, `.gitattributes`, and the `harness/` + `fixtures/`
+  directories (only into repos that run them). `modules/lefthook/*.yml` is
+  **deferred** from directory sync (see below); do not add it to the
+  activation/manifest Layer-2 set until the revisit trigger fires.
 
 ## The distribution manifest (Layer 2)
 
