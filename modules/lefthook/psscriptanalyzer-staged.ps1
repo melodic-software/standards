@@ -48,9 +48,10 @@ if (Test-Path -LiteralPath $settings) {
 #
 # Retry a file once when its analysis reports an error: the analyzer runs rules in parallel over a
 # shared, non-thread-safe CommandInfo cache and can throw a benign, intermittent NullReferenceException
-# (https://github.com/PowerShell/PSScriptAnalyzer/issues/1867) - observed only on a fresh host's first analysis, with an immediate
-# in-session retry reliably clean. The retry's result replaces the first attempt's (an errored run's
-# findings may be incomplete). An error that survives the retry is real - a rule failed to load or a
+# (https://github.com/PowerShell/PSScriptAnalyzer/issues/1867) - observed only on a
+# fresh host's first analysis, with an immediate in-session retry reliably clean. The
+# retry's result replaces the first attempt's (an errored run's findings may be
+# incomplete). An error that survives the retry is real - a rule failed to load or a
 # broken ruleset ran - and must fail the hook.
 $saErrors = [System.Collections.Generic.List[object]]::new()
 $findings = foreach ($file in $targets) {
