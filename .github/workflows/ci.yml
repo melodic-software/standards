@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 # Self-lint lanes run the ci-workflows composite actions (referenced by SHA,
-# bumped via Dependabot). The fixture-assertion lanes stay local — they prove
-# this repo's own configs flag the bad fixtures — and the ci-status gateway
+# bumped via Dependabot). Component contract-test lanes stay local — they prove
+# this repo's own policies flag their bad fixtures — and the ci-status gateway
 # aggregates every lane into the single required check. link-check is the one
 # deliberate exception: it is advisory/scheduled and lives in its own workflow.
 jobs:
@@ -27,9 +27,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/markdown@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          globs: '**/*.md !fixtures/*/bad/**'
+          config: .markdownlint-cli2.jsonc
+          globs: '**/*.md !components/**/fixtures/bad/**'
 
   powershell:
     runs-on: ubuntu-latest
@@ -40,9 +41,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/powershell@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: fixtures/powershell/bad
+          settings: PSScriptAnalyzerSettings.psd1
+          exclude: components/psscriptanalyzer/fixtures/bad
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -53,9 +55,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: fixtures/shellcheck/bad
+          rcfile: .shellcheckrc
+          exclude: components/shellcheck/fixtures/bad
 
   lychee:
     runs-on: ubuntu-latest
@@ -66,9 +69,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: 'fixtures/[^/]+/bad'
+          config: lychee.toml
+          exclude: 'components/[^/]+/fixtures/bad'
 
   editorconfig:
     runs-on: ubuntu-latest
@@ -79,11 +83,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/editorconfig@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/editorconfig@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: 'fixtures/[^/]+/bad/'
-      - name: editorconfig module fixtures test
-        run: bash harness/shell/run-tests.sh modules/editorconfig/editorconfig.test.sh
+          config: .editorconfig-checker.json
+          exclude: 'components/[^/]+/fixtures/bad/'
+      - name: EditorConfig checker contract test
+        run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -94,9 +99,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
-        uses: melodic-software/ci-workflows/.github/actions/gitleaks@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
-      - name: gitleaks module fixtures test
-        run: bash harness/shell/run-tests.sh modules/gitleaks/gitleaks.test.sh
+        uses: melodic-software/ci-workflows/.github/actions/gitleaks@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
+        with:
+          config: .gitleaks.toml
+      - name: Gitleaks contract test
+        run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
 
   typos:
     runs-on: ubuntu-latest
@@ -107,11 +114,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/typos@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/typos@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: 'fixtures/*/bad/'
-      - name: typos module fixtures test
-        run: bash harness/shell/run-tests.sh modules/typos/typos.test.sh
+          config: _typos.toml
+          exclude: 'components/*/fixtures/bad/'
+      - name: Typos contract test
+        run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
   markdown-fixtures:
     runs-on: ubuntu-latest
@@ -128,8 +136,8 @@ jobs:
           cache: npm
       - name: Install pinned dependencies
         run: npm ci
-      - name: Markdown module fixtures test
-        run: bash harness/shell/run-tests.sh modules/markdown/markdown.test.sh
+      - name: Markdownlint contract test
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
 
   powershell-fixtures:
     runs-on: ubuntu-latest
@@ -154,8 +162,8 @@ jobs:
           }
           Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
-      - name: PowerShell module fixtures test
-        run: bash harness/shell/run-tests.sh modules/powershell/powershell.test.sh
+      - name: PSScriptAnalyzer contract test
+        run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
 
   shellcheck-fixtures:
     runs-on: ubuntu-latest
@@ -177,8 +185,8 @@ jobs:
           sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
           rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
           shellcheck --version
-      - name: shellcheck module fixtures test
-        run: bash harness/shell/run-tests.sh modules/shellcheck/shellcheck.test.sh
+      - name: ShellCheck contract test
+        run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
   lychee-fixtures:
     runs-on: ubuntu-latest
@@ -201,8 +209,8 @@ jobs:
           sudo install lychee /usr/local/bin/lychee
           rm -f lychee.tar.gz lychee
           lychee --version
-      - name: lychee module fixtures test
-        run: bash harness/shell/run-tests.sh modules/lychee/lychee.test.sh
+      - name: Lychee contract test
+        run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
 
   ruff:
     runs-on: ubuntu-latest
@@ -213,9 +221,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/ruff@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: fixtures/python/bad
+          config: ruff.toml
+          exclude: components/ruff/fixtures/bad
 
   pyright:
     runs-on: ubuntu-latest
@@ -229,9 +238,10 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/pyright@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          paths: fixtures/python/good
+          config: components/pyright/pyrightconfig.json
+          paths: components/pyright/fixtures/good
 
   biome:
     runs-on: ubuntu-latest
@@ -245,9 +255,10 @@ jobs:
         # Biome has no CLI exclude, so scope at the conforming fixture (the repo
         # carries no other JS/TS source; the bad fixture is non-conforming by
         # design).
-        uses: melodic-software/ci-workflows/.github/actions/biome@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/biome@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          paths: fixtures/typescript/good
+          config: components/biome/biome.json
+          paths: components/biome/fixtures/good
 
   tsc:
     runs-on: ubuntu-latest
@@ -261,9 +272,9 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so point tsc at
         # the conforming fixture's project, which extends the base and supplies
         # `include` (the bad fixture is non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/tsc@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/tsc@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          project: fixtures/typescript/good/tsconfig.json
+          project: components/tsconfig/fixtures/good/tsconfig.json
 
   dotnet-build:
     runs-on: ubuntu-latest
@@ -277,9 +288,9 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          project: fixtures/dotnet/good/good.csproj
+          project: components/dotnet-analysis/fixtures/good/good.csproj
 
   dotnet-format:
     runs-on: ubuntu-latest
@@ -290,9 +301,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          project: fixtures/dotnet/good/good.csproj
+          project: components/dotnet-analysis/fixtures/good/good.csproj
 
   actionlint:
     runs-on: ubuntu-latest
@@ -303,13 +314,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
 
   zizmor:
     permissions:
       contents: read
     # Advisory Actions security lint; findings annotate without blocking.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
     with:
       paths: .
 
@@ -320,14 +331,14 @@ jobs:
       security-events: write
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false).
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
 
   python-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Inline install — the fixtures suite asserts specific rule codes fire on
-      # the bad fixture, which needs the tools on PATH (the ruff/pyright actions
+      # Inline install — component contract tests assert specific rule codes on
+      # bad fixtures, which needs the tools on PATH (the Ruff/Pyright actions
       # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
       # and with medley.
       RUFF_VERSION: 0.15.14
@@ -351,14 +362,16 @@ jobs:
         run: |
           ruff --version
           pyright --version
-      - name: python module fixtures test
-        run: bash harness/shell/run-tests.sh modules/python/python.test.sh
+      - name: Ruff contract test
+        run: bash harness/shell/run-tests.sh components/ruff/ruff.test.sh
+      - name: Pyright contract test
+        run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   typescript-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Inline install — the fixtures suite asserts specific rule/error codes on
+      # Inline install — component tests assert specific rule/error codes on
       # the bad fixture, which needs the tools on PATH (the biome/tsc actions
       # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
       # and with medley.
@@ -379,8 +392,10 @@ jobs:
         run: |
           biome --version
           tsc --version
-      - name: typescript module fixtures test
-        run: bash harness/shell/run-tests.sh modules/typescript/typescript.test.sh
+      - name: Biome contract test
+        run: bash harness/shell/run-tests.sh components/biome/biome.test.sh
+      - name: TypeScript config contract test
+        run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-fixtures:
     runs-on: ubuntu-latest
@@ -402,8 +417,8 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Verify toolchain
         run: dotnet --version
-      - name: dotnet module fixtures test
-        run: bash harness/shell/run-tests.sh modules/dotnet/dotnet.test.sh
+      - name: .NET analysis contract test
+        run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
 
   harness:
     runs-on: ubuntu-latest
@@ -416,6 +431,30 @@ jobs:
       - name: Harness self-test
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
+  distribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install yq 4.53.3
+        run: |
+          set -euo pipefail
+          version=4.53.3
+          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
+          curl -fsSL "$url" -o yq
+          echo "${sha}  yq" | sha256sum -c -
+          sudo install yq /usr/local/bin/yq
+          rm yq
+          yq --version
+      - name: Test distribution engine
+        run: bash distribution/sync-manifest.test.sh
+      - name: Validate production manifest
+        run: bash distribution/sync-manifest.sh validate
+
   exec-bit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -425,7 +464,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/exec-bit@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/exec-bit@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
 
   machine-specific-paths:
     runs-on: ubuntu-latest
@@ -436,7 +475,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check for machine-specific paths
-        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
 
   eol-renormalize:
     runs-on: ubuntu-latest
@@ -447,7 +486,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
 
   comment-hygiene:
     runs-on: ubuntu-latest
@@ -457,12 +496,12 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - name: Scan comment hygiene (excludes intentionally-bad fixtures + module)
-        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+      - name: Scan comment hygiene (excludes contract fixtures and policy source)
+        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
         with:
-          exclude: ':(exclude)fixtures/*/bad/** :(exclude)modules/comment-hygiene/**'
-      - name: comment-hygiene module fixtures test
-        run: bash harness/shell/run-tests.sh modules/comment-hygiene/comment-hygiene.test.sh
+          exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
+      - name: Comment-hygiene contract test
+        run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
   lefthook:
     runs-on: ubuntu-latest
@@ -482,7 +521,7 @@ jobs:
       - name: Put npm bin on PATH
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install ShellCheck 0.11.0
-        # The module test drives the shellcheck lane as its representative tool,
+        # The component test drives the ShellCheck lane as its representative tool,
         # so the engine must be on PATH (kept in lockstep with shellcheck-fixtures).
         run: |
           set -euo pipefail
@@ -497,8 +536,8 @@ jobs:
           shellcheck --version
       - name: Validate the merged hook config (root + all fragments)
         run: lefthook validate
-      - name: lefthook module test (hooks fire and skip correctly)
-        run: bash harness/shell/run-tests.sh modules/lefthook/lefthook.test.sh
+      - name: Lefthook ShellCheck contract test
+        run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
 
   ci-status:
     if: always()
@@ -524,6 +563,7 @@ jobs:
       - dotnet-format
       - dotnet-fixtures
       - harness
+      - distribution
       - lefthook
       - exec-bit
       - machine-specific-paths
@@ -559,6 +599,7 @@ jobs:
             ${{ needs.dotnet-format.result }}
             ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.distribution.result }}
             ${{ needs.lefthook.result }}
             ${{ needs.exec-bit.result }}
             ${{ needs.machine-specific-paths.result }}

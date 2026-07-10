@@ -1,28 +1,67 @@
-# standards
+# Melodic Software standards
 
-Curated, drop-in code-quality standards — linting, static analysis, and repo hygiene — that constrain both human contributors and agentic AI tools, consistently, across any repository.
+The normative source of shared repository-quality policy and engineering
+conventions. Change shared standards here; consuming repositories receive the
+result through native references/packages or reviewed synchronization pull
+requests. A downstream repository owns only its product behavior, project
+scope, and explicit local exceptions.
 
-This repo is the **single source of truth** (upstream). Consuming repos (downstream) adopt individual modules; they are never forced to take the whole thing, and they never couple back to this repo at runtime.
+## Ownership boundaries
 
-## What lives here
+- This repository owns lint, hygiene, analyzer, text, runtime-pin,
+  hook-adapter, and review policy.
+- [`melodic-software/ci-workflows`](https://github.com/melodic-software/ci-workflows)
+  owns reusable GitHub Actions execution.
+- the relevant `github-iac` repository owns organization/repository governance
+  expressible as infrastructure as code.
+- consumers compose these capabilities and own repository-specific behavior.
 
-A modular catalog — each module is self-contained and independently adoptable.
-Configs sort into two channels by how the tool finds them:
+The accepted architecture is recorded in
+[`docs/adr/0001-federated-component-distribution.md`](docs/adr/0001-federated-component-distribution.md).
 
-- **Copy-only, at the repo root** — `.editorconfig`, `.gitattributes`, `.gitignore`. Editors and Git discover these only by walking the directory tree, so they cannot be referenced; the root files here *are* the published standard.
-- `modules/<tool>/` — **referenceable** drop-in configs a tool reads from an explicit path: Markdown, PowerShell, the editorconfig checker, and the typos, gitleaks, shellcheck, and lychee scanners; per-language overlays (.NET, Python, TypeScript)
-- `modules/lefthook/` — **local git hooks** (Lefthook): copy-and-`extends` fragments that run the same standardized tools as fast, staged-only pre-commit checks; a consumer's own root `lefthook.yml` composes them
-- `harness/` — the shell test runner the modules rely on
-- `fixtures/` — good/bad samples that prove each module behaves
-- `conventions/` — **prose standards tooling cannot enforce**: engineering conventions and code-review criteria. The reasoning-only counterpart to the modules; adopted by copy or pointer, with no runtime coupling
-- `docs/` — the migration plan and decision records
+## Repository shape
 
-## What does not live here
+- `components/<capability>/` — one cohesive source slice per independently
+  adoptable capability: documentation, contract tests, fixtures, and any
+  package metadata live with the policy they prove.
+- root tool configs — canonical files for tools that require or naturally
+  discover a repository-root path. They exist exactly once; the corresponding
+  component slice documents and tests them.
+- `conventions/` — reasoning-only engineering and review standards that cannot
+  be reduced honestly to deterministic tooling.
+- `distribution/` — explicit mappings for exact-file synchronization when no
+  native reference mechanism fits.
+- `harness/` — shared infrastructure for component contract tests.
+- `docs/adr/` — durable, repository-specific architecture decisions.
 
-- Project scaffolding and build config — a separate `project-template` repo
-- AI-agent guardrails (hooks, agents, skills) — a separate agent/marketplace repo
-- Application, library, or product code
+`biome.jsonc` and `lefthook.yml` are genuine standards-repository adapters:
+they add this repository's scope/composition while referencing component
+policy. They are not duplicated policy sources.
 
-## Status
+## Component model
 
-Bootstrapping. See [`docs/migration-plan.md`](docs/migration-plan.md) for the phased plan. Shipped so far: **Markdown**, **PowerShell**, **base hygiene** (`.editorconfig` / `.gitattributes` / `.gitignore` + the editorconfig checker), **typos** (spell checking), **gitleaks** (secret scanning), **shellcheck** (shell-script analysis), **lychee** (offline link/anchor integrity), the **.NET / Python / TypeScript** overlays, **local git hooks** (Lefthook), and the **conventions** prose (engineering conventions + code-review criteria).
+A component is the smallest capability with one normative owner and one update
+lifecycle. It may export one file or an atomic group of heterogeneous files.
+Tests, fixtures, and maintainer documentation stay upstream unless a consumer
+operationally needs them.
+
+Delivery preference is: platform control plane, native package/reference,
+tool-native extension, exact-file synchronization, then explicit local
+ownership. There is no generic templating or partial-merge layer and no
+downstream receipt/header bookkeeping. Managed files are read-only downstream;
+a reusable change flows upstream first.
+
+## Validation
+
+CI dogfoods every root policy, runs each component's contract tests, validates
+the composed Lefthook adapter, and aggregates blocking lanes into `ci-status`.
+Locally, install pinned Node dependencies with `npm ci`, then run:
+
+```bash
+npm run lint:md
+npm run lint:hooks
+bash harness/shell/run-tests.sh harness/shell/lib.test.sh
+```
+
+Individual component tests skip cleanly when their external engine is absent;
+CI installs pinned engines and runs the complete suite.

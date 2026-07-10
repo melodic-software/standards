@@ -1,0 +1,17 @@
+{
+  "name": "@melodic-software/tsconfig",
+  "version": "1.0.1",
+  "description": "Melodic Software's shared strict TypeScript base configuration.",
+  "license": "UNLICENSED",
+  "files": [
+    "tsconfig.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/melodic-software/standards.git",
+    "directory": "components/tsconfig"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

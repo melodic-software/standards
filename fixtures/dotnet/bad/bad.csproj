@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <!-- Intentionally non-conforming fixture: imports the same strict base as the
-       good fixture so the analyzers/code-style rules fire. Excluded from the
-       repo's own self-lint; exercised only by dotnet.test.sh. -->
-  <Import Project="../../../modules/dotnet/Directory.Build.props" />
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-  </PropertyGroup>
-</Project>

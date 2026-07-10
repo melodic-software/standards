@@ -1,0 +1,20 @@
+# PowerShell adapter — opt-in. Extend it alongside the base from a consumer root
+# that has PowerShell sources and PSScriptAnalyzer installed.
+#
+# The lane calls a small component-owned runner via `pwsh -File` rather than an inline
+# `-Command "..."`: a complex inline command is split incorrectly by the shells
+# Lefthook spawns on Windows (nested quoting), whereas a script file invokes
+# portably. The runner resolves the repo-root PSScriptAnalyzerSettings.psd1 itself,
+# so the consumer needs no path here. It stays minimal — it does not copy the
+# ci-workflows pwsh action's reusable runner (that would couple a consumer's local
+# hook to ci-workflows). Fast staged-file feedback; CI is the authoritative gate.
+#
+# Adopt psscriptanalyzer-staged.ps1 alongside the managed hook payload at
+# `.lefthook/psscriptanalyzer-staged.ps1`.
+
+pre-commit:
+  commands:
+    psscriptanalyzer:
+      glob: "**/*.{ps1,psm1,psd1}"
+      run: pwsh -NoProfile -NonInteractive -File .lefthook/psscriptanalyzer-staged.ps1 {staged_files}
+      fail_text: "PSScriptAnalyzer findings. Fix them, or suppress a justified rule per the PSScriptAnalyzer component's settings."

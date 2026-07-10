@@ -1,0 +1,49 @@
+# typos — https://github.com/crate-ci/typos
+# Config reference: https://github.com/crate-ci/typos/blob/master/docs/reference.md
+# Identifiers vs words:  https://github.com/crate-ci/typos/blob/master/docs/design.md
+#
+# Root-canonical policy synced verbatim to managed consumers (read-only there).
+# typos already respects .gitignore and skips binary files, so the lists below
+# stay minimal.
+
+[default]
+extend-ignore-re = [
+  # Inline ignore directives. typos has no built-in pragma, so this config
+  # blesses a convention: silence a single line, the following line, or a
+  # block, without polluting the global allow-lists. Shell / JS comment forms.
+  "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",
+  # \r?\n tolerates a CRLF line ending, matching the CRLF-awareness of the sibling
+  # directives above (?Rm) and below (?s); a bare \n silently no-ops on a CRLF file.
+  "(#|//)\\s*spellchecker:ignore-next-line\\r?\\n.*",
+  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
+  # Markdown / HTML comment form of the block directive — invisible in render.
+  "(?s)<!--\\s*spellchecker:off\\s*-->.*?<!--\\s*spellchecker:on\\s*-->",
+  # Braced GUID / UUID literals — opaque hex segments trip the word splitter
+  # (e.g. `ba54` -> "bash"). Matches the canonical 8-4-4-4-12 brace form.
+  "\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\}",
+]
+
+# Domain words / proper nouns (case-insensitive, [default.extend-words]) and
+# whole-token identifiers (case-sensitive, below): the base carries the
+# CONSTELLATION-WIDE UNION. This file is synced verbatim to consumers and typos
+# has no config layering, so a repo-specific exception cannot survive as a
+# local edit — route a broadly valid exception here via an upstream PR; a repo
+# with genuinely different policy owns the complete component locally.
+# Each entry only skips its exact token, so the union is inert outside the
+# repos that need it; keep every entry annotated.
+[default.extend-identifiers]
+# Win32 APPBARDATA variable ($abd) — dotfiles set-windows-prefs (taskbar auto-hide).
+abd = "abd"
+# Business Associate Agreements (HIPAA) — provisioning.
+BAAs = "BAAs"
+# Features on Demand (Windows optional-feature packaging) — provisioning.
+FoD = "FoD"
+# NIC power-management registry value name — provisioning.
+PnPCapabilities = "PnPCapabilities"
+
+[files]
+# typos respects .gitignore by default, so only tracked paths that should never
+# be spell-checked belong here. Minified bundles are the near-universal case.
+extend-exclude = [
+  "*.min.*",
+]

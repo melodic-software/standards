@@ -3,16 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Curated, drop-in code-quality standards. Markdown linting via markdownlint-cli2.",
+  "description": "Normative, tested repository-quality components and conventions.",
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.1",
     "lefthook": "2.1.9",
     "markdownlint-cli2": "0.23.0"
   },
   "scripts": {
-    "lint:md": "markdownlint-cli2 --config modules/markdown/.markdownlint-cli2.jsonc \"**/*.md\" \"!fixtures/*/bad/**\"",
+    "lint:md": "markdownlint-cli2 --config .markdownlint-cli2.jsonc \"**/*.md\" \"!components/**/fixtures/bad/**\"",
     "lint:hooks": "lefthook validate"
   }
 }

@@ -5,7 +5,7 @@ name: link-check
 # Deterministic on-disk link integrity is the lychee lane in ci.yml.
 on:
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: '17 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@2275e82c502d29b468e3ee2b9c11b2de69b1677f # b6431a1 2026-06-26
+    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@e103a330577206213a4ebc0919029d2533c39cdb # e103a33 2026-07-10
     with:
       # The called workflow's defaults plus one repo-specific addition: the
       # online lane also verifies local file links, so the intentionally-broken
@@ -30,6 +30,6 @@ jobs:
         --max-cache-age 7d
         --no-progress
         --accept-timeouts
-        --exclude-path 'fixtures/[^/]+/bad'
-        --config modules/lychee/lychee.toml
+        --exclude-path 'components/[^/]+/fixtures/bad'
+        --config lychee.toml
         './**/*.md'

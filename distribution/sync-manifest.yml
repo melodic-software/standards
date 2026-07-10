@@ -1,201 +1,173 @@
-# Track B distribution manifest — LIVE.
-#
-# Consumed by the first-party sync workflow (ci-workflows: standards-sync.yml),
-# activated 2026-07-06 (App auth provisioned, caller wired — see
-# docs/dedup-program/config-distribution-plan.md). Layer-2 files only; Layer-1
-# configs (biome, tsconfig, .NET globalconfig/analyzers) are distributed via
-# extends/packages, never listed here.
-#
-# Targets below were confirmed against the live repos at activation
-# (2026-07-06): every target is root-layout — no consumer vendors tool configs
-# under modules/<tool>/ anymore. The modules layout stays supported in the
-# engine and the per-file dests below in case a modules-layout consumer
-# returns.
-#
-# Layouts:
-#   root    = file copied to the consumer repo root (consumer passes explicit
-#             config inputs to the ci-workflows actions)
-#   modules = file vendored under modules/<tool>/ (consumer relies on action
-#             defaults; also needs the root extend-stubs, below)
-#
-# Per-file destinations: a `null`/absent dest for a layout means "not applicable
-# to that layout" and the engine skips it (e.g. the *-stub files apply only to
-# the modules layout; root-layout consumers have the real config at root).
+# Exact materializations owned by melodic-software/standards.
+# Native package, GitHub Actions, and IaC adoption remain authoritative in
+# their respective consumer manifests and are intentionally absent here.
+version: 2
 
-# Schema version — the engine validates against this so format changes (new
-# layout names, new keys, new behavior) stay backward-compatible.
-version: 1
-
-files:
-  gitleaks:
-    source: modules/gitleaks/.gitleaks.toml
-    root: .gitleaks.toml
-    modules: modules/gitleaks/.gitleaks.toml
-  typos:
-    source: modules/typos/_typos.toml
-    root: _typos.toml
-    modules: modules/typos/_typos.toml
-  shellcheck:
-    source: modules/shellcheck/.shellcheckrc
-    root: .shellcheckrc
-    modules: modules/shellcheck/.shellcheckrc
-  ruff:
-    source: modules/python/ruff.toml
-    root: ruff.toml
-    modules: modules/python/ruff.toml
-  pyright:
-    source: modules/python/pyrightconfig.json
-    root: pyrightconfig.json
-    modules: modules/python/pyrightconfig.json
+components:
+  architecture-decisions:
+    files:
+      docs/adr/README.md: docs/adr/README.md
+      docs/adr/adr-template.md: docs/adr/adr-template.md
+  comment-hygiene-action:
+    files:
+      components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
+  dotnet-analysis:
+    files:
+      components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
+      components/dotnet-analysis/dotnet.globalconfig: eng/dotnet-analysis/dotnet.globalconfig
   editorconfig-checker:
-    source: modules/editorconfig/.editorconfig-checker.json
-    root: .editorconfig-checker.json
-    modules: modules/editorconfig/.editorconfig-checker.json
-  psscriptanalyzer:
-    source: modules/powershell/PSScriptAnalyzerSettings.psd1
-    root: PSScriptAnalyzerSettings.psd1
-    modules: modules/powershell/PSScriptAnalyzerSettings.psd1
-  # lychee lands under modules/lychee/ in BOTH layouts (not repo root): the
-  # ci-workflows link-check reusable workflow checks out the caller and defaults
-  # to `--config modules/lychee/lychee.toml`, so a consumer that calls it without
-  # overriding `args` reads its own vendored copy at that path regardless of the
-  # repo's general layout. Sync it to every consumer that runs the link-check lane.
-  lychee:
-    source: modules/lychee/lychee.toml
-    root: modules/lychee/lychee.toml
-    modules: modules/lychee/lychee.toml
-  # markdown is a Layer-1 candidate (extends) once the module is refactored; until
-  # then its config is synced as a whole file (Layer-2). See the plan doc.
-  markdown:
-    source: modules/markdown/.markdownlint-cli2.jsonc
-    root: .markdownlint-cli2.jsonc
-    modules: modules/markdown/.markdownlint-cli2.jsonc
-  # comment-hygiene patterns are path-referenced by the action (not discovered),
-  # so they sit under modules/ in both layouts. This is the file whose manual
-  # re-sync motivated Track B (rollout.md). medley keeps its own policy — exclude
-  # it from medley's include list.
-  comment-hygiene:
-    source: modules/comment-hygiene/comment-hygiene-patterns.sh
-    root: modules/comment-hygiene/comment-hygiene-patterns.sh
-    modules: modules/comment-hygiene/comment-hygiene-patterns.sh
-  # Always-root files (no modules/ variant):
-  editorconfig:
-    source: .editorconfig
-    root: .editorconfig
-    modules: .editorconfig
-  gitattributes:
-    source: .gitattributes
-    root: .gitattributes
-    modules: .gitattributes
-  # Root extend-stubs — modules-layout ONLY (root-layout has the real config at
-  # root, so `root:` is omitted and the engine skips it there). These mirror the
-  # stubs standards carries for its own dogfooding. PAIRING RULE: include a
-  # `*-stub` only in a target that also includes its base tool AND actually uses
-  # that tool — the stub's `extend` points at modules/<tool>/..., so without the
-  # base file present the tool errors (e.g. ruff-stub needs Python + `ruff`).
-  ruff-stub:
-    source: ruff.toml
-    modules: ruff.toml
-  gitleaks-stub:
-    source: .gitleaks.toml
-    modules: .gitleaks.toml
-  # Layer-1 / per-file-choice (NOT synced by default — listed for reference):
-  #   biome.json, tsconfig.json        -> Layer 1 (@melodic/* package extends)
-  #   dotnet.globalconfig, analyzers   -> Layer 1 (NuGet config package)
-  #   Directory.Build.props            -> NuGet if hands-off, else sync (add here)
-
-# Consumers and what each receives. `include` = the files the repo carries
-# today plus what its CI lanes consume — confirmed against the live repos
-# 2026-07-06. standards (source) and any repo with no overlap are omitted.
-targets:
-  - repo: kyle-sexton/provisioning                 # PowerShell (personal acct)
-    layout: root
-    include:
-      - editorconfig
+    requires:
+      - repository-text
+    files:
+      .editorconfig-checker.json: .editorconfig-checker.json
+  gitleaks:
+    files:
+      .gitleaks.toml: .gitleaks.toml
+  lefthook-base:
+    requires:
       - editorconfig-checker
-      - gitattributes
-      - typos
       - gitleaks
+      - markdownlint
+      - node-runtime
+      - repository-text
+      - typos
+    files:
+      components/lefthook-base/lefthook.yml: .lefthook/base.yml
+  lefthook-dotnet:
+    requires:
+      - dotnet-analysis
+      - lefthook-base
+    files:
+      components/lefthook-dotnet/lefthook.yml: .lefthook/dotnet.yml
+  lefthook-powershell:
+    requires:
+      - lefthook-base
       - psscriptanalyzer
-      - lychee
-      - markdown
-      - comment-hygiene
-  # Migrated off the modules-vendored layout to root (mirror of the org
-  # github-iac); no Python, so no ruff.
-  - repo: kyle-sexton/github-iac                   # C# Pulumi
-    layout: root
-    include:
-      - editorconfig
-      - editorconfig-checker
-      - gitattributes
-      - typos
-      - gitleaks
-      - markdown
-      - comment-hygiene
-  - repo: melodic-software/github-iac              # C# Pulumi
-    layout: root
-    include:
-      - editorconfig
-      - editorconfig-checker
-      - gitattributes
-      - typos
-      - gitleaks
-      - markdown
-      - comment-hygiene
-  - repo: melodic-software/claude-code-plugins     # markdown + JSON + shell
-    layout: root
-    include:
-      - editorconfig
-      - editorconfig-checker
-      - gitattributes
-      - typos
-      - gitleaks
+    files:
+      components/lefthook-powershell/lefthook.yml: .lefthook/powershell.yml
+      components/lefthook-powershell/psscriptanalyzer-staged.ps1: .lefthook/psscriptanalyzer-staged.ps1
+  lefthook-shellcheck:
+    requires:
+      - lefthook-base
       - shellcheck
-      - lychee
-      - markdown
-      - comment-hygiene
-  # shellcheck is deliberately NOT synced: the repo's .shellcheckrc is a
-  # documented minimal divergence (the SSOT's require-double-brackets would
-  # flag its statusline's intentional `[ ]` idiom), tracked as follow-up FU4 in
-  # dot_claude/statusline/README.md — add shellcheck here when FU4 lands.
-  - repo: kyle-sexton/dotfiles                     # chezmoi + PowerShell + shell
-    layout: root
-    include:
-      - editorconfig
+    files:
+      components/lefthook-shellcheck/lefthook.yml: .lefthook/shellcheck.yml
+  lychee:
+    files:
+      lychee.toml: lychee.toml
+  markdownlint:
+    files:
+      .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
+  node-runtime:
+    files:
+      .node-version: .node-version
+  psscriptanalyzer:
+    files:
+      PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
+  repository-text:
+    files:
+      .editorconfig: .editorconfig
+      .gitattributes: .gitattributes
+  shellcheck:
+    files:
+      .shellcheckrc: .shellcheckrc
+  typos:
+    files:
+      _typos.toml: _typos.toml
+
+targets:
+  kyle-sexton/.github:
+    managed:
+      - markdownlint
+      - repository-text
+  kyle-sexton/dotfiles:
+    managed:
       - editorconfig-checker
-      - gitattributes
-      - typos
       - gitleaks
+      - lefthook-base
+      - lefthook-powershell
+      - lefthook-shellcheck
+      - lychee
+      - markdownlint
+      - node-runtime
       - psscriptanalyzer
-      - lychee
-      - markdown
-      - comment-hygiene
-  # lychee inclusion assumes the repo's root lychee.toml moves to the
-  # constellation-standard modules/lychee/lychee.toml (companion PR there).
-  - repo: melodic-software/.github                 # org meta/community files
-    layout: root
-    include:
-      - editorconfig
-      - editorconfig-checker
-      - gitattributes
+      - repository-text
       - typos
+    locally-owned:
+      - shellcheck
+  kyle-sexton/github-iac:
+    managed:
+      - dotnet-analysis
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-dotnet
+      - markdownlint
+      - node-runtime
+      - repository-text
+      - typos
+  kyle-sexton/provisioning:
+    managed:
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-powershell
+      - lefthook-shellcheck
+      - lychee
+      - markdownlint
+      - node-runtime
+      - psscriptanalyzer
+      - repository-text
+      - shellcheck
+      - typos
+  melodic-software/.github:
+    managed:
+      - editorconfig-checker
       - gitleaks
       - lychee
-      - markdown
-  # Markdown is its only config-bearing CI lane; editorconfig/gitattributes are
-  # universal repo hygiene (synced in even though absent today).
-  - repo: kyle-sexton/.github                      # personal meta files
-    layout: root
-    include:
-      - editorconfig
-      - gitattributes
-      - markdown
-  # Platform peer: only its ROOT hygiene files sync; the configs it vendors
-  # under modules/ are its own dogfooding copies and stay self-managed.
-  - repo: melodic-software/ci-workflows            # platform (execution layer)
-    layout: root
-    include:
-      - editorconfig
-      - gitattributes
-  # melodic-software/medley — root; keeps its OWN comment-hygiene policy, so
-  # exclude comment-hygiene. Large/complex; confirm includes carefully.
+      - markdownlint
+      - repository-text
+      - typos
+  melodic-software/ci-runner:
+    managed:
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - repository-text
+      - shellcheck
+      - typos
+  melodic-software/ci-workflows:
+    managed:
+      - comment-hygiene-action
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - psscriptanalyzer
+      - repository-text
+      - shellcheck
+      - typos
+  melodic-software/claude-code-plugins:
+    managed:
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - repository-text
+      - shellcheck
+      - typos
+  melodic-software/github-iac:
+    managed:
+      - dotnet-analysis
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-dotnet
+      - markdownlint
+      - node-runtime
+      - repository-text
+      - typos
+  melodic-software/medley:
+    managed:
+      - architecture-decisions

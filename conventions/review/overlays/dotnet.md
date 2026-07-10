@@ -1,10 +1,10 @@
 # .NET review overlay
 
-Stack-specific review bars for .NET that the agnostic review criteria leave to an overlay. The mechanically-enforced posture (analyzers, code style, formatting, banned symbols) is owned by `modules/dotnet/` — this overlay covers only the reasoning-tier judgments a build cannot make. Severity labels are defined in [../README.md](../README.md).
+Stack-specific review bars for .NET that the agnostic review criteria leave to an overlay. The mechanically enforced posture (analyzers, code style, formatting, banned symbols) is owned by the [`.NET analysis`](../../../components/dotnet-analysis/) component; this overlay covers only reasoning-tier judgments a build cannot make. Severity labels are defined in [../README.md](../README.md).
 
 ## Code quality and shape
 
-- **Parameter-count ceiling** — the analyzer breaks the build past its configured maximum (the `modules/dotnet/` posture). Review still owns the four-to-six range and the early parameter-object default below that floor.
+- **Parameter-count ceiling** — the analyzer component breaks the build past its configured maximum. Review still owns the four-to-six range and the early parameter-object default below that floor.
 - **Reflection where a source generator exists** — runtime reflection for serialization, P/Invoke, or assembly-scanning registration where a compile-time generator is available.
 - **DI registration without an explicit service type** — registering a concrete instance such that the registered type is inferred; state the service type explicitly.
 - **EF Core nullable pattern** — new entity reference properties use the null-forgiving initializer rather than a pragma suppression.

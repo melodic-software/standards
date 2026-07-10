@@ -1,21 +1,19 @@
 {
-  // Dogfood stub — not the ruleset. The Biome ruleset SSOT is the catalog copy
-  // at modules/typescript/biome.json (root: false); CI lints with
-  // --config-path=modules/typescript/biome.json. This root stub only exists so
-  // local auto-discovery (lefthook, editors) inherits that ruleset via extends,
-  // keeping local and CI in agreement. Edit the ruleset in the module, never
-  // here. Keep $schema in lockstep with modules/typescript/biome.json on a bump.
+  // Standards-specific adapter, not the reusable ruleset. The package and
+  // policy source is components/biome/biome.json (root: false). This root file
+  // provides only this repository's scope and local auto-discovery. Keep the
+  // schema in lockstep with the component when Biome changes.
   //
   // This is .jsonc, not .json, on purpose: Biome silently ignores a biome.json
   // that contains comments (no error — it just falls back to defaults), so a
   // commented stub MUST use the .jsonc extension.
   "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
   "root": true,
-  "extends": ["./modules/typescript/biome.json"],
+  "extends": ["./components/biome/biome.json"],
   // File scope is per-repo, NOT part of the shared ruleset: Biome UNIONS
   // files.includes across extends (verified empirically), so anything the base
   // included would override every consumer's attempt to scan narrower. The
-  // NuGet-lockfile exclusion therefore lives here (this repo's dotnet fixtures
+  // NuGet-lockfile exclusion therefore lives here (the .NET component fixtures
   // carry packages.lock.json), and each consumer scopes its own files block.
   "files": {
     "includes": ["**", "!**/packages.lock.json"]

@@ -14,7 +14,7 @@ A criterion's default severity often shifts with context — the same smell is a
 
 ## Agnostic criteria plus thin overlays
 
-The criteria are language-agnostic by default. A stack overlay under `overlays/` adds only the bars specific to that stack that the agnostic file leaves out, and points to the corresponding `modules/<stack>/` for everything the toolchain already enforces — it never restates an enforced rule. When a change touches a stack, read its overlay alongside the agnostic criteria.
+The criteria are language-agnostic by default. A stack overlay under `overlays/` adds only the bars specific to that stack that the agnostic file leaves out, and points to the corresponding components for everything the toolchain already enforces. When a change touches a stack, read its overlay alongside the agnostic criteria.
 
 | Criteria | Covers |
 |---|---|

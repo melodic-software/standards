@@ -1,19 +1,15 @@
 name: publish-packages
 
-# Layer-1 (Track B) package publishing: stages each package's SSOT config from
-# modules/typescript/ into the package dir (the config is never committed under
-# packages/ — single source, no drift) and publishes to GitHub Packages when the
-# version in packages/<name>/package.json is new. If the staged config differs
-# from what the published version carries, the run fails loudly: that is the
-# "config changed upstream, version not bumped" drift signal.
-# See docs/dedup-program/config-distribution-plan.md (Layer 1).
+# Package components are published directly from their cohesive source slices.
+# There is no staging copy: the authored, tested, packed, and published config
+# is the same file. If an already-published version's complete packed payload
+# differs from a fresh local pack, the workflow fails and requires a version bump.
 on:
   push:
     branches: [main]
     paths:
-      - packages/**
-      - modules/typescript/biome.json
-      - modules/typescript/tsconfig.json
+      - components/biome/**
+      - components/tsconfig/**
       - .github/workflows/publish-packages.yml
   workflow_dispatch:
 
@@ -34,13 +30,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - package: biome-config
-            source: modules/typescript/biome.json
-            artifact: biome.json
-          - package: tsconfig
-            source: modules/typescript/tsconfig.json
-            artifact: tsconfig.json
+        component: [biome, tsconfig]
+    defaults:
+      run:
+        working-directory: components/${{ matrix.component }}
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -54,25 +47,27 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@melodic-software'
 
-      - name: Stage the SSOT config into the package
-        env:
-          SOURCE: ${{ matrix.source }}
-          PACKAGE: ${{ matrix.package }}
-          ARTIFACT: ${{ matrix.artifact }}
-        run: cp "$SOURCE" "packages/$PACKAGE/$ARTIFACT"
+      - name: Pack the complete component payload
+        id: pack
+        run: |
+          set -euo pipefail
+          destination="$RUNNER_TEMP/local-package"
+          mkdir -p "$destination"
+          npm pack --json --pack-destination "$destination" > "$RUNNER_TEMP/pack.json"
+          filename="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p[0].filename)' "$RUNNER_TEMP/pack.json")"
+          echo "tarball=$destination/$filename" >> "$GITHUB_OUTPUT"
 
-      - name: Publish if the version is new; fail on unbumped drift
-        working-directory: packages/${{ matrix.package }}
+      - name: Publish a new version or reject unbumped payload drift
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACT: ${{ matrix.artifact }}
+          LOCAL_TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
           set -euo pipefail
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
-          # Only a definitive E404 means "not published" — any other npm view
-          # failure (auth, registry outage) must abort rather than fall through
-          # to a publish attempt that would skip the drift tripwire below.
+
+          # Only E404 means the version is absent. Authentication or registry
+          # failures must abort rather than fall through to a publish attempt.
           set +e
           view_out="$(npm view "$name@$version" dist.tarball 2>&1)"
           view_rc=$?
@@ -81,18 +76,21 @@ jobs:
             echo "::error::npm view failed for $name@$version (not a 404): $view_out"
             exit 1
           fi
-          if [ "$view_rc" -eq 0 ]; then
-            published_tarball="$view_out"
-            # Version already published — verify the registry copy still matches
-            # the SSOT, else demand a version bump.
-            curl -fsSL -H "Authorization: Bearer $NODE_AUTH_TOKEN" "$published_tarball" -o /tmp/published.tgz
-            tar -xzOf /tmp/published.tgz "package/$ARTIFACT" > /tmp/published-artifact
-            if ! diff -u /tmp/published-artifact "$ARTIFACT"; then
-              echo "::error::$name@$version is published but its $ARTIFACT no longer matches the SSOT — bump the version in packages/ to release the change"
-              exit 1
-            fi
-            echo "$name@$version already published and up to date — nothing to do"
-          else
-            npm publish
+
+          if [ "$view_rc" -ne 0 ]; then
+            npm publish "$LOCAL_TARBALL"
             echo "published $name@$version"
+            exit 0
           fi
+
+          compare="$RUNNER_TEMP/compare"
+          mkdir -p "$compare/local" "$compare/published"
+          curl -fsSL -H "Authorization: Bearer $NODE_AUTH_TOKEN" "$view_out" \
+            -o "$compare/published.tgz"
+          tar -xzf "$LOCAL_TARBALL" -C "$compare/local"
+          tar -xzf "$compare/published.tgz" -C "$compare/published"
+          if ! diff -ru --no-dereference "$compare/published/package" "$compare/local/package"; then
+            echo "::error::$name@$version is published but its complete payload changed; bump components/${{ matrix.component }}/package.json"
+            exit 1
+          fi
+          echo "$name@$version already published and matches the complete local payload"

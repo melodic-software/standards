@@ -1,10 +1,10 @@
 # Security review criteria
 
-Diff-time checks for the security concerns automated tooling cannot fully catch — trust boundaries, injection, data exposure, and supply chain. Severity labels are defined in [README.md](README.md). Two mechanical backstops already exist in the catalog: secret scanning (`modules/gitleaks/`) and dependency-vulnerability scanning (`modules/osv-scanner/`); review owns the judgment they cannot make.
+Diff-time checks for the security concerns automated tooling cannot fully catch — trust boundaries, injection, data exposure, and supply chain. Severity labels are defined in [README.md](README.md). Mechanical backstops include the [`gitleaks`](../../components/gitleaks/) policy and the OSV-Scanner workflow in `ci-workflows`; review owns the judgment they cannot make.
 
 ## Secrets and credentials
 
-- **No secrets in source** — tokens, keys, and connection strings live in environment variables or a secret store, never in code or tracked config. Watch for local-only config content leaking into a tracked file. (The gitleaks module backstops this mechanically.)
+- **No secrets in source** — tokens, keys, and connection strings live in environment variables or a secret store, never in code or tracked config. Watch for local-only config content leaking into a tracked file. (The Gitleaks component backstops this mechanically.)
 - **Credential-bearing inputs via environment only** — a tool that consumes credentials, cookie files, or session state reads their location from the environment or detects them at runtime; it never embeds login state in a tracked file.
 - **No personal data in logs** — personally identifiable information logged without a data-classification control is a finding; flag it for redaction.
 

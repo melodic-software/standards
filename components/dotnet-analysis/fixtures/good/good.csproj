@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Contract fixture: imports the component's strict props (which wire
+       dotnet.globalconfig), then supplies the
+       project scope the base omits. -->
+  <Import Project="../../Directory.Build.props" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+</Project>
