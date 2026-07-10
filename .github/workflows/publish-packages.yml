@@ -68,15 +68,16 @@ jobs:
 
           # Only E404 means the version is absent. Authentication or registry
           # failures must abort rather than fall through to a publish attempt.
+          view_err="$(mktemp)"
           set +e
-          view_out="$(npm view "$name@$version" dist.tarball 2>/tmp/view-err)"
+          view_out="$(npm view "$name@$version" dist.tarball 2>"$view_err")"
           view_rc=$?
           set -e
-          cat /tmp/view-err >&2 || true
-          if [ "$view_rc" -ne 0 ] && ! grep -q "E404" /tmp/view-err; then
-            echo "::error::npm view failed for $name@$version (not a 404): $(cat /tmp/view-err)"
+          if [ "$view_rc" -ne 0 ] && ! grep -q "E404" "$view_err"; then
+            echo "::error::npm view failed for $name@$version (not a 404): $(cat "$view_err")"
             exit 1
           fi
+          cat "$view_err" >&2 || true
 
           if [ "$view_rc" -ne 0 ]; then
             npm publish "$LOCAL_TARBALL"
