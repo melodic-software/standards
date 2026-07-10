@@ -12,8 +12,8 @@ pre-commit:
     ruff-lint:
       glob: "**/*.{py,pyi}"
       run: ruff check {staged_files}
-      fail_text: "Ruff lint failures. Run: ruff check --fix {staged_files}"
+      fail_text: "Ruff lint failures. Run: ruff check --fix <files>"
     ruff-format:
       glob: "**/*.{py,pyi}"
       run: ruff format --check {staged_files}
-      fail_text: "Ruff format drift. Run: ruff format {staged_files}"
+      fail_text: "Ruff format drift. Run: ruff format <files>"

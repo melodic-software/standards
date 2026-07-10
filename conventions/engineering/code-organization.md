@@ -2,12 +2,14 @@
 
 How code is grouped, shared, and exposed determines how cheaply it can change. The aim is units that own one concern, expose a deliberate contract surface, and keep everything else private — so a change behind the surface never breaks a consumer. These are reasoning-only structural judgments.
 
-## Share on the rule of three, not the rule of two
+## Share at the second consumer; never copy
 
 - **One consumer** — co-locate the code with its consumer. No shared location.
 - **Two or more consumers of the same logic** — extract it to the nearest shared location and have every consumer import from there. Never copy a script or function into a second place; import it.
 
 Promote a co-located helper to a shared location *in the same change* that adds its second consumer. Until two real consumers exist, inline duplication is cheaper than a premature abstraction.
+
+This governs verbatim reuse of identical logic; deciding the shape of a new abstraction follows the rule of three — see `simpler-code.md`.
 
 ## Name a shared unit for its capability, not its callers
 

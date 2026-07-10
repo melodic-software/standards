@@ -9,4 +9,6 @@ def build(name):
     created = datetime.now()
     location = os.path.join("/var/tmp", name)
     count: int = "not an integer"
+    handle = open("x")
+    banner = "implicit" "concat"
     return location

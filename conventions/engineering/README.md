@@ -1,6 +1,6 @@
 # Engineering conventions
 
-Agent-agnostic engineering standards that no linter can decide for you — the reasoning-only tier of `../../conventions`. Each file owns one concern. Where a convention *can* be mechanically enforced, it belongs to a component under `../../components/`, not here; `enforceability-tiers.md` explains the split.
+Agent-agnostic engineering standards that no linter can decide for you — the authoring half of `../../conventions`, the catalog's reasoning-only tier. Each file owns one concern. Where a convention *can* be mechanically enforced, it belongs to a component under `../../components/`, not here; `enforceability-tiers.md` explains the split.
 
 | Convention | Owns |
 |---|---|
@@ -9,7 +9,7 @@ Agent-agnostic engineering standards that no linter can decide for you — the r
 | [domain-driven-design.md](domain-driven-design.md) | tactical patterns (entities, value objects, aggregates, repositories) and ubiquitous language |
 | [naming.md](naming.md) | verbose behavior-naming, name-by-responsibility, disambiguating overloaded terms |
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |
-| [code-organization.md](code-organization.md) | sharing on the rule of three, contract-versus-private surfaces, breaking-change discipline |
+| [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
 | [legacy-and-migration-debt.md](legacy-and-migration-debt.md) | describing the current form; the exposure classifier for old paths |

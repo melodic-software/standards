@@ -24,13 +24,30 @@ assert_contains 'reports a warning marker' "$out" 'warning-marker'
 assert_contains 'reports a tracker reference' "$out" 'tracker-ref'
 assert_contains 'flags cc-issue' "$out" 'cc-issue'
 assert_contains 'flags a closing keyword with a number' "$out" 'closing-keyword'
+assert_contains 'flags an issue/tracked reference' "$out" 'issue-reference'
 assert_contains 'flags owner/repo#N' "$out" 'repo-issue'
 assert_contains 'flags GH-N' "$out" 'gh-reference'
+assert_contains 'flags PR #N' "$out" 'pr-reference'
 
 # Comment styles beyond // and #: block, block-continuation, and HTML comments.
 block="$(printf '%s\n' '/* fixes #5 */' ' * TODO: later' '<!-- tracked: #3 -->')"
-chp::scan_text "$block" >/dev/null
+block_out="$(chp::scan_text "$block")"
 assert_exit 'block / continuation / html comments are scanned' 1 "$?"
+assert_row_count 'every block-style line is flagged' "$block_out" 3 '^[0-9]+:'
+
+# Matching is case-insensitive, and the scan restores the caller's nocasematch
+# state instead of leaking it.
+chp::scan_text '# todo: later' >/dev/null
+assert_exit 'lowercase marker is flagged' 1 "$?"
+shopt -q nocasematch
+assert_exit 'nocasematch does not leak from the scan' 1 "$?"
+
+# The one case-sensitive rule: XXX flags only in uppercase (lowercase collides
+# with the CSS keyword xxx-large and placeholder text).
+chp::scan_text '# XXX revisit this' >/dev/null
+assert_exit 'uppercase XXX is flagged' 1 "$?"
+chp::scan_text '# font-size: xxx-large is fine' >/dev/null
+assert_exit 'lowercase xxx is not flagged' 0 "$?"
 
 # False-positive guards: technical tokens that share the LETTERS-NUMBER shape
 # and closing keywords without a # must stay clean.

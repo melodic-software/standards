@@ -1,6 +1,6 @@
 # Documentation and external citations
 
-A source of truth that lives outside the repo — a vendor's product docs, a framework reference, a cloud dashboard, an API reference, a registry page — is owned by that upstream, not by you. Copying its content into tracked files creates a snapshot that decays the moment the upstream changes. Cite it; fetch it at read time. This complements the in-repo discipline (see `reference-dont-duplicate.md`): one governs facts you own, this governs facts someone else owns.
+A source of truth that lives outside the repo — a vendor's product docs, a framework reference, a cloud dashboard, an API reference, a registry page — is owned by that upstream, not by you. Copying its content into tracked files creates a snapshot that decays the moment the upstream changes. Cite it; fetch it at read time. This complements the in-repo discipline (see `reference-dont-duplicate.md`): one governs facts you own, this governs facts someone else owns. These are reasoning-only judgments — a link checker can verify that a cited URL still resolves, but whether to cite rather than copy, and where the citation lives, is yours to decide.
 
 ## Upstream bodies are read-on-demand
 

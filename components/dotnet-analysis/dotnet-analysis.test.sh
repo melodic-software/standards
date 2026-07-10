@@ -75,7 +75,7 @@ public static class S
 }
 CS
 cd "$work" || exit 1
-dotnet format style --diagnostics IDE0055 --verify-no-changes >/dev/null 2>&1
-assert_nonzero 'dotnet format style: System-first using order is enforced' "$?"
+assert_command_fails 'dotnet format style: System-first using order is enforced' \
+  dotnet format style --diagnostics IDE0055 --verify-no-changes
 
 [[ $FAILED -eq 0 ]] || exit 1

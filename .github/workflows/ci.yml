@@ -326,9 +326,7 @@ jobs:
 
   osv-scanner:
     permissions:
-      actions: read
       contents: read
-      security-events: write
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false).
     uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10

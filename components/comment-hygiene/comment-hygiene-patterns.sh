@@ -3,15 +3,16 @@
 #
 # Library, NOT executable. Pure functions: no env reads, no file I/O, no exit
 # calls. The comment-hygiene composite action sources this file and handles file
-# enumeration, path scoping, and exit-code mapping. POSIX ERE only (grep -E) for
-# cross-platform parity.
+# enumeration, path scoping, and exit-code mapping. POSIX ERE only for
+# cross-platform parity: bash =~ delegates to the platform's regex library, so
+# non-POSIX extensions would not behave identically on Linux CI and Git Bash.
 #
 # Policy: comments in production code must not carry deferred-work markers
 # (TODO / FIXME / HACK / XXX) or issue-tracker references: cc-issue, GitHub
 # closing keywords with a number (fix(es|ed)/close[sd]/resolve[sd] #N), issue /
-# issues / tracked #N, owner/repo#N, GH-N, and PR #N. Track outstanding work in
-# the issue tracker, not in code comments, so it stays visible and does not rot
-# silently in the source.
+# issues / tracked + N (# optional), owner/repo#N, GH-N, and PR #N. Track
+# outstanding work in the issue tracker, not in code comments, so it stays
+# visible and does not rot silently in the source.
 #
 # This file is the managed policy payload and is not edited downstream. Route a
 # reusable change upstream; a repository with genuinely different policy opts
@@ -29,9 +30,9 @@ chp::scan_text() {
   local entry lineno line violations=0
   local nocase_was=0
 
-  # Every pattern below matches case-insensitively (Todo:, fixme, Closes #1,
-  # gh-5, …). Save/restore the shell option so sourcing this function never
-  # leaks nocasematch to the caller.
+  # Rules match case-insensitively (Todo:, fixme, gh-3, …) — except XXX, which
+  # is matched uppercase-only below. Save/restore the shell option so a scan
+  # never leaks nocasematch to the caller.
   if shopt -q nocasematch; then
     nocase_was=1
   else
@@ -39,17 +40,27 @@ chp::scan_text() {
   fi
 
   while IFS= read -r entry; do
-    [[ -z "$entry" ]] && continue
     lineno="${entry%%:*}"
     line="${entry#*:}"
 
-    # Warning markers — FIXME/HACK/XXX share one rule; TODO is separate so the
-    # report names the exact marker.
-    if [[ "$line" =~ (^|[^[:alnum:]_])(FIXME|HACK|XXX)([^[:alnum:]_]|$) ]]; then
+    # Warning markers — FIXME/HACK share one rule and the report names the
+    # marker matched; TODO has its own rule so its reported detail is always the
+    # canonical "TODO" spelling regardless of the case matched.
+    if [[ "$line" =~ (^|[^[:alnum:]_])(FIXME|HACK)([^[:alnum:]_]|$) ]]; then
       printf '%s:warning-marker:%s\n' "$lineno" "${BASH_REMATCH[2]}"
       violations=$((violations + 1))
       continue
     fi
+    # XXX is uppercase-only: lowercase xxx collides with the CSS keyword
+    # xxx-large and with placeholder text, so this one rule is case-sensitive.
+    shopt -u nocasematch
+    if [[ "$line" =~ (^|[^[:alnum:]_])XXX([^[:alnum:]_]|$) ]]; then
+      shopt -s nocasematch
+      printf '%s:warning-marker:XXX\n' "$lineno"
+      violations=$((violations + 1))
+      continue
+    fi
+    shopt -s nocasematch
     if [[ "$line" =~ (^|[^[:alnum:]_])TODO([^[:alnum:]_]|$) ]]; then
       printf '%s:warning-marker:TODO\n' "$lineno"
       violations=$((violations + 1))
