@@ -10,6 +10,7 @@ updates:
   # SHA-rewrite supply-chain risk that motivates SHA-pinning.
   - package-ecosystem: github-actions
     directory: /
+    labels: ["dependencies"]
     schedule:
       interval: weekly
     cooldown:
@@ -27,6 +28,7 @@ updates:
   # lefthook pin that the local git hooks run on.
   - package-ecosystem: npm
     directory: /
+    labels: ["dependencies"]
     schedule:
       interval: weekly
     cooldown:
