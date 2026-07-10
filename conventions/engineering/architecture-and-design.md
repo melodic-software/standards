@@ -1,6 +1,6 @@
 # Architecture and design
 
-The structural defaults for production code. SOLID, fail-fast, and immutability are assumed as the baseline; this convention states the architecture-level choices a senior engineer makes by default. These are reasoning-only — the catalog's analyzer modules can enforce some boundary rules mechanically, but the design judgment behind them is yours. The diff-time review counterparts live in `../review/architecture.md`.
+The structural defaults for production code. SOLID, fail-fast, and immutability are assumed as the baseline; this convention states the architecture-level choices a senior engineer makes by default. These are reasoning-only — analyzer components can enforce some boundary rules mechanically, but the design judgment behind them is yours. The diff-time review counterparts live in `../review/architecture.md`.
 
 ## Dependency direction
 

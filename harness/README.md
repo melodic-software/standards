@@ -1,6 +1,6 @@
 # harness
 
-Shared test infrastructure the modules rely on. Dependency-light by design: the shell harness needs only `bash`, `git`, and coreutils.
+Shared contract-test infrastructure for components. Dependency-light by design: the shell harness needs only `bash`, `git`, and coreutils.
 
 ## Shell tests
 

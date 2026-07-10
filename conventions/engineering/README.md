@@ -1,6 +1,6 @@
 # Engineering conventions
 
-Agent-agnostic engineering standards that no linter can decide for you — the reasoning-only tier of `../../conventions`. Each file owns one concern; copy the ones a repo adopts, or read them in place. Where a convention *can* be mechanically enforced, it lives in a tool module under `modules/`, not here; `enforceability-tiers.md` explains the split.
+Agent-agnostic engineering standards that no linter can decide for you — the reasoning-only tier of `../../conventions`. Each file owns one concern. Where a convention *can* be mechanically enforced, it belongs to a component under `../../components/`, not here; `enforceability-tiers.md` explains the split.
 
 | Convention | Owns |
 |---|---|

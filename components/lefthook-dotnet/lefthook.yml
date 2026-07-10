@@ -1,0 +1,18 @@
+# .NET adapter — opt-in. Extend it alongside the base from a consumer root that
+# has C# sources and the .NET SDK installed. `dotnet format` resolves the project
+# or solution from the working directory and reads .editorconfig / the global
+# AnalyzerConfig automatically.
+#
+# This lane runs whitespace verification only — the one thing `dotnet format`
+# owns in the .NET analysis component's split. The build-enforced analyzers and code-style
+# (CAxxxx / IDExxxx) are deliberately left to CI: a full analyzer build is too
+# slow for pre-commit, and running it here would double-report against the CI
+# build lane. This is the heaviest opt-in lane (it loads MSBuild); skip it via a
+# gitignored lefthook-local.yml if local commit latency matters more than parity.
+
+pre-commit:
+  commands:
+    dotnet-format:
+      glob: "**/*.cs"
+      run: dotnet format whitespace --verify-no-changes --include {staged_files}
+      fail_text: "Whitespace/layout drift. Run: dotnet format whitespace --include <files>"

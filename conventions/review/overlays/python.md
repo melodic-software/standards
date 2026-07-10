@@ -1,6 +1,6 @@
 # Python review overlay
 
-Stack-specific review bars for Python. The mechanically-enforced posture — linting, formatting, and type-checking — is owned by `modules/python/` (Ruff and Pyright); this overlay covers only the reasoning-tier judgments those tools do not make. Severity labels are defined in [../README.md](../README.md).
+Stack-specific review bars for Python. The mechanically enforced posture is owned independently by the [`ruff`](../../../components/ruff/) and [`pyright`](../../../components/pyright/) components; this overlay covers only reasoning-tier judgments those tools do not make. Severity labels are defined in [../README.md](../README.md).
 
 ## Correctness traps
 
@@ -19,4 +19,4 @@ Stack-specific review bars for Python. The mechanically-enforced posture — lin
 
 ## Testing
 
-- **Tests for non-trivial package logic** — a package carrying real logic, a CLI boundary, or regression-prone parsing has tests for it; "covered by a consumer" is not a default. The framework and placement follow `modules/python/`.
+- **Tests for non-trivial package logic** — a package carrying real logic, a CLI boundary, or regression-prone parsing has tests for it; "covered by a consumer" is not a default. Framework and placement remain repository-specific.

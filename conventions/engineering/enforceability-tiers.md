@@ -1,6 +1,6 @@
 # Enforceability tiers
 
-Some conventions a tool can decide alone; some need a tool to flag candidates and a human to judge; some are pure judgment no tool can make. Classifying a convention by which tier it belongs to is what keeps this catalog honest: a rule a tool *can* own should move into a tool config and stop reaching reviewers, while a rule that is irreducibly judgment should stay in prose and not pretend to be automatable. This is also why the catalog is split the way it is — tool-enforceable rules live in `modules/`; reasoning-only rules live here in `conventions/`.
+Some conventions a tool can decide alone; some need a tool to flag candidates and a human to judge; some are pure judgment no tool can make. Classifying a convention by which tier it belongs to is what keeps this catalog honest: a rule a tool *can* own should move into a component config and stop reaching reviewers, while a rule that is irreducibly judgment should stay in prose and not pretend to be automatable. Tool-enforceable rules belong to `components/` (or their root-canonical payload); reasoning-only rules live here in `conventions/`.
 
 ## The three tiers
 
@@ -10,7 +10,7 @@ Some conventions a tool can decide alone; some need a tool to flag candidates an
 | **Detect-then-judge** | a tool flags candidates (advisory); a human or agent rules on each | a mechanical signal narrows the set, but the verdict needs meaning or context |
 | **Reasoning-only** | a human or agent against written criteria — no tool can decide | meaning, intent, fit, abstraction quality, semantic equivalence |
 
-Deterministic examples are the kind of thing the catalog's tool modules own: a banned symbol, a code-style rule at error severity, a secret pattern, a malformed file. Detect-then-judge covers things like a near-duplicate flagged for a human to decide whether to extract, or an unrecognized CLI flag flagged for the author to confirm against the tool's help. Reasoning-only covers "is this the right abstraction", "does this name track its responsibility", "does this comment explain *why* and not *what*".
+Deterministic examples are the kind of thing executable components own: a banned symbol, a code-style rule at error severity, a secret pattern, a malformed file. Detect-then-judge covers things like a near-duplicate flagged for a human to decide whether to extract, or an unrecognized CLI flag flagged for the author to confirm against the tool's help. Reasoning-only covers "is this the right abstraction", "does this name track its responsibility", "does this comment explain *why* and not *what*".
 
 ## Rule of thumb
 

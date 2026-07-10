@@ -1,4 +1,0 @@
-{
-  "extends": "../../../modules/typescript/tsconfig.json",
-  "include": ["violations.ts"]
-}

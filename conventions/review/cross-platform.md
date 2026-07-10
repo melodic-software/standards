@@ -21,7 +21,7 @@ Diff-time checks for code, scripts, config, and filenames that work on one opera
 ## Text, encoding, and line endings
 
 - **UTF-8 for text** — source, config, and machine-readable output default to UTF-8 unless a format mandates otherwise.
-- **Consistent line endings** — the line-ending authority is the repo's `.gitattributes` (`modules/editorconfig/` ships the canonical base hygiene); flag scripts and pipelines that fail to tolerate the other convention when reading files, and never commit literal carriage-return line endings in source. A pipeline parsing tool output on Windows that does not strip carriage returns is a common injection of stray characters.
+- **Consistent line endings** — the line-ending authority is the repo's `.gitattributes` (the `repository-text` component owns the canonical policy); flag scripts and pipelines that fail to tolerate the other convention when reading files, and never commit literal carriage-return line endings in source. A pipeline parsing tool output on Windows that does not strip carriage returns is a common injection of stray characters.
 - **Locale-independent machine output** — timestamps, numbers, and sort order in logs and artifacts use fixed, invariant formats (ISO-8601, ordinal comparison), not locale defaults.
 
 ## Tools, processes, and committed artifacts

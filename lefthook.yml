@@ -1,20 +1,36 @@
-# Dogfood: standards runs the hooks it ships. This root config composes the base
-# fragment plus every overlay exactly as a consumer would — the open/closed
-# extensibility point is this file; the fragments under modules/lefthook/ are
-# never edited. CI validates the merged config (`lefthook validate`) and a unit
-# test (modules/lefthook/lefthook.test.sh) exercises a representative lane
-# end-to-end. The strict top-level posture (min_version, assert_lefthook_installed,
-# glob_matcher) is inherited from base.yml.
+# Standards-specific adapter: compose the component fragments without copying
+# their policy. CI validates the merged config and the ShellCheck component's
+# behavioral test exercises inheritance and opt-out end to end. This root also
+# owns the catalog-only fixture exclusions and local paths needed to dogfood
+# components without pretending those details belong in reusable adapters.
 #
 # A real consumer's root config is also where project scope and any opt-outs live
 # — add a `pre-commit.commands.<lane>` entry to set `exclude:`/`skip:` for one
 # lane (a new key merges onto the inherited lane), or override anything for one
-# machine via a gitignored lefthook-local.yml. This repo keeps the root config to
-# pure composition: its own sources are covered by the base lanes, and its
-# language samples under fixtures/ are owned by the per-module fixtures lanes.
+# machine via a gitignored lefthook-local.yml.
 extends:
-  - modules/lefthook/base.yml
-  - modules/lefthook/lefthook-powershell.yml
-  - modules/lefthook/lefthook-python.yml
-  - modules/lefthook/lefthook-typescript.yml
-  - modules/lefthook/lefthook-dotnet.yml
+  - components/lefthook-base/lefthook.yml
+  - components/lefthook-shellcheck/lefthook.yml
+  - components/lefthook-python/lefthook.yml
+  - components/lefthook-typescript/lefthook.yml
+
+pre-commit:
+  # Intentionally non-conforming fixtures are exercised by component contract
+  # tests, not by the ordinary staged-file lanes.
+  exclude:
+    - "components/*/fixtures/bad/**"
+  commands:
+    # These two catalog-local adapters use source-slice paths. Consumers adopt
+    # the reusable fragments at their managed destinations instead.
+    psscriptanalyzer:
+      glob: "**/*.{ps1,psm1,psd1}"
+      run: >-
+        pwsh -NoProfile -NonInteractive -File
+        components/lefthook-powershell/psscriptanalyzer-staged.ps1 {staged_files}
+      fail_text: "PSScriptAnalyzer findings. Fix them or justify the exception."
+    dotnet-format:
+      glob: "**/*.cs"
+      run: >-
+        dotnet format components/dotnet-analysis/fixtures/good/good.csproj
+        whitespace --verify-no-changes --include {staged_files}
+      fail_text: "Whitespace/layout drift in the .NET analysis fixture."

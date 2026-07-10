@@ -1,6 +1,5 @@
-# Language/framework-agnostic base: OS/editor noise plus the tooling present in
-# this repo. Language overlays (.NET, Python, …) extend it with their own
-# ignores when adopted.
+# Repository-local generated output and editor noise. This file is not a shared
+# standards payload; each consumer owns the ignore list for its own toolchain.
 
 # OS / editor noise
 .DS_Store
@@ -17,6 +16,9 @@ Thumbs.db
 # Node
 node_modules/
 
+# Python tooling
+.ruff_cache/
+
 # Lefthook — per-developer override config and local-only scripts dir
 lefthook-local.yml
 .lefthook-local/
@@ -25,8 +27,5 @@ lefthook-local.yml
 bin/
 obj/
 
-# Layer-1 packages — the configs are staged in from modules/typescript/ at
-# publish time (see publish-packages.yml), never committed here
-packages/biome-config/biome.json
-packages/tsconfig/tsconfig.json
-packages/*/*.tgz
+# Local npm pack output (CI writes packages to a temporary directory).
+components/*/*.tgz

@@ -1,0 +1,9 @@
+# Opt-in ShellCheck hook. ShellCheck discovers the root .shellcheckrc, so this
+# adapter contains execution only and does not duplicate policy.
+
+pre-commit:
+  commands:
+    shellcheck:
+      glob: "**/*.{sh,bash}"
+      run: shellcheck {staged_files}
+      fail_text: "ShellCheck findings. Fix them, or annotate a justified exception with a shellcheck directive."

@@ -1,6 +1,6 @@
 # Code quality review criteria
 
-Diff-time checks for design, shape, style, and authoring hygiene — the quality bars automated tooling cannot fully decide. Severity labels (Critical / Important / Suggestion) are defined in [README.md](README.md). Where a check restates a principle owned by an engineering convention, it points there rather than re-explaining it; where a check is mechanically enforced by a tool module, it points to the module instead of duplicating the rule.
+Diff-time checks for design, shape, style, and authoring hygiene — the quality bars automated tooling cannot fully decide. Severity labels (Critical / Important / Suggestion) are defined in [README.md](README.md). Where a check restates a principle owned by an engineering convention, it points there rather than re-explaining it; where a component mechanically enforces a check, it points to that component instead of duplicating the rule.
 
 ## Design
 
@@ -33,7 +33,7 @@ Review is stricter than the linter here: a per-ecosystem rule enforces an arity 
 - **No conjunctions in function names** — `record_and_exit`, `validate_or_throw` hide two concerns; split them. Exception: a genuinely atomic operation (`compare_and_swap`).
 - **No sequence numbers in file names** — name by content, not position.
 - **No noise comments** — documentation comments on self-explanatory members add clutter; reserve comments for non-obvious intent or constraints.
-- **Comments explain why, not what** — code reads without commentary; comments capture the non-obvious *why*. Actionable debt markers and internal tracker provenance in merged production code are mechanically caught by the comment-hygiene module (`modules/comment-hygiene/`) — review covers the judgment the patterns cannot, such as a comment that restates the code or states a false current fact.
+- **Comments explain why, not what** — code reads without commentary; comments capture the non-obvious *why*. The [`comment-hygiene`](../../components/comment-hygiene/) component mechanically catches actionable debt markers and tracker provenance; review covers judgments the patterns cannot, such as a comment that restates code or states a false current fact.
 - **No layer-leaking in comments** — do not mention transport status codes in domain types or storage columns in domain entities.
 
 ## Authoring hygiene
