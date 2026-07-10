@@ -45,6 +45,10 @@ lifecycle. It may export one file or an atomic group of heterogeneous files.
 Tests, fixtures, and maintainer documentation stay upstream unless a consumer
 operationally needs them.
 
+`components/runner-policy/` owns the YAML-aware GitHub Actions routing contract:
+public work remains hosted, enrolled private jobs use only an approved selector,
+and every hosted exception is explicit machine-readable inventory.
+
 Delivery preference is: platform control plane, native package/reference,
 tool-native extension, exact-file synchronization, then explicit local
 ownership. There is no generic templating or partial-merge layer and no
@@ -60,6 +64,8 @@ Locally, install pinned Node dependencies with `npm ci`, then run:
 ```bash
 npm run lint:md
 npm run lint:hooks
+npm run test:runner-policy
+npm run lint:runner-policy
 bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 ```
 

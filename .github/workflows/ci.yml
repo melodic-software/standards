@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 permissions:
   contents: read
@@ -19,7 +20,7 @@ concurrency:
 # deliberate exception: it is advisory/scheduled and lives in its own workflow.
 jobs:
   markdown:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -33,7 +34,7 @@ jobs:
           globs: '**/*.md !components/**/fixtures/bad/**'
 
   powershell:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -47,7 +48,7 @@ jobs:
           exclude: components/psscriptanalyzer/fixtures/bad
 
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -61,7 +62,7 @@ jobs:
           exclude: components/shellcheck/fixtures/bad
 
   lychee:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -75,7 +76,7 @@ jobs:
           exclude: 'components/[^/]+/fixtures/bad'
 
   editorconfig:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -91,7 +92,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
 
   gitleaks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -106,7 +107,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
 
   typos:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -122,7 +123,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
   markdown-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -139,8 +140,31 @@ jobs:
       - name: Markdownlint contract test
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
 
+  runner-policy:
+    name: Runner policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Test runner policy
+        run: npm run test:runner-policy
+      - name: Enforce runner policy on standards
+        run: npm run lint:runner-policy
+        env:
+          CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+
   powershell-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -166,7 +190,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
 
   shellcheck-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -189,7 +213,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
   lychee-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -213,7 +237,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
 
   ruff:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -227,7 +251,7 @@ jobs:
           exclude: components/ruff/fixtures/bad
 
   pyright:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -244,7 +268,7 @@ jobs:
           paths: components/pyright/fixtures/good
 
   biome:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -252,16 +276,16 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check JS/TS
-        # Biome has no CLI exclude, so scope at the conforming fixture (the repo
-        # carries no other JS/TS source; the bad fixture is non-conforming by
-        # design).
+        # Biome has no CLI exclude, so scope at the conforming fixture and the
+        # runner-policy implementation. The bad fixture is non-conforming by
+        # design.
         uses: melodic-software/ci-workflows/.github/actions/biome@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
         with:
           config: components/biome/biome.json
-          paths: components/biome/fixtures/good
+          paths: components/biome/fixtures/good components/runner-policy
 
   tsc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -277,7 +301,7 @@ jobs:
           project: components/tsconfig/fixtures/good/tsconfig.json
 
   dotnet-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -293,7 +317,7 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   dotnet-format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -306,7 +330,7 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   actionlint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -334,7 +358,7 @@ jobs:
     uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
   python-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — component contract tests assert specific rule codes on
@@ -368,7 +392,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   typescript-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — component tests assert specific rule/error codes on
@@ -398,7 +422,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-fixtures:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — the fixtures suite asserts specific rule codes fire on
@@ -421,7 +445,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
 
   harness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -432,7 +456,7 @@ jobs:
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
   distribution:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -456,7 +480,7 @@ jobs:
         run: bash distribution/sync-manifest.sh validate
 
   exec-bit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -467,7 +491,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/exec-bit@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
   machine-specific-paths:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -478,7 +502,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
   eol-renormalize:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -489,7 +513,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
   comment-hygiene:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -504,7 +528,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
   lefthook:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -550,6 +574,7 @@ jobs:
       - gitleaks
       - typos
       - markdown-fixtures
+      - runner-policy
       - powershell-fixtures
       - shellcheck-fixtures
       - lychee-fixtures
@@ -572,7 +597,7 @@ jobs:
       - actionlint
       - zizmor
       - osv-scanner
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Aggregate lane results
@@ -586,6 +611,7 @@ jobs:
             ${{ needs.gitleaks.result }}
             ${{ needs.typos.result }}
             ${{ needs.markdown-fixtures.result }}
+            ${{ needs.runner-policy.result }}
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
             ${{ needs.lychee-fixtures.result }}

@@ -10,10 +10,13 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
     "lefthook": "2.1.9",
-    "markdownlint-cli2": "0.23.0"
+    "markdownlint-cli2": "0.23.0",
+    "yaml": "2.9.0"
   },
   "scripts": {
     "lint:md": "markdownlint-cli2 --config .markdownlint-cli2.jsonc \"**/*.md\" \"!components/**/fixtures/bad/**\"",
-    "lint:hooks": "lefthook validate"
+    "lint:hooks": "lefthook validate",
+    "lint:runner-policy": "node components/runner-policy/runner-policy.mjs --root .",
+    "test:runner-policy": "node --test components/runner-policy/runner-policy.test.mjs"
   }
 }
