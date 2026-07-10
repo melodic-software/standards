@@ -6,22 +6,6 @@ name: standards-sync
 on:
   push:
     branches: [main]
-    paths:
-      - .editorconfig
-      - .editorconfig-checker.json
-      - .gitattributes
-      - .gitleaks.toml
-      - .markdownlint-cli2.jsonc
-      - .node-version
-      - .shellcheckrc
-      - _typos.toml
-      - PSScriptAnalyzerSettings.psd1
-      - lychee.toml
-      - components/**
-      - docs/adr/README.md
-      - docs/adr/adr-template.md
-      - distribution/sync-manifest.sh
-      - distribution/sync-manifest.yml
   workflow_dispatch:
     inputs:
       dry-run:
