@@ -9,8 +9,8 @@
 # ci-workflows pwsh action's reusable runner (that would couple a consumer's local
 # hook to ci-workflows). Fast staged-file feedback; CI is the authoritative gate.
 #
-# Adopt psscriptanalyzer-staged.ps1 alongside the managed hook payload at
-# `.lefthook/psscriptanalyzer-staged.ps1`.
+# Adopt psscriptanalyzer-staged.ps1 and its isolated psscriptanalyzer-target.ps1
+# worker alongside the managed hook payload under `.lefthook/`.
 
 pre-commit:
   commands:

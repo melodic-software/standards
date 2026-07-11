@@ -158,6 +158,8 @@ jobs:
         run: npm ci
       - name: Test runner policy
         run: npm run test:runner-policy
+      - name: Test .NET staged adapter
+        run: npm run test:lefthook-dotnet
       - name: Enforce runner policy on standards
         run: npm run lint:runner-policy
         env:
@@ -188,6 +190,9 @@ jobs:
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
       - name: PSScriptAnalyzer contract test
         run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
+      - name: PSScriptAnalyzer staged-adapter regression
+        shell: pwsh
+        run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
   shellcheck-fixtures:
     runs-on: ubuntu-24.04
@@ -439,10 +444,22 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
       - name: Verify toolchain
-        run: dotnet --version
+        run: |
+          dotnet --version
+          node --version
       - name: .NET analysis contract test
         run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
+      - name: .NET staged-adapter integration
+        run: >-
+          node components/lefthook-dotnet/dotnet-format-staged.mjs
+          components/dotnet-analysis/fixtures/good/Calculator.cs
+        env:
+          DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
 
   harness:
     runs-on: ubuntu-24.04

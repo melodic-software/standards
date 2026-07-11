@@ -15,8 +15,8 @@
 
 @{
     # Include Information so the Information-severity rules enabled below
-    # (PSUseCorrectCasing, PSProvideCommentHelp,
-    # PSAvoidUsingDoubleQuotesForConstantString) actually gate — a top-level
+    # (PSProvideCommentHelp and PSAvoidUsingDoubleQuotesForConstantString)
+    # actually gate — a top-level
     # Severity filter discards any severity not listed here.
     Severity = @('Error', 'Warning', 'Information')
 
@@ -74,10 +74,6 @@
         PSAlignAssignmentStatement = @{
             Enable         = $false
             CheckHashtable = $false
-        }
-
-        PSUseCorrectCasing = @{
-            Enable = $true
         }
 
         # Line length limit — PoshCode recommends 115; 120 matches common repo

@@ -10,11 +10,17 @@ import { parseDocument } from "yaml";
 const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
 const DEFAULT_CONFIG_PATH = ".github/runner-policy.json";
-const RUNNER_OUTPUT = /^\s*\$\{\{\s*needs\.([A-Za-z0-9_-]+)\.outputs\.runner\s*}}\s*$/;
+const RUNNER_OUTPUT =
+  /^\s*\$\{\{\s*needs\.([A-Za-z0-9_-]+)\.outputs\.runner\s*\|\|\s*'ubuntu-24\.04'\s*}}\s*$/;
 const MATRIX_OUTPUT = /^\$\{\{ matrix\.([A-Za-z0-9_-]+) }}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const REUSABLE_WORKFLOW_PATH =
   /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
+const LOCAL_REUSABLE_WORKFLOW = /^\.\/\.github\/workflows\/([A-Za-z0-9_.-]+\.ya?ml)$/;
+const EXACT_GITHUB_TOKEN_EXPRESSIONS = new Set([
+  `\${{ secrets.GITHUB_TOKEN }}`,
+  `\${{ github.token }}`,
+]);
 
 class ConfigurationError extends Error {
   constructor(message) {
@@ -79,11 +85,12 @@ function validatePolicy(value) {
       "forbiddenHostedRunnerLabels",
       "managedLabelPatterns",
       "hostedExceptionReasons",
+      "localCredentialActions",
     ],
     "policy",
   );
-  if (value.schemaVersion !== 1) {
-    throw new ConfigurationError("policy.schemaVersion must be 1");
+  if (value.schemaVersion !== 2) {
+    throw new ConfigurationError("policy.schemaVersion must be 2");
   }
   assertStringArray(value.selectorWorkflowPaths, "policy.selectorWorkflowPaths");
   if (value.selectorWorkflowPaths.some((workflow) => !REUSABLE_WORKFLOW_PATH.test(workflow))) {
@@ -136,6 +143,18 @@ function validatePolicy(value) {
   assertStringArray(value.forbiddenHostedRunnerLabels, "policy.forbiddenHostedRunnerLabels");
   assertStringArray(value.managedLabelPatterns, "policy.managedLabelPatterns");
   assertStringArray(value.hostedExceptionReasons, "policy.hostedExceptionReasons");
+  assertStringArray(value.localCredentialActions, "policy.localCredentialActions");
+
+  if (
+    value.localCredentialActions.some(
+      (action) =>
+        !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(action) || action !== action.toLowerCase(),
+    )
+  ) {
+    throw new ConfigurationError(
+      "policy.localCredentialActions must contain lowercase owner/action names without revisions",
+    );
+  }
 
   const approvedHostedRunnerLabels = new Set(value.approvedHostedRunnerLabels);
   const forbiddenHostedRunnerLabels = new Set(
@@ -182,7 +201,7 @@ function validatePolicy(value) {
     assertPlainObject(contract, `reusable workflow contract ${reference}`);
     assertExactKeys(
       contract,
-      ["routing", "runnerInput", "allowedInputs", "fixedRunsOn"],
+      ["routing", "runnerInput", "allowedInputs", "allowedSecrets", "fixedRunsOn"],
       `reusable workflow contract ${reference}`,
     );
     if (!new Set(["hosted-only", "runner-input"]).has(contract.routing)) {
@@ -193,6 +212,11 @@ function validatePolicy(value) {
     assertStringArray(
       contract.allowedInputs,
       `reusable workflow contract ${reference}.allowedInputs`,
+      { allowEmpty: true },
+    );
+    assertStringMap(
+      contract.allowedSecrets,
+      `reusable workflow contract ${reference}.allowedSecrets`,
       { allowEmpty: true },
     );
     if (contract.routing === "runner-input") {
@@ -237,6 +261,8 @@ function validatePolicy(value) {
       routing: contract.routing,
       ...(contract.runnerInput ? { runnerInput: contract.runnerInput } : {}),
       allowedInputs: new Set(contract.allowedInputs),
+      allowedSecrets: contract.allowedSecrets,
+      allowedSecretNames: new Set(Object.keys(contract.allowedSecrets)),
       ...(contract.fixedRunsOn ? { fixedRunsOn: new Set(contract.fixedRunsOn) } : {}),
     });
   }
@@ -285,6 +311,7 @@ function validatePolicy(value) {
     hostedMatrixAxes,
     forbiddenHostedRunnerLabels,
     hostedExceptionReasons: new Set(value.hostedExceptionReasons),
+    localCredentialActions: new Set(value.localCredentialActions),
     managedLabelRegexes,
   };
 }
@@ -405,6 +432,370 @@ function parseReusableWorkflowReference(value) {
   return { workflow: value.slice(0, separator), revision: value.slice(separator + 1) };
 }
 
+function parseLocalReusableWorkflowReference(value) {
+  if (typeof value !== "string" || !value.startsWith("./")) {
+    return { attempted: false };
+  }
+  const match = LOCAL_REUSABLE_WORKFLOW.exec(value);
+  if (!match) {
+    return {
+      attempted: true,
+      reason:
+        "repository-local reusable workflows must use the exact path ./.github/workflows/<file>.yml without traversal or subdirectories",
+    };
+  }
+  return { attempted: true, file: `.github/workflows/${match[1]}` };
+}
+
+function workflowCallDeclaration(workflow) {
+  if (workflow.on === "workflow_call") {
+    return {};
+  }
+  if (Array.isArray(workflow.on)) {
+    return workflow.on.includes("workflow_call") ? {} : undefined;
+  }
+  if (
+    workflow.on === null ||
+    typeof workflow.on !== "object" ||
+    !Object.hasOwn(workflow.on, "workflow_call")
+  ) {
+    return undefined;
+  }
+  const declaration = workflow.on.workflow_call;
+  if (declaration === null) {
+    return {};
+  }
+  if (typeof declaration !== "object" || Array.isArray(declaration)) {
+    return {};
+  }
+  return declaration;
+}
+
+function isWorkflowCallExclusive(workflow) {
+  if (workflow.on === "workflow_call") {
+    return true;
+  }
+  if (Array.isArray(workflow.on)) {
+    return workflow.on.length === 1 && workflow.on[0] === "workflow_call";
+  }
+  return (
+    workflow.on !== null &&
+    typeof workflow.on === "object" &&
+    !Array.isArray(workflow.on) &&
+    Object.keys(workflow.on).length === 1 &&
+    Object.hasOwn(workflow.on, "workflow_call")
+  );
+}
+
+function validateLocalCallMapping(job, calledWorkflow) {
+  const declaration = workflowCallDeclaration(calledWorkflow);
+  if (declaration === undefined) {
+    return "the repository-local workflow does not declare on.workflow_call";
+  }
+
+  const declaredInputs = declaration.inputs ?? {};
+  if (
+    declaredInputs === null ||
+    typeof declaredInputs !== "object" ||
+    Array.isArray(declaredInputs)
+  ) {
+    return "the repository-local workflow has an invalid workflow_call.inputs mapping";
+  }
+  const inputs = job.with ?? {};
+  if (inputs === null || typeof inputs !== "object" || Array.isArray(inputs)) {
+    return "repository-local reusable workflow inputs must be an explicit mapping";
+  }
+  const extraInputs = Object.keys(inputs).filter((name) => !Object.hasOwn(declaredInputs, name));
+  if (extraInputs.length > 0) {
+    return `the repository-local reusable workflow call has undeclared inputs: ${extraInputs.join(", ")}`;
+  }
+  const missingInputs = Object.entries(declaredInputs)
+    .filter(
+      ([name, input]) =>
+        input !== null &&
+        typeof input === "object" &&
+        !Array.isArray(input) &&
+        input.required === true &&
+        !Object.hasOwn(inputs, name),
+    )
+    .map(([name]) => name);
+  if (missingInputs.length > 0) {
+    return `the repository-local reusable workflow call omits required inputs: ${missingInputs.join(", ")}`;
+  }
+
+  if (job.secrets === "inherit") {
+    return "repository-local reusable workflows must not use secrets: inherit";
+  }
+  const declaredSecrets = declaration.secrets ?? {};
+  if (
+    declaredSecrets === null ||
+    typeof declaredSecrets !== "object" ||
+    Array.isArray(declaredSecrets)
+  ) {
+    return "the repository-local workflow has an invalid workflow_call.secrets mapping";
+  }
+  const secrets = job.secrets ?? {};
+  if (secrets === null || typeof secrets !== "object" || Array.isArray(secrets)) {
+    return "repository-local reusable workflow secrets must be an explicit mapping";
+  }
+  const extraSecrets = Object.keys(secrets).filter((name) => !Object.hasOwn(declaredSecrets, name));
+  if (extraSecrets.length > 0) {
+    return `the repository-local reusable workflow call has undeclared secrets: ${extraSecrets.join(", ")}`;
+  }
+  const missingSecrets = Object.entries(declaredSecrets)
+    .filter(
+      ([name, secret]) =>
+        secret !== null &&
+        typeof secret === "object" &&
+        !Array.isArray(secret) &&
+        secret.required === true &&
+        !Object.hasOwn(secrets, name),
+    )
+    .map(([name]) => name);
+  if (missingSecrets.length > 0) {
+    return `the repository-local reusable workflow call omits required secrets: ${missingSecrets.join(", ")}`;
+  }
+  return undefined;
+}
+
+function localCallReaches(startFile, soughtFile, workflowIndex, visited = new Set()) {
+  if (startFile === soughtFile) {
+    return true;
+  }
+  if (visited.has(startFile)) {
+    return false;
+  }
+  visited.add(startFile);
+  const record = workflowIndex.get(startFile);
+  if (!record?.workflow) {
+    return false;
+  }
+  for (const job of Object.values(record.workflow.jobs)) {
+    const reference = parseLocalReusableWorkflowReference(job?.uses);
+    if (reference.file && localCallReaches(reference.file, soughtFile, workflowIndex, visited)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function localWorkflowRoutingMode(record, policy, workflowIndex, visited = new Set()) {
+  if (visited.has(record.file)) {
+    return "internal-routing";
+  }
+  visited.add(record.file);
+  let internalRouting = false;
+  for (const job of Object.values(record.workflow.jobs)) {
+    if (selectorStatus(job, policy).isSelector) {
+      internalRouting = true;
+      continue;
+    }
+    if (typeof job?.["runs-on"] === "string") {
+      const runner = job["runs-on"];
+      if (
+        runner === policy.governedReusableRunnerInput.expression ||
+        RUNNER_OUTPUT.test(runner) ||
+        rawManagedLabel(runner, policy)
+      ) {
+        internalRouting = true;
+      }
+    }
+    const external =
+      typeof job?.uses === "string"
+        ? policy.approvedReusableWorkflowContracts.get(job.uses)
+        : undefined;
+    if (external?.routing === "runner-input") {
+      internalRouting = true;
+    }
+    const local = parseLocalReusableWorkflowReference(job?.uses);
+    if (local.file) {
+      const nested = workflowIndex.get(local.file);
+      if (!nested?.workflow) {
+        internalRouting = true;
+      } else if (localWorkflowRoutingMode(nested, policy, workflowIndex, visited) !== "hosted") {
+        internalRouting = true;
+      }
+    }
+  }
+  visited.delete(record.file);
+
+  const runnerDeclaration =
+    record.workflow.on?.workflow_call?.inputs?.[policy.governedReusableRunnerInput.name];
+  if (runnerDeclaration !== undefined && internalRouting) {
+    const status = governedReusableRunnerStatus(record.workflow, policy);
+    return status.approved ? "runner-input" : "invalid-runner-input";
+  }
+  return internalRouting ? "internal-routing" : "hosted";
+}
+
+function localReusableWorkflowStatus(callerFile, job, policy, workflowIndex) {
+  const reference = parseLocalReusableWorkflowReference(job?.uses);
+  if (!reference.attempted) {
+    return { isLocal: false, approved: false };
+  }
+  if (!reference.file) {
+    return { isLocal: true, approved: false, reason: reference.reason };
+  }
+  const record = workflowIndex.get(reference.file);
+  if (!record) {
+    return {
+      isLocal: true,
+      approved: false,
+      reason: `repository-local reusable workflow ${reference.file} does not exist`,
+    };
+  }
+  if (!record.workflow) {
+    return {
+      isLocal: true,
+      approved: false,
+      reason: `repository-local reusable workflow ${reference.file} is not a parsed regular workflow file`,
+    };
+  }
+  if (localCallReaches(reference.file, callerFile, workflowIndex)) {
+    return {
+      isLocal: true,
+      approved: false,
+      reason: `repository-local reusable workflow call creates a recursion cycle through ${reference.file}`,
+    };
+  }
+  const mappingError = validateLocalCallMapping(job, record.workflow);
+  if (mappingError) {
+    return { isLocal: true, approved: false, reason: mappingError };
+  }
+  const routing = localWorkflowRoutingMode(record, policy, workflowIndex);
+  if (routing === "invalid-runner-input") {
+    return {
+      isLocal: true,
+      approved: false,
+      reason:
+        "repository-local runner-input workflows must use workflow_call exclusively and declare the governed optional runner default",
+    };
+  }
+  return { isLocal: true, approved: true, record, routing };
+}
+
+function permissionCapability(workflow, job, inherited = "may-write") {
+  const declaration = Object.hasOwn(job, "permissions")
+    ? job.permissions
+    : Object.hasOwn(workflow, "permissions")
+      ? workflow.permissions
+      : undefined;
+  if (declaration === undefined) {
+    return inherited;
+  }
+  const requestsOnlyRead =
+    declaration === "read-all" ||
+    (declaration !== null &&
+      typeof declaration === "object" &&
+      !Array.isArray(declaration) &&
+      Object.values(declaration).every((access) => access === "read" || access === "none"));
+  if (requestsOnlyRead || inherited === "read-only") {
+    return "read-only";
+  }
+  return "may-write";
+}
+
+function auditLocalPermissionFlow({
+  localStatus,
+  inherited,
+  policy,
+  workflowIndex,
+  config,
+  consumedExceptions,
+  visited,
+}) {
+  const record = localStatus.record;
+  const visitKey = `${record.file}\0${inherited}`;
+  if (visited.has(visitKey)) {
+    return [];
+  }
+  visited.add(visitKey);
+  const findings = [];
+  for (const [jobId, job] of Object.entries(record.workflow.jobs)) {
+    if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      continue;
+    }
+    const capability = permissionCapability(record.workflow, job, inherited);
+    const nested = localReusableWorkflowStatus(record.file, job, policy, workflowIndex);
+    if (nested.approved) {
+      findings.push(
+        ...auditLocalPermissionFlow({
+          localStatus: nested,
+          inherited: capability,
+          policy,
+          workflowIndex,
+          config,
+          consumedExceptions,
+          visited,
+        }),
+      );
+      continue;
+    }
+
+    const selector = selectorStatus(job, policy);
+    const target = selector.isSelector
+      ? undefined
+      : runnerTargetStatus(
+          jobId,
+          job,
+          record.workflow.jobs,
+          record.workflow,
+          policy,
+          record.file,
+          workflowIndex,
+        );
+    const localExecution =
+      target?.kind === "selector-output" ||
+      target?.kind === "reusable-input" ||
+      target?.kind === "transparent-local-reusable";
+    if (localExecution && capability !== "read-only") {
+      findings.push(
+        finding(
+          "local-reusable-permissions",
+          record.file,
+          jobId,
+          "a locally routable called job can inherit write-capable caller permissions; declare an explicit read-only job permission mapping",
+        ),
+      );
+      continue;
+    }
+
+    const hostedExecution =
+      selector.approved ||
+      target?.kind === "hosted-literal" ||
+      target?.kind === "hosted-matrix" ||
+      target?.kind === "hosted-reusable" ||
+      target?.kind === "hosted-local-reusable";
+    if (hostedExecution && capability !== "read-only") {
+      const key = `${record.file}#${jobId}`;
+      const exception = config.exceptions.get(key);
+      if (!exception) {
+        findings.push(
+          finding(
+            "hosted-exception-required",
+            record.file,
+            jobId,
+            "a fixed-hosted called job inherits write-capable caller permissions and requires a privileged-control-plane exception",
+          ),
+        );
+      } else {
+        consumedExceptions.add(key);
+        if (exception.reason !== "privileged-control-plane") {
+          findings.push(
+            finding(
+              "hosted-exception-category",
+              record.file,
+              jobId,
+              `inherited write-capable caller permissions require exception reason privileged-control-plane, not ${exception.reason}`,
+            ),
+          );
+        }
+      }
+    }
+  }
+  return findings;
+}
+
 function exactCanonicalMap(actual, required, optional, allowedNames, location) {
   if (actual === null || typeof actual !== "object" || Array.isArray(actual)) {
     return `${location} must be an explicit mapping`;
@@ -506,6 +897,24 @@ function reusableWorkflowStatus(job, policy) {
       reason: "the reusable workflow path@SHA has no reviewed runner-input contract",
     };
   }
+  if (job.secrets === "inherit") {
+    return {
+      isReusable: true,
+      approved: false,
+      reason: "reviewed reusable workflows must not use secrets: inherit",
+    };
+  }
+  const secrets = job.secrets === undefined ? {} : job.secrets;
+  const secretError = exactCanonicalMap(
+    secrets,
+    contract.allowedSecrets,
+    {},
+    contract.allowedSecretNames,
+    "reusable workflow secrets",
+  );
+  if (secretError) {
+    return { isReusable: true, approved: false, reason: secretError };
+  }
   const inputs = job.with === undefined ? {} : job.with;
   if (inputs === null || typeof inputs !== "object" || Array.isArray(inputs)) {
     return {
@@ -541,7 +950,8 @@ function routeStatus(jobId, target, job, jobs, policy) {
     return {
       attempted: target.includes("outputs.runner"),
       approved: false,
-      reason: "runner routing must use needs.<selector-job>.outputs.runner",
+      reason:
+        "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-24.04'",
     };
   }
 
@@ -568,7 +978,95 @@ function routeStatus(jobId, target, job, jobs, policy) {
   if (!status.approved) {
     return { attempted: true, approved: false, reason: status.reason };
   }
+  const condition = cancellationSafeConditionStatus(job.if);
+  if (!condition.approved) {
+    return { attempted: true, approved: false, reason: condition.reason };
+  }
   return { attempted: true, approved: true, selectorId };
+}
+
+function cancellationSafeConditionStatus(value) {
+  if (typeof value !== "string") {
+    return {
+      approved: false,
+      reason: `selector-routed jobs must declare if: \${{ !cancelled() }} so selector failure falls back without overriding cancellation`,
+    };
+  }
+  const wrapper = /^\s*\$\{\{([\s\S]*)}}\s*$/.exec(value);
+  if (!wrapper) {
+    return {
+      approved: false,
+      reason: `selector-routed job conditions must use the exact \${{ !cancelled() }} expression contract`,
+    };
+  }
+  const expression = wrapper[1].trim();
+  if (expression === "!cancelled()") {
+    return { approved: true };
+  }
+  const prefix = "!cancelled()";
+  if (!expression.startsWith(prefix)) {
+    return {
+      approved: false,
+      reason:
+        "selector-routed job conditions must begin with !cancelled() as the first top-level conjunction",
+    };
+  }
+  const remainder = expression.slice(prefix.length).trim();
+  if (!remainder.startsWith("&&") || remainder.slice(2).trim() === "") {
+    return {
+      approved: false,
+      reason:
+        "selector-routed job conditions must be !cancelled() or combine an existing condition with top-level &&",
+    };
+  }
+
+  let depth = 0;
+  let quote;
+  for (let index = 2; index < remainder.length; index += 1) {
+    const character = remainder[index];
+    if (quote) {
+      if (character === quote) {
+        if (remainder[index + 1] === quote) {
+          index += 1;
+        } else {
+          quote = undefined;
+        }
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")") {
+      depth -= 1;
+      if (depth < 0) {
+        return {
+          approved: false,
+          reason: "selector-routed job condition has unbalanced parentheses",
+        };
+      }
+      continue;
+    }
+    if (depth === 0 && remainder.slice(index, index + 2) === "||") {
+      return {
+        approved: false,
+        reason:
+          "selector-routed job conditions cannot use top-level || because cancellation could start the workload",
+      };
+    }
+  }
+  if (quote || depth !== 0) {
+    return {
+      approved: false,
+      reason: "selector-routed job condition has an unbalanced quoted string or parentheses",
+    };
+  }
+  return { approved: true };
 }
 
 function governedReusableRunnerStatus(workflow, policy) {
@@ -644,15 +1142,29 @@ function hostedMatrixStatus(job, target, policy) {
   return { approved: true };
 }
 
-function runnerTargetStatus(jobId, job, jobs, workflow, policy) {
+function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIndex) {
+  const local = localReusableWorkflowStatus(file, job, policy, workflowIndex);
+  if (local.isLocal && !local.approved) {
+    return { approved: false, kind: "invalid", reason: local.reason };
+  }
+  if (local.approved && local.routing === "hosted") {
+    return { approved: true, kind: "hosted-local-reusable" };
+  }
+  if (local.approved && local.routing === "internal-routing") {
+    return { approved: true, kind: "transparent-local-reusable" };
+  }
   const reusable = reusableWorkflowStatus(job, policy);
-  if (reusable.isReusable && !reusable.approved) {
+  if (!local.approved && reusable.isReusable && !reusable.approved) {
     return { approved: false, kind: "invalid", reason: reusable.reason };
   }
-  if (reusable.approved && reusable.contract.routing === "hosted-only") {
+  if (!local.approved && reusable.approved && reusable.contract.routing === "hosted-only") {
     return { approved: true, kind: "hosted-reusable" };
   }
-  const target = reusable.approved ? job.with[reusable.contract.runnerInput] : job?.["runs-on"];
+  const target = local.approved
+    ? job.with[policy.governedReusableRunnerInput.name]
+    : reusable.approved
+      ? job.with[reusable.contract.runnerInput]
+      : job?.["runs-on"];
   if (typeof target !== "string") {
     return {
       approved: false,
@@ -723,6 +1235,184 @@ function rawManagedLabel(value, policy) {
   return policy.managedLabelRegexes.some((pattern) => pattern.test(trimmed));
 }
 
+function effectivePermissions(workflow, job) {
+  return Object.hasOwn(job, "permissions") ? job.permissions : workflow.permissions;
+}
+
+function permissionHostedRequirement(workflow, job, { requireExplicitReadOnly = false } = {}) {
+  const permissions = effectivePermissions(workflow, job);
+  if (permissions === "write-all") {
+    return {
+      reason: "privileged-control-plane",
+      description: "write-all GITHUB_TOKEN permissions",
+      rule: "privileged-hosted-only",
+    };
+  }
+  if (permissions === "read-all") {
+    return undefined;
+  }
+  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+    if (requireExplicitReadOnly) {
+      return {
+        reason: "privileged-control-plane",
+        description:
+          permissions === undefined
+            ? "omitted GITHUB_TOKEN permissions with repository/organization-defined defaults"
+            : "GITHUB_TOKEN permissions that are not explicitly read-only",
+        rule: "privileged-hosted-only",
+      };
+    }
+    return undefined;
+  }
+  const writable = Object.entries(permissions)
+    .filter(([, access]) => access === "write")
+    .map(([scope]) => scope)
+    .sort((left, right) => left.localeCompare(right));
+  if (writable.length === 0) {
+    if (requireExplicitReadOnly && !hasStaticallyReadOnlyPermissions(workflow, job)) {
+      return {
+        reason: "privileged-control-plane",
+        description: "GITHUB_TOKEN permissions that are not explicitly read-only",
+        rule: "privileged-hosted-only",
+      };
+    }
+    return undefined;
+  }
+  return {
+    reason: "privileged-control-plane",
+    description: `write GITHUB_TOKEN permissions (${writable.join(", ")})`,
+    rule: "privileged-hosted-only",
+  };
+}
+
+function containsCredentialExpression(value) {
+  return stringsIn(value).some((item) =>
+    /\$\{\{[\s\S]*?\b(?:secrets\s*(?:\.|\[)|github\s*(?:\.\s*token\b|\[\s*["']token["']\s*\]))/i.test(
+      item,
+    ),
+  );
+}
+
+function hasStaticallyReadOnlyPermissions(workflow, job) {
+  const permissions = effectivePermissions(workflow, job);
+  if (permissions === "read-all") {
+    return true;
+  }
+  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+    return false;
+  }
+  return Object.values(permissions).every((access) => access === "read" || access === "none");
+}
+
+function localCredentialRequirement(workflow, job) {
+  if (containsCredentialExpression(workflow.env)) {
+    return "a credential expression in workflow-level env";
+  }
+  const { steps, ...jobWithoutSteps } = job;
+  if (containsCredentialExpression(jobWithoutSteps)) {
+    return "a credential expression outside a narrow step env/with value";
+  }
+  if (!Array.isArray(steps)) {
+    return undefined;
+  }
+  const readOnly = hasStaticallyReadOnlyPermissions(workflow, job);
+  for (const step of steps) {
+    if (step === null || typeof step !== "object" || Array.isArray(step)) {
+      continue;
+    }
+    const { env, with: inputs, ...stepWithoutCredentialMappings } = step;
+    if (containsCredentialExpression(stepWithoutCredentialMappings)) {
+      return "a credential expression outside a narrow step env/with value";
+    }
+    for (const mapping of [env, inputs]) {
+      if (mapping === null || typeof mapping !== "object" || Array.isArray(mapping)) {
+        if (containsCredentialExpression(mapping)) {
+          return "a transformed or indirect credential expression";
+        }
+        continue;
+      }
+      for (const value of Object.values(mapping)) {
+        if (!containsCredentialExpression(value)) {
+          continue;
+        }
+        if (typeof value === "string" && EXACT_GITHUB_TOKEN_EXPRESSIONS.has(value) && readOnly) {
+          continue;
+        }
+        return EXACT_GITHUB_TOKEN_EXPRESSIONS.has(value)
+          ? "GitHub-provided token use without statically read-only permissions"
+          : "an unapproved or transformed credential expression";
+      }
+    }
+  }
+  return undefined;
+}
+
+function credentialAction(job, policy) {
+  if (!Array.isArray(job.steps)) {
+    return undefined;
+  }
+  for (const step of job.steps) {
+    if (step === null || typeof step !== "object" || Array.isArray(step)) {
+      continue;
+    }
+    if (typeof step.uses !== "string") {
+      continue;
+    }
+    const action = step.uses.split("@", 1)[0].toLowerCase();
+    if (policy.localCredentialActions.has(action)) {
+      return action;
+    }
+  }
+  return undefined;
+}
+
+function privilegedHostedRequirement(workflow, job, selector, target, policy, localCall) {
+  const permissionRequirement = localCall?.approved
+    ? undefined
+    : permissionHostedRequirement(workflow, job, {
+        requireExplicitReadOnly: target?.kind === "selector-output",
+      });
+  if (permissionRequirement) {
+    return permissionRequirement;
+  }
+
+  // The selector's one exact observer secret is part of its reviewed hosted
+  // reusable-workflow contract. Exact hosted-only reusable secret mappings are
+  // likewise governed by approvedReusableWorkflowContracts rather than this
+  // local-workload boundary.
+  if (selector.isSelector || target?.kind === "hosted-reusable") {
+    return undefined;
+  }
+
+  if (Object.hasOwn(job, "environment")) {
+    return {
+      reason: "privileged-control-plane",
+      description: "a deployment environment",
+      rule: "privileged-hosted-only",
+    };
+  }
+
+  const credentialRequirement = localCredentialRequirement(workflow, job);
+  if (credentialRequirement) {
+    return {
+      reason: "privileged-control-plane",
+      description: credentialRequirement,
+      rule: "privileged-hosted-only",
+    };
+  }
+
+  const action = credentialAction(job, policy);
+  if (action) {
+    return {
+      reason: "privileged-control-plane",
+      description: `credential-minting action ${action}`,
+      rule: "privileged-hosted-only",
+    };
+  }
+
+  return undefined;
+}
+
 function structuralHostedRequirement(job) {
   const hasJobContainer = Object.hasOwn(job, "container");
   const hasServices = Object.hasOwn(job, "services");
@@ -733,30 +1423,59 @@ function structuralHostedRequirement(job) {
     return {
       reason: "job-container",
       description: hasServices ? "job container and services" : "job container",
+      rule: "structural-hosted-only",
     };
   }
-  return { reason: "service-container", description: "services" };
+  return {
+    reason: "service-container",
+    description: "services",
+    rule: "structural-hosted-only",
+  };
 }
 
 function finding(rule, file, job, message) {
   return { rule, file, ...(job ? { job } : {}), message };
 }
 
-async function workflowFiles(root) {
+async function repositoryWorkflowIndex(root) {
   const directory = path.join(root, ".github", "workflows");
   let entries;
   try {
     entries = await readdir(directory, { withFileTypes: true });
   } catch (error) {
     if (error.code === "ENOENT") {
-      return [];
+      return new Map();
     }
     throw error;
   }
-  return entries
-    .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
-    .map((entry) => path.join(directory, entry.name))
-    .sort((left, right) => left.localeCompare(right));
+  const records = new Map();
+  for (const entry of entries
+    .filter((candidate) => /\.ya?ml$/i.test(candidate.name))
+    .sort((left, right) => left.name.localeCompare(right.name))) {
+    const file = `.github/workflows/${entry.name}`;
+    const absoluteFile = path.join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      records.set(file, {
+        file,
+        absoluteFile,
+        error: `${file} must be a regular file; workflow symlinks are forbidden`,
+      });
+      continue;
+    }
+    if (!entry.isFile()) {
+      continue;
+    }
+    try {
+      records.set(file, {
+        file,
+        absoluteFile,
+        workflow: parseWorkflow(await readFile(absoluteFile, "utf8"), file),
+      });
+    } catch (error) {
+      records.set(file, { file, absoluteFile, error: error.message });
+    }
+  }
+  return records;
 }
 
 export async function auditRepository({
@@ -789,14 +1508,25 @@ export async function auditRepository({
   }
   const findings = [];
   const consumedExceptions = new Set();
+  const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
+  const localPermissionVisits = new Set();
+  const localIncomingFiles = new Set();
+  for (const record of workflowIndex.values()) {
+    if (!record.workflow) {
+      continue;
+    }
+    for (const job of Object.values(record.workflow.jobs)) {
+      const reference = parseLocalReusableWorkflowReference(job?.uses);
+      if (reference.file) {
+        localIncomingFiles.add(reference.file);
+      }
+    }
+  }
 
-  for (const absoluteFile of await workflowFiles(resolvedRoot)) {
-    const file = path.relative(resolvedRoot, absoluteFile).replaceAll(path.sep, "/");
-    let workflow;
-    try {
-      workflow = parseWorkflow(await readFile(absoluteFile, "utf8"), file);
-    } catch (error) {
-      findings.push(finding("workflow-parse", file, undefined, error.message));
+  for (const record of workflowIndex.values()) {
+    const { file, workflow } = record;
+    if (!workflow) {
+      findings.push(finding("workflow-parse", file, undefined, record.error));
       continue;
     }
 
@@ -808,13 +1538,35 @@ export async function auditRepository({
       const key = `${file}#${jobId}`;
       const exception = config.exceptions.get(key);
       const selector = selectorStatus(job, policy);
+      const localCall = selector.isSelector
+        ? undefined
+        : localReusableWorkflowStatus(file, job, policy, workflowIndex);
       const target = selector.isSelector
         ? undefined
-        : runnerTargetStatus(jobId, job, workflow.jobs, workflow, policy);
+        : runnerTargetStatus(jobId, job, workflow.jobs, workflow, policy, file, workflowIndex);
       const attemptsSelectorRoute =
         target !== undefined && Object.hasOwn(target, "route") && target.route.attempted === true;
       const runnerStrings = rawRunnerStrings(job, !selector.isSelector);
-      const structuralHosted = structuralHostedRequirement(job);
+      const routingEnabled = config.visibility === "private" && config.selfHostedCi;
+      const seedLocalPermissionFlow =
+        !isWorkflowCallExclusive(workflow) || !localIncomingFiles.has(file);
+      if (routingEnabled && localCall?.approved && seedLocalPermissionFlow) {
+        findings.push(
+          ...auditLocalPermissionFlow({
+            localStatus: localCall,
+            inherited: permissionCapability(workflow, job),
+            policy,
+            workflowIndex,
+            config,
+            consumedExceptions,
+            visited: localPermissionVisits,
+          }),
+        );
+      }
+      const privilegedHosted = routingEnabled
+        ? privilegedHostedRequirement(workflow, job, selector, target, policy, localCall)
+        : undefined;
+      const hostedRequirement = privilegedHosted ?? structuralHostedRequirement(job);
       let hasForbiddenHostedLabel = false;
       let hasRawManagedLabel = false;
 
@@ -858,25 +1610,25 @@ export async function auditRepository({
         findings.push(finding("runner-target-contract", file, jobId, target.reason));
       }
 
-      if (structuralHosted) {
+      if (hostedRequirement) {
         if (!exception) {
           findings.push(
             finding(
               "hosted-exception-required",
               file,
               jobId,
-              `${structuralHosted.description} requires a hosted exception with reason ${structuralHosted.reason}`,
+              `${hostedRequirement.description} requires a hosted exception with reason ${hostedRequirement.reason}`,
             ),
           );
         } else {
           consumedExceptions.add(key);
-          if (exception.reason !== structuralHosted.reason) {
+          if (exception.reason !== hostedRequirement.reason) {
             findings.push(
               finding(
                 "hosted-exception-category",
                 file,
                 jobId,
-                `${structuralHosted.description} requires exception reason ${structuralHosted.reason}, not ${exception.reason}`,
+                `${hostedRequirement.description} requires exception reason ${hostedRequirement.reason}, not ${exception.reason}`,
               ),
             );
           }
@@ -885,20 +1637,20 @@ export async function auditRepository({
           selector.isSelector ||
           (target?.kind !== "hosted-literal" &&
             target?.kind !== "hosted-matrix" &&
-            target?.kind !== "hosted-reusable")
+            target?.kind !== "hosted-reusable" &&
+            target?.kind !== "hosted-local-reusable")
         ) {
           findings.push(
             finding(
-              "structural-hosted-only",
+              hostedRequirement.rule,
               file,
               jobId,
-              `${structuralHosted.description} cannot use selector or reusable local-runner routing`,
+              `${hostedRequirement.description} cannot use selector or reusable local-runner routing`,
             ),
           );
         }
       }
 
-      const routingEnabled = config.visibility === "private" && config.selfHostedCi;
       if (!routingEnabled) {
         if (selector.isSelector || target?.kind === "selector-output" || attemptsSelectorRoute) {
           findings.push(
@@ -931,10 +1683,16 @@ export async function auditRepository({
       if (target?.kind === "reusable-input") {
         continue;
       }
+      if (
+        target?.kind === "hosted-local-reusable" ||
+        target?.kind === "transparent-local-reusable"
+      ) {
+        continue;
+      }
       if (target?.kind === "invalid") {
         if (exception) {
           consumedExceptions.add(key);
-        } else if (!structuralHosted) {
+        } else if (!hostedRequirement) {
           findings.push(
             finding(
               "hosted-exception-required",
@@ -946,7 +1704,7 @@ export async function auditRepository({
         }
         continue;
       }
-      if (!exception && !structuralHosted) {
+      if (!exception && !hostedRequirement) {
         findings.push(
           finding(
             "hosted-exception-required",
@@ -974,7 +1732,14 @@ export async function auditRepository({
     }
   }
 
-  return findings.sort((left, right) =>
+  const uniqueFindings = new Map();
+  for (const item of findings) {
+    const key = [item.file, item.job ?? "", item.rule].join("\0");
+    if (!uniqueFindings.has(key)) {
+      uniqueFindings.set(key, item);
+    }
+  }
+  return [...uniqueFindings.values()].sort((left, right) =>
     [left.file, left.job ?? "", left.rule, left.message]
       .join("\0")
       .localeCompare([right.file, right.job ?? "", right.rule, right.message].join("\0")),

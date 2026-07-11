@@ -229,4 +229,64 @@ else
   skip_case 'symlink destination case unavailable on this platform'
 fi
 
+# Production coverage contract: the runner policy is one atomic runtime
+# component in each enrolled private consumer. Its dependency lockfile travels
+# with the executable, and node-runtime makes the engine pin explicit.
+actual_manifest="$root/distribution/sync-manifest.yml"
+assert_eq 'runner-policy requires the shared Node runtime pin' 'node-runtime' \
+  "$(yq -r '.components.runner-policy.requires | join(",")' "$actual_manifest")"
+assert_eq 'runner-policy materializes exactly four runtime files' '4' \
+  "$(yq -r '.components.runner-policy.files | length' "$actual_manifest")"
+
+for mapping in \
+  'components/runner-policy/runner-policy.mjs=.github/standards/runner-policy/runner-policy.mjs' \
+  'components/runner-policy/policy.json=.github/standards/runner-policy/policy.json' \
+  'components/runner-policy/package.json=.github/standards/runner-policy/package.json' \
+  'components/runner-policy/package-lock.json=.github/standards/runner-policy/package-lock.json'; do
+  source_path="${mapping%%=*}"
+  destination_path="${mapping#*=}"
+  assert_eq "runner-policy mapping is exact: $source_path" "$destination_path" \
+    "$(SOURCE_PATH="$source_path" yq -r '.components.runner-policy.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
+done
+
+expected_runner_policy_targets='["kyle-sexton/dotfiles","kyle-sexton/github-iac","kyle-sexton/provisioning","melodic-software/claude-code-plugins","melodic-software/github-iac","melodic-software/medley"]'
+actual_runner_policy_targets="$(
+  yq -o=json -I=0 \
+    '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
+    "$actual_manifest"
+)"
+assert_eq 'runner-policy covers exactly the six enrolled private consumers' \
+  "$expected_runner_policy_targets" "$actual_runner_policy_targets"
+assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
+  "$(
+    yq -r \
+      '[.updates[] | select(.package-ecosystem == "npm" and .directory == "/components/runner-policy")] | length' \
+      "$root/.github/dependabot.yml"
+  )"
+
+assert_eq 'lefthook-dotnet distributes its argv-safe staged wrapper' \
+  '.lefthook/dotnet-format-staged.mjs' \
+  "$(
+    yq -r \
+      '.components.lefthook-dotnet.files."components/lefthook-dotnet/dotnet-format-staged.mjs"' \
+      "$actual_manifest"
+  )"
+assert_eq 'lefthook-dotnet declares its direct Node runtime dependency' '1' \
+  "$(
+    yq -r \
+      '[.components.lefthook-dotnet.requires[] | select(. == "node-runtime")] | length' \
+      "$actual_manifest"
+  )"
+
+assert_eq 'lefthook-powershell materializes its complete isolated adapter' '3' \
+  "$(yq -r '.components.lefthook-powershell.files | length' "$actual_manifest")"
+for mapping in \
+  'components/lefthook-powershell/psscriptanalyzer-staged.ps1=.lefthook/psscriptanalyzer-staged.ps1' \
+  'components/lefthook-powershell/psscriptanalyzer-target.ps1=.lefthook/psscriptanalyzer-target.ps1'; do
+  source_path="${mapping%%=*}"
+  destination_path="${mapping#*=}"
+  assert_eq "lefthook-powershell mapping is exact: $source_path" "$destination_path" \
+    "$(SOURCE_PATH="$source_path" yq -r '.components.lefthook-powershell.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
+done
+
 [[ $FAILED -eq 0 ]] || exit 1

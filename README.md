@@ -64,6 +64,7 @@ Locally, install pinned Node dependencies with `npm ci`, then run:
 ```bash
 npm run lint:md
 npm run lint:hooks
+npm run test:lefthook-dotnet
 npm run test:runner-policy
 npm run lint:runner-policy
 bash harness/shell/run-tests.sh harness/shell/lib.test.sh

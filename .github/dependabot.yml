@@ -33,3 +33,13 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+  # The runner policy is distributed with its own runtime lockfile, so it is a
+  # separate npm dependency root. Keep this entry in sync with that component;
+  # every downstream materialization must add the equivalent destination path.
+  - package-ecosystem: npm
+    directory: /components/runner-policy
+    labels: ["dependencies"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
