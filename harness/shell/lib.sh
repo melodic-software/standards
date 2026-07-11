@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Shared assertion library for *.test.sh shell tests in this repo.
 #
-# Plain-bash test convention: a *.test.sh file lives next to the script it
-# tests, sources this lib, and calls assertions. Not a BATS replacement — a
-# lightweight shared helper that keeps the test suite dependency-free.
+# Plain-bash test convention: a *.test.sh file lives next to the config or
+# script it tests, sources this lib, and calls assertions. Not a BATS
+# replacement — a lightweight shared helper that keeps the test suite
+# dependency-free.
 #
 # Source it (CWD-independent — resolves via git toplevel). Hoist the toplevel into
 # `root` once and reuse it for the source path and any later paths, rather than
@@ -65,8 +66,6 @@ skip_case() {
 # gating on the wrong version or dropping the suite.
 require_min_version() {
   local label="$1" have="$2" min="$3"
-  # <have> must look like a version (lead with a digit). Empty or a non-version
-  # token means the caller's --version parse broke — fail loudly (see above).
   if [[ ! "$have" =~ ^[0-9] ]]; then
     printf 'ERROR: %s reported an unparsable version: %q (fix the --version parse)\n' "$label" "$have" >&2
     exit 1
@@ -167,8 +166,12 @@ assert_file_absent() {
 
 assert_line_count() {
   local label="$1" path="$2" expected="$3"
-  local got=0
-  [[ -f "$path" ]] && got=$(wc -l <"$path" | tr -d ' ')
+  if [[ ! -f "$path" ]]; then
+    fail "$label" "expected file $path"
+    return
+  fi
+  local got
+  got=$(wc -l <"$path" | tr -d ' ')
   if [[ "$got" == "$expected" ]]; then
     pass "$label"
   else
@@ -204,12 +207,14 @@ assert_row_count() {
 }
 
 # make_repo <dir> — fresh git repo with one empty commit and a local identity,
-# so tests that need a valid HEAD work in CI without global git config.
+# so tests that need a valid HEAD work in CI without global git config. The
+# commit overrides ambient global config (commit signing, hooks path) so a
+# contributor's machine behaves like CI.
 make_repo() {
   local dir="$1"
   mkdir -p "$dir"
   git -C "$dir" init -q
   git -C "$dir" config user.email t@example.local
   git -C "$dir" config user.name testuser
-  git -C "$dir" commit --allow-empty -m init -q
+  git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit --allow-empty -m init -q
 }

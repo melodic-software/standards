@@ -6,8 +6,9 @@
 #   harness/shell/run-tests.sh            # all *.test.sh in the repo
 #   harness/shell/run-tests.sh path/a.test.sh path/b.test.sh
 #
-# A test file passes when it exits 0. A file that exits 0 with a `SKIP:` marker
-# and no `PASS:` lines is counted as skipped (no coverage this run).
+# A test file passes when it exits 0 and emits no `FAIL: ` markers. A file that
+# exits 0 with a `SKIP:` marker and no `PASS:` lines is counted as skipped (no
+# coverage this run). A listed file that does not exist counts as a failure.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd))"
@@ -17,7 +18,7 @@ if [[ $# -gt 0 ]]; then
   tests=("$@")
 else
   while IFS= read -r f; do tests+=("$f"); done \
-    < <(find "$root" -name '*.test.sh' -not -path '*/.git/*' | sort)
+    < <(find "$root" -name '*.test.sh' -not -path '*/.git/*' -not -path '*/node_modules/*' | sort)
 fi
 
 total=0 passed=0 failed=0 skipped=0
@@ -25,11 +26,19 @@ total=0 passed=0 failed=0 skipped=0
 # <= 4.3, including macOS's system bash 3.2, expanding an empty array otherwise
 # aborts with "unbound variable").
 for t in "${tests[@]+"${tests[@]}"}"; do
-  [[ -f "$t" ]] || continue
   total=$((total + 1))
   rel="${t#"$root"/}"
+  if [[ ! -f "$t" ]]; then
+    failed=$((failed + 1))
+    printf 'FAIL  %s (not found)\n' "$rel"
+    continue
+  fi
   if out="$(bash "$t" 2>&1)"; then
-    if grep -q '^SKIP: ' <<<"$out" && ! grep -q '^PASS: ' <<<"$out"; then
+    if grep -q '^FAIL: ' <<<"$out"; then
+      failed=$((failed + 1))
+      printf 'FAIL  %s\n' "$rel"
+      printf '%s\n' "$out" | sed 's/^/      | /'
+    elif grep -q '^SKIP: ' <<<"$out" && ! grep -q '^PASS: ' <<<"$out"; then
       skipped=$((skipped + 1))
       printf 'SKIP  %s\n' "$rel"
     else

@@ -4,9 +4,10 @@
 #
 # The managed payload lives at a consuming repo's root, where PSScriptAnalyzer
 # and editors discover it automatically. Consumers do not edit it in place.
-# Severity below is the
-# single source of truth for which findings block — CLI -Severity is ignored
-# when it conflicts with this file (Invoke-ScriptAnalyzer Example 8).
+# Severity below is the single source of truth for which findings block — the
+# Invoke-ScriptAnalyzer -Settings docs give profile values precedence over the
+# same parameters on the command line, so a conflicting CLI -Severity is
+# ignored.
 #
 # Refs:
 #   https://learn.microsoft.com/powershell/utility-modules/psscriptanalyzer/rules/readme

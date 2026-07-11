@@ -10,8 +10,8 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 config='.editorconfig-checker.json'
 
-# Binary name varies by install method: the official GitHub Action and most
-# package managers install `editorconfig-checker` (with an `ec` alias); the
+# Binary name varies by install method: npm installs `editorconfig-checker`
+# with an `ec` alias, the ci-workflows CI action installs `ec`, and the
 # winget package ships `ec-windows-amd64`.
 if command -v editorconfig-checker >/dev/null 2>&1; then
   run_ec() { editorconfig-checker "$@"; }
@@ -30,6 +30,7 @@ assert_exit 'good fixture exits 0' 0 "$rc"
 out="$(run_ec -config "$config" components/editorconfig-checker/fixtures/bad 2>&1)"
 rc=$?
 assert_exit 'bad fixture exits 1' 1 "$rc"
-assert_contains 'bad fixture reports a finding' "$out" 'newline'
+assert_contains 'bad fixture reports the final-newline finding' "$out" 'newline'
+assert_contains 'bad fixture reports the indent-style finding' "$out" 'indent style'
 
 [[ $FAILED -eq 0 ]] || exit 1

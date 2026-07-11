@@ -17,7 +17,7 @@ Diff-time checks for design, shape, style, and authoring hygiene — the quality
 
 ## Parameter and model shape
 
-Review is stricter than the linter here: a per-ecosystem rule enforces an arity *ceiling* (the numbers live in each stack overlay), but the universal tiers below apply well below that floor.
+Review owns parameter shape: where a stack toolchain enforces an arity ceiling, the universal tiers below apply well below it — and they apply in full where no such ceiling exists.
 
 - **Parameter-object default** — when a method or type takes two or more inputs describing one operation, start with a single named input object rather than a growing flat list, even below the linter's arity limit. Name it by role.
 - **Flat arity tiers** — zero to three independent parameters are unremarkable; two to three *co-traveling related* primitives are a data clump worth grouping even at low arity; four to six flat unrelated parameters are Important (introduce a parameter object, or apply Fowler's preceding refactors first); seven or more is Important at minimum, Critical at a public boundary.

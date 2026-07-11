@@ -12,7 +12,7 @@ The default posture for any code in a consuming repo: write like a senior engine
 
 ## Simplicity and design
 
-- **Simpler code over more code.** The smallest form that preserves correctness, readability, test coverage, observability, and convention conformance is the default. Lines are liability.
+- **Simpler code over more code.** The smallest form that trades nothing away is the default; lines are liability. The constraints and named failure modes are owned by `simpler-code.md`.
 - **Do it right, not cheap.** Choose the best long-term design over an expedient hack. If the "right" approach would demand unwarranted complexity, find a different right design — never ship a documented wrong one.
 - **One mechanism per concern.** Each operational concern has one authoritative owner. When a better mechanism exists, migrate to it fully rather than layering a second. Defense-in-depth is reserved for security boundaries.
 - **Strongly-typed identities.** Model domain identities and constrained concepts as dedicated types, not bare primitives. Infrastructure, correlation, and configuration values stay primitive.

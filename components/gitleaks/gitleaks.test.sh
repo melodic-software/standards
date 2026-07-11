@@ -7,8 +7,8 @@
 # secret scanning) flags the test scaffolding. The literal joined token never
 # appears in this file's source.
 #
-# Each scan sets -i to the temp dir (no .gitleaksignore there) so nothing masks
-# the detection under test. Skips cleanly when the engine is absent.
+# Each scan sets -i to its scan target (no .gitleaksignore there) so nothing
+# masks the detection under test. Skips cleanly when the engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
