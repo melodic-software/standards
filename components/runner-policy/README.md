@@ -147,7 +147,7 @@ exceptions live on the actual called job instead of becoming a blanket caller
 exception.
 
 The approved production contracts at
-`c34f0aa2aca9309699ec0b8c6cf94a4b76c498d6` were independently reviewed. The
+`99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` were independently reviewed. The
 selector and `semantic-pr` workflow expose only the governed runner contract;
 Windows Pester, Docker-dependent scans, and privileged control-plane workflows
 such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
