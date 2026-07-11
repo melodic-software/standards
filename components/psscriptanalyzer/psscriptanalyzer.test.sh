@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Tests the PSScriptAnalyzer component's root-canonical ruleset.
-# the good fixture and flags the bad fixture. This asserts the config only —
-# Invoke-ScriptAnalyzer is called directly. The CI runner that wraps the
-# analyzer (per-file subprocess isolation) lives in the ci-workflows repo and is
-# dogfooded there. Skips cleanly when the engine is absent.
+# the good fixture and flags the bad fixture. This asserts the config only;
+# Invoke-ScriptAnalyzer is called directly. The Lefthook adapter's one-pass
+# error behavior has a separate focused regression test. Skips cleanly when the
+# engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh

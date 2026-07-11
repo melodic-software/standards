@@ -30,7 +30,5 @@ pre-commit:
       fail_text: "PSScriptAnalyzer findings. Fix them or justify the exception."
     dotnet-format:
       glob: "**/*.cs"
-      run: >-
-        dotnet format components/dotnet-analysis/fixtures/good/good.csproj
-        whitespace --verify-no-changes --include {staged_files}
+      run: node components/lefthook-dotnet/dotnet-format-staged.mjs {staged_files}
       fail_text: "Whitespace/layout drift in the .NET analysis fixture."

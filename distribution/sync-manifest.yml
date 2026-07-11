@@ -37,7 +37,9 @@ components:
     requires:
       - dotnet-analysis
       - lefthook-base
+      - node-runtime
     files:
+      components/lefthook-dotnet/dotnet-format-staged.mjs: .lefthook/dotnet-format-staged.mjs
       components/lefthook-dotnet/lefthook.yml: .lefthook/dotnet.yml
   lefthook-powershell:
     requires:
@@ -46,6 +48,7 @@ components:
     files:
       components/lefthook-powershell/lefthook.yml: .lefthook/powershell.yml
       components/lefthook-powershell/psscriptanalyzer-staged.ps1: .lefthook/psscriptanalyzer-staged.ps1
+      components/lefthook-powershell/psscriptanalyzer-target.ps1: .lefthook/psscriptanalyzer-target.ps1
   lefthook-shellcheck:
     requires:
       - lefthook-base
@@ -68,6 +71,14 @@ components:
     files:
       .editorconfig: .editorconfig
       .gitattributes: .gitattributes
+  runner-policy:
+    requires:
+      - node-runtime
+    files:
+      components/runner-policy/package-lock.json: .github/standards/runner-policy/package-lock.json
+      components/runner-policy/package.json: .github/standards/runner-policy/package.json
+      components/runner-policy/policy.json: .github/standards/runner-policy/policy.json
+      components/runner-policy/runner-policy.mjs: .github/standards/runner-policy/runner-policy.mjs
   shellcheck:
     files:
       .shellcheckrc: .shellcheckrc
@@ -92,6 +103,7 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
+      - runner-policy
       - typos
     locally-owned:
       - shellcheck
@@ -105,6 +117,7 @@ targets:
       - markdownlint
       - node-runtime
       - repository-text
+      - runner-policy
       - typos
   kyle-sexton/provisioning:
     managed:
@@ -118,6 +131,7 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
+      - runner-policy
       - shellcheck
       - typos
   melodic-software/.github:
@@ -154,7 +168,9 @@ targets:
       - gitleaks
       - lychee
       - markdownlint
+      - node-runtime
       - repository-text
+      - runner-policy
       - shellcheck
       - typos
   melodic-software/github-iac:
@@ -167,7 +183,10 @@ targets:
       - markdownlint
       - node-runtime
       - repository-text
+      - runner-policy
       - typos
   melodic-software/medley:
     managed:
       - architecture-decisions
+      - node-runtime
+      - runner-policy

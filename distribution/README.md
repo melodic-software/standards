@@ -86,3 +86,57 @@ deletes files.
 The GitHub App installation is an authorization boundary, not an adoption
 registry. A new target must also be granted App access before a real sync can
 succeed.
+
+## Runner-policy consumer handoff
+
+The `runner-policy` component materializes one atomic runtime at
+`.github/standards/runner-policy/` in exactly these enrolled private targets:
+
+- `melodic-software/claude-code-plugins`
+- `melodic-software/github-iac`
+- `melodic-software/medley`
+- `kyle-sexton/dotfiles`
+- `kyle-sexton/provisioning`
+- `kyle-sexton/github-iac`
+
+It includes `runner-policy.mjs`, `policy.json`, and the component-local npm
+manifest and lockfile. The component requires `node-runtime`, so `.node-version`
+is part of each target's managed materialization as well.
+
+Repository-specific adoption remains a separate consumer change. Each target
+must add all of the following in the same integration PR:
+
+1. A locally owned `.github/runner-policy.json` with correct visibility,
+   enrollment, and exact job exceptions.
+2. A fixed `ubuntu-24.04` hosted CI job that runs
+   `npm ci --prefix .github/standards/runner-policy`, then invokes
+   `node .github/standards/runner-policy/runner-policy.mjs --root .` with
+   `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. Its
+   exception reason is `hosted-control-plane`.
+3. An npm Dependabot entry with
+   `directory: /.github/standards/runner-policy` for the distributed lockfile.
+4. Workflow routing and exception inventory that pass the gate at the reviewed
+   selector/reusable-workflow SHA in the distributed `policy.json`.
+
+Every selector-dependent direct job and reusable caller uses the same recovery
+contract: `if: ${{ !cancelled() }}` (safely conjoined with any existing
+predicate) and `${{ needs.<selector>.outputs.runner || 'ubuntu-24.04' }}` as the
+direct `runs-on` value or canonical `with.runner` input. The fallback never
+reads `vars.CI_HOSTED_RUNNER`, because selector failure means that value was not
+validated by the selector.
+
+The synchronizer deliberately does not invent those files: workflow shape,
+exceptions, and dependency-update configuration are executable facts owned by
+each consumer. A materialization PR is not an adoption completion signal until
+its corresponding integration PR supplies this wiring and CI passes.
+
+The `lefthook-dotnet` component has a similar explicit consumer value. A target
+that selects it receives `.lefthook/dotnet.yml` and
+`.lefthook/dotnet-format-staged.mjs`, while the consumer owns only
+`.lefthook/dotnet-format.json`. That strict file contains `schemaVersion: 1` and
+one repository-relative `.sln`, `.slnx`, or `.csproj` `workspace`. The complete
+managed named job remains the sole owner of `run`, `glob`, and `fail_text`; the
+workspace never enters its shell command. The wrapper rejects missing,
+malformed, unknown-version, unknown-key, out-of-repository, and unsupported
+workspace configurations before spawning `dotnet`. Implicit MSBuild workspace
+discovery is not an accepted default.
