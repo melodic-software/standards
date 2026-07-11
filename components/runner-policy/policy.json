@@ -78,6 +78,12 @@
       "allowedSecrets": {},
       "fixedRunsOn": ["windows-2025"]
     },
+    "melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@9596686335da057de7b575ebf82ca1210768c590": {
+      "routing": "hosted-only",
+      "allowedInputs": [],
+      "allowedSecrets": {},
+      "fixedRunsOn": ["ubuntu-24.04"]
+    },
     "melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@9596686335da057de7b575ebf82ca1210768c590": {
       "routing": "runner-input",
       "runnerInput": "runner",

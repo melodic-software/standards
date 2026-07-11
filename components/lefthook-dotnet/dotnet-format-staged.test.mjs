@@ -97,8 +97,42 @@ test("rejects Windows drive-qualified, drive-relative, UNC, and cross-volume pat
       `staged file: ${candidate}`,
     );
   }
-  assert.equal(isInside(String.raw`C:\repo`, String.raw`D:\outside\Program.cs`), false);
-  assert.equal(isInside(String.raw`C:\repo`, String.raw`C:\repo\src\Program.cs`), true);
+});
+
+test("uses Windows semantics for Windows-shaped absolute paths on every host", () => {
+  for (const [root, candidate, expected] of [
+    [String.raw`C:\repo`, String.raw`C:\repo`, true],
+    [String.raw`C:\repo`, String.raw`C:\repo\src\Program.cs`, true],
+    [String.raw`C:\repo`, "C:/repo/src/Program.cs", true],
+    [String.raw`C:\repo`, String.raw`C:\repository\Program.cs`, false],
+    [String.raw`C:\repo`, String.raw`C:\outside\Program.cs`, false],
+    [String.raw`C:\repo`, String.raw`D:\repo\Program.cs`, false],
+    [String.raw`\\server\share\repo`, String.raw`\\server\share\repo\src\Program.cs`, true],
+    [String.raw`\\server\share\repo`, String.raw`\\server\other\repo\Program.cs`, false],
+  ]) {
+    assert.equal(isInside(root, candidate), expected, `${root} -> ${candidate}`);
+  }
+});
+
+test("rejects mixed path flavors and non-absolute containment inputs", () => {
+  assert.equal(isInside(String.raw`C:\repo`, "/repo/src/Program.cs"), false);
+  assert.equal(isInside("/repo", String.raw`C:\repo\src\Program.cs`), false);
+  assert.equal(isInside("repo", "repo/src/Program.cs"), false);
+  assert.equal(isInside("/repo", "repo/src/Program.cs"), false);
+});
+
+test("uses native semantics for native absolute paths", () => {
+  const nativeRoot = path.resolve(path.parse(process.cwd()).root, "repo");
+  assert.equal(isInside(nativeRoot, nativeRoot), true);
+  assert.equal(isInside(nativeRoot, path.join(nativeRoot, "src", "Program.cs")), true);
+  assert.equal(
+    isInside(nativeRoot, path.resolve(nativeRoot, "..", "outside", "Program.cs")),
+    false,
+  );
+
+  assert.equal(isInside("/repo", "/repo/src/Program.cs"), true);
+  assert.equal(isInside("/repo", "/repository/Program.cs"), false);
+  assert.equal(isInside("/repo", "/outside/Program.cs"), false);
 });
 
 test("accepts valid repository-relative workspace and staged-file paths", async () => {

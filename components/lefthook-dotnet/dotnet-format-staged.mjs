@@ -8,14 +8,31 @@ import { pathToFileURL } from "node:url";
 
 const WORKSPACE_EXTENSIONS = new Set([".csproj", ".sln", ".slnx"]);
 
-export function isInside(root, candidate) {
-  const relative = path.relative(root, candidate);
-  const win32Relative = path.win32.relative(root, candidate);
+function isWindowsShapedAbsolute(value) {
   return (
-    !path.isAbsolute(relative) &&
-    !path.win32.isAbsolute(win32Relative) &&
-    (relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".."))
+    path.win32.isAbsolute(value) &&
+    (/^[A-Za-z]:[\\/]/.test(value) || /^\\/.test(value) || /^\/\/[^/]+\/[^/]+(?:\/|$)/.test(value))
   );
+}
+
+function isRelativeInside(pathApi, root, candidate) {
+  const relative = pathApi.relative(root, candidate);
+  return (
+    !pathApi.isAbsolute(relative) &&
+    (relative === "" || (!relative.startsWith(`..${pathApi.sep}`) && relative !== ".."))
+  );
+}
+
+export function isInside(root, candidate) {
+  const rootIsWindows = isWindowsShapedAbsolute(root);
+  const candidateIsWindows = isWindowsShapedAbsolute(candidate);
+  if (rootIsWindows || candidateIsWindows) {
+    return rootIsWindows && candidateIsWindows && isRelativeInside(path.win32, root, candidate);
+  }
+  if (!path.isAbsolute(root) || !path.isAbsolute(candidate)) {
+    return false;
+  }
+  return isRelativeInside(path, root, candidate);
 }
 
 function portableRelative(root, candidate) {

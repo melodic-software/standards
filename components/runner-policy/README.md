@@ -150,7 +150,8 @@ The approved production contracts at
 `9596686335da057de7b575ebf82ca1210768c590` were independently reviewed. The
 selector and `semantic-pr` workflow expose only the governed runner contract;
 Windows Pester, Docker-dependent scans, and privileged control-plane workflows
-remain fixed to explicit GitHub-hosted images. The production Claude review
+such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
+images. The production Claude review
 contract permits its general `skip-actors` string input without constraining the
 caller-owned value; every other input name remains denied by default. The
 earlier hosted-only contracts

@@ -249,6 +249,69 @@ for mapping in \
     "$(SOURCE_PATH="$source_path" yq -r '.components.runner-policy.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
 done
 
+runner_policy_source='components/runner-policy/runner-policy.mjs'
+runner_policy_destination='.github/standards/runner-policy/runner-policy.mjs'
+lefthook_dotnet_source='components/lefthook-dotnet/dotnet-format-staged.mjs'
+lefthook_dotnet_destination='.lefthook/dotnet-format-staged.mjs'
+assert_eq 'runner-policy production CLI source is executable in the Git index' '100755' \
+  "$(git -C "$root" ls-files --stage -- "$runner_policy_source" | awk '{print $1}')"
+assert_eq 'lefthook-dotnet production CLI source is executable in the Git index' '100755' \
+  "$(git -C "$root" ls-files --stage -- "$lefthook_dotnet_source" | awk '{print $1}')"
+
+# Exercise every production target that carries either CLI, not only the
+# generic executable fixture. Linux is the deployment environment that records
+# worktree modes in materialization PR indexes; source-index assertions remain
+# platform-independent and fail before apply if either production mode regresses.
+while IFS=$'\t' read -r production_slug includes_dotnet; do
+  production_target="$tmp_root/production-${production_slug//\//-}"
+  make_target "$production_target"
+  out="$(
+    "$engine" apply \
+      --source-root "$root" \
+      --manifest distribution/sync-manifest.yml \
+      --target "$production_slug" \
+      --target-root "$production_target" 2>&1
+  )"; rc=$?
+  assert_exit "$production_slug production mapping applies" 0 "$rc"
+  assert_contains "$production_slug runner-policy apply reports executable mode" "$out" \
+    "$runner_policy_source -> $runner_policy_destination (100755)"
+  assert_file_exists "$production_slug runner-policy CLI reaches the target" \
+    "$production_target/$runner_policy_destination"
+  if [[ "$(uname -s)" == Linux* ]]; then
+    assert_eq "$production_slug runner-policy target worktree mode is executable" 755 \
+      "$(stat -c '%a' "$production_target/$runner_policy_destination")"
+    git -C "$production_target" add -- "$runner_policy_destination"
+    assert_eq "$production_slug runner-policy target index mode is executable" 100755 \
+      "$(git -C "$production_target" ls-files --stage -- "$runner_policy_destination" | awk '{print $1}')"
+  else
+    skip_case "$production_slug runner-policy worktree mode requires a mode-preserving filesystem"
+    skip_case "$production_slug runner-policy index mode requires a mode-preserving filesystem"
+  fi
+
+  if [[ "$includes_dotnet" == true ]]; then
+    assert_contains "$production_slug lefthook-dotnet apply reports executable mode" "$out" \
+      "$lefthook_dotnet_source -> $lefthook_dotnet_destination (100755)"
+    assert_file_exists "$production_slug lefthook-dotnet CLI reaches the target" \
+      "$production_target/$lefthook_dotnet_destination"
+    if [[ "$(uname -s)" == Linux* ]]; then
+      assert_eq "$production_slug lefthook-dotnet target worktree mode is executable" 755 \
+        "$(stat -c '%a' "$production_target/$lefthook_dotnet_destination")"
+      git -C "$production_target" add -- "$lefthook_dotnet_destination"
+      assert_eq "$production_slug lefthook-dotnet target index mode is executable" 100755 \
+        "$(git -C "$production_target" ls-files --stage -- "$lefthook_dotnet_destination" | awk '{print $1}')"
+    else
+      skip_case "$production_slug lefthook-dotnet worktree mode requires a mode-preserving filesystem"
+      skip_case "$production_slug lefthook-dotnet index mode requires a mode-preserving filesystem"
+    fi
+  fi
+done < <(
+  yq -r \
+    '.targets | to_entries[] |
+     select(.value.managed | any_c(. == "runner-policy" or . == "lefthook-dotnet")) |
+     [.key, (.value.managed | any_c(. == "lefthook-dotnet"))] | @tsv' \
+    "$actual_manifest"
+)
+
 expected_runner_policy_targets='["kyle-sexton/dotfiles","kyle-sexton/github-iac","kyle-sexton/provisioning","melodic-software/claude-code-plugins","melodic-software/github-iac","melodic-software/medley"]'
 actual_runner_policy_targets="$(
   yq -o=json -I=0 \

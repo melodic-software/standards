@@ -13,14 +13,33 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Self-lint lanes run the ci-workflows composite actions (referenced by SHA,
-# bumped via Dependabot). Component contract-test lanes stay local — they prove
-# this repo's own policies flag their bad fixtures — and the ci-status gateway
-# aggregates every lane into the single required check. link-check is the one
-# deliberate exception: it is advisory/scheduled and lives in its own workflow.
+# Each independently scheduled eligible lane asks the central selector for a
+# runner. A selector failure cannot skip required work: every workload uses a
+# cancellation-safe condition and an explicit ubuntu-24.04 fallback. The
+# ci-status gateway stays hosted and aggregates only the original lane IDs, so
+# required check names and merge-queue behavior do not change. Workload steps
+# are route-independent: pinned setup/composite actions install every tool, and
+# existing setup-action caches remain GitHub-managed rather than host-mounted.
 jobs:
+  select-markdown:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   markdown:
-    runs-on: ubuntu-24.04
+    needs: select-markdown
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-markdown.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -33,8 +52,25 @@ jobs:
           config: .markdownlint-cli2.jsonc
           globs: '**/*.md !components/**/fixtures/bad/**'
 
+  select-powershell:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   powershell:
-    runs-on: ubuntu-24.04
+    needs: select-powershell
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-powershell.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -47,8 +83,25 @@ jobs:
           settings: PSScriptAnalyzerSettings.psd1
           exclude: components/psscriptanalyzer/fixtures/bad
 
+  select-shellcheck:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   shellcheck:
-    runs-on: ubuntu-24.04
+    needs: select-shellcheck
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-shellcheck.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -61,8 +114,25 @@ jobs:
           rcfile: .shellcheckrc
           exclude: components/shellcheck/fixtures/bad
 
+  select-lychee:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   lychee:
-    runs-on: ubuntu-24.04
+    needs: select-lychee
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-lychee.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -75,8 +145,25 @@ jobs:
           config: lychee.toml
           exclude: 'components/[^/]+/fixtures/bad'
 
+  select-editorconfig:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   editorconfig:
-    runs-on: ubuntu-24.04
+    needs: select-editorconfig
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-editorconfig.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -91,8 +178,25 @@ jobs:
       - name: EditorConfig checker contract test
         run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
 
+  select-gitleaks:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   gitleaks:
-    runs-on: ubuntu-24.04
+    needs: select-gitleaks
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-gitleaks.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -106,8 +210,25 @@ jobs:
       - name: Gitleaks contract test
         run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
 
+  select-typos:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   typos:
-    runs-on: ubuntu-24.04
+    needs: select-typos
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-typos.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -122,8 +243,25 @@ jobs:
       - name: Typos contract test
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
+  select-markdown-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   markdown-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-markdown-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-markdown-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -142,6 +280,8 @@ jobs:
 
   runner-policy:
     name: Runner policy
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -165,8 +305,25 @@ jobs:
         env:
           CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 
+  select-powershell-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   powershell-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-powershell-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-powershell-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -194,8 +351,25 @@ jobs:
         shell: pwsh
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
+  select-shellcheck-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   shellcheck-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-shellcheck-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-shellcheck-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -217,8 +391,25 @@ jobs:
       - name: ShellCheck contract test
         run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
+  select-lychee-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   lychee-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-lychee-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-lychee-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -241,8 +432,25 @@ jobs:
       - name: Lychee contract test
         run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
 
+  select-ruff:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   ruff:
-    runs-on: ubuntu-24.04
+    needs: select-ruff
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-ruff.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -255,8 +463,25 @@ jobs:
           config: ruff.toml
           exclude: components/ruff/fixtures/bad
 
+  select-pyright:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   pyright:
-    runs-on: ubuntu-24.04
+    needs: select-pyright
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-pyright.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -272,8 +497,25 @@ jobs:
           config: components/pyright/pyrightconfig.json
           paths: components/pyright/fixtures/good
 
+  select-biome:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   biome:
-    runs-on: ubuntu-24.04
+    needs: select-biome
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-biome.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -289,8 +531,25 @@ jobs:
           config: components/biome/biome.json
           paths: components/biome/fixtures/good components/runner-policy
 
+  select-tsc:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   tsc:
-    runs-on: ubuntu-24.04
+    needs: select-tsc
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-tsc.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -305,8 +564,25 @@ jobs:
         with:
           project: components/tsconfig/fixtures/good/tsconfig.json
 
+  select-dotnet-build:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   dotnet-build:
-    runs-on: ubuntu-24.04
+    needs: select-dotnet-build
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-dotnet-build.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -321,8 +597,25 @@ jobs:
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
+  select-dotnet-format:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   dotnet-format:
-    runs-on: ubuntu-24.04
+    needs: select-dotnet-format
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-dotnet-format.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -334,8 +627,25 @@ jobs:
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
+  select-actionlint:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   actionlint:
-    runs-on: ubuntu-24.04
+    needs: select-actionlint
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-actionlint.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -343,27 +653,43 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@fd9a74d126fcaca9543ce8172c019e5a97ea4e79 # fd9a74d 2026-07-10
 
   zizmor:
     permissions:
       contents: read
     # Advisory Actions security lint; findings annotate without blocking.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
     with:
       paths: .
 
   osv-scanner:
     permissions:
-      actions: read
       contents: read
-      security-events: write
     # Advisory dependency vuln scan; reports against package-lock.json without
-    # blocking (fail-on-vuln defaults false).
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
+    # blocking (fail-on-vuln defaults false). Annotation mode needs no
+    # security-events write grant.
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+
+  select-python-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
 
   python-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-python-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-python-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     env:
       # Inline install — component contract tests assert specific rule codes on
@@ -396,8 +722,25 @@ jobs:
       - name: Pyright contract test
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
+  select-typescript-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   typescript-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-typescript-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-typescript-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     env:
       # Inline install — component tests assert specific rule/error codes on
@@ -426,8 +769,25 @@ jobs:
       - name: TypeScript config contract test
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
+  select-dotnet-fixtures:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   dotnet-fixtures:
-    runs-on: ubuntu-24.04
+    needs: select-dotnet-fixtures
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-dotnet-fixtures.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     env:
       # Inline install — the fixtures suite asserts specific rule codes fire on
@@ -461,8 +821,25 @@ jobs:
         env:
           DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
 
+  select-harness:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   harness:
-    runs-on: ubuntu-24.04
+    needs: select-harness
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-harness.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -472,8 +849,25 @@ jobs:
       - name: Harness self-test
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
+  select-distribution:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   distribution:
-    runs-on: ubuntu-24.04
+    needs: select-distribution
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-distribution.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -496,8 +890,25 @@ jobs:
       - name: Validate production manifest
         run: bash distribution/sync-manifest.sh validate
 
+  select-exec-bit:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   exec-bit:
-    runs-on: ubuntu-24.04
+    needs: select-exec-bit
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-exec-bit.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -507,8 +918,25 @@ jobs:
       - name: Verify shebang files are executable
         uses: melodic-software/ci-workflows/.github/actions/exec-bit@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
+  select-machine-specific-paths:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   machine-specific-paths:
-    runs-on: ubuntu-24.04
+    needs: select-machine-specific-paths
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-machine-specific-paths.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -518,8 +946,25 @@ jobs:
       - name: Check for machine-specific paths
         uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
+  select-eol-renormalize:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   eol-renormalize:
-    runs-on: ubuntu-24.04
+    needs: select-eol-renormalize
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-eol-renormalize.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -529,8 +974,25 @@ jobs:
       - name: Check index-level EOL drift
         uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@1d3762c2ace413db0f347048307946c46850161c # 1d3762c 2026-07-10
 
+  select-comment-hygiene:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   comment-hygiene:
-    runs-on: ubuntu-24.04
+    needs: select-comment-hygiene
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-comment-hygiene.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -544,8 +1006,25 @@ jobs:
       - name: Comment-hygiene contract test
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
+  select-lefthook:
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@9596686335da057de7b575ebf82ca1210768c590 # 9596686 2026-07-10
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
   lefthook:
-    runs-on: ubuntu-24.04
+    needs: select-lefthook
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-lefthook.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -582,6 +1061,7 @@ jobs:
 
   ci-status:
     if: always()
+    permissions: {}
     needs:
       - markdown
       - powershell
@@ -654,8 +1134,8 @@ jobs:
         run: |
           for r in $RESULTS; do
             case "$r" in
-              success|skipped) ;;
+              success) ;;
               *) echo "A lane did not pass (result: $r)."; exit 1 ;;
             esac
           done
-          echo "All lanes passed or were skipped."
+          echo "All lanes passed."

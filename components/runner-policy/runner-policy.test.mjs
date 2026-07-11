@@ -14,6 +14,7 @@ const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scann
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
+const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PRODUCTION_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
@@ -748,6 +749,12 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       fixedRunsOn: ["windows-2025"],
     },
   );
+  assert.deepEqual(contracts[PULUMI_DRIFT_REUSABLE_REFERENCE], {
+    routing: "hosted-only",
+    allowedInputs: [],
+    allowedSecrets: {},
+    fixedRunsOn: ["ubuntu-24.04"],
+  });
   assert.deepEqual(
     contracts[`melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${PRODUCTION_SHA}`],
     {
@@ -1061,6 +1068,72 @@ test("hosted-only reusable contract accepts its exact reviewed secret mapping", 
     `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
+});
+
+test("reviewed Pulumi drift workflow is an exact privileged hosted contract", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#drift": {
+        reason: "privileged-control-plane",
+        justification: "The reviewed drift workflow maintains an issue on hosted compute.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  drift:
+    permissions:
+      contents: read
+      issues: write
+    uses: ${PULUMI_DRIFT_REUSABLE_REFERENCE}
+`,
+    },
+  });
+  await writeFile(
+    path.join(root, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  assert.deepEqual(await audit(root), []);
+});
+
+test("Pulumi drift issues write requires the privileged hosted category", async () => {
+  for (const [exceptions, expectedRule] of [
+    [{}, "hosted-exception-required"],
+    [
+      {
+        ".github/workflows/ci.yml#drift": {
+          reason: "hosted-control-plane",
+          justification: "This intentionally exercises the wrong hosted category.",
+        },
+      },
+      "hosted-exception-category",
+    ],
+  ]) {
+    const root = await repository({
+      exceptions,
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  drift:
+    permissions:
+      contents: read
+      issues: write
+    uses: ${PULUMI_DRIFT_REUSABLE_REFERENCE}
+`,
+      },
+    });
+    await writeFile(
+      path.join(root, "runner-policy-policy.json"),
+      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    );
+    const findings = await audit(root);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, expectedRule);
+    assert.match(
+      findings[0].message,
+      /write GITHUB_TOKEN permissions \(issues\).*privileged-control-plane/,
+    );
+  }
 });
 
 test("production Claude review contract accepts its supported skip-actors input", async () => {
