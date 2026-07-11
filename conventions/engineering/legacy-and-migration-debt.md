@@ -18,7 +18,7 @@ Executable or documented dual paths: shims, silent fallbacks, rollback flags, du
 
 ## Exposure classifier
 
-Tag every finding with its exposure; that sets the default severity. When exposure is uncertain, treat it as a suggestion and confirm before removal — never assume a repo has no external consumers.
+Tag every finding with its exposure; that sets the default severity (labels defined in `../review/README.md`). When exposure is uncertain, treat it as a suggestion and confirm before removal — never assume a repo has no external consumers.
 
 | Exposure | Signals | Default severity |
 |---|---|---|

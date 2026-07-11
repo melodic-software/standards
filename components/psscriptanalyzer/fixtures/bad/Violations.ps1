@@ -6,3 +6,5 @@ function getData
     gci .
   }
 }
+
+function badParams($x) { Write-Output $x }

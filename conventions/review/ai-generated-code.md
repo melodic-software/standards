@@ -28,7 +28,7 @@ Each figure carries its source and date; these decay, so re-verify against curre
 ## Security-specific
 
 - **Prompt-injection exposure** — two facets. First, *poisoned tooling config*: an instruction or rules file can hide directives in invisible or bidirectional Unicode that the agent reads but a diff does not show, steering it to emit a backdoor or leak a secret. Scan AI-config changes for non-printable and bidirectional characters. Second, *AI-scaffolded model-calling code*: code an agent wrote that itself calls a model is a top LLM risk — review for untrusted input concatenated into prompts, missing output validation, and tools the model can invoke without least-privilege scoping.
-- **Test theater and over-mocking** — agent-generated tests skew toward mocks. On a high-risk path with no real-behavior assertion, this is **Important**; the incentive is language-agnostic for AI-authored tests.
+- **Test theater and over-mocking** — agent-generated tests skew toward mocks, and the incentive is language-agnostic for AI-authored tests; the criterion and severity are the test-theater bar in [testing.md](testing.md).
 - **License and provenance** — a model trained on unsanitized code can reproduce training code near-verbatim without attribution. Flag any sizeable block that reads like lifted code — distinctive comments, unusual identifiers, an algorithm the author cannot explain — especially where a copyleft license's terms would attach.
 
 ## Hygiene

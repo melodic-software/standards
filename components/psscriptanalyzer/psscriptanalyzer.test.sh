@@ -42,5 +42,6 @@ assert_exit 'good fixture has no findings' 0 "$rc"
 out="$(run_pssa "$root/components/psscriptanalyzer/fixtures/bad/Violations.ps1")"; rc=$?
 assert_exit 'bad fixture has findings' 1 "$rc"
 assert_contains 'bad fixture flags the alias rule' "$out" 'PSAvoidUsingCmdletAliases'
+assert_contains 'bad fixture flags the params-kind rule behind the 1.25.0 floor' "$out" 'PSUseConsistentParametersKind'
 
 [[ $FAILED -eq 0 ]] || exit 1
