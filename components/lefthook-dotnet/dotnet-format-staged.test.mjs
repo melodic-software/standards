@@ -1,12 +1,32 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { buildDotnetInvocation, isInside, runDotnetFormat } from "./dotnet-format-staged.mjs";
 
 const roots = [];
+const LEFTHOOK_CLI = fileURLToPath(
+  new URL("../../node_modules/lefthook/bin/index.js", import.meta.url),
+);
+
+function runLefthook(root, ...args) {
+  const result = spawnSync(process.execPath, [LEFTHOOK_CLI, ...args], {
+    cwd: root,
+    encoding: "utf8",
+    env: { ...process.env, LEFTHOOK_CONFIG: "lefthook.yml", NO_COLOR: "1" },
+    shell: false,
+  });
+  assert.equal(
+    result.status,
+    0,
+    [result.error?.message, result.stdout, result.stderr].filter(Boolean).join("\n"),
+  );
+  return result.stdout.trim();
+}
 
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "dotnet-format-staged-"));
@@ -21,6 +41,54 @@ async function fixture() {
 
 test.after(async () => {
   await Promise.all(roots.map((root) => rm(root, { force: true, recursive: true })));
+});
+
+test("pinned Lefthook merges the consumer workspace into the production named job", async () => {
+  const root = await fixture();
+  const gitInit = spawnSync("git", ["init", "--quiet"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+  });
+  assert.equal(
+    gitInit.status,
+    0,
+    [gitInit.error?.message, gitInit.stdout, gitInit.stderr].filter(Boolean).join("\n"),
+  );
+  await mkdir(path.join(root, ".lefthook"), { recursive: true });
+  await writeFile(
+    path.join(root, ".lefthook", "dotnet.yml"),
+    await readFile(new URL("./lefthook.yml", import.meta.url), "utf8"),
+  );
+  await writeFile(
+    path.join(root, "lefthook.yml"),
+    `extends:
+  - .lefthook/dotnet.yml
+
+pre-commit:
+  jobs:
+    - name: dotnet-format
+      env:
+        DOTNET_FORMAT_WORKSPACE: Repository.sln
+`,
+  );
+
+  const packageJson = JSON.parse(
+    await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  );
+  assert.equal(runLefthook(root, "version"), packageJson.devDependencies.lefthook);
+
+  const config = JSON.parse(runLefthook(root, "dump", "--format", "json"));
+  const dotnetJobs = config["pre-commit"].jobs.filter(({ name }) => name === "dotnet-format");
+  assert.equal(dotnetJobs.length, 1);
+  assert.equal(dotnetJobs[0].run, "node .lefthook/dotnet-format-staged.mjs {staged_files}");
+  assert.deepEqual(dotnetJobs[0].glob, ["**/*.cs"]);
+  assert.equal(
+    dotnetJobs[0].fail_text,
+    "Whitespace/layout drift or invalid DOTNET_FORMAT_WORKSPACE. Run: dotnet format whitespace <workspace> --include <files>",
+  );
+  assert.deepEqual(dotnetJobs[0].env, { DOTNET_FORMAT_WORKSPACE: "Repository.sln" });
+  assert.equal(config["pre-commit"].commands?.["dotnet-format"], undefined);
 });
 
 test("builds one explicit-workspace invocation with normalized staged paths", async () => {

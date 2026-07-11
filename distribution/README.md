@@ -133,6 +133,9 @@ its corresponding integration PR supplies this wiring and CI passes.
 The `lefthook-dotnet` component has a similar explicit consumer value. A target
 that selects it receives `.lefthook/dotnet.yml` and
 `.lefthook/dotnet-format-staged.mjs`, but its root `lefthook.yml` must merge
-`pre-commit.commands.dotnet-format.env.DOTNET_FORMAT_WORKSPACE` with one
-repository-relative `.sln`, `.slnx`, or `.csproj` path. The wrapper fails closed
-without it; implicit MSBuild workspace discovery is not an accepted default.
+`DOTNET_FORMAT_WORKSPACE` into the `dotnet-format`
+[named job](https://lefthook.dev/configuration/jobs/) with one
+repository-relative `.sln`, `.slnx`, or `.csproj` path. Repeating only the job's
+name and `env` preserves the managed `run`, `glob`, and `fail_text` across
+`extends`. The wrapper fails closed without the value; implicit MSBuild
+workspace discovery is not an accepted default.

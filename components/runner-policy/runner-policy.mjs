@@ -11,7 +11,7 @@ const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
 const DEFAULT_CONFIG_PATH = ".github/runner-policy.json";
 const RUNNER_OUTPUT =
-  /^\s*\$\{\{\s*needs\.([A-Za-z0-9_-]+)\.outputs\.runner\s*\|\|\s*'ubuntu-24\.04'\s*}}\s*$/;
+  /^\s*\$\{\{\s*needs\.(?<selectorId>[A-Za-z0-9_-]+)\.outputs\.runner\s*\|\|\s*'(?<fallback>[^'\r\n]+)'\s*}}\s*$/;
 const MATRIX_OUTPUT = /^\$\{\{ matrix\.([A-Za-z0-9_-]+) }}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const REUSABLE_WORKFLOW_PATH =
@@ -592,9 +592,10 @@ function localWorkflowRoutingMode(record, policy, workflowIndex, visited = new S
     }
     if (typeof job?.["runs-on"] === "string") {
       const runner = job["runs-on"];
+      const route = RUNNER_OUTPUT.exec(runner);
       if (
         runner === policy.governedReusableRunnerInput.expression ||
-        RUNNER_OUTPUT.test(runner) ||
+        route !== null ||
         rawManagedLabel(runner, policy)
       ) {
         internalRouting = true;
@@ -946,16 +947,16 @@ function reusableWorkflowStatus(job, policy) {
 
 function routeStatus(jobId, target, job, jobs, policy) {
   const match = RUNNER_OUTPUT.exec(target);
-  if (!match) {
+  const configuredDefault = policy.governedReusableRunnerInput.default;
+  if (!match || match.groups.fallback !== configuredDefault) {
     return {
       attempted: target.includes("outputs.runner"),
       approved: false,
-      reason:
-        "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-24.04'",
+      reason: `runner routing must use exactly needs.<selector-job>.outputs.runner || '${configuredDefault}'`,
     };
   }
 
-  const selectorId = match[1];
+  const selectorId = match.groups.selectorId;
   if (!normalizeNeeds(job.needs).includes(selectorId)) {
     return {
       attempted: true,
@@ -1692,7 +1693,7 @@ export async function auditRepository({
       if (target?.kind === "invalid") {
         if (exception) {
           consumedExceptions.add(key);
-        } else if (!hostedRequirement) {
+        } else if (!hostedRequirement && !attemptsSelectorRoute) {
           findings.push(
             finding(
               "hosted-exception-required",

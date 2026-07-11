@@ -1,10 +1,10 @@
 # .NET adapter — opt-in. Extend it alongside the base from a consumer root that
 # has C# sources, Node, and the .NET SDK installed. The consumer must merge an
-# exact repository-relative project or solution into this command's environment:
+# exact repository-relative project or solution into this named job's environment:
 #
 # pre-commit:
-#   commands:
-#     dotnet-format:
+#   jobs:
+#     - name: dotnet-format
 #       env:
 #         DOTNET_FORMAT_WORKSPACE: Repository.sln
 #
@@ -20,8 +20,8 @@
 # gitignored lefthook-local.yml if local commit latency matters more than parity.
 
 pre-commit:
-  commands:
-    dotnet-format:
+  jobs:
+    - name: dotnet-format
       glob: "**/*.cs"
       run: node .lefthook/dotnet-format-staged.mjs {staged_files}
       fail_text: >-

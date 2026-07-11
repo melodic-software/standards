@@ -36,6 +36,7 @@ async function repository({
   visibility = "private",
   selfHostedCi = true,
   exceptions = {},
+  policyOverrides = {},
   workflows = {},
 } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), "runner-policy-"));
@@ -59,6 +60,7 @@ async function repository({
             allowedSecrets: {},
           },
         },
+        ...policyOverrides,
       },
       null,
       2,
@@ -134,6 +136,47 @@ test("private job can consume a full-SHA-pinned selector output", async () => {
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("selector recovery derives its literal fallback from the governed default", async () => {
+  const alternateDefault = "ubuntu-22.04";
+  const policyOverrides = {
+    approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
+    governedReusableRunnerInput: {
+      ...BASE_POLICY.governedReusableRunnerInput,
+      default: alternateDefault,
+    },
+  };
+  const workflow = (fallback) => `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || '${fallback}' }}
+    steps: []
+`;
+
+  const acceptedRoot = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow(alternateDefault) },
+  });
+  assert.deepEqual(await audit(acceptedRoot), []);
+
+  const mismatchedRoot = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow(BASE_POLICY.governedReusableRunnerInput.default) },
+  });
+  const findings = await audit(mismatchedRoot);
+  assert.deepEqual(
+    findings.map(({ rule, job }) => ({ rule, job })),
+    [{ rule: "selector-contract", job: "test" }],
+  );
+  const selectorFinding = findings.find(({ rule }) => rule === "selector-contract");
+  assert.equal(
+    selectorFinding.message,
+    "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-22.04'",
+  );
 });
 
 test("omitted permissions keep a full-SHA untrusted action off the local fleet", async () => {
@@ -1936,7 +1979,7 @@ test("selector ref must be a full SHA", async () => {
     },
   });
   const rules = (await audit(root)).map(({ rule }) => rule);
-  assert.deepEqual(rules, ["selector-pin", "hosted-exception-required", "selector-contract"]);
+  assert.deepEqual(rules, ["selector-pin", "selector-contract"]);
 });
 
 test("selector cannot inherit all caller secrets", async () => {
