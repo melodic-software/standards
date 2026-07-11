@@ -7,7 +7,7 @@ import test from "node:test";
 import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
-const PRODUCTION_SHA = "9596686335da057de7b575ebf82ca1210768c590";
+const PRODUCTION_SHA = "c34f0aa2aca9309699ec0b8c6cf94a4b76c498d6";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
