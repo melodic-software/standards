@@ -1,16 +1,14 @@
 # .NET adapter — opt-in. Extend it alongside the base from a consumer root that
-# has C# sources, Node, and the .NET SDK installed. The consumer must merge an
-# exact repository-relative project or solution into this named job's environment:
+# has C# sources, Node, and the .NET SDK installed. The consumer owns one strict
+# data-only file; it never repeats this managed job or its command behavior:
 #
-# pre-commit:
-#   jobs:
-#     - name: dotnet-format
-#       env:
-#         DOTNET_FORMAT_WORKSPACE: Repository.sln
+# .lefthook/dotnet-format.json
+# { "schemaVersion": 1, "workspace": "Repository.sln" }
 #
-# The wrapper fails closed when that value is absent or unsafe. It passes each
-# existing staged path as its own argument and never asks dotnet format to infer
-# a workspace from repository contents.
+# The wrapper reads and validates that file directly, so workspace spaces and
+# shell metacharacters never enter this run string. It passes each existing
+# staged path as its own argument and never asks dotnet format to infer a
+# workspace from repository contents.
 #
 # This lane runs whitespace verification only — the one thing `dotnet format`
 # owns in the .NET analysis component's split. The build-enforced analyzers and code-style
@@ -25,5 +23,5 @@ pre-commit:
       glob: "**/*.cs"
       run: node .lefthook/dotnet-format-staged.mjs {staged_files}
       fail_text: >-
-        Whitespace/layout drift or invalid DOTNET_FORMAT_WORKSPACE. Run: dotnet
+        Whitespace/layout drift or invalid dotnet-format.json. Run: dotnet
         format whitespace <workspace> --include <files>

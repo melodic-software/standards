@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 const WORKSPACE_EXTENSIONS = new Set([".csproj", ".sln", ".slnx"]);
+const DEFAULT_CONFIG_PATH = ".lefthook/dotnet-format.json";
 
 function isWindowsShapedAbsolute(value) {
   return (
@@ -39,6 +40,13 @@ function portableRelative(root, candidate) {
   return path.relative(root, candidate).split(path.sep).join("/");
 }
 
+function hasControlCharacter(value) {
+  return [...value].some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint <= 0x1f || codePoint === 0x7f;
+  });
+}
+
 function resolveRepositoryPath(root, candidate, label) {
   if (typeof candidate !== "string" || candidate.trim() === "") {
     throw new Error(`${label} must be a non-empty repository-relative path`);
@@ -57,24 +65,80 @@ function resolveRepositoryPath(root, candidate, label) {
   return resolved;
 }
 
+function validateWorkspaceValue(candidate) {
+  if (typeof candidate !== "string" || candidate.trim() === "") {
+    throw new Error("workspace must be a non-empty repository-relative path");
+  }
+  if (
+    path.isAbsolute(candidate) ||
+    path.win32.isAbsolute(candidate) ||
+    /^[A-Za-z]:/.test(candidate)
+  ) {
+    throw new Error(`workspace must be repository-relative, not absolute: ${candidate}`);
+  }
+  if (
+    candidate !== candidate.trim() ||
+    hasControlCharacter(candidate) ||
+    /[<>:"|?*\\]/.test(candidate)
+  ) {
+    throw new Error(
+      "workspace must use forward slashes and portable path characters without surrounding whitespace",
+    );
+  }
+  return candidate;
+}
+
+export function loadDotnetFormatConfig({ root = process.cwd() } = {}) {
+  const resolvedRoot = realpathSync(root);
+  const resolvedConfig = resolveRepositoryPath(resolvedRoot, DEFAULT_CONFIG_PATH, "config path");
+  if (!existsSync(resolvedConfig)) {
+    throw new Error(`missing required ${DEFAULT_CONFIG_PATH}`);
+  }
+  const configRealPath = realpathSync(resolvedConfig);
+  if (!isInside(resolvedRoot, configRealPath) || !statSync(configRealPath).isFile()) {
+    throw new Error(`${DEFAULT_CONFIG_PATH} must be a regular file inside the repository`);
+  }
+  let value;
+  try {
+    value = JSON.parse(readFileSync(configRealPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `${DEFAULT_CONFIG_PATH} must contain valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${DEFAULT_CONFIG_PATH} must contain an object`);
+  }
+  const allowedKeys = new Set(["schemaVersion", "workspace"]);
+  const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.has(key));
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `${DEFAULT_CONFIG_PATH} contains unknown keys: ${unknownKeys.sort().join(", ")}`,
+    );
+  }
+  const missingKeys = [...allowedKeys].filter((key) => !Object.hasOwn(value, key));
+  if (missingKeys.length > 0) {
+    throw new Error(`${DEFAULT_CONFIG_PATH} is missing required keys: ${missingKeys.join(", ")}`);
+  }
+  if (value.schemaVersion !== 1) {
+    throw new Error(`${DEFAULT_CONFIG_PATH}.schemaVersion must be 1`);
+  }
+  return { schemaVersion: 1, workspace: validateWorkspaceValue(value.workspace) };
+}
+
 export function buildDotnetInvocation({ root = process.cwd(), workspace, files = [] } = {}) {
   const resolvedRoot = realpathSync(root);
-  const resolvedWorkspace = resolveRepositoryPath(
-    resolvedRoot,
-    workspace,
-    "DOTNET_FORMAT_WORKSPACE",
-  );
+  const workspaceValue = validateWorkspaceValue(workspace);
+  const resolvedWorkspace = resolveRepositoryPath(resolvedRoot, workspaceValue, "workspace");
   if (!existsSync(resolvedWorkspace) || !statSync(resolvedWorkspace).isFile()) {
-    throw new Error(`DOTNET_FORMAT_WORKSPACE does not name a file: ${workspace}`);
+    throw new Error(`workspace does not name a file: ${workspaceValue}`);
   }
   const workspaceRealPath = realpathSync(resolvedWorkspace);
   if (!isInside(resolvedRoot, workspaceRealPath)) {
-    throw new Error(`DOTNET_FORMAT_WORKSPACE resolves outside the repository: ${workspace}`);
+    throw new Error(`workspace resolves outside the repository: ${workspaceValue}`);
   }
   if (!WORKSPACE_EXTENSIONS.has(path.extname(workspaceRealPath).toLowerCase())) {
-    throw new Error(
-      `DOTNET_FORMAT_WORKSPACE must name a .sln, .slnx, or .csproj file: ${workspace}`,
-    );
+    throw new Error(`workspace must name a .sln, .slnx, or .csproj file: ${workspaceValue}`);
   }
 
   const includedFiles = [];
@@ -114,10 +178,10 @@ export function buildDotnetInvocation({ root = process.cwd(), workspace, files =
 
 export function runDotnetFormat({
   root = process.cwd(),
-  workspace = process.env.DOTNET_FORMAT_WORKSPACE,
   files = process.argv.slice(2),
   spawn = spawnSync,
 } = {}) {
+  const { workspace } = loadDotnetFormatConfig({ root });
   const invocation = buildDotnetInvocation({ root, workspace, files });
   if (invocation.skip) {
     return 0;
