@@ -149,8 +149,11 @@ exception.
 The approved production contracts at
 `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` and the label-less scale-set
 selector fix at `029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1` were independently
-reviewed. Both selector revisions remain temporarily allowlisted for an ordered
-consumer rollout; the older revision is removed after every consumer migrates.
+reviewed. The self-hosted-only selector at
+`3cb83c9502da0b210c335785e250023508c4b8e3` was independently reviewed as
+well. All three selector revisions remain temporarily allowlisted for an
+ordered consumer rollout; the older revisions are removed after every consumer
+migrates.
 The selector and `semantic-pr` workflow expose only the governed runner contract;
 Windows Pester, Docker-dependent scans, and privileged control-plane workflows
 such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted

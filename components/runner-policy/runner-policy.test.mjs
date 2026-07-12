@@ -9,6 +9,7 @@ import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
 const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
+const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -744,7 +745,7 @@ test("obsolete full selector SHA is rejected unless that exact path@SHA is appro
 });
 
 test("production selector allowlist contains only independently reviewed commits", async () => {
-  const selectorShas = [PRODUCTION_SHA, LATEST_SELECTOR_SHA];
+  const selectorShas = [PRODUCTION_SHA, LATEST_SELECTOR_SHA, SELF_HOSTED_ONLY_SELECTOR_SHA];
   assert.deepEqual(
     BASE_POLICY.approvedSelectorReferences,
     selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
