@@ -1020,6 +1020,13 @@ function routeStatus(jobId, target, job, jobs, policy, reusableContract) {
 }
 
 function failClosedSelectorConditionStatus(job, selectorId, selectorResultInput) {
+  const prerequisites = normalizeNeeds(job.needs);
+  if (prerequisites.length !== 1 || prerequisites[0] !== selectorId) {
+    return {
+      approved: false,
+      reason: `fail-closed selector-result reporters must declare exactly needs: ${selectorId} so the reported result covers every prerequisite`,
+    };
+  }
   const alwaysCondition = `\${{ always() }}`;
   if (job.if !== alwaysCondition) {
     return {
