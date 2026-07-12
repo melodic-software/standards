@@ -23,7 +23,7 @@ concurrency:
 jobs:
   select-markdown:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -54,7 +54,7 @@ jobs:
 
   select-powershell:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -85,7 +85,7 @@ jobs:
 
   select-shellcheck:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -116,7 +116,7 @@ jobs:
 
   select-lychee:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -147,7 +147,7 @@ jobs:
 
   select-editorconfig:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -180,7 +180,7 @@ jobs:
 
   select-gitleaks:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -212,7 +212,7 @@ jobs:
 
   select-typos:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -245,7 +245,7 @@ jobs:
 
   select-markdown-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -307,7 +307,7 @@ jobs:
 
   select-powershell-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -353,7 +353,7 @@ jobs:
 
   select-shellcheck-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -393,7 +393,7 @@ jobs:
 
   select-lychee-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -434,7 +434,7 @@ jobs:
 
   select-ruff:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -465,7 +465,7 @@ jobs:
 
   select-pyright:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -499,7 +499,7 @@ jobs:
 
   select-biome:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -533,7 +533,7 @@ jobs:
 
   select-tsc:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -566,7 +566,7 @@ jobs:
 
   select-dotnet-build:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -584,6 +584,10 @@ jobs:
       contents: read
     runs-on: ${{ needs.select-dotnet-build.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
+    env:
+      # The rootless fleet has no write access to setup-dotnet's Linux default.
+      # Keep hosted/local parity by selecting a per-job ephemeral directory.
+      DOTNET_INSTALL_DIR: ~/.dotnet
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -599,7 +603,7 @@ jobs:
 
   select-dotnet-format:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -617,6 +621,8 @@ jobs:
       contents: read
     runs-on: ${{ needs.select-dotnet-format.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
+    env:
+      DOTNET_INSTALL_DIR: ~/.dotnet
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -629,7 +635,7 @@ jobs:
 
   select-actionlint:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -673,7 +679,7 @@ jobs:
 
   select-python-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -724,7 +730,7 @@ jobs:
 
   select-typescript-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -771,7 +777,7 @@ jobs:
 
   select-dotnet-fixtures:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -794,6 +800,7 @@ jobs:
       # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
       # actions only pass/fail). Keep in lockstep with the action defaults in
       # ci-workflows and with medley.
+      DOTNET_INSTALL_DIR: ~/.dotnet
       DOTNET_VERSION: 10.0.301
     steps:
       - name: Check out
@@ -823,7 +830,7 @@ jobs:
 
   select-harness:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -851,7 +858,7 @@ jobs:
 
   select-distribution:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -892,7 +899,7 @@ jobs:
 
   select-exec-bit:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -920,7 +927,7 @@ jobs:
 
   select-machine-specific-paths:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -948,7 +955,7 @@ jobs:
 
   select-eol-renormalize:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -976,7 +983,7 @@ jobs:
 
   select-comment-hygiene:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -1008,7 +1015,7 @@ jobs:
 
   select-lefthook:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1 # 029a1c3 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3cb83c9502da0b210c335785e250023508c4b8e3 # 3cb83c9 2026-07-12
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
