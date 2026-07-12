@@ -1213,7 +1213,7 @@ function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIn
     !local.approved &&
     reusable.approved &&
     reusable.contract.selectorResultInput &&
-    isWorkflowCallExclusive(workflow)
+    workflowCallDeclaration(workflow) !== undefined
   ) {
     return {
       approved: false,
