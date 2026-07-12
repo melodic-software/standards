@@ -2,7 +2,8 @@
   "schemaVersion": 2,
   "selectorWorkflowPaths": ["melodic-software/ci-workflows/.github/workflows/select-runner.yml"],
   "approvedSelectorReferences": [
-    "melodic-software/ci-workflows/.github/workflows/select-runner.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c"
+    "melodic-software/ci-workflows/.github/workflows/select-runner.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c",
+    "melodic-software/ci-workflows/.github/workflows/select-runner.yml@029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1"
   ],
   "approvedReusableWorkflowContracts": {
     "melodic-software/ci-workflows/.github/workflows/claude-review.yml@1d3762c2ace413db0f347048307946c46850161c": {
