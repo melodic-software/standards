@@ -983,6 +983,46 @@ ${resultMapping}`,
   }
 });
 
+test("fail-closed reusable gate rejects additional prerequisites", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          selectorResultInput: "prerequisite-result",
+          allowedInputs: ["runner", "prerequisite-result"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    workflows: {
+      "pr-title.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  setup:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: exit 1
+  pr-title:
+    needs: [choose, setup]
+    if: \${{ always() }}
+    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      prerequisite-result: \${{ needs.choose.result }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "selector-contract" && /must declare exactly needs: choose/.test(message),
+    ),
+  );
+});
+
 test("repository-local workflows cannot wrap fail-closed selector-result gates", async () => {
   const root = await repository({
     exceptions: {

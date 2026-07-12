@@ -164,7 +164,9 @@ The fail-closed required-check revision of `semantic-pr` at
 `51012e2c7b8bf74bc26e08c6446b488254a8770f` was independently reviewed. Its
 contract permits only the governed `runner` input plus `prerequisite-result`,
 which lets a caller report selector failure without making the required check
-disappear. The selector and `semantic-pr` workflow expose only the governed
+disappear. A fail-closed caller must declare the selector as its only `needs`
+prerequisite so the forwarded result covers every dependency outcome. The
+selector and `semantic-pr` workflow expose only the governed
 runner contract; Windows Pester, Docker-dependent scans, and privileged
 control-plane workflows
 such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
