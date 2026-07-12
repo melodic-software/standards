@@ -1209,6 +1209,19 @@ function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIn
   if (!local.approved && reusable.isReusable && !reusable.approved) {
     return { approved: false, kind: "invalid", reason: reusable.reason };
   }
+  if (
+    !local.approved &&
+    reusable.approved &&
+    reusable.contract.selectorResultInput &&
+    isWorkflowCallExclusive(workflow)
+  ) {
+    return {
+      approved: false,
+      kind: "invalid",
+      reason:
+        "repository-local reusable workflows cannot wrap a selector-result reporting contract; the selector-owning workflow must call that reviewed contract directly",
+    };
+  }
   if (!local.approved && reusable.approved && reusable.contract.routing === "hosted-only") {
     return { approved: true, kind: "hosted-reusable" };
   }

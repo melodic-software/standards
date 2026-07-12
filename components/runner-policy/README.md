@@ -134,7 +134,9 @@ unknown secret names, and alternate expressions:
   A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
   and the matching `${{ needs.<selector>.result }}` mapping so a required gate
   can report every selector outcome without authorizing general workloads to
-  run after cancellation.
+  run after cancellation. Repository-local reusable workflows cannot wrap this
+  contract; the selector-owning workflow must call the reviewed immutable
+  workflow directly so no wrapper can default or forge the result.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.

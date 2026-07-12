@@ -831,6 +831,41 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
   );
 });
 
+test("policy rejects invalid selector-result contract shapes", async () => {
+  for (const contract of [
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      selectorResultInput: "runner",
+      allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      selectorResultInput: "prerequisite-result",
+      allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+    {
+      routing: "hosted-only",
+      selectorResultInput: "prerequisite-result",
+      allowedInputs: ["prerequisite-result"],
+      allowedSecrets: {},
+      fixedRunsOn: ["ubuntu-24.04"],
+    },
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: contract,
+        },
+      },
+    });
+    await assert.rejects(() => audit(root), ConfigurationError);
+  }
+});
+
 test("selector policy must use the governed variable expression, not hosted-only", async () => {
   const root = await repository({
     workflows: {
@@ -916,7 +951,9 @@ test("fail-closed reusable gate requires exact always and selector-result mappin
   for (const [condition, result] of [
     [`\${{ !cancelled() }}`, `\${{ needs.choose.result }}`],
     [`\${{ always() }}`, `\${{ needs.other.result }}`],
+    [`\${{ always() }}`, undefined],
   ]) {
+    const resultMapping = result === undefined ? "" : `      prerequisite-result: ${result}\n`;
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
@@ -939,12 +976,71 @@ ${SELECTOR}  pr-title:
     uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
     with:
       runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: ${result}
-`,
+${resultMapping}`,
       },
     });
     assert.ok((await audit(root)).some(({ rule }) => rule === "selector-contract"));
   }
+});
+
+test("repository-local workflows cannot wrap fail-closed selector-result gates", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/semantic-wrapper.yml#wrapped": {
+        reason: "hosted-control-plane",
+        justification:
+          "An exception cannot make a wrapper around a selector-result contract trustworthy.",
+      },
+    },
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          selectorResultInput: "prerequisite-result",
+          allowedInputs: ["runner", "prerequisite-result"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    workflows: {
+      "semantic-wrapper.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: ubuntu-24.04
+      prerequisite-result:
+        type: string
+        default: success
+jobs:
+  wrapped:
+    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
+    with:
+      runner: \${{ inputs.runner }}
+      prerequisite-result: \${{ inputs.prerequisite-result }}
+`,
+      "pr-title.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  pr-title:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ./.github/workflows/semantic-wrapper.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      prerequisite-result: success
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "runner-target-contract" &&
+        /cannot wrap a selector-result reporting contract/.test(message),
+    ),
+  );
 });
 
 test("reusable workflow callers use the same literal fallback and cancellation contract", async () => {
