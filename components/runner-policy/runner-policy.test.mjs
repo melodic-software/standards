@@ -8,12 +8,14 @@ import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
+const FAIL_CLOSED_SEMANTIC_PR_SHA = "51012e2c7b8bf74bc26e08c6446b488254a8770f";
 const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
+const FAIL_CLOSED_SEMANTIC_PR_REFERENCE = `melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${FAIL_CLOSED_SEMANTIC_PR_SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PRODUCTION_SHA}`;
@@ -815,6 +817,18 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       allowedSecrets: {},
     },
   );
+  assert.deepEqual(
+    contracts[
+      `melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${FAIL_CLOSED_SEMANTIC_PR_SHA}`
+    ],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      selectorResultInput: "prerequisite-result",
+      allowedInputs: ["runner", "prerequisite-result"],
+      allowedSecrets: {},
+    },
+  );
 });
 
 test("selector policy must use the governed variable expression, not hosted-only", async () => {
@@ -866,6 +880,71 @@ test("reusable workflow caller passes the approved runner input", async () => {
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("fail-closed reusable gate reports every selector result", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          selectorResultInput: "prerequisite-result",
+          allowedInputs: ["runner", "prerequisite-result"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    workflows: {
+      "pr-title.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  pr-title:
+    needs: choose
+    if: \${{ always() }}
+    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      prerequisite-result: \${{ needs.choose.result }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("fail-closed reusable gate requires exact always and selector-result mapping", async () => {
+  for (const [condition, result] of [
+    [`\${{ !cancelled() }}`, `\${{ needs.choose.result }}`],
+    [`\${{ always() }}`, `\${{ needs.other.result }}`],
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            selectorResultInput: "prerequisite-result",
+            allowedInputs: ["runner", "prerequisite-result"],
+            allowedSecrets: {},
+          },
+        },
+      },
+      workflows: {
+        "pr-title.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  pr-title:
+    needs: choose
+    if: ${condition}
+    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      prerequisite-result: ${result}
+`,
+      },
+    });
+    assert.ok((await audit(root)).some(({ rule }) => rule === "selector-contract"));
+  }
 });
 
 test("reusable workflow callers use the same literal fallback and cancellation contract", async () => {

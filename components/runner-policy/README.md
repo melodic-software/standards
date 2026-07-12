@@ -131,6 +131,10 @@ unknown secret names, and alternate expressions:
 
 - `runner-input` names the one canonical runner input. Unknown workflows,
   obsolete SHAs, omitted runner inputs, and extra inputs fail closed.
+  A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
+  and the matching `${{ needs.<selector>.result }}` mapping so a required gate
+  can report every selector outcome without authorizing general workloads to
+  run after cancellation.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
@@ -154,8 +158,13 @@ reviewed. The self-hosted-only selector at
 well. All three selector revisions remain temporarily allowlisted for an
 ordered consumer rollout; the older revisions are removed after every consumer
 migrates.
-The selector and `semantic-pr` workflow expose only the governed runner contract;
-Windows Pester, Docker-dependent scans, and privileged control-plane workflows
+The fail-closed required-check revision of `semantic-pr` at
+`51012e2c7b8bf74bc26e08c6446b488254a8770f` was independently reviewed. Its
+contract permits only the governed `runner` input plus `prerequisite-result`,
+which lets a caller report selector failure without making the required check
+disappear. The selector and `semantic-pr` workflow expose only the governed
+runner contract; Windows Pester, Docker-dependent scans, and privileged
+control-plane workflows
 such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
 images. The production Claude review
 contract permits its general `skip-actors` string input without constraining the
