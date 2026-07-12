@@ -73,7 +73,7 @@ Public repositories and repositories not enrolled for local CI cannot call the
 selector. Enrolled private repositories must route each independently scheduled
 job through a selector whose complete workflow path and 40-character commit SHA
 appear in `policy.json`'s `approvedSelectorReferences`. The allowlist contains
-only the independently reviewed production selector commit. Updating that
+only independently reviewed production selector commits. Updating that
 path@SHA remains a reviewed, data-only policy change.
 
 An approved selector call has an exact contract. Alternate variables, literals,
@@ -147,8 +147,11 @@ exceptions live on the actual called job instead of becoming a blanket caller
 exception.
 
 The approved production contracts at
-`99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` were independently reviewed. The
-selector and `semantic-pr` workflow expose only the governed runner contract;
+`99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` and the label-less scale-set
+selector fix at `029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1` were independently
+reviewed. Both selector revisions remain temporarily allowlisted for an ordered
+consumer rollout; the older revision is removed after every consumer migrates.
+The selector and `semantic-pr` workflow expose only the governed runner contract;
 Windows Pester, Docker-dependent scans, and privileged control-plane workflows
 such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
 images. The production Claude review

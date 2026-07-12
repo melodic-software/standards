@@ -8,6 +8,7 @@ import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
+const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -742,18 +743,24 @@ test("obsolete full selector SHA is rejected unless that exact path@SHA is appro
   assert.match(findings[0].message, /path@SHA.*allowlist/);
 });
 
-test("production selector allowlist contains only the independently reviewed commit", async () => {
-  assert.deepEqual(BASE_POLICY.approvedSelectorReferences, [`${SELECTOR_PATH}@${PRODUCTION_SHA}`]);
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, PRODUCTION_SHA)}`,
-    },
-  });
-  await writeFile(
-    path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+test("production selector allowlist contains only independently reviewed commits", async () => {
+  const selectorShas = [PRODUCTION_SHA, LATEST_SELECTOR_SHA];
+  assert.deepEqual(
+    BASE_POLICY.approvedSelectorReferences,
+    selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
   );
-  assert.deepEqual(await audit(root), []);
+  for (const sha of selectorShas) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, sha)}`,
+      },
+    });
+    await writeFile(
+      path.join(root, "runner-policy-policy.json"),
+      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    );
+    assert.deepEqual(await audit(root), []);
+  }
 });
 
 test("production contracts pin reviewed Windows and selectable Linux workflows", () => {
