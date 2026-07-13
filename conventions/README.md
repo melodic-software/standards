@@ -1,6 +1,6 @@
 # conventions
 
-Prose standards that tooling cannot enforce — the reasoning-only tier of this catalog. Where `components/` owns executable policy and its contract tests, `conventions/` holds judgments a human or agent makes: engineering conventions and code-review criteria. The split between the two is itself a convention — see [engineering/enforceability-tiers.md](engineering/enforceability-tiers.md).
+Prose standards that tooling cannot enforce — the reasoning-only tier of this catalog. Where `components/` owns executable policy and its contract tests, `conventions/` holds judgments a human or agent makes: engineering conventions, code-review criteria, and operational process standards. The split between the two is itself a convention — see [engineering/enforceability-tiers.md](engineering/enforceability-tiers.md).
 
 Three concerns live here:
 
