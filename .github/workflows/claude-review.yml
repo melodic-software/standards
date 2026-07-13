@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+# No caller-level concurrency: the reusable workflow already supersedes
+# in-flight reviews per PR via job-level concurrency (`claude-review-<pr>`),
+# and a caller group with the same name would deadlock the called job.
+
 jobs:
   review:
     permissions:
