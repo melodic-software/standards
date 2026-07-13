@@ -1,6 +1,6 @@
 # Engineering conventions
 
-Agent-agnostic engineering standards that no linter can decide for you — the authoring half of `../../conventions`, the catalog's reasoning-only tier. Each file owns one concern. Where a convention *can* be mechanically enforced, it belongs to a component under `../../components/`, not here; `enforceability-tiers.md` explains the split.
+Agent-agnostic engineering standards that no linter can decide for you — the authoring lane of `../../conventions`, the catalog's reasoning-only tier. Each file owns one concern. Where a convention *can* be mechanically enforced, it belongs to a component under `../../components/`, not here; `enforceability-tiers.md` explains the split.
 
 | Convention | Owns |
 |---|---|
