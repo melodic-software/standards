@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   sync:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c # 99ac2f8 2026-07-11
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@c2654182bc2d78f7909795df78304d482aa69226 # 99ac2f8 2026-07-11
     with:
       # Schedule and push run for real (inputs is empty on those events, so
       # `|| false` makes them real runs); manual dispatch keeps its dry-run
