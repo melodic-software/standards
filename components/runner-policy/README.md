@@ -161,9 +161,16 @@ The approved production contracts at
 selector fix at `029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1` were independently
 reviewed. The self-hosted-only selector at
 `3cb83c9502da0b210c335785e250023508c4b8e3` was independently reviewed as
-well. All three selector revisions remain temporarily allowlisted for an
+well. The strict-selector scheduling fix at
+`de50a08b6093d231519ee7a4c9371db76c0a7e1e` keeps the selector control-plane
+job on the managed fleet for `self-hosted-only` while preserving the hosted
+selector for adaptive policies. All four selector revisions remain temporarily allowlisted for an
 ordered consumer rollout; the older revisions are removed after every consumer
 migrates.
+The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
+uses its reviewed `runner` input and checksum-verified native Linux binary, so
+strict consumers may route that advisory lane through the approved selector
+without Docker-socket access.
 The fail-closed required-check revision of `semantic-pr` at
 `51012e2c7b8bf74bc26e08c6446b488254a8770f` was independently reviewed. Its
 contract permits only the governed `runner` input plus `prerequisite-result`,

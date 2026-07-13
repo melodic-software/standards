@@ -7,10 +7,6 @@
       "reason": "hosted-control-plane",
       "justification": "Policy enforcement stays on independent GitHub-hosted compute so malformed local-routing changes cannot disable their own gate."
     },
-    ".github/workflows/ci.yml#zizmor": {
-      "reason": "docker-socket",
-      "justification": "The reviewed Zizmor workflow invokes Docker, while local workers deliberately receive no Docker socket or privileged host access."
-    },
     ".github/workflows/ci.yml#osv-scanner": {
       "reason": "docker-socket",
       "justification": "The reviewed OSV workflow invokes a digest-pinned image through Docker, while local workers deliberately receive no Docker socket."

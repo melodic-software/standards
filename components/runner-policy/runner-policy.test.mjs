@@ -11,6 +11,7 @@ const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
 const FAIL_CLOSED_SEMANTIC_PR_SHA = "51012e2c7b8bf74bc26e08c6446b488254a8770f";
 const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
+const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -756,7 +757,12 @@ test("obsolete full selector SHA is rejected unless that exact path@SHA is appro
 });
 
 test("production selector allowlist contains only independently reviewed commits", async () => {
-  const selectorShas = [PRODUCTION_SHA, LATEST_SELECTOR_SHA, SELF_HOSTED_ONLY_SELECTOR_SHA];
+  const selectorShas = [
+    PRODUCTION_SHA,
+    LATEST_SELECTOR_SHA,
+    SELF_HOSTED_ONLY_SELECTOR_SHA,
+    LOCAL_SELECTOR_SHA,
+  ];
   assert.deepEqual(
     BASE_POLICY.approvedSelectorReferences,
     selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
@@ -823,6 +829,15 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       routing: "runner-input",
       runnerInput: "runner",
       allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner", "paths"],
       allowedSecrets: {},
     },
   );
