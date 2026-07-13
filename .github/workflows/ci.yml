@@ -8,11 +8,11 @@ on:
 permissions:
   contents: read
 
-# head_ref is only set on pull_request, so PR pushes supersede in-flight runs
-# for the same branch; main pushes fall back to the unique run_id and are
-# never cancelled.
+# The PR number keys pull_request runs, so a new push supersedes that PR's
+# in-flight run without colliding with same-named branches from other head
+# repos; main pushes fall back to the unique run_id and are never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 # Every eligible lane shares one same-contract central selector decision. A
