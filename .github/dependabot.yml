@@ -11,6 +11,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     labels: ["dependencies"]
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
@@ -29,17 +30,31 @@ updates:
   - package-ecosystem: npm
     directory: /
     labels: ["dependencies"]
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    # Batch minor and patch bumps into one PR; majors stay individual so
+    # breaking changes get their own review.
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
   # The runner policy is distributed with its own runtime lockfile, so it is a
   # separate npm dependency root. Keep this entry in sync with that component;
   # every downstream materialization must add the equivalent destination path.
   - package-ecosystem: npm
     directory: /components/runner-policy
     labels: ["dependencies"]
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+# One review run per PR branch at a time; a new push supersedes the in-flight
+# review of the outdated diff.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   review:
     permissions:

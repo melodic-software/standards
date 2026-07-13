@@ -4,22 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
-  merge_group:
 
 permissions:
   contents: read
 
+# head_ref is only set on pull_request, so PR pushes supersede in-flight runs
+# for the same branch; main pushes fall back to the unique run_id and are
+# never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 # Every eligible lane shares one same-contract central selector decision. A
 # selector failure cannot skip required work: every workload directly uses a
 # cancellation-safe condition and an explicit ubuntu-24.04 fallback. The
 # ci-status gateway stays hosted and aggregates only the original lane IDs, so
-# required check names and merge-queue behavior do not change. Workload steps
-# are route-independent: pinned setup/composite actions install every tool, and
-# existing setup-action caches remain GitHub-managed rather than host-mounted.
+# required check names do not change. Workload steps are route-independent:
+# pinned setup/composite actions install every tool, and existing setup-action
+# caches remain GitHub-managed rather than host-mounted.
 jobs:
   select-runner:
     permissions: {}
