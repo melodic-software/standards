@@ -189,12 +189,17 @@ reviewed. The self-hosted-only selector at
 well. The strict-selector scheduling fix at
 `de50a08b6093d231519ee7a4c9371db76c0a7e1e` keeps the selector control-plane
 job on the managed fleet for `self-hosted-only` while preserving the hosted
-selector for adaptive policies. Four selector revisions remain approved for an
-ordered consumer rollout. GitHub does not allow a reusable workflow to target a
-self-hosted runner group owned by a different repository owner, so this revision
-is approved only for `melodic-software`; `kyle-sexton` repositories cannot
-select it. The three older revisions remain globally approved until compatible
-consumers migrate.
+selector for adaptive policies. The liveness-routing revision at
+`3415de3ff2fafee40e4d087eb6073d2f6952b595` routes to the managed fleet
+whenever a matching runner is online — busy runners queue instead of falling
+back to hosted — removes the rerun-to-hosted branch so a re-run keeps its
+original route, and reports `online-runner-count`. Five selector revisions
+remain approved for an ordered consumer rollout. GitHub does not allow a
+reusable workflow to target a self-hosted runner group owned by a different
+repository owner, so these two strict-scheduling revisions are approved only
+for `melodic-software`; `kyle-sexton` repositories cannot select them. The
+three older revisions remain globally approved until compatible consumers
+migrate.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 strict consumers may route that advisory lane through the approved selector

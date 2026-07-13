@@ -12,6 +12,7 @@ const FAIL_CLOSED_SEMANTIC_PR_SHA = "51012e2c7b8bf74bc26e08c6446b488254a8770f";
 const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
+const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -774,7 +775,10 @@ test("production selector allowlist contains only independently reviewed commits
     selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
   );
   assert.deepEqual(BASE_POLICY.approvedSelectorReferencesByRepositoryOwner, {
-    "melodic-software": [`${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`],
+    "melodic-software": [
+      `${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
+    ],
   });
   for (const sha of selectorShas) {
     const root = await repository({
@@ -787,6 +791,19 @@ test("production selector allowlist contains only independently reviewed commits
       `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
     );
     assert.deepEqual(await audit(root), []);
+  }
+  for (const sha of [LOCAL_SELECTOR_SHA, LIVENESS_SELECTOR_SHA]) {
+    const root = await repository({
+      repositoryOwner: "melodic-software",
+      workflows: {
+        "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, sha)}`,
+      },
+    });
+    await writeFile(
+      path.join(root, "runner-policy-policy.json"),
+      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    );
+    assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
   }
 });
 
