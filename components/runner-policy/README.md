@@ -76,6 +76,10 @@ appear in `policy.json`'s `approvedSelectorReferences`. The allowlist contains
 only independently reviewed production selector commits. Updating that
 path@SHA remains a reviewed, data-only policy change.
 
+Workloads with the same selector inputs and secret mapping may share one
+selector job in the same workflow. Each workload still follows the direct
+dependency, runner-output, and cancellation-safe condition contract below.
+
 An approved selector call has an exact contract. Alternate variables, literals,
 extra inputs, extra secrets, and `secrets: inherit` are rejected:
 
