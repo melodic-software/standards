@@ -112,7 +112,10 @@ must add all of the following in the same integration PR:
    `npm ci --prefix .github/standards/runner-policy`, then invokes
    `node .github/standards/runner-policy/runner-policy.mjs --root .` with
    `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. Its
-   exception reason is `hosted-control-plane`.
+   exception reason is `hosted-control-plane`. The analyzer consumes GitHub's
+   default `GITHUB_REPOSITORY` environment variable as trusted owner evidence;
+   `.github/runner-policy.json#repositoryOwner` is only inventory and a mismatch
+   tripwire.
 3. An npm Dependabot entry with
    `directory: /.github/standards/runner-policy` for the distributed lockfile.
 4. Workflow routing and exception inventory that pass the gate at the reviewed

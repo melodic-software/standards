@@ -790,7 +790,7 @@ test("production selector allowlist contains only independently reviewed commits
   }
 });
 
-test("owner-scoped selector approval uses reviewed repository ownership", async () => {
+test("owner-scoped selector approval requires external repository identity", async () => {
   const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
   const melodicRoot = await repository({
     repositoryOwner: "melodic-software",
@@ -800,7 +800,14 @@ test("owner-scoped selector approval uses reviewed repository ownership", async 
     path.join(melodicRoot, "runner-policy-policy.json"),
     `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
   );
-  assert.deepEqual(await audit(melodicRoot), []);
+  const selfDeclaredFindings = await audit(melodicRoot);
+  assert.equal(selfDeclaredFindings.length, 1);
+  assert.equal(selfDeclaredFindings[0].rule, "selector-pin");
+  assert.match(selfDeclaredFindings[0].message, /owner-scoped.*owner evidence is unavailable/);
+  assert.deepEqual(
+    await audit(melodicRoot, { githubRepository: "melodic-software/standards" }),
+    [],
+  );
 
   const personalRoot = await repository({
     repositoryOwner: "kyle-sexton",
@@ -810,7 +817,9 @@ test("owner-scoped selector approval uses reviewed repository ownership", async 
     path.join(personalRoot, "runner-policy-policy.json"),
     `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
   );
-  const personalFindings = await audit(personalRoot);
+  const personalFindings = await audit(personalRoot, {
+    githubRepository: "kyle-sexton/standards",
+  });
   assert.equal(personalFindings.length, 1);
   assert.equal(personalFindings[0].rule, "selector-pin");
   assert.match(personalFindings[0].message, /not approved for repository owner kyle-sexton/);
@@ -820,13 +829,13 @@ test("owner-scoped selector approval uses reviewed repository ownership", async 
     path.join(ownerlessRoot, "runner-policy-policy.json"),
     `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
   );
-  const ownerlessFindings = await audit(ownerlessRoot);
-  assert.equal(ownerlessFindings.length, 1);
-  assert.equal(ownerlessFindings[0].rule, "selector-pin");
-  assert.match(ownerlessFindings[0].message, /owner-scoped.*owner evidence is unavailable/);
+  assert.deepEqual(
+    await audit(ownerlessRoot, { githubRepository: "melodic-software/standards" }),
+    [],
+  );
 });
 
-test("GITHUB_REPOSITORY owner evidence takes precedence and must match reviewed config", async () => {
+test("GITHUB_REPOSITORY owner evidence must match reviewed inventory", async () => {
   const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
   const root = await repository({
     repositoryOwner: "melodic-software",

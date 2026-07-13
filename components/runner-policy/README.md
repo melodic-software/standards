@@ -3,19 +3,30 @@
 This module is the enforceable contract for local GitHub Actions routing. It
 parses workflow YAML; it does not use text matching to infer job structure.
 
-In this source repository, run it from the repository root:
+In this source repository, run it from the repository root with explicit local
+repository identity evidence:
 
 ```sh
+GITHUB_REPOSITORY=melodic-software/standards \
+  node components/runner-policy/runner-policy.mjs --root .
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:GITHUB_REPOSITORY = "melodic-software/standards"
 node components/runner-policy/runner-policy.mjs --root .
 ```
 
 The distributed component lives at `.github/standards/runner-policy/` and owns
 its own `package.json` and lockfile with the exact `yaml@2.9.0` runtime pin.
-Consumers install and invoke that dependency root directly:
+Consumers install and invoke that dependency root directly, supplying their own
+`owner/repository` identity for local analysis:
 
 ```sh
 npm ci --prefix .github/standards/runner-policy
-node .github/standards/runner-policy/runner-policy.mjs --root .
+GITHUB_REPOSITORY=owner/repository \
+  node .github/standards/runner-policy/runner-policy.mjs --root .
 ```
 
 The policy gate itself stays on an explicit GitHub-hosted image so the
@@ -44,7 +55,9 @@ runner-policy:
 Its `.github/runner-policy.json` entry therefore declares that job with a
 `hosted-control-plane` exception. Set `CI_REPOSITORY_VISIBILITY` from the event
 as shown so checked-in inventory cannot claim that a public repository is
-private.
+private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
+variable independently of the checked-out repository, so owner-scoped selector
+approval remains available without another workflow-controlled input.
 
 Because the distributed lockfile is an independent dependency root, every
 consumer must add an npm Dependabot entry whose `directory` is exactly
@@ -70,12 +83,13 @@ Each adopting repository carries `.github/runner-policy.json`:
 ```
 
 `repositoryOwner`, `visibility`, and `selfHostedCi` are governed inventory, not
-runtime switches. `repositoryOwner` is the reviewed ownership evidence used by
-local analysis. In GitHub Actions, the analyzer prefers the immutable default
-`GITHUB_REPOSITORY` context; when both sources are present, their owners must
-match or analysis fails closed. Owner names are lowercase GitHub logins. A
-missing owner does not change globally approved selector behavior, but it cannot
-authorize an owner-scoped selector revision.
+runtime switches. `repositoryOwner` is inventory and a mismatch tripwire only;
+it never authorizes an owner-scoped selector revision. Authorization evidence
+must come from the externally supplied `GITHUB_REPOSITORY` context. When both
+sources are present, their owners must match or analysis fails closed. Owner
+names are lowercase GitHub logins. Missing external owner evidence does not
+change globally approved selector behavior, but it cannot authorize an
+owner-scoped selector revision even when checked-in inventory declares an owner.
 
 Public repositories and repositories not enrolled for local CI cannot call the
 selector. Enrolled private repositories must route each independently scheduled
