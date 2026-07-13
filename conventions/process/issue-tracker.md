@@ -17,7 +17,7 @@ Labels follow one grammar across every axis, so a reader parses any label withou
 
 ## The type axis
 
-On organization repositories the type axis is **native GitHub Issue Types**, not labels. Issue Types are an organization-level, single-select field — an issue carries exactly one type, enforced — and GitHub positions them as the successor to a type-prefixed label. They are the governance mechanism for this axis; there is no parallel type label alongside them.
+On organization repositories the type axis is **native GitHub Issue Types**, not labels. Issue Types are an organization-level, single-select field — an issue carries **at most one** type, never two — and GitHub positions them as the successor to a type-prefixed label. They are the governance mechanism for this axis; there is no parallel type label alongside them. GitHub does not require every issue to carry a type (the `no:type` search filter exists precisely to find the ones that don't), so an issue created via a form or API call that skips the field can silently fall outside the taxonomy — set a template default or triage `no:type` results periodically.
 
 Personal accounts have no native Issue Types, so their repositories retain a labelled type axis under the same naming grammar. This is a deliberate per-account divergence, not drift, and it is declared in [`kyle-sexton/github-iac`](https://github.com/kyle-sexton/github-iac).
 
