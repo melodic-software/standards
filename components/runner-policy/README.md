@@ -57,6 +57,7 @@ Each adopting repository carries `.github/runner-policy.json`:
 ```json
 {
   "schemaVersion": 1,
+  "repositoryOwner": "melodic-software",
   "visibility": "private",
   "selfHostedCi": true,
   "exceptions": {
@@ -68,13 +69,23 @@ Each adopting repository carries `.github/runner-policy.json`:
 }
 ```
 
-`visibility` and `selfHostedCi` are governed inventory, not runtime switches.
+`repositoryOwner`, `visibility`, and `selfHostedCi` are governed inventory, not
+runtime switches. `repositoryOwner` is the reviewed ownership evidence used by
+local analysis. In GitHub Actions, the analyzer prefers the immutable default
+`GITHUB_REPOSITORY` context; when both sources are present, their owners must
+match or analysis fails closed. Owner names are lowercase GitHub logins. A
+missing owner does not change globally approved selector behavior, but it cannot
+authorize an owner-scoped selector revision.
+
 Public repositories and repositories not enrolled for local CI cannot call the
 selector. Enrolled private repositories must route each independently scheduled
 job through a selector whose complete workflow path and 40-character commit SHA
-appear in `policy.json`'s `approvedSelectorReferences`. The allowlist contains
-only independently reviewed production selector commits. Updating that
-path@SHA remains a reviewed, data-only policy change.
+appear in policy schema v3's global `approvedSelectorReferences` or in the
+current owner entry under `approvedSelectorReferencesByRepositoryOwner`. The
+allowlists contain only independently reviewed production selector commits.
+Owner-scoped entries cannot also be globally approved, and malformed owners,
+malformed refs, or ownership mismatches fail closed. Updating a path@SHA or its
+owner scope remains a reviewed, data-only policy change.
 
 Workloads with the same selector inputs and secret mapping may share one
 selector job in the same workflow. Each workload still follows the direct
@@ -164,9 +175,12 @@ reviewed. The self-hosted-only selector at
 well. The strict-selector scheduling fix at
 `de50a08b6093d231519ee7a4c9371db76c0a7e1e` keeps the selector control-plane
 job on the managed fleet for `self-hosted-only` while preserving the hosted
-selector for adaptive policies. All four selector revisions remain temporarily allowlisted for an
-ordered consumer rollout; the older revisions are removed after every consumer
-migrates.
+selector for adaptive policies. Four selector revisions remain approved for an
+ordered consumer rollout. GitHub does not allow a reusable workflow to target a
+self-hosted runner group owned by a different repository owner, so this revision
+is approved only for `melodic-software`; `kyle-sexton` repositories cannot
+select it. The three older revisions remain globally approved until compatible
+consumers migrate.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 strict consumers may route that advisory lane through the approved selector

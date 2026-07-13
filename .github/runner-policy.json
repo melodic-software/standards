@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "repositoryOwner": "melodic-software",
   "visibility": "private",
   "selfHostedCi": true,
   "exceptions": {
