@@ -11,6 +11,7 @@ const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
 const FAIL_CLOSED_SEMANTIC_PR_SHA = "51012e2c7b8bf74bc26e08c6446b488254a8770f";
 const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
+const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -37,6 +38,7 @@ const SELECTOR = `    uses: ${SELECTOR_REFERENCE}
 `;
 
 async function repository({
+  repositoryOwner,
   visibility = "private",
   selfHostedCi = true,
   exceptions = {},
@@ -48,7 +50,17 @@ async function repository({
   await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
   await writeFile(
     path.join(root, ".github", "runner-policy.json"),
-    `${JSON.stringify({ schemaVersion: 1, visibility, selfHostedCi, exceptions }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        ...(repositoryOwner ? { repositoryOwner } : {}),
+        visibility,
+        selfHostedCi,
+        exceptions,
+      },
+      null,
+      2,
+    )}\n`,
   );
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
@@ -761,6 +773,9 @@ test("production selector allowlist contains only independently reviewed commits
     BASE_POLICY.approvedSelectorReferences,
     selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
   );
+  assert.deepEqual(BASE_POLICY.approvedSelectorReferencesByRepositoryOwner, {
+    "melodic-software": [`${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`],
+  });
   for (const sha of selectorShas) {
     const root = await repository({
       workflows: {
@@ -772,6 +787,139 @@ test("production selector allowlist contains only independently reviewed commits
       `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
     );
     assert.deepEqual(await audit(root), []);
+  }
+});
+
+test("owner-scoped selector approval uses reviewed repository ownership", async () => {
+  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
+  const melodicRoot = await repository({
+    repositoryOwner: "melodic-software",
+    workflows: { "ci.yml": workflow },
+  });
+  await writeFile(
+    path.join(melodicRoot, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  assert.deepEqual(await audit(melodicRoot), []);
+
+  const personalRoot = await repository({
+    repositoryOwner: "kyle-sexton",
+    workflows: { "ci.yml": workflow },
+  });
+  await writeFile(
+    path.join(personalRoot, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  const personalFindings = await audit(personalRoot);
+  assert.equal(personalFindings.length, 1);
+  assert.equal(personalFindings[0].rule, "selector-pin");
+  assert.match(personalFindings[0].message, /not approved for repository owner kyle-sexton/);
+
+  const ownerlessRoot = await repository({ workflows: { "ci.yml": workflow } });
+  await writeFile(
+    path.join(ownerlessRoot, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  const ownerlessFindings = await audit(ownerlessRoot);
+  assert.equal(ownerlessFindings.length, 1);
+  assert.equal(ownerlessFindings[0].rule, "selector-pin");
+  assert.match(ownerlessFindings[0].message, /owner-scoped.*owner evidence is unavailable/);
+});
+
+test("GITHUB_REPOSITORY owner evidence takes precedence and must match reviewed config", async () => {
+  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
+  const root = await repository({
+    repositoryOwner: "melodic-software",
+    workflows: { "ci.yml": workflow },
+  });
+  await writeFile(
+    path.join(root, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
+  await assert.rejects(
+    () => audit(root, { githubRepository: "kyle-sexton/standards" }),
+    /GITHUB_REPOSITORY owner evidence is kyle-sexton.*declares melodic-software/,
+  );
+});
+
+test("malformed repository ownership evidence fails closed", async () => {
+  for (const repositoryOwner of [
+    "Melodic-Software",
+    "melodic/software",
+    " melodic-software",
+    "owner-",
+    "owner--name",
+  ]) {
+    const root = await repository({ repositoryOwner });
+    await assert.rejects(
+      () => audit(root),
+      /repositoryOwner must be a lowercase GitHub repository owner/,
+    );
+  }
+  const root = await repository({ repositoryOwner: "melodic-software" });
+  for (const githubRepository of [
+    "not-a-repository",
+    "owner-/repository",
+    "owner--name/repository",
+  ]) {
+    await assert.rejects(
+      () => audit(root, { githubRepository }),
+      /GITHUB_REPOSITORY evidence must be an owner\/repository name/,
+    );
+  }
+});
+
+test("global selector approvals remain owner-independent", async () => {
+  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, PRODUCTION_SHA)}`;
+  const root = await repository({
+    repositoryOwner: "kyle-sexton",
+    workflows: { "ci.yml": workflow },
+  });
+  await writeFile(
+    path.join(root, "runner-policy-policy.json"),
+    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+  );
+  assert.deepEqual(await audit(root), []);
+});
+
+test("policy schema rejects malformed or ambiguous owner-scoped approvals", async () => {
+  const invalidPolicies = [
+    {
+      approvedSelectorReferencesByRepositoryOwner: {
+        "Melodic-Software": [SELECTOR_REFERENCE],
+      },
+    },
+    {
+      approvedSelectorReferencesByRepositoryOwner: {
+        "owner-": [SELECTOR_REFERENCE],
+      },
+    },
+    {
+      approvedSelectorReferencesByRepositoryOwner: {
+        "owner--name": [SELECTOR_REFERENCE],
+      },
+    },
+    {
+      approvedSelectorReferencesByRepositoryOwner: {
+        "melodic-software": [],
+      },
+    },
+    {
+      approvedSelectorReferencesByRepositoryOwner: {
+        "melodic-software": [`${SELECTOR_PATH}@main`],
+      },
+    },
+    {
+      approvedSelectorReferences: [SELECTOR_REFERENCE],
+      approvedSelectorReferencesByRepositoryOwner: {
+        "melodic-software": [SELECTOR_REFERENCE],
+      },
+    },
+  ];
+  for (const policyOverrides of invalidPolicies) {
+    const root = await repository({ policyOverrides });
+    await assert.rejects(() => audit(root), ConfigurationError);
   }
 });
 
@@ -823,6 +971,15 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       routing: "runner-input",
       runnerInput: "runner",
       allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner", "paths"],
       allowedSecrets: {},
     },
   );
