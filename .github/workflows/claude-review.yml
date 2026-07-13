@@ -15,11 +15,9 @@ on:
 permissions:
   contents: read
 
-# One review run per PR at a time; a new push supersedes the in-flight review
-# of the outdated diff.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+# No caller-level concurrency: the reusable workflow already supersedes
+# in-flight reviews per PR via job-level concurrency (`claude-review-<pr>`),
+# and a caller group with the same name would deadlock the called job.
 
 jobs:
   review:
