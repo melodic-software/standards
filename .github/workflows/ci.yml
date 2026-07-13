@@ -25,7 +25,7 @@ concurrency:
 jobs:
   select-runner:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@de50a08b6093d231519ee7a4c9371db76c0a7e1e # de50a08 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@3415de3ff2fafee40e4d087eb6073d2f6952b595 # 3415de3 2026-07-13
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
