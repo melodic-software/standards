@@ -142,6 +142,15 @@ test("private job can consume a full-SHA-pinned selector output", async () => {
   assert.deepEqual(await audit(root), []);
 });
 
+test("same-contract workloads can share one selector decision", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  lint:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 test("selector recovery derives its literal fallback from the governed default", async () => {
   const alternateDefault = "ubuntu-22.04";
   const policyOverrides = {
