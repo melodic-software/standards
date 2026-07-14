@@ -93,10 +93,10 @@ The `runner-policy` component materializes one atomic runtime at
 `.github/standards/runner-policy/` in exactly these enrolled private targets:
 
 - `melodic-software/claude-code-plugins`
+- `melodic-software/dotfiles`
 - `melodic-software/github-iac`
 - `melodic-software/medley`
-- `kyle-sexton/dotfiles`
-- `kyle-sexton/provisioning`
+- `melodic-software/provisioning`
 - `kyle-sexton/github-iac`
 
 It includes `runner-policy.mjs`, `policy.json`, and the component-local npm

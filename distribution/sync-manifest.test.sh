@@ -312,7 +312,7 @@ done < <(
     "$actual_manifest"
 )
 
-expected_runner_policy_targets='["kyle-sexton/dotfiles","kyle-sexton/github-iac","kyle-sexton/provisioning","melodic-software/claude-code-plugins","melodic-software/github-iac","melodic-software/medley"]'
+expected_runner_policy_targets='["kyle-sexton/github-iac","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
 actual_runner_policy_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \

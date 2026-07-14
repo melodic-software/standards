@@ -91,22 +91,6 @@ targets:
     managed:
       - markdownlint
       - repository-text
-  kyle-sexton/dotfiles:
-    managed:
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
-      - lefthook-powershell
-      - lefthook-shellcheck
-      - lychee
-      - markdownlint
-      - node-runtime
-      - psscriptanalyzer
-      - repository-text
-      - runner-policy
-      - typos
-    locally-owned:
-      - shellcheck
   kyle-sexton/github-iac:
     managed:
       - dotnet-analysis
@@ -118,21 +102,6 @@ targets:
       - node-runtime
       - repository-text
       - runner-policy
-      - typos
-  kyle-sexton/provisioning:
-    managed:
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
-      - lefthook-powershell
-      - lefthook-shellcheck
-      - lychee
-      - markdownlint
-      - node-runtime
-      - psscriptanalyzer
-      - repository-text
-      - runner-policy
-      - shellcheck
       - typos
   melodic-software/.github:
     managed:
@@ -173,6 +142,22 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+  melodic-software/dotfiles:
+    managed:
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-powershell
+      - lefthook-shellcheck
+      - lychee
+      - markdownlint
+      - node-runtime
+      - psscriptanalyzer
+      - repository-text
+      - runner-policy
+      - typos
+    locally-owned:
+      - shellcheck
   melodic-software/github-iac:
     managed:
       - dotnet-analysis
@@ -190,3 +175,18 @@ targets:
       - architecture-decisions
       - node-runtime
       - runner-policy
+  melodic-software/provisioning:
+    managed:
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-powershell
+      - lefthook-shellcheck
+      - lychee
+      - markdownlint
+      - node-runtime
+      - psscriptanalyzer
+      - repository-text
+      - runner-policy
+      - shellcheck
+      - typos
