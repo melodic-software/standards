@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
+import { auditRepository, ConfigurationError, parseUniqueJson } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
@@ -26,6 +26,26 @@ const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
 const temporaryRoots = [];
+
+test("duplicate JSON object members fail closed with their policy or schema path", () => {
+  for (const [location, source] of [
+    ["central policy at /tmp/policy.json", '{"schemaVersion":1,"schemaVersion":1}'],
+    ["repository policy at /tmp/repository.json", '{"exceptions":{"job":{},"job":{}}}'],
+    ["policy schema at /tmp/policy.schema.json", '{"properties":{"a":{},"a":{}}}'],
+    [
+      "repository policy schema at /tmp/repository-policy.schema.json",
+      '{"$defs":{"exception":{"type":"object","type":"array"}}}',
+    ],
+  ]) {
+    assert.throws(
+      () => parseUniqueJson(source, location),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.includes(location) &&
+        error.message.includes("duplicate"),
+    );
+  }
+});
 const SELECTOR = `    uses: ${SELECTOR_REFERENCE}
     secrets:
       observer-private-key: \${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
@@ -902,7 +922,7 @@ test("malformed repository ownership evidence fails closed", async () => {
     const root = await repository({ repositoryOwner });
     await assert.rejects(
       () => audit(root),
-      /repositoryOwner must be a lowercase GitHub repository owner/,
+      /repository config\.repositoryOwner must match pattern/,
     );
   }
   const root = await repository({ repositoryOwner: "melodic-software" });

@@ -23,6 +23,9 @@ components:
   gitleaks:
     files:
       .gitleaks.toml: .gitleaks.toml
+  go-analysis:
+    files:
+      .golangci.yml: .golangci.yml
   lefthook-base:
     requires:
       - editorconfig-checker
@@ -90,6 +93,8 @@ components:
       components/runner-policy/package-lock.json: .github/standards/runner-policy/package-lock.json
       components/runner-policy/package.json: .github/standards/runner-policy/package.json
       components/runner-policy/policy.json: .github/standards/runner-policy/policy.json
+      components/runner-policy/policy.schema.json: .github/standards/runner-policy/policy.schema.json
+      components/runner-policy/repository-policy.schema.json: .github/standards/runner-policy/repository-policy.schema.json
       components/runner-policy/runner-policy.mjs: .github/standards/runner-policy/runner-policy.mjs
   shellcheck:
     files:
@@ -111,6 +116,7 @@ targets:
     managed:
       - editorconfig-checker
       - gitleaks
+      - go-analysis
       - lychee
       - markdownlint
       - repository-text

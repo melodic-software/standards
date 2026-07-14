@@ -31,3 +31,8 @@ bash harness/shell/run-tests.sh path/to/a.test.sh
 `run-tests.sh` discovers every `*.test.sh` in the repo, runs each, and reports a per-file status plus a summary. A file passes when it exits 0; a file that exits 0 with a `SKIP:` marker and no `PASS:` lines counts as skipped.
 
 `lib.sh` provides the full assertion set — equality, containment, exit code, file presence, line and row counts, command-failure, and `skip_suite`/`skip_case`. Its header documents each and the parameter-order convention.
+
+## Package lifecycle tests
+
+[`packages/README.md`](packages/README.md) documents the packed-payload and
+version-lifecycle harness used by publishable component packages.

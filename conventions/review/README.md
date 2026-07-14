@@ -24,11 +24,12 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [concurrency.md](concurrency.md) | shared state, cancellation, async hazards, deadlocks |
 | [performance.md](performance.md) | queries, allocation, caching, pagination, streaming |
 | [security.md](security.md) | secrets, injection, trust boundaries, supply chain |
+| [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
 | [ai-generated-code.md](ai-generated-code.md) | the empirical failure modes of AI-authored changes |
-| [overlays/dotnet.md](overlays/dotnet.md) · [overlays/python.md](overlays/python.md) · [overlays/typescript.md](overlays/typescript.md) | per-stack review bars |
+| [overlays/containers.md](overlays/containers.md) · [overlays/dotnet.md](overlays/dotnet.md) · [overlays/go.md](overlays/go.md) · [overlays/python.md](overlays/python.md) · [overlays/typescript.md](overlays/typescript.md) | per-stack review bars |
 
 ## Enforcement escalation
 

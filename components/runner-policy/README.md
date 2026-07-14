@@ -19,7 +19,15 @@ node components/runner-policy/runner-policy.mjs --root .
 ```
 
 The distributed component lives at `.github/standards/runner-policy/` and owns
-its own `package.json` and lockfile with the exact `yaml@2.9.0` runtime pin.
+its own `package.json` and lockfile with exact `ajv@8.20.0` and `yaml@2.9.0`
+runtime pins. `policy.schema.json` and `repository-policy.schema.json` are the
+Draft 2020-12 structural authorities. Ajv compiles them in strict mode; the
+runtime retains only cross-record semantics and workflow/path checks that JSON
+Schema cannot express.
+
+The security boundaries, fail-closed behavior, and required review triggers are
+documented in the component [threat model](THREAT-MODEL.md).
+
 Consumers install and invoke that dependency root directly, supplying their own
 `owner/repository` identity for local analysis:
 

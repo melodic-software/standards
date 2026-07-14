@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://standards.melodic.software/distribution/sync-manifest.schema.json",
+  "title": "Standards distribution sync manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "components", "targets"],
+  "properties": {
+    "version": { "const": 2 },
+    "components": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/componentName" },
+      "additionalProperties": { "$ref": "#/$defs/component" }
+    },
+    "targets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/targetName" },
+      "additionalProperties": { "$ref": "#/$defs/target" }
+    }
+  },
+  "$defs": {
+    "componentName": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "targetName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9._-]+$"
+    },
+    "nonWhitespaceString": {
+      "type": "string",
+      "allOf": [{ "pattern": "\\S" }, { "pattern": "^[^\\u0000-\\u001F\\u007F]*$" }]
+    },
+    "componentList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/componentName" }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files"],
+      "properties": {
+        "files": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/nonWhitespaceString" },
+          "additionalProperties": { "$ref": "#/$defs/nonWhitespaceString" }
+        },
+        "requires": { "$ref": "#/$defs/componentList" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["managed"],
+      "properties": {
+        "managed": { "$ref": "#/$defs/componentList" },
+        "locally-owned": { "$ref": "#/$defs/componentList" }
+      }
+    }
+  }
+}

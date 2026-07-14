@@ -9,6 +9,16 @@ deterministic interpreter. The reusable workflow in `ci-workflows` supplies
 GitHub authentication and opens one reviewed reconciliation pull request per
 target.
 
+The production Bash entrypoint uses Mike Farah `yq` v4 and requires no Node
+runtime. Standards authoring CI independently converts the YAML and checks the
+Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with pinned Node
+dependencies. The Bash path retains equivalent structural checks plus the
+repository path, Git-index, ownership, dependency-graph, target-identity, and
+apply safety checks that JSON Schema cannot express.
+
+The distribution [threat model](THREAT-MODEL.md) records trust boundaries,
+fail-closed guarantees, residual risks, and security review triggers.
+
 ## Ownership model
 
 Each component has one or more fixed source-to-destination mappings. All files
@@ -98,9 +108,11 @@ The `runner-policy` component materializes one atomic runtime at
 - `melodic-software/medley`
 - `melodic-software/provisioning`
 
-It includes `runner-policy.mjs`, `policy.json`, and the component-local npm
-manifest and lockfile. The component requires `node-runtime`, so `.node-version`
-is part of each target's managed materialization as well.
+It includes `runner-policy.mjs`, `policy.json`, both Draft 2020-12 policy schema
+files, and the component-local npm manifest and lockfile. The component requires
+`node-runtime`, so `.node-version` is part of each target's managed
+materialization as well. The runtime loads both schemas directly; omitting them
+would make the supposedly atomic payload fail on a clean consumer checkout.
 
 Repository-specific adoption remains a separate consumer change. Each target
 must add all of the following in the same integration PR:
@@ -135,6 +147,19 @@ The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
 each consumer. A materialization PR is not an adoption completion signal until
 its corresponding integration PR supplies this wiring and CI passes.
+
+## Go-analysis consumer handoff
+
+The `go-analysis` component materializes the root `.golangci.yml` in
+`melodic-software/ci-runner`. The file is exact managed policy: consumers do not
+change the enabled set, suppression rules, or config version downstream.
+
+Analyzer execution remains a separate native workflow adoption. The consumer
+calls the merged `ci-workflows` Go quality workflow by a full commit SHA, passes
+the exact `.golangci.yml` path, runs native Linux and Windows analysis, and
+includes its stable local gateway job in required `ci-status`. The workflow
+owns golangci-lint v2.12.2 and govulncheck v1.6.0 installation and integrity
+checks; this materialization component owns only analyzer policy bytes.
 
 The `lefthook-dotnet` component has a similar explicit consumer value. A target
 that selects it receives `.lefthook/dotnet.yml` and
