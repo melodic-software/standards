@@ -27,8 +27,8 @@ The accepted architecture is recorded in
 - root tool configs — canonical files for tools that require or naturally
   discover a repository-root path. They exist exactly once; the corresponding
   component slice documents and tests them.
-- `conventions/` — reasoning-only engineering and review standards that cannot
-  be reduced honestly to deterministic tooling.
+- `conventions/` — reasoning-only engineering, review, and process standards
+  that cannot be reduced honestly to deterministic tooling.
 - `distribution/` — explicit mappings for exact-file synchronization when no
   native reference mechanism fits.
 - `harness/` — shared infrastructure for component contract tests.

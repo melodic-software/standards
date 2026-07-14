@@ -1,11 +1,12 @@
 # conventions
 
-Prose standards that tooling cannot enforce — the reasoning-only tier of this catalog. Where `components/` owns executable policy and its contract tests, `conventions/` holds judgments a human or agent makes: engineering conventions and code-review criteria. The split between the two is itself a convention — see [engineering/enforceability-tiers.md](engineering/enforceability-tiers.md).
+Prose standards that tooling cannot enforce — the reasoning-only tier of this catalog. Where `components/` owns executable policy and its contract tests, `conventions/` holds judgments a human or agent makes: engineering conventions, code-review criteria, and operational process standards. The split between the two is itself a convention — see [engineering/enforceability-tiers.md](engineering/enforceability-tiers.md).
 
-Two concerns live here:
+Three concerns live here:
 
 - **[engineering/](engineering/)** — the standards a contributor follows while writing: philosophy, architecture and design, domain modeling, naming, simplicity, code organization, and the source-of-truth disciplines.
 - **[review/](review/)** — the criteria a reviewer applies to a change: code quality, architecture, error handling, concurrency, performance, security, cross-platform, observability, testing, AI-generated code, and thin per-stack overlays.
+- **[process/](process/)** — the operational standards for how work is tracked and moved: the issue-tracker usage, naming, and governance playbook.
 
 ## How this is consumed
 
