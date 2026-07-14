@@ -302,11 +302,12 @@ can access `github.token` implicitly, so full-SHA action policy and least token
 permissions remain the actual boundary; banning only one equivalent spelling
 would add no isolation.
 
-The policy also forbids `ubuntu-latest`, direct `self-hosted` use, managed scale
-set labels, unknown literal labels, and arbitrary expression/variable
-indirection. Hosted targets must come from the policy's explicit label
-allowlist. A policy exception permits hosted execution; it does not suppress
-the runner-target, selector-contract, or image-version rules.
+The policy also forbids `ubuntu-latest`, direct `self-hosted` use, owner-prefixed
+managed scale-set labels (including tiered and canary forms), unknown literal
+labels, and arbitrary expression/variable indirection. Hosted targets must come
+from the policy's explicit label allowlist. A policy exception permits hosted
+execution; it does not suppress the runner-target, selector-contract, or
+image-version rules.
 
 The contract follows GitHub's documentation for [choosing runners for jobs][1],
 [reusing workflows and passing secrets explicitly][2], [secure use of
