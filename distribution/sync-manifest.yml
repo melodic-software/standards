@@ -87,22 +87,6 @@ components:
       _typos.toml: _typos.toml
 
 targets:
-  kyle-sexton/.github:
-    managed:
-      - markdownlint
-      - repository-text
-  kyle-sexton/github-iac:
-    managed:
-      - dotnet-analysis
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
-      - lefthook-dotnet
-      - markdownlint
-      - node-runtime
-      - repository-text
-      - runner-policy
-      - typos
   melodic-software/.github:
     managed:
       - editorconfig-checker
