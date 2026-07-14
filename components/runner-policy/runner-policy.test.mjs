@@ -139,6 +139,7 @@ for (const managedLabel of [
   "melodic-build-ubuntu-24.04-x64",
   "melodic-canary-ubuntu-24.04-x64",
   "kyle-ubuntu-24.04-x64",
+  "kyle-build-ubuntu-24.04-x64",
 ]) {
   test(`managed runner namespace ${managedLabel} requires selector output`, async () => {
     const root = await repository({
