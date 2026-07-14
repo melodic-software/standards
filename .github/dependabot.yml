@@ -25,6 +25,14 @@ updates:
       github-actions:
         patterns:
           - "*"
+    # The runner-policy allowlist pins ci-workflows reusable-workflow refs to
+    # independently reviewed SHAs, so a Dependabot bump to an unreviewed main
+    # commit can only fail the Runner policy lane. Those pins move through
+    # deliberate reviewed PRs after a standards allowlist update; composite
+    # actions (melodic-software/ci-workflows/.github/actions/*) are not
+    # SHA-allowlisted and stay Dependabot-managed.
+    ignore:
+      - dependency-name: "melodic-software/ci-workflows/.github/workflows/*"
   # Keep the npm dev-dependencies current — the markdownlint-cli2 and YAML
   # parser pins, plus the lefthook pin that the local git hooks run on.
   - package-ecosystem: npm
