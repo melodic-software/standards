@@ -13,6 +13,7 @@ const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
+const SECURITY_HARDENING_SHA = "8adffb3228dd7a583ba07c582f70f74aa9252e76";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -800,6 +801,7 @@ test("production selector allowlist contains only independently reviewed commits
     "melodic-software": [
       `${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -814,7 +816,7 @@ test("production selector allowlist contains only independently reviewed commits
     );
     assert.deepEqual(await audit(root), []);
   }
-  for (const sha of [LOCAL_SELECTOR_SHA, LIVENESS_SELECTOR_SHA]) {
+  for (const sha of [LOCAL_SELECTOR_SHA, LIVENESS_SELECTOR_SHA, SECURITY_HARDENING_SHA]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
       workflows: {
@@ -1024,6 +1026,28 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
   );
   assert.deepEqual(
     contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner", "paths"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[
+      `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${SECURITY_HARDENING_SHA}`
+    ],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[
+      `melodic-software/ci-workflows/.github/workflows/zizmor.yml@${SECURITY_HARDENING_SHA}`
+    ],
     {
       routing: "runner-input",
       runnerInput: "runner",
