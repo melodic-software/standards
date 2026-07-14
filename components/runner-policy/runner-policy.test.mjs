@@ -2460,6 +2460,24 @@ test("exception inventory drift fails", async () => {
   );
 });
 
+test("hosted-only repository rejects exception inventory", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    exceptions: {
+      ".github/workflows/ci.yml#test": {
+        reason: "hosted-control-plane",
+        justification: "This fixed hosted job does not route to the local fleet.",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["exception-inventory-drift"],
+  );
+});
+
 test("managed label is forbidden even when listed in a matrix", async () => {
   const root = await repository({
     workflows: {

@@ -52,9 +52,13 @@ runner-policy:
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
-Its `.github/runner-policy.json` entry therefore declares that job with a
-`hosted-control-plane` exception. Set `CI_REPOSITORY_VISIBILITY` from the event
-as shown so checked-in inventory cannot claim that a public repository is
+In a private repository with `selfHostedCi: true`, its
+`.github/runner-policy.json` entry declares that fixed hosted job with a
+`hosted-control-plane` exception. A hosted-only repository sets
+`selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
+fixed approved hosted targets need no exception, and any unconsumed exception
+fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
+event as shown so checked-in inventory cannot claim that a public repository is
 private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
 variable independently of the checked-out repository, so owner-scoped selector
 approval remains available without another workflow-controlled input.
