@@ -31,10 +31,12 @@ gh_token="${gh_prefix}1A2b3C4d5E6f7G8h9I0jK1l2M3n4O5p6Q7r8"
 
 # A bare token is flagged.
 printf 'GITHUB_TOKEN=%s\n' "$gh_token" >"$tmp/bad/leak.env"
-out="$(gitleaks dir "$tmp/bad" --config "$config" --no-banner -i "$tmp/bad" 2>&1)"
+out="$(gitleaks dir "$tmp/bad" --config "$config" --no-banner --redact \
+  -i "$tmp/bad" 2>&1)"
 rc=$?
 assert_exit 'constructed secret is flagged (exit 1)' 1 "$rc"
 assert_contains 'reports leaks' "$out" 'leaks found'
+assert_not_contains 'detected value is redacted' "$out" "$gh_token"
 
 # The same token silenced with the native gitleaks:allow pragma is ignored.
 printf 'EXAMPLE_TOKEN=%s # gitleaks:allow\n' "$gh_token" >"$tmp/allow/ok.env"
