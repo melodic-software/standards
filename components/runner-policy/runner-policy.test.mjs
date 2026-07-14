@@ -13,7 +13,7 @@ const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
-const SECURITY_HARDENING_SHA = "8adffb3228dd7a583ba07c582f70f74aa9252e76";
+const SECURITY_HARDENING_SHA = "b65fb57945f9cab0a50909b7113ca8e59496e4fb";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -656,11 +656,16 @@ test("GitHub token aliases, case variants, and transformed expressions fail clos
   const variants = [
     `\${{ secrets.github_token }}`,
     `\${{ secrets['GITHUB_TOKEN'] }}`,
+    `\${{ secrets [ 'PACKAGES_TOKEN' ] }}`,
     `\${{ format('{0}', secrets.GITHUB_TOKEN) }}`,
+    `\${{ format('}}', secrets.PACKAGES_TOKEN) }}`,
     `\${{ github['token'] }}`,
+    `\${{ github [ "token" ] }}`,
     `\${{ github.Token }}`,
     `\${{ secrets.GITHUB_TOKEN || 'fallback' }}`,
     `\${{ secrets.PACKAGES_TOKEN }}`,
+    `prefix \${{ vars.FLAG }} suffix \${{ secrets.PACKAGES_TOKEN }}`,
+    `\${{ secrets.PACKAGES_TOKEN`,
   ];
   for (const expression of variants) {
     const root = await repository({
@@ -685,6 +690,57 @@ ${SELECTOR}  test:
       `credential variant must remain hosted: ${expression}`,
     );
   }
+});
+
+test("non-credential expression lookalikes remain eligible for the local fleet", async () => {
+  const variants = [
+    "secrets.PACKAGES_TOKEN",
+    `\${{ mysecrets.PACKAGES_TOKEN }}`,
+    `\${{ secretsValue }}`,
+    `\${{ github.tokens }}`,
+    `\${{ github['tokens'] }}`,
+    `\${{ vars.CREDENTIAL }}`,
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          BENIGN: ${expression}
+`,
+      },
+    });
+    assert.deepEqual(await audit(root), [], `benign lookalike must pass: ${expression}`);
+  }
+});
+
+test("long repeated expression prefixes without credentials remain eligible", async () => {
+  const repeatedPrefix = "${{".repeat(20_000);
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          BENIGN: "${repeatedPrefix} github.tokens }}"
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
 });
 
 test("GitHub-provided tokens are rejected outside narrow step env/with values", async () => {

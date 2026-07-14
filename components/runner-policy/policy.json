@@ -10,7 +10,7 @@
     "melodic-software": [
       "melodic-software/ci-workflows/.github/workflows/select-runner.yml@de50a08b6093d231519ee7a4c9371db76c0a7e1e",
       "melodic-software/ci-workflows/.github/workflows/select-runner.yml@3415de3ff2fafee40e4d087eb6073d2f6952b595",
-      "melodic-software/ci-workflows/.github/workflows/select-runner.yml@8adffb3228dd7a583ba07c582f70f74aa9252e76"
+      "melodic-software/ci-workflows/.github/workflows/select-runner.yml@b65fb57945f9cab0a50909b7113ca8e59496e4fb"
     ]
   },
   "approvedReusableWorkflowContracts": {
@@ -127,13 +127,13 @@
       "allowedInputs": ["runner", "paths"],
       "allowedSecrets": {}
     },
-    "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@8adffb3228dd7a583ba07c582f70f74aa9252e76": {
+    "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@b65fb57945f9cab0a50909b7113ca8e59496e4fb": {
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner"],
       "allowedSecrets": {}
     },
-    "melodic-software/ci-workflows/.github/workflows/zizmor.yml@8adffb3228dd7a583ba07c582f70f74aa9252e76": {
+    "melodic-software/ci-workflows/.github/workflows/zizmor.yml@b65fb57945f9cab0a50909b7113ca8e59496e4fb": {
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner", "paths"],

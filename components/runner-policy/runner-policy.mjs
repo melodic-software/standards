@@ -1425,12 +1425,113 @@ function permissionHostedRequirement(workflow, job, { requireExplicitReadOnly = 
   };
 }
 
-function containsCredentialExpression(value) {
-  return stringsIn(value).some((item) =>
-    /\$\{\{[\s\S]*?\b(?:secrets\s*(?:\.|\[)|github\s*(?:\.\s*token\b|\[\s*["']token["']\s*\]))/i.test(
-      item,
-    ),
+function isExpressionWordCharacter(codeUnit) {
+  return (
+    (codeUnit >= 48 && codeUnit <= 57) ||
+    (codeUnit >= 65 && codeUnit <= 90) ||
+    codeUnit === 95 ||
+    (codeUnit >= 97 && codeUnit <= 122)
   );
+}
+
+function skipExpressionWhitespace(value, cursor, end) {
+  while (cursor < end && value[cursor].trim() === "") {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function findExpressionEnd(value, cursor) {
+  let quote;
+  while (cursor < value.length) {
+    const character = value[cursor];
+    if (quote !== undefined) {
+      if (character === quote) {
+        if (value[cursor + 1] === quote) {
+          cursor += 2;
+          continue;
+        }
+        quote = undefined;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      cursor += 1;
+      continue;
+    }
+    if (character === "}" && value[cursor + 1] === "}") {
+      return cursor;
+    }
+    cursor += 1;
+  }
+  return value.length;
+}
+
+function expressionContainsCredentialReference(value, cursor, end) {
+  while (cursor < end) {
+    const previousIsWord = cursor > 0 && isExpressionWordCharacter(value.charCodeAt(cursor - 1));
+    if (!previousIsWord && value.startsWith("secrets", cursor)) {
+      const property = skipExpressionWhitespace(value, cursor + "secrets".length, end);
+      if (property < end && (value[property] === "." || value[property] === "[")) {
+        return true;
+      }
+    }
+    if (!previousIsWord && value.startsWith("github", cursor)) {
+      let property = skipExpressionWhitespace(value, cursor + "github".length, end);
+      if (property < end && value[property] === ".") {
+        property = skipExpressionWhitespace(value, property + 1, end);
+        const tokenEnd = property + "token".length;
+        if (
+          tokenEnd <= end &&
+          value.startsWith("token", property) &&
+          (tokenEnd === end || !isExpressionWordCharacter(value.charCodeAt(tokenEnd)))
+        ) {
+          return true;
+        }
+      } else if (property < end && value[property] === "[") {
+        property = skipExpressionWhitespace(value, property + 1, end);
+        const quote = value[property];
+        if (quote === "'" || quote === '"') {
+          const tokenEnd = property + 1 + "token".length;
+          if (value.startsWith("token", property + 1) && value[tokenEnd] === quote) {
+            property = skipExpressionWhitespace(value, tokenEnd + 1, end);
+            if (property < end && value[property] === "]") {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    cursor += 1;
+  }
+  return false;
+}
+
+function stringContainsCredentialExpression(value) {
+  const normalized = value.toLowerCase();
+  let cursor = 0;
+  while (cursor < normalized.length) {
+    const start = normalized.indexOf("${{", cursor);
+    if (start === -1) {
+      return false;
+    }
+    const expressionStart = start + "${{".length;
+    const expressionEnd = findExpressionEnd(normalized, expressionStart);
+    if (expressionContainsCredentialReference(normalized, expressionStart, expressionEnd)) {
+      return true;
+    }
+    if (expressionEnd === normalized.length) {
+      return false;
+    }
+    cursor = expressionEnd + "}}".length;
+  }
+  return false;
+}
+
+function containsCredentialExpression(value) {
+  return stringsIn(value).some(stringContainsCredentialExpression);
 }
 
 function hasStaticallyReadOnlyPermissions(workflow, job) {
