@@ -318,7 +318,7 @@ actual_runner_policy_targets="$(
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'runner-policy covers exactly the six enrolled private consumers' \
+assert_eq 'runner-policy covers exactly the five enrolled private consumers' \
   "$expected_runner_policy_targets" "$actual_runner_policy_targets"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(
