@@ -106,15 +106,19 @@ Repository-specific adoption remains a separate consumer change. Each target
 must add all of the following in the same integration PR:
 
 1. A locally owned `.github/runner-policy.json` with correct visibility,
-   enrollment, and exact job exceptions.
+   enrollment, and exact job exceptions. A hosted-only consumer uses
+   `selfHostedCi: false` and `exceptions: {}`; because selector routing is
+   disabled, fixed approved hosted targets need no exception and the analyzer
+   rejects every unconsumed entry as `exception-inventory-drift`.
 2. A fixed `ubuntu-24.04` hosted CI job that runs
    `npm ci --prefix .github/standards/runner-policy`, then invokes
    `node .github/standards/runner-policy/runner-policy.mjs --root .` with
-   `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. Its
-   exception reason is `hosted-control-plane`. The analyzer consumes GitHub's
-   default `GITHUB_REPOSITORY` environment variable as trusted owner evidence;
-   `.github/runner-policy.json#repositoryOwner` is only inventory and a mismatch
-   tripwire.
+   `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. In a
+   private consumer with `selfHostedCi: true`, this fixed hosted job uses the
+   `hosted-control-plane` exception; a hosted-only consumer does not. The
+   analyzer consumes GitHub's default `GITHUB_REPOSITORY` environment variable
+   as trusted owner evidence; `.github/runner-policy.json#repositoryOwner` is
+   only inventory and a mismatch tripwire.
 3. An npm Dependabot entry with
    `directory: /.github/standards/runner-policy` for the distributed lockfile.
 4. Workflow routing and exception inventory that pass the gate at the reviewed

@@ -318,7 +318,7 @@ actual_runner_policy_targets="$(
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'runner-policy covers exactly the six enrolled private consumers' \
+assert_eq 'runner-policy covers exactly the five enrolled private consumers' \
   "$expected_runner_policy_targets" "$actual_runner_policy_targets"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(
@@ -350,6 +350,26 @@ for mapping in \
   destination_path="${mapping#*=}"
   assert_eq "lefthook-powershell mapping is exact: $source_path" "$destination_path" \
     "$(SOURCE_PATH="$source_path" yq -r '.components.lefthook-powershell.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
+done
+
+assert_eq 'Ruff materializes at its root-canonical discovery path' \
+  'ruff.toml' \
+  "$(yq -r '.components.ruff.files."ruff.toml"' "$actual_manifest")"
+assert_eq 'Lefthook Python materializes as a composable fragment' \
+  '.lefthook/python.yml' \
+  "$(yq -r '.components.lefthook-python.files."components/lefthook-python/lefthook.yml"' "$actual_manifest")"
+assert_eq 'Lefthook Python carries its complete direct dependencies' \
+  'lefthook-base,ruff' \
+  "$(yq -r '.components.lefthook-python.requires | join(",")' "$actual_manifest")"
+assert_eq 'Pyright materializes as an inheritable base below the consumer root' \
+  '.github/standards/pyright/pyrightconfig.json' \
+  "$(yq -r '.components.pyright.files."components/pyright/pyrightconfig.json"' "$actual_manifest")"
+
+for component in ruff lefthook-python pyright; do
+  assert_eq "dotfiles enrolls the managed Python component exactly once: $component" '1' \
+    "$(COMPONENT="$component" yq -r \
+      '[.targets."melodic-software/dotfiles".managed[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
 done
 
 [[ $FAILED -eq 0 ]] || exit 1

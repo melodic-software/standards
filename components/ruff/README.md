@@ -8,7 +8,11 @@ tests.
 Ruff owns lint, formatting, imports, modernization, security heuristics, and
 unused-symbol findings. Pyright separately owns type correctness. The shared
 policy omits `target-version`, allowing each repository's Python floor to drive
-syntax modernization.
+syntax modernization. A consumer must declare that floor in the root
+`pyproject.toml` `project.requires-python` field; Ruff's
+[version inference](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)
+then selects the minimum supported version. Without that declaration, Ruff's
+documented fallback applies instead of repository policy.
 
 Managed consumers do not edit `ruff.toml`. A nested Python project may use
 Ruff's native `extend` plus `extend-select` and

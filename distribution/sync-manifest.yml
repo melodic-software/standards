@@ -49,6 +49,12 @@ components:
       components/lefthook-powershell/lefthook.yml: .lefthook/powershell.yml
       components/lefthook-powershell/psscriptanalyzer-staged.ps1: .lefthook/psscriptanalyzer-staged.ps1
       components/lefthook-powershell/psscriptanalyzer-target.ps1: .lefthook/psscriptanalyzer-target.ps1
+  lefthook-python:
+    requires:
+      - lefthook-base
+      - ruff
+    files:
+      components/lefthook-python/lefthook.yml: .lefthook/python.yml
   lefthook-shellcheck:
     requires:
       - lefthook-base
@@ -67,10 +73,16 @@ components:
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
+  pyright:
+    files:
+      components/pyright/pyrightconfig.json: .github/standards/pyright/pyrightconfig.json
   repository-text:
     files:
       .editorconfig: .editorconfig
       .gitattributes: .gitattributes
+  ruff:
+    files:
+      ruff.toml: ruff.toml
   runner-policy:
     requires:
       - node-runtime
@@ -132,12 +144,15 @@ targets:
       - gitleaks
       - lefthook-base
       - lefthook-powershell
+      - lefthook-python
       - lefthook-shellcheck
       - lychee
       - markdownlint
       - node-runtime
       - psscriptanalyzer
+      - pyright
       - repository-text
+      - ruff
       - runner-policy
       - typos
     locally-owned:
