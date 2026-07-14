@@ -97,7 +97,6 @@ The `runner-policy` component materializes one atomic runtime at
 - `melodic-software/github-iac`
 - `melodic-software/medley`
 - `melodic-software/provisioning`
-- `kyle-sexton/github-iac`
 
 It includes `runner-policy.mjs`, `policy.json`, and the component-local npm
 manifest and lockfile. The component requires `node-runtime`, so `.node-version`
