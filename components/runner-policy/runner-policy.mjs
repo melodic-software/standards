@@ -1049,6 +1049,28 @@ function securitySurfaceDiffField(basis, candidate) {
   return undefined;
 }
 
+function reviewedContractSurface(contract) {
+  return normalizeStructuralValue({
+    routing: contract.routing,
+    ...(contract.runnerInput ? { runnerInput: contract.runnerInput } : {}),
+    ...(contract.selectorResultInput ? { selectorResultInput: contract.selectorResultInput } : {}),
+    allowedInputs: [...contract.allowedInputs].sort((left, right) => left.localeCompare(right)),
+    allowedSecrets: contract.allowedSecrets,
+    ...(contract.fixedRunsOn
+      ? {
+          fixedRunsOn: [...contract.fixedRunsOn].sort((left, right) => left.localeCompare(right)),
+        }
+      : {}),
+  });
+}
+
+function differingReviewedContractFields(surfaces) {
+  const fields = new Set(surfaces.flatMap((surface) => Object.keys(surface)));
+  return [...fields]
+    .filter((field) => new Set(surfaces.map((surface) => JSON.stringify(surface[field]))).size > 1)
+    .sort((left, right) => left.localeCompare(right));
+}
+
 async function fetchReusableWorkflowSource(workflowPath, revision, fetchImpl) {
   const [owner, repo, , , file] = workflowPath.split("/", 5);
   const url = `${RAW_GITHUB_CONTENT_BASE}/${owner}/${repo}/${revision}/.github/workflows/${file}`;
@@ -1074,9 +1096,12 @@ async function fetchReusableWorkflowSource(workflowPath, revision, fetchImpl) {
 // different SHA (i.e. the source is already trusted), and (b) fetching both
 // the previously approved SHA and the new SHA from the source repository and
 // structurally diffing workflow_call presence and validity, permissions,
-// workflow_call inputs/secrets, and job routing shows no change. Any fetch
-// failure, parse failure, or surface diff fails closed and is surfaced back to
-// the operator via diagnostics.
+// workflow_call inputs/secrets, and job routing shows no change. If multiple
+// reviewed revisions match that fetched surface, their effective reviewed
+// contracts must also agree; contract ambiguity fails closed rather than
+// letting policy insertion order select the inherited authority. Any fetch
+// Candidate fetch/parse failures, lack of a usable match, surface diffs, and
+// contract disagreement are surfaced back to the operator via diagnostics.
 async function resolveAutoApprovedContracts({
   policy,
   workflowIndex,
@@ -1146,9 +1171,11 @@ async function resolveAutoApprovedContracts({
       continue;
     }
 
-    let matchedBasis;
-    let declineReason;
-    for (const basis of bases) {
+    const matchingBases = [];
+    const declineReasons = [];
+    for (const basis of [...bases].sort((left, right) =>
+      left.revision.localeCompare(right.revision),
+    )) {
       let basisWorkflow;
       try {
         const basisSource = await fetchReusableWorkflowSource(
@@ -1158,7 +1185,7 @@ async function resolveAutoApprovedContracts({
         );
         basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
       } catch (error) {
-        declineReason = error.message;
+        declineReasons.push(error.message);
         continue;
       }
       const diffField = securitySurfaceDiffField(
@@ -1166,19 +1193,36 @@ async function resolveAutoApprovedContracts({
         candidateSurface,
       );
       if (!diffField) {
-        matchedBasis = basis;
-        break;
+        matchingBases.push(basis);
+        continue;
       }
-      declineReason = `${diffField} changed since the previously reviewed ${parsed.workflow}@${basis.revision}`;
+      declineReasons.push(
+        `${diffField} changed since the previously reviewed ${parsed.workflow}@${basis.revision}`,
+      );
     }
 
-    if (!matchedBasis) {
+    if (matchingBases.length === 0) {
       diagnostics.set(
         reference,
-        declineReason ?? `no previously approved revision of ${parsed.workflow} could be diffed`,
+        declineReasons[0] ??
+          `no previously approved revision of ${parsed.workflow} could be diffed`,
       );
       continue;
     }
+
+    const contractSurfaces = matchingBases.map(({ contract }) => reviewedContractSurface(contract));
+    const contractDiffFields = differingReviewedContractFields(contractSurfaces);
+    if (contractDiffFields.length > 0) {
+      diagnostics.set(
+        reference,
+        `surface-matching reviewed revisions of ${parsed.workflow} disagree on effective reviewed contract terms (${contractDiffFields.join(
+          ", ",
+        )}): ${matchingBases.map(({ revision }) => revision).join(", ")}`,
+      );
+      continue;
+    }
+
+    const matchedBasis = matchingBases[0];
 
     approved.set(reference, {
       ...matchedBasis.contract,

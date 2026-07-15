@@ -27,6 +27,8 @@ const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
 const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
 const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
+const ALTERNATE_REVIEWED_SHA = "1123456789abcdef0123456789abcdef01234567";
+const ALTERNATE_REUSABLE_REFERENCE = `${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`;
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
@@ -1978,6 +1980,148 @@ test("Dependabot SHA bump with an identical security surface is auto-approved", 
     }),
   });
   assert.deepEqual(findings, []);
+});
+
+test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts independent of insertion order", async () => {
+  const runnerContract = ({
+    runnerInput = "runner",
+    allowedInputs = [runnerInput],
+    allowedSecrets = {},
+  } = {}) => ({
+    routing: "runner-input",
+    runnerInput,
+    allowedInputs,
+    allowedSecrets,
+  });
+  const hostedContract = (fixedRunsOn) => ({
+    routing: "hosted-only",
+    allowedInputs: [],
+    allowedSecrets: {},
+    fixedRunsOn,
+  });
+  const disagreements = [
+    [
+      "inputs",
+      runnerContract({ allowedInputs: ["runner", "extra"] }),
+      runnerContract(),
+      "allowedInputs",
+    ],
+    [
+      "secrets",
+      runnerContract({
+        allowedSecrets: { token: `\${{ secrets.REUSABLE_TOKEN }}` },
+      }),
+      runnerContract(),
+      "allowedSecrets",
+    ],
+    [
+      "runner input",
+      runnerContract(),
+      runnerContract({ runnerInput: "executor" }),
+      "allowedInputs, runnerInput",
+    ],
+    [
+      "hosted routing",
+      hostedContract(["ubuntu-24.04"]),
+      hostedContract(["windows-2025"]),
+      "fixedRunsOn",
+    ],
+  ];
+
+  for (const [name, firstContract, secondContract, fields] of disagreements) {
+    let expectedDiagnostic;
+    for (const reverse of [false, true]) {
+      const entries = [
+        [REUSABLE_REFERENCE, firstContract],
+        [ALTERNATE_REUSABLE_REFERENCE, secondContract],
+      ];
+      if (reverse) {
+        entries.reverse();
+      }
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: Object.fromEntries(entries),
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+        },
+      });
+      const findings = await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        }),
+      });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
+      const diagnostic = contractFinding.message.match(/auto-approval declined: (.*)\)$/)?.[1];
+      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
+      assert.match(
+        diagnostic,
+        new RegExp(
+          `^surface-matching reviewed revisions of .* disagree on effective reviewed contract terms \\(${fields}\\): ${SHA}, ${ALTERNATE_REVIEWED_SHA}$`,
+        ),
+        `${name}, reverse=${reverse}`,
+      );
+      if (expectedDiagnostic === undefined) {
+        expectedDiagnostic = diagnostic;
+      } else {
+        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
+      }
+    }
+  }
+});
+
+test("Dependabot SHA bump accepts multiple surface-matching bases with one effective contract", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  for (const reverse of [false, true]) {
+    const entries = [
+      [REUSABLE_REFERENCE, contract],
+      [ALTERNATE_REUSABLE_REFERENCE, { ...contract }],
+    ];
+    if (reverse) {
+      entries.reverse();
+    }
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: Object.fromEntries(entries),
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    assert.deepEqual(
+      await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        }),
+      }),
+      [],
+      `reverse=${reverse}`,
+    );
+  }
 });
 
 test("Dependabot SHA bump that adds write permissions is declined with a specific diagnostic", async () => {
