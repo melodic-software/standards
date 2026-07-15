@@ -876,46 +876,50 @@ function reusableWorkflowStatus(job, policy) {
 
 const RAW_GITHUB_CONTENT_BASE = "https://raw.githubusercontent.com";
 
+function normalizeStructuralValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeStructuralValue);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([key, nested]) => [key, normalizeStructuralValue(nested)])
+        .sort(([left], [right]) => left.localeCompare(right)),
+    );
+  }
+  return value;
+}
+
 function normalizePermissionsSurface(permissions) {
   if (permissions === undefined) {
-    return {};
+    return { declaration: "omitted" };
   }
   if (permissions === "read-all" || permissions === "write-all") {
-    return { "*": permissions };
+    return { declaration: "all", value: permissions };
   }
   if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
-    return { "*": "invalid" };
+    return { declaration: "invalid", value: permissions };
   }
-  return Object.fromEntries(
-    Object.entries(permissions).sort(([left], [right]) => left.localeCompare(right)),
-  );
+  return {
+    declaration: "mapping",
+    value: normalizeStructuralValue(permissions),
+  };
 }
 
 function normalizeDeclarationSurface(declaration) {
   if (declaration === null || typeof declaration !== "object" || Array.isArray(declaration)) {
     return {};
   }
-  return Object.fromEntries(
-    Object.entries(declaration)
-      .map(([name, spec]) => [
-        name,
-        spec !== null && typeof spec === "object" && !Array.isArray(spec)
-          ? Object.fromEntries(
-              Object.entries(spec).sort(([left], [right]) => left.localeCompare(right)),
-            )
-          : spec,
-      ])
-      .sort(([left], [right]) => left.localeCompare(right)),
-  );
+  return normalizeStructuralValue(declaration);
 }
 
-// The security-relevant surface of a reusable workflow: the GITHUB_TOKEN
-// permissions it requests plus the workflow_call inputs/secrets contract it
-// exposes to callers. Dependabot SHA bumps are eligible for deterministic
-// auto-approval only when this surface is byte-for-byte identical between a
-// previously reviewed SHA and the new SHA; any other change (job logic,
-// steps, actions pinned inside the workflow, etc.) still requires a human to
-// add a new approvedReusableWorkflowContracts entry.
+// The security-relevant surface of a reusable workflow: whether it remains
+// callable, the GITHUB_TOKEN permissions it requests, the workflow_call
+// inputs/secrets contract it exposes to callers, and its job routing.
+// Dependabot SHA bumps are eligible for deterministic auto-approval only when
+// this surface is structurally identical between a previously reviewed SHA
+// and the new SHA. Changes outside this deliberately bounded surface do not
+// change the runner contract and can be auto-approved.
 //
 // The workflow-level permissions block is only the caller-visible default: a
 // job can declare its own permissions: block that grants more than that
@@ -942,13 +946,16 @@ function jobPermissionsSurface(workflow) {
 
 // The reusable contract this feature auto-approves is specifically a
 // routing contract (runner-input or hosted-only), so the candidate's actual
-// runner target is part of its security surface: a bumped SHA that keeps the
-// same workflow_call inputs/secrets and permissions but flips jobs.*.runs-on
-// (e.g. from `${{ inputs.runner }}` to a hardcoded `self-hosted`) must not be
-// silently auto-approved. jobs.*.strategy is captured alongside runs-on
-// because a matrix-driven runs-on (e.g. `${{ matrix.os }}`) can change its
-// resolved runner target purely by the matrix values changing, without the
-// runs-on literal itself changing.
+// runner boundary is part of its security surface: a bumped SHA that keeps the
+// same workflow_call inputs/secrets and permissions but changes jobs.*.runs-on,
+// a matrix strategy, a nested reusable call, a container/service, or a
+// deployment environment must not be silently auto-approved.
+function declaredValueSurface(mapping, key) {
+  return Object.hasOwn(mapping, key)
+    ? { declared: true, value: normalizeStructuralValue(mapping[key]) }
+    : { declared: false };
+}
+
 function jobRoutingSurface(workflow) {
   const jobs =
     workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
@@ -959,22 +966,53 @@ function jobRoutingSurface(workflow) {
       .filter(([, job]) => job !== null && typeof job === "object" && !Array.isArray(job))
       .map(([jobId, job]) => [
         jobId,
-        { runsOn: job["runs-on"] ?? null, strategy: job.strategy ?? null },
+        {
+          runsOn: declaredValueSurface(job, "runs-on"),
+          strategy: declaredValueSurface(job, "strategy"),
+          reusableWorkflow: {
+            uses: declaredValueSurface(job, "uses"),
+            with: declaredValueSurface(job, "with"),
+            secrets: declaredValueSurface(job, "secrets"),
+          },
+          executionBoundary: {
+            container: declaredValueSurface(job, "container"),
+            services: declaredValueSurface(job, "services"),
+            environment: declaredValueSurface(job, "environment"),
+          },
+        },
       ])
       .sort(([left], [right]) => left.localeCompare(right)),
   );
 }
 
+function workflowCallSurface(workflow) {
+  const declaration = workflowCallDeclaration(workflow);
+  if (declaration === undefined) {
+    return { declared: false };
+  }
+
+  if (
+    workflow.on !== null &&
+    typeof workflow.on === "object" &&
+    !Array.isArray(workflow.on) &&
+    Object.hasOwn(workflow.on, "workflow_call")
+  ) {
+    const rawDeclaration = workflow.on.workflow_call;
+    if (
+      rawDeclaration !== null &&
+      (typeof rawDeclaration !== "object" || Array.isArray(rawDeclaration))
+    ) {
+      return { declared: true, valid: false };
+    }
+  }
+
+  return { declared: true, valid: true };
+}
+
 function reusableWorkflowSecuritySurface(workflow) {
-  const workflowCall =
-    workflow.on !== null && typeof workflow.on === "object" && !Array.isArray(workflow.on)
-      ? workflow.on.workflow_call
-      : undefined;
-  const declaration =
-    workflowCall !== null && typeof workflowCall === "object" && !Array.isArray(workflowCall)
-      ? workflowCall
-      : {};
+  const declaration = workflowCallDeclaration(workflow) ?? {};
   return {
+    workflowCall: workflowCallSurface(workflow),
     permissions: normalizePermissionsSurface(workflow.permissions),
     inputs: normalizeDeclarationSurface(declaration.inputs),
     secrets: normalizeDeclarationSurface(declaration.secrets),
@@ -984,7 +1022,14 @@ function reusableWorkflowSecuritySurface(workflow) {
 }
 
 function securitySurfaceDiffField(basis, candidate) {
-  for (const key of ["permissions", "inputs", "secrets", "jobPermissions", "routing"]) {
+  for (const key of [
+    "workflowCall",
+    "permissions",
+    "inputs",
+    "secrets",
+    "jobPermissions",
+    "routing",
+  ]) {
     if (JSON.stringify(basis[key]) !== JSON.stringify(candidate[key])) {
       return key;
     }
@@ -1016,9 +1061,10 @@ async function fetchReusableWorkflowSource(workflowPath, revision, fetchImpl) {
 // exact same workflow path already has at least one reviewed contract at a
 // different SHA (i.e. the source is already trusted), and (b) fetching both
 // the previously approved SHA and the new SHA from the source repository and
-// structurally diffing permissions/workflow_call.inputs/workflow_call.secrets
-// shows no change. Any fetch failure, parse failure, or surface diff fails
-// closed and is surfaced back to the operator via diagnostics.
+// structurally diffing workflow_call presence and validity, permissions,
+// workflow_call inputs/secrets, and job routing shows no change. Any fetch
+// failure, parse failure, or surface diff fails closed and is surfaced back to
+// the operator via diagnostics.
 async function resolveAutoApprovedContracts({
   policy,
   workflowIndex,

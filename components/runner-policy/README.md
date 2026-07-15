@@ -187,19 +187,29 @@ automatically rejected if the same workflow path already has a reviewed
 contract at a different SHA: this is the common Dependabot-bump case. Before
 the per-job checks run, the policy fetches both the previously reviewed
 revision and the candidate revision from the source repository and
-structurally diffs their security-relevant surface — `permissions`,
-`on.workflow_call.inputs`, and `on.workflow_call.secrets`. A byte-for-byte
-match on that surface auto-approves the candidate under the previously
-reviewed contract, stamped with `autoApproved: { basisSha, approvedAt }`
+structurally diffs their security-relevant surface — the presence and validity
+of `on.workflow_call`, workflow- and effective job-level `permissions`,
+`on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
+runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls)
+and execution boundaries (`container`, `services`, and `environment`). A
+structural match on that surface auto-approves the candidate under the
+previously reviewed contract,
+stamped with `autoApproved: { basisSha, approvedAt }`
 provenance; anything else (a fetch failure, a parse failure, or any change to
 that surface) fails closed exactly as an unreviewed reference does, with the
 declined reason folded into the diagnostic. This is a deterministic structural
 comparison, not a judgment call, and it grants no blanket trust to a source
-repository — every other file in the called workflow, and any change to the
-security surface itself, still requires a human to add a new contract entry.
+repository. Changes outside that bounded runner-contract surface may be
+auto-approved; any change to the surface itself requires a human to add a new
+contract entry.
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every
 SHA.
+
+The comparison preserves GitHub's documented distinctions: a reusable workflow
+must declare [`on.workflow_call`][12], and omitted `permissions` inherit the
+configured default while an explicit empty mapping disables all token
+permissions.[13]
 
 Repository-local calls use only the canonical
 `./.github/workflows/<file>.yml` form. The policy resolves the regular checked-in
@@ -432,3 +442,5 @@ default `GITHUB_TOKEN` permissions][7].
 [9]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow
 [10]: https://docs.github.com/en/actions/reference/runners/self-hosted-runners#routing-precedence-for-self-hosted-runners
 [11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
+[12]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow
+[13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions

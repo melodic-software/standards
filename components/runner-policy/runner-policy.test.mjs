@@ -260,6 +260,77 @@ jobs:
     steps: []
 `;
 
+const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions: {}
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    permissions: {}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
+on: push
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
+on:
+  workflow_call: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
 });
@@ -2001,6 +2072,184 @@ test("Dependabot SHA bump that flips a job's runs-on to self-hosted is declined 
   assert.match(
     contractFinding.message,
     new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+test("Dependabot SHA bump that changes a privileged execution boundary is declined", async () => {
+  const nestedSha = "0123456789abcdef0123456789abcdef01234567";
+  const candidates = [
+    [
+      "job container",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    container: node:24\n    steps: []",
+      ),
+    ],
+    [
+      "service container",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    services:\n      redis:\n        image: redis:8\n    steps: []",
+      ),
+    ],
+    [
+      "deployment environment",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    environment: production\n    steps: []",
+      ),
+    ],
+    [
+      "nested reusable workflow",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    runs-on: $" + "{{ inputs.runner }}\n    steps: []",
+        `    uses: example/reusable/.github/workflows/nested.yml@${nestedSha}`,
+      ),
+    ],
+  ];
+
+  for (const [name, candidateSource] of candidates) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: candidateSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, name);
+    assert.match(
+      contractFinding.message,
+      new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+      name,
+    );
+  }
+});
+
+test("Dependabot SHA bump from empty to omitted workflow permissions is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump from empty to omitted effective job permissions is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that removes workflow_call is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump with a malformed workflow_call declaration is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
+    ),
   );
 });
 
