@@ -21,11 +21,11 @@ chooses repository-history coverage must:
 - prove `git rev-parse --is-shallow-repository` returns `false`; and
 - invoke `gitleaks git --log-opts="--all"`.
 
-Git's `--all` revision set covers `HEAD` and every ref present in the local
-repository. A remote ref that the origin does not advertise or the checkout
-does not fetch into a local ref cannot be scanned, so the workflow's fetch
-refspec must cover every remote ref in the declared scope. A working-tree scan
-is not a substitute for repository-history coverage.
+Git's [`--all` revision set](https://git-scm.com/docs/git-rev-list#Documentation/git-rev-list.txt---all)
+covers `HEAD` and every ref under `refs/`. A remote ref that the origin does not
+advertise or the checkout does not fetch into a local ref cannot be scanned, so
+the workflow's fetch refspec must cover every remote ref in the declared scope.
+A working-tree scan is not a substitute for repository-history coverage.
 
 Keep Gitleaks as the single organization-default secret scanner. Upstream
 [describes it as feature complete](https://github.com/gitleaks/gitleaks),
