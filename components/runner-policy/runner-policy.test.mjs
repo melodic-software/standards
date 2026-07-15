@@ -2878,3 +2878,59 @@ test("duplicate YAML keys fail closed", async () => {
     ["workflow-parse"],
   );
 });
+
+const pinnedStepWorkflow = (comment) =>
+  "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps:\n" +
+  "      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" +
+  ` # ${comment}\n`;
+
+test("a pin comment claiming a different commit fails as provenance drift", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": pinnedStepWorkflow("99ac2f8 2026-07-11") },
+  });
+  const findings = (await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift");
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].message, /claims commit 99ac2f8/u);
+});
+
+test("a pin comment matching the pinned commit prefix passes", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": pinnedStepWorkflow("9c091bb 2026-07-11") },
+  });
+  assert.deepEqual(
+    (await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift"),
+    [],
+  );
+});
+
+test("version, prose, hex-word, and date comments are not SHA claims", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "a.yml": pinnedStepWorkflow("v7.0.0"),
+      "b.yml": pinnedStepWorkflow("reviewed canary contract"),
+      "c.yml": pinnedStepWorkflow("acceded to on 2026-07-11"),
+      "d.yml": pinnedStepWorkflow("20260711"),
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift"),
+    [],
+  );
+});
+
+test("a full-length mismatched SHA in the comment fails as provenance drift", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": pinnedStepWorkflow("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+    },
+  });
+  assert.equal((await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift").length, 1);
+});

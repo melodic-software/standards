@@ -271,6 +271,14 @@ those layers is not detected by any repository check and shows up as the
 selector routing hosted (adaptive policies) or refusing the label
 (`self-hosted-only`) while runner inventory looks healthy.
 
+The analyzer also reports `pin-provenance-drift`: when the trailing comment on
+a 40-character `uses:` pin contains a token that reads as a short commit SHA
+(mixed hex digits and letters, or a full 40-character SHA), it must be a
+prefix of the pinned commit. An automated or manual repin that leaves the old
+short SHA behind turns the comment into misinformation for the next reviewer;
+version tags, prose, dates, and hex-only English words are not treated as SHA
+claims. Update the provenance comment in the same change as the pin.
+
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:
 

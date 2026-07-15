@@ -1577,6 +1577,44 @@ function finding(rule, file, job, message) {
   return { rule, file, ...(job ? { job } : {}), message };
 }
 
+const PINNED_USES_WITH_COMMENT =
+  /^\s*(?:-\s+)?uses:\s*\S+@(?<sha>[0-9a-f]{40})\s+#\s*(?<comment>.*)$/u;
+const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/gu;
+
+// A hex run reads as a short-SHA claim only when it mixes digits and letters
+// (or is a full 40-character SHA): all-letter runs are ordinary English words
+// ("acceded") and all-digit runs are dates or counters, and flagging either
+// would fail closed on prose.
+function isShaClaim(token) {
+  return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/u.test(token));
+}
+
+function pinProvenanceFindings(source, file) {
+  const findings = [];
+  for (const [index, line] of source.split(/\r?\n/u).entries()) {
+    const pinned = line.match(PINNED_USES_WITH_COMMENT);
+    if (!pinned) {
+      continue;
+    }
+    const { comment, sha } = pinned.groups;
+    for (const token of comment.match(COMMENT_HEX_TOKENS) ?? []) {
+      if (isShaClaim(token) && !sha.startsWith(token)) {
+        findings.push(
+          finding(
+            "pin-provenance-drift",
+            file,
+            undefined,
+            `line ${index + 1}: pin comment claims commit ${token}, but the ` +
+              `reference pins ${sha.slice(0, 12)}; update the provenance ` +
+              "comment in the same change as the pin",
+          ),
+        );
+      }
+    }
+  }
+  return findings;
+}
+
 async function repositoryWorkflowIndex(root) {
   const directory = path.join(root, ".github", "workflows");
   let entries;
@@ -1605,14 +1643,17 @@ async function repositoryWorkflowIndex(root) {
     if (!entry.isFile()) {
       continue;
     }
+    let source;
     try {
+      source = await readFile(absoluteFile, "utf8");
       records.set(file, {
         file,
         absoluteFile,
-        workflow: parseWorkflow(await readFile(absoluteFile, "utf8"), file),
+        source,
+        workflow: parseWorkflow(source, file),
       });
     } catch (error) {
-      records.set(file, { file, absoluteFile, error: error.message });
+      records.set(file, { file, absoluteFile, source, error: error.message });
     }
   }
   return records;
@@ -1695,6 +1736,9 @@ export async function auditRepository({
 
   for (const record of workflowIndex.values()) {
     const { file, workflow } = record;
+    if (record.source) {
+      findings.push(...pinProvenanceFindings(record.source, file));
+    }
     if (!workflow) {
       findings.push(finding("workflow-parse", file, undefined, record.error));
       continue;
