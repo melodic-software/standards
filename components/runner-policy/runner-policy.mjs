@@ -1333,7 +1333,12 @@ function routeStatus(jobId, target, job, jobs, policy, reusableContract, localRu
   if (!condition.approved) {
     return { attempted: true, approved: false, reason: condition.reason };
   }
-  return { attempted: true, approved: true, selectorId };
+  return {
+    attempted: true,
+    approved: true,
+    selectorId,
+    mode: usesRequiredInput ? "required-no-default" : "optional-default",
+  };
 }
 
 function failClosedSelectorConditionStatus(job, selectorId, selectorResultInput) {
@@ -1571,7 +1576,7 @@ function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIn
     return {
       approved: unroutableFailure.approved,
       kind: unroutableFailure.approved ? "unroutable-failure" : "invalid",
-      route: { attempted: true },
+      route: { attempted: true, selectorId: unroutableFailure.selectorId },
       ...(unroutableFailure.reason ? { reason: unroutableFailure.reason } : {}),
     };
   }
@@ -2267,6 +2272,8 @@ export async function auditRepository({
       continue;
     }
 
+    const requiredNoDefaultCallers = new Map();
+    const approvedFailureSentinels = new Map();
     for (const [jobId, job] of Object.entries(workflow.jobs)) {
       if (job === null || typeof job !== "object" || Array.isArray(job)) {
         findings.push(finding("job-shape", file, jobId, "job must be a mapping"));
@@ -2285,6 +2292,21 @@ export async function auditRepository({
         target !== undefined && Object.hasOwn(target, "route") && target.route.attempted === true;
       const runnerStrings = rawRunnerStrings(job, !selector.isSelector);
       const routingEnabled = config.visibility === "private" && config.selfHostedCi;
+      if (
+        routingEnabled &&
+        target?.kind === "selector-output" &&
+        target.approved &&
+        target.route.mode === "required-no-default"
+      ) {
+        const callers = requiredNoDefaultCallers.get(target.route.selectorId) ?? [];
+        callers.push(jobId);
+        requiredNoDefaultCallers.set(target.route.selectorId, callers);
+      }
+      if (routingEnabled && target?.kind === "unroutable-failure" && target.approved) {
+        const sentinels = approvedFailureSentinels.get(target.route.selectorId) ?? [];
+        sentinels.push(jobId);
+        approvedFailureSentinels.set(target.route.selectorId, sentinels);
+      }
       const seedLocalPermissionFlow =
         !isWorkflowCallExclusive(workflow) || !localIncomingFiles.has(file);
       if (routingEnabled && localCall?.approved && seedLocalPermissionFlow) {
@@ -2455,6 +2477,23 @@ export async function auditRepository({
         );
       } else if (exception) {
         consumedExceptions.add(key);
+      }
+    }
+
+    for (const [selectorId, callerIds] of requiredNoDefaultCallers) {
+      const sentinelIds = approvedFailureSentinels.get(selectorId) ?? [];
+      if (sentinelIds.length === 1) {
+        continue;
+      }
+      for (const jobId of callerIds) {
+        findings.push(
+          finding(
+            "selector-failure-sentinel-required",
+            file,
+            jobId,
+            `required no-default local runner calls using ${selectorId} require exactly one approved ${policy.governedReusableRunnerInput.failureSentinel} rejection job for the same selector in this workflow; found ${sentinelIds.length}`,
+          ),
+        );
       }
     }
   }
