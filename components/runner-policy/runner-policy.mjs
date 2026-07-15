@@ -1434,6 +1434,12 @@ function isExpressionWordCharacter(codeUnit) {
   );
 }
 
+function isExpressionPropertyNameStart(codeUnit) {
+  return (
+    (codeUnit >= 65 && codeUnit <= 90) || codeUnit === 95 || (codeUnit >= 97 && codeUnit <= 122)
+  );
+}
+
 function skipExpressionWhitespace(value, cursor, end) {
   while (cursor < end && value[cursor].trim() === "") {
     cursor += 1;
@@ -1485,6 +1491,29 @@ function skipExpressionQuotedLiteral(value, cursor, end) {
   return end;
 }
 
+function staticExpressionIndex(value, cursor, end) {
+  cursor = skipExpressionWhitespace(value, cursor, end);
+  if (value[cursor] !== "'") {
+    return undefined;
+  }
+  cursor += 1;
+  let literal = "";
+  while (cursor < end) {
+    if (value[cursor] === "'") {
+      if (value[cursor + 1] === "'") {
+        literal += "'";
+        cursor += 2;
+        continue;
+      }
+      cursor = skipExpressionWhitespace(value, cursor + 1, end);
+      return value[cursor] === "]" ? literal : undefined;
+    }
+    literal += value[cursor];
+    cursor += 1;
+  }
+  return undefined;
+}
+
 function expressionContainsCredentialReference(value, cursor, end) {
   let previousSignificant;
   while (cursor < end) {
@@ -1525,25 +1554,23 @@ function expressionContainsCredentialReference(value, cursor, end) {
       let property = skipExpressionWhitespace(value, githubEnd, end);
       if (property < end && value[property] === ".") {
         property = skipExpressionWhitespace(value, property + 1, end);
-        const tokenEnd = property + "token".length;
-        if (
-          tokenEnd <= end &&
-          value.startsWith("token", property) &&
-          (tokenEnd === end || !isExpressionWordCharacter(value.charCodeAt(tokenEnd)))
+        const propertyStart = property;
+        if (!isExpressionPropertyNameStart(value.charCodeAt(property))) {
+          return true;
+        }
+        while (
+          property < end &&
+          (isExpressionWordCharacter(value.charCodeAt(property)) || value[property] === "-")
         ) {
+          property += 1;
+        }
+        if (property === propertyStart || value.slice(propertyStart, property) === "token") {
           return true;
         }
       } else if (property < end && value[property] === "[") {
-        property = skipExpressionWhitespace(value, property + 1, end);
-        const quote = value[property];
-        if (quote === "'" || quote === '"') {
-          const tokenEnd = property + 1 + "token".length;
-          if (value.startsWith("token", property + 1) && value[tokenEnd] === quote) {
-            property = skipExpressionWhitespace(value, tokenEnd + 1, end);
-            if (property < end && value[property] === "]") {
-              return true;
-            }
-          }
+        const index = staticExpressionIndex(value, property + 1, end);
+        if (index === undefined || index === "token") {
+          return true;
         }
       } else {
         return true;
@@ -1581,6 +1608,14 @@ function containsCredentialExpression(value) {
   return stringsIn(value).some(stringContainsCredentialExpression);
 }
 
+function conditionContainsCredentialReference(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.toLowerCase();
+  return expressionContainsCredentialReference(normalized, 0, normalized.length);
+}
+
 function hasStaticallyReadOnlyPermissions(workflow, job) {
   const permissions = effectivePermissions(workflow, job);
   if (permissions === "read-all") {
@@ -1596,7 +1631,10 @@ function localCredentialRequirement(workflow, job) {
   if (containsCredentialExpression(workflow.env)) {
     return "a credential expression in workflow-level env";
   }
-  const { steps, ...jobWithoutSteps } = job;
+  const { steps, if: jobCondition, ...jobWithoutSteps } = job;
+  if (conditionContainsCredentialReference(jobCondition)) {
+    return "a credential expression in a job condition";
+  }
   if (containsCredentialExpression(jobWithoutSteps)) {
     return "a credential expression outside a narrow step env/with value";
   }
@@ -1608,7 +1646,10 @@ function localCredentialRequirement(workflow, job) {
     if (step === null || typeof step !== "object" || Array.isArray(step)) {
       continue;
     }
-    const { env, with: inputs, ...stepWithoutCredentialMappings } = step;
+    const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
+    if (conditionContainsCredentialReference(stepCondition)) {
+      return "a credential expression in a step condition";
+    }
     if (containsCredentialExpression(stepWithoutCredentialMappings)) {
       return "a credential expression outside a narrow step env/with value";
     }

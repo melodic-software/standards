@@ -704,6 +704,13 @@ test("whole credential contexts and direct credential properties remain hosted",
     `\${{ format('{0}', github) }}`,
     `\${{ secrets.PACKAGES_TOKEN }}`,
     `\${{ format('{0}', github.token) }}`,
+    `\${{ github[format('{0}{1}', 'to', 'ken')] }}`,
+    `\${{ github[fromJSON('"token"')] }}`,
+    `\${{ github['to' + 'ken'] }}`,
+    `\${{ github[*] }}`,
+    `\${{ toJSON(github.*) }}`,
+    `\${{ github['repository' }}`,
+    `\${{ github["repository"] }}`,
     `prefix \${{ vars.FLAG }} suffix \${{ toJSON(secrets) }}`,
     `\${{ toJSON(secrets)`,
   ];
@@ -742,6 +749,7 @@ test("non-credential expression lookalikes remain eligible for the local fleet",
     `\${{ github['tokens'] }}`,
     `\${{ github.repository }}`,
     `\${{ github['repository'] }}`,
+    `\${{ github['repository-owner'] }}`,
     `\${{ github.secrets }}`,
     `\${{ github.token_type }}`,
     `\${{ github['token_type'] }}`,
@@ -794,6 +802,106 @@ ${SELECTOR}  test:
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("implicit job conditions keep credential contexts off the local fleet", async () => {
+  const variants = [
+    "github.token",
+    "github['token']",
+    "github[format('{0}{1}', 'to', 'ken')]",
+    `github[fromJSON('"token"')]`,
+    "github[*]",
+    "toJSON(github.*)",
+    "github",
+    "secrets",
+    "format('{0}', toJSON(secrets))",
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: ${expression} && !cancelled()
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps: []
+`,
+      },
+    });
+    const workloadFindings = (await audit(root)).filter(({ job }) => job === "test");
+    assert.ok(
+      workloadFindings.some(({ rule }) => rule === "privileged-hosted-only"),
+      `implicit job credential must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("implicit step conditions keep credential contexts off the local fleet", async () => {
+  const variants = [
+    "github.token",
+    "github['token']",
+    "github[format('{0}{1}', 'to', 'ken')]",
+    `github[fromJSON('"token"')]`,
+    "github[*]",
+    "toJSON(github.*)",
+    "github",
+    "secrets",
+    "format('{0}', toJSON(secrets))",
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - if: ${expression}
+        run: npm test
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "privileged-hosted-only"],
+      `implicit step credential must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("implicit conditions allow static noncredential GitHub fields and quoted text", async () => {
+  const conditions = [
+    "github.repository == 'owner/repo'",
+    "github['repository'] == 'owner/repo'",
+    "contains('github.token secrets', github.repository)",
+  ];
+  for (const condition of conditions) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: ${condition} && !cancelled()
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - if: ${condition}
+        run: npm test
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["selector-contract"],
+      `benign implicit condition must add no credential finding: ${condition}`,
+    );
+  }
 });
 
 test("GitHub-provided tokens are rejected outside narrow step env/with values", async () => {
