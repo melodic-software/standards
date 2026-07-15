@@ -238,6 +238,39 @@ removed after the six consumer migrations. The policy records each complete
 path@SHA, fixed runner label, caller-input allowlist, and exact secret map;
 changing any field requires another review.
 
+## Selector revision lockstep
+
+A selector or approved-contract revision is never a one-repository change.
+Shipping one requires every step below in order; skipping any of them is a
+known failure mode, not a shortcut:
+
+1. Land the reviewed change in `melodic-software/ci-workflows` and take the
+   **merged main commit SHA**. A PR-branch head becomes unreachable after a
+   squash merge; GitHub then refuses reusable-workflow resolution at that SHA,
+   the pin passes review and sync, and the break surfaces only as a
+   `startup_failure` on the first live dispatch.
+2. Append the new `path@SHA` to the correct allowlist scope in `policy.json`
+   (owner-scoped for strict-scheduling revisions, global otherwise), record
+   its review note above, and distribute through the normal component sync.
+3. Repin **every** consumer caller. Enumerate them with an org-wide code
+   search for the previous SHA rather than trusting a remembered list, and
+   remember that a single repository can fetch the pin in more than one
+   workflow (for example a CI lane and a conformance lane); a missed
+   pin-fetch step stays hidden while the PR ref keeps the old commit
+   reachable and fails only after merge.
+4. Remove superseded allowlist entries once every consumer has migrated, so
+   the allowlist keeps expressing only what production may run.
+
+A production fleet relabel is the same class of event plus its own sites: the
+selector's label constant and strict-policy `runs-on` (gated red by the
+`ci-workflows` fleet-label-agreement tests), the `CI_SELF_HOSTED_LABEL`
+organization variable in `github-iac`, and each host's scale-set labels in
+`provisioning`. Changing the selector constant mints a new selector revision,
+so a relabel always implies the full lockstep above; live-state drift between
+those layers is not detected by any repository check and shows up as the
+selector routing hosted (adaptive policies) or refusing the label
+(`self-hosted-only`) while runner inventory looks healthy.
+
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:
 
