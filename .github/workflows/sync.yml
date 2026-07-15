@@ -27,7 +27,9 @@ permissions:
 
 jobs:
   sync:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c # 99ac2f8 2026-07-11
+    # Real runs attest App access for the complete unfiltered manifest before
+    # mutation; `targets` limits reconciliation only, never attestation.
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@35f2684ac953794b854bac1959df00e74eeca1d9 # 35f2684 2026-07-15
     with:
       # Schedule and push run for real (inputs is empty on those events, so
       # `|| false` makes them real runs); manual dispatch keeps its dry-run

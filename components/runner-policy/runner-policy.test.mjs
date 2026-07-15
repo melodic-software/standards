@@ -15,6 +15,7 @@ const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
+const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -24,6 +25,7 @@ const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflo
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
+const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
@@ -246,7 +248,7 @@ ${SELECTOR}  test:
   const selectorFinding = findings.find(({ rule }) => rule === "selector-contract");
   assert.equal(
     selectorFinding.message,
-    "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-22.04'",
+    "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-22.04', or a raw selector output passed to a required no-default repository-local runner input",
   );
 });
 
@@ -1283,6 +1285,15 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     allowedSecrets: {},
     fixedRunsOn: ["ubuntu-24.04"],
   });
+  assert.deepEqual(contracts[STANDARDS_SYNC_REUSABLE_REFERENCE], {
+    routing: "hosted-only",
+    allowedInputs: ["dry-run", "targets"],
+    allowedSecrets: {
+      "app-client-id": `\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}`,
+      "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
+    },
+    fixedRunsOn: ["ubuntu-24.04"],
+  });
   assert.deepEqual(
     contracts[`melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${PRODUCTION_SHA}`],
     {
@@ -2087,6 +2098,277 @@ jobs:
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("required repository-local runner input accepts only a proven self-hosted selector output", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("required local runner input rejects weak routes and ambiguous declarations", async () => {
+  const caller = (condition) => `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: ${condition}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+`;
+  const called = (declaration) => `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+${declaration}
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+  const validCondition = `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}`;
+  for (const [label, condition, declaration] of [
+    ["weak condition", `\${{ !cancelled() }}`, "        required: true"],
+    [
+      "missing nonempty proof",
+      `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}`,
+      "        required: true",
+    ],
+    [
+      "required input with a default",
+      validCondition,
+      "        required: true\n        default: ubuntu-24.04",
+    ],
+    ["non-boolean required value", validCondition, '        required: "true"'],
+    ["optional input without its governed default", validCondition, "        required: false"],
+  ]) {
+    const root = await repository({
+      workflows: { "ci.yml": caller(condition), "build.yml": called(declaration) },
+    });
+    const findings = await audit(root);
+    assert.ok(findings.length > 0, `${label} must fail closed`);
+    assert.ok(
+      findings.some(
+        ({ message }) =>
+          message.includes("required no-default") ||
+          message.includes("required string with no default") ||
+          message.includes("required local runner inputs"),
+      ),
+      `${label} must report the runner-input contract`,
+    );
+  }
+});
+
+test("required repository-local runner input must be supplied by every caller", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    permissions: read-all
+    steps: []
+`,
+    },
+  });
+  assert.ok(
+    (await audit(root)).some(({ message }) => message.includes("omits required inputs: runner")),
+  );
+});
+
+function selectorFailureWorkflow({
+  needs = "choose",
+  condition = `\${{ !cancelled() && (needs.choose.result != 'success' || !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}`,
+  target = "ci-runner-selection-failed",
+  timeout = 1,
+  permissions = "{}",
+  extra = "",
+  run = 'echo "::error::A governed self-hosted route is required"\n          exit 1',
+} = {}) {
+  return `jobs:
+  choose:
+${SELECTOR}  reject-route:
+    needs: ${needs}
+    if: ${condition}
+    runs-on: ${target}
+    timeout-minutes: ${timeout}
+    permissions: ${permissions}
+${extra}    steps:
+      - name: Reject non-governed route
+        run: |
+          ${run}
+`;
+}
+
+test("reserved unroutable sentinel accepts only the exact selector rejection topology", async () => {
+  const root = await repository({ workflows: { "ci.yml": selectorFailureWorkflow() } });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("reserved unroutable sentinel rejects every widened execution surface", async () => {
+  for (const [label, overrides] of [
+    ["wrong literal", { target: "another-unmatched-label" }],
+    ["multiple needs", { needs: "[choose, choose]" }],
+    ["weak condition", { condition: `\${{ !cancelled() }}` }],
+    [
+      "selector-failure skip",
+      {
+        condition: `\${{ !cancelled() && needs.choose.result == 'success' && !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL) }}`,
+      },
+    ],
+    [
+      "noncomplementary condition",
+      {
+        condition: `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route != 'self-hosted' }}`,
+      },
+    ],
+    ["long timeout", { timeout: 2 }],
+    ["read permission", { permissions: "{ contents: read }" }],
+    ["environment", { extra: "    env:\n      VALUE: present\n" }],
+    ["action call", { extra: "    uses: owner/workflow/.github/workflows/a.yml@main\n" }],
+    ["secret mapping", { extra: "    secrets: inherit\n" }],
+    [
+      "extra command",
+      {
+        run: 'echo "::error::A governed self-hosted route is required"\n          echo unsafe\n          exit 1',
+      },
+    ],
+    ["nonfailing command", { run: 'echo "::error::A governed self-hosted route is required"' }],
+  ]) {
+    const root = await repository({
+      workflows: { "ci.yml": selectorFailureWorkflow(overrides) },
+    });
+    const findings = await audit(root);
+    assert.ok(findings.length > 0, `${label} must fail closed`);
+  }
+});
+
+test("sentinel requires an approved selector and private self-hosted enrollment", async () => {
+  const unapprovedSelector = await repository({
+    policyOverrides: { approvedSelectorReferences: [] },
+    workflows: { "ci.yml": selectorFailureWorkflow() },
+  });
+  assert.ok((await audit(unapprovedSelector)).length > 0);
+
+  const publicRepository = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": selectorFailureWorkflow() },
+  });
+  assert.ok(
+    (await audit(publicRepository)).some(({ rule }) => rule === "public-self-hosted-routing"),
+  );
+
+  const routingDisabled = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    workflows: { "ci.yml": selectorFailureWorkflow() },
+  });
+  assert.ok(
+    (await audit(routingDisabled)).some(({ rule }) => rule === "self-hosted-routing-disabled"),
+  );
+});
+
+test("sentinel cannot enter any hosted or managed runner label set", async () => {
+  for (const policyOverrides of [
+    {
+      approvedHostedRunnerLabels: [
+        ...BASE_POLICY.approvedHostedRunnerLabels,
+        BASE_POLICY.governedReusableRunnerInput.failureSentinel,
+      ],
+    },
+    {
+      forbiddenHostedRunnerLabels: [
+        ...BASE_POLICY.forbiddenHostedRunnerLabels,
+        BASE_POLICY.governedReusableRunnerInput.failureSentinel,
+      ],
+    },
+    {
+      managedLabelPatterns: [...BASE_POLICY.managedLabelPatterns, "^ci-runner-selection-failed$"],
+    },
+  ]) {
+    const root = await repository({
+      policyOverrides,
+      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    });
+    await assert.rejects(() => audit(root), /failureSentinel must remain outside/);
+  }
+});
+
+test("policy schema fixes the reserved sentinel literal", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        failureSentinel: "another-unmatched-label",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(() => audit(root), /governedReusableRunnerInput\.failureSentinel/);
+});
+
+test("sentinel is not a general local reusable runner value", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: ci-runner-selection-failed
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.ok((await audit(root)).length > 0);
 });
 
 test("repository-local hosted structural and privileged jobs are inspected at their definitions", async () => {
