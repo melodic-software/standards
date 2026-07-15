@@ -1469,17 +1469,60 @@ function findExpressionEnd(value, cursor) {
   return value.length;
 }
 
-function expressionContainsCredentialReference(value, cursor, end) {
+function skipExpressionQuotedLiteral(value, cursor, end) {
+  const quote = value[cursor];
+  cursor += 1;
   while (cursor < end) {
-    const previousIsWord = cursor > 0 && isExpressionWordCharacter(value.charCodeAt(cursor - 1));
-    if (!previousIsWord && value.startsWith("secrets", cursor)) {
-      const property = skipExpressionWhitespace(value, cursor + "secrets".length, end);
-      if (property < end && (value[property] === "." || value[property] === "[")) {
-        return true;
+    if (value[cursor] === quote) {
+      if (value[cursor + 1] === quote) {
+        cursor += 2;
+        continue;
       }
+      return cursor + 1;
     }
-    if (!previousIsWord && value.startsWith("github", cursor)) {
-      let property = skipExpressionWhitespace(value, cursor + "github".length, end);
+    cursor += 1;
+  }
+  return end;
+}
+
+function expressionContainsCredentialReference(value, cursor, end) {
+  let previousSignificant;
+  while (cursor < end) {
+    const character = value[cursor];
+    if (character.trim() === "") {
+      cursor += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      cursor = skipExpressionQuotedLiteral(value, cursor, end);
+      previousSignificant = character;
+      continue;
+    }
+
+    const previousIsWord =
+      previousSignificant !== undefined &&
+      isExpressionWordCharacter(previousSignificant.charCodeAt(0));
+    const previousIsPropertyDereference = previousSignificant === ".";
+    const secretsEnd = cursor + "secrets".length;
+    if (
+      !previousIsWord &&
+      !previousIsPropertyDereference &&
+      secretsEnd <= end &&
+      value.startsWith("secrets", cursor) &&
+      (secretsEnd === end || !isExpressionWordCharacter(value.charCodeAt(secretsEnd)))
+    ) {
+      return true;
+    }
+
+    const githubEnd = cursor + "github".length;
+    if (
+      !previousIsWord &&
+      !previousIsPropertyDereference &&
+      githubEnd <= end &&
+      value.startsWith("github", cursor) &&
+      (githubEnd === end || !isExpressionWordCharacter(value.charCodeAt(githubEnd)))
+    ) {
+      let property = skipExpressionWhitespace(value, githubEnd, end);
       if (property < end && value[property] === ".") {
         property = skipExpressionWhitespace(value, property + 1, end);
         const tokenEnd = property + "token".length;
@@ -1502,8 +1545,12 @@ function expressionContainsCredentialReference(value, cursor, end) {
             }
           }
         }
+      } else {
+        return true;
       }
     }
+
+    previousSignificant = character;
     cursor += 1;
   }
   return false;

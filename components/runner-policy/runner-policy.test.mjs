@@ -694,14 +694,65 @@ ${SELECTOR}  test:
   }
 });
 
+test("whole credential contexts and direct credential properties remain hosted", async () => {
+  const variants = [
+    `\${{ toJSON(secrets) }}`,
+    `\${{ toJSON( secrets ) }}`,
+    `\${{ format('{0}', toJSON(secrets)) }}`,
+    `\${{ toJSON(github) }}`,
+    `\${{ secrets }}`,
+    `\${{ format('{0}', github) }}`,
+    `\${{ secrets.PACKAGES_TOKEN }}`,
+    `\${{ format('{0}', github.token) }}`,
+    `prefix \${{ vars.FLAG }} suffix \${{ toJSON(secrets) }}`,
+    `\${{ toJSON(secrets)`,
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          CREDENTIAL_CONTEXT: ${expression}
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "privileged-hosted-only"],
+      `credential context must remain hosted: ${expression}`,
+    );
+  }
+});
+
 test("non-credential expression lookalikes remain eligible for the local fleet", async () => {
   const variants = [
     "secrets.PACKAGES_TOKEN",
     `\${{ mysecrets.PACKAGES_TOKEN }}`,
     `\${{ secretsValue }}`,
+    `\${{ githubish }}`,
     `\${{ github.tokens }}`,
     `\${{ github['tokens'] }}`,
+    `\${{ github.repository }}`,
+    `\${{ github['repository'] }}`,
+    `\${{ github.secrets }}`,
+    `\${{ github.token_type }}`,
+    `\${{ github['token_type'] }}`,
     `\${{ vars.CREDENTIAL }}`,
+    `\${{ vars.secrets }}`,
+    `\${{ vars.github }}`,
+    `\${{ toJSON('secrets') }}`,
+    `\${{ toJSON('github') }}`,
+    `\${{ format('secrets github.token', vars.VALUE) }}`,
+    `\${{ format('It''s github.token and secrets', vars.VALUE) }}`,
+    `prefix \${{ vars.secrets }} suffix \${{ github.repository }}`,
   ];
   for (const expression of variants) {
     const root = await repository({
