@@ -1210,6 +1210,31 @@ test("policy schema rejects malformed or ambiguous owner-scoped approvals", asyn
   }
 });
 
+test("hosted matrix expression policy remains required, unique, and structurally exact", async () => {
+  const omittedRoot = await repository({
+    policyOverrides: { hostedMatrixExpressions: undefined },
+  });
+  await assert.rejects(
+    () => audit(omittedRoot),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message === "policy must have required property 'hostedMatrixExpressions'",
+  );
+
+  for (const hostedMatrixExpressions of [
+    [`\${{ matrix.os }}`, `\${{ matrix.os }}`],
+    [`\${{ matrix.os || 'ubuntu-24.04' }}`],
+  ]) {
+    const root = await repository({ policyOverrides: { hostedMatrixExpressions } });
+    await assert.rejects(
+      () => audit(root),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.startsWith("policy.hostedMatrixExpressions"),
+    );
+  }
+});
+
 test("production contracts pin reviewed Windows and selectable Linux workflows", () => {
   const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
   assert.deepEqual(
@@ -2493,6 +2518,44 @@ test("static allowlisted hosted matrix is supported", async () => {
   assert.deepEqual(await audit(root), []);
 });
 
+test("empty hosted matrix expression policy permits approved literals", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: { hostedMatrixExpressions: [] },
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("empty hosted matrix expression policy disables matrix routing fail closed", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: { hostedMatrixExpressions: [] },
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+    runs-on: \${{ matrix.os }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+});
+
 test("hosted matrix include cannot override the proven runner axis", async () => {
   const root = await repository({
     visibility: "public",
@@ -2505,6 +2568,29 @@ test("hosted matrix include cannot override the proven runner axis", async () =>
         os: [ubuntu-24.04]
         include:
           - os: ubuntu-24.04
+    runs-on: \${{ matrix.os }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+});
+
+test("hosted matrix exclude cannot alter the proven runner axis", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        exclude:
+          - os: windows-2025
     runs-on: \${{ matrix.os }}
     steps: []
 `,
