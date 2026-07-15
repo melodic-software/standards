@@ -2112,6 +2112,7 @@ ${SELECTOR}  build:
     uses: ./.github/workflows/build.yml
     with:
       runner: \${{ needs.choose.outputs.runner }}
+${selectorFailureJob()}
 `,
       "build.yml": `on:
   workflow_call:
@@ -2127,6 +2128,77 @@ jobs:
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("required no-default local runner calls require a matching failure sentinel", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root))
+      .filter(({ rule }) => rule === "selector-failure-sentinel-required")
+      .map(({ job }) => job),
+    ["build"],
+  );
+});
+
+test("a failure sentinel in another workflow cannot satisfy required routing", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+`,
+      "guard.yml": selectorFailureWorkflow(),
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.ok(
+    (await audit(root)).some(
+      ({ rule, file, job }) =>
+        rule === "selector-failure-sentinel-required" &&
+        file === ".github/workflows/ci.yml" &&
+        job === "build",
+    ),
+  );
 });
 
 test("required local runner input rejects weak routes and ambiguous declarations", async () => {
@@ -2210,18 +2282,18 @@ jobs:
   );
 });
 
-function selectorFailureWorkflow({
-  needs = "choose",
-  condition = `\${{ !cancelled() && (needs.choose.result != 'success' || !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}`,
+function selectorFailureJob({
+  jobId = "reject-route",
+  selectorId = "choose",
+  needs = selectorId,
+  condition = `\${{ !cancelled() && (needs.${selectorId}.result != 'success' || !(needs.${selectorId}.outputs.route == 'self-hosted' && needs.${selectorId}.outputs.runner != '' && needs.${selectorId}.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}`,
   target = "ci-runner-selection-failed",
   timeout = 1,
   permissions = "{}",
   extra = "",
   run = 'echo "::error::A governed self-hosted route is required"\n          exit 1',
 } = {}) {
-  return `jobs:
-  choose:
-${SELECTOR}  reject-route:
+  return `  ${jobId}:
     needs: ${needs}
     if: ${condition}
     runs-on: ${target}
@@ -2234,9 +2306,128 @@ ${extra}    steps:
 `;
 }
 
+function selectorFailureWorkflow(options = {}) {
+  return `jobs:
+  choose:
+${SELECTOR}${selectorFailureJob(options)}`;
+}
+
 test("reserved unroutable sentinel accepts only the exact selector rejection topology", async () => {
   const root = await repository({ workflows: { "ci.yml": selectorFailureWorkflow() } });
   assert.deepEqual(await audit(root), []);
+});
+
+test("one matching sentinel covers multiple required callers sharing a selector", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build-one:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+  build-two:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+${selectorFailureJob()}
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a sentinel for another selector or duplicate sentinels cannot satisfy pairing", async () => {
+  const called = `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+  const caller = (sentinels) => `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  alternate:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+${sentinels}`;
+
+  for (const [label, sentinels] of [
+    ["wrong selector", selectorFailureJob({ selectorId: "alternate" })],
+    [
+      "duplicates",
+      selectorFailureJob({ jobId: "reject-one" }) + selectorFailureJob({ jobId: "reject-two" }),
+    ],
+  ]) {
+    const root = await repository({
+      workflows: { "ci.yml": caller(sentinels), "build.yml": called },
+    });
+    assert.ok(
+      (await audit(root)).some(
+        ({ rule, job }) => rule === "selector-failure-sentinel-required" && job === "build",
+      ),
+      `${label} must fail pairing`,
+    );
+  }
+});
+
+test("an invalid sentinel leaves required no-default routing unpaired", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+${selectorFailureJob({ condition: `\${{ !cancelled() }}` })}
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(findings.some(({ rule }) => rule === "selector-failure-sentinel-required"));
+  assert.ok(
+    findings.some(({ rule, job }) => rule === "selector-contract" && job === "reject-route"),
+  );
 });
 
 test("reserved unroutable sentinel rejects every widened execution surface", async () => {

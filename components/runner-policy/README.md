@@ -308,11 +308,16 @@ trigger. The runner input must be either an optional string with the governed
 `ubuntu-24.04` default, or `required: true` with no `default`. The required form
 accepts only the raw selector output and requires the caller condition to prove
 selector success, the `self-hosted` route, a non-empty runner, and equality with
-`vars.CI_SELF_HOSTED_LABEL`. A `workflow_dispatch`, schedule, push, or other
-co-trigger invalidates either routing contract because those entry points share
-the workflow's `inputs` context. GitHub documents required reusable-workflow
-inputs; separately, an optional string without a default becomes `""`, which is
-why the no-fallback form is required rather than merely omitting `default`.[9]
+`vars.CI_SELF_HOSTED_LABEL`. The same caller workflow must also contain exactly
+one approved unroutable failure sentinel for that selector; one sentinel may
+cover multiple required calls sharing the selector, but a sentinel in another
+workflow or for another selector does not satisfy the contract. Optional calls
+with the governed hosted fallback do not require this guard. A
+`workflow_dispatch`, schedule, push, or other co-trigger invalidates either
+routing contract because those entry points share the workflow's `inputs`
+context. GitHub documents required reusable-workflow inputs; separately, an
+optional string without a default becomes `""`, which is why the no-fallback
+form is required rather than merely omitting `default`.[9]
 
 One exact literal, `ci-runner-selection-failed`, is reserved as an unroutable
 failure sentinel. It is not a general runner target or fallback. The analyzer
