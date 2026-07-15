@@ -224,13 +224,23 @@ selector for adaptive policies. The liveness-routing revision at
 `3415de3ff2fafee40e4d087eb6073d2f6952b595` routes to the managed fleet
 whenever a matching runner is online — busy runners queue instead of falling
 back to hosted — removes the rerun-to-hosted branch so a re-run keeps its
-original route, and reports `online-runner-count`. Five selector revisions
-remain approved for an ordered consumer rollout. GitHub does not allow a
-reusable workflow to target a self-hosted runner group owned by a different
-repository owner, so these two strict-scheduling revisions are approved only
-for `melodic-software`; `kyle-sexton` repositories cannot select them. The
-three older revisions remain globally approved until compatible consumers
-migrate.
+original route, and reports `online-runner-count`. The revision at
+`f2d5e06757201f2fce187096a2c6fa805836c3d2` carries that selector
+byte-identical; it is approved so consumer pins adopting the repository's
+non-shallow Gitleaks scan fix keep a reviewed selector reference. The
+Dependabot-routing revision at `3931f91ccba9bfe97500196091ae2cc039672952`
+retires the Dependabot hosted-only guard with the owner's named approval:
+same-repository Dependabot runs route like pushes, sourcing the observer key
+from the organization's Dependabot secrets store, while fork and public guards
+are unchanged and the key stays confined to the selector job. Until
+`CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
+keep falling back hosted (`missing-secret`), so rollout is fail-safe.
+Seven selector revisions remain approved for an ordered consumer rollout.
+GitHub does not allow a reusable workflow to target a self-hosted runner group
+owned by a different repository owner, so these four strict-scheduling
+revisions are approved only for `melodic-software`; `kyle-sexton` repositories
+cannot select them. The three older revisions remain globally approved until
+compatible consumers migrate.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 strict consumers may route that advisory lane through the approved selector
@@ -290,6 +300,14 @@ those layers is not detected by any repository check and shows up as the
 selector routing hosted (adaptive policies) or refusing the label
 (`self-hosted-only`) while runner inventory looks healthy.
 
+The analyzer also reports `pin-provenance-drift`: when the trailing comment on
+a 40-character `uses:` pin contains a token that reads as a short commit SHA
+(mixed hex digits and letters, or a full 40-character SHA), it must be a
+prefix of the pinned commit. An automated or manual repin that leaves the old
+short SHA behind turns the comment into misinformation for the next reviewer;
+version tags, prose, dates, and hex-only English words are not treated as SHA
+claims. Update the provenance comment in the same change as the pin.
+
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:
 
@@ -305,10 +323,29 @@ literal-fallback expression through its canonical `runner` input:
 The exact contract applies equally to cross-repository and repository-local
 reusable callers. Reusable workflow definitions may use
 `runs-on: ${{ inputs.runner }}` only when `workflow_call` is the file's exclusive
-trigger and `on.workflow_call.inputs.runner` is an optional string with the
-governed `ubuntu-24.04` default. A `workflow_dispatch`, schedule, push, or other
-co-trigger invalidates that routing contract because those entry points share
-the workflow's `inputs` context.
+trigger. The runner input must be either an optional string with the governed
+`ubuntu-24.04` default, or `required: true` with no `default`. The required form
+accepts only the raw selector output and requires the caller condition to prove
+selector success, the `self-hosted` route, a non-empty runner, and equality with
+`vars.CI_SELF_HOSTED_LABEL`. A `workflow_dispatch`, schedule, push, or other
+co-trigger invalidates either routing contract because those entry points share
+the workflow's `inputs` context. GitHub documents required reusable-workflow
+inputs; separately, an optional string without a default becomes `""`, which is
+why the no-fallback form is required rather than merely omitting `default`.[9]
+
+One exact literal, `ci-runner-selection-failed`, is reserved as an unroutable
+failure sentinel. It is not a general runner target or fallback. The analyzer
+accepts it only for a selector-dependent rejection job with one selector in
+`needs`, the exact complement of a successful governed self-hosted route
+(including an explicit selector-failure arm),
+`timeout-minutes: 1`, `permissions: {}`, no environment, secrets, action, or
+other executable surface, and one static error annotation followed by `exit 1`.
+GitHub leaves a self-hosted-labelled job queued when no matching runner exists
+and fails it after 24 hours,[10] so this exceptional guard fails a scheduled run
+without consuming a hosted minute. The one-minute execution timeout does not
+shorten that queue period; it limits execution only if a runner is mistakenly
+given the reserved label. The guard exists because a condition-skipped job
+reports Success and cannot by itself make a required check fail.[11]
 
 The only other dynamic `runs-on` form is a configured hosted matrix expression
 (`matrix.os` or `matrix.runner`) backed by a non-empty, static array containing
@@ -392,3 +429,6 @@ default `GITHUB_TOKEN` permissions][7].
 [6]: https://docs.github.com/en/actions/reference/evaluate-expressions-in-workflows-and-actions#status-check-functions
 [7]: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#setting-the-permissions-of-the-github_token-for-your-repository
 [8]: https://json-schema.org/draft/2020-12/json-schema-validation#section-6.4.2
+[9]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow
+[10]: https://docs.github.com/en/actions/reference/runners/self-hosted-runners#routing-precedence-for-self-hosted-runners
+[11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
