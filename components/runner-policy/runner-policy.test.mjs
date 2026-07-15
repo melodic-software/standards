@@ -13,6 +13,7 @@ const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
 const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
+const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -657,11 +658,16 @@ test("GitHub token aliases, case variants, and transformed expressions fail clos
   const variants = [
     `\${{ secrets.github_token }}`,
     `\${{ secrets['GITHUB_TOKEN'] }}`,
+    `\${{ secrets [ 'PACKAGES_TOKEN' ] }}`,
     `\${{ format('{0}', secrets.GITHUB_TOKEN) }}`,
+    `\${{ format('}}', secrets.PACKAGES_TOKEN) }}`,
     `\${{ github['token'] }}`,
+    `\${{ github [ "token" ] }}`,
     `\${{ github.Token }}`,
     `\${{ secrets.GITHUB_TOKEN || 'fallback' }}`,
     `\${{ secrets.PACKAGES_TOKEN }}`,
+    `prefix \${{ vars.FLAG }} suffix \${{ secrets.PACKAGES_TOKEN }}`,
+    `\${{ secrets.PACKAGES_TOKEN`,
   ];
   for (const expression of variants) {
     const root = await repository({
@@ -684,6 +690,216 @@ ${SELECTOR}  test:
       (await audit(root)).map(({ rule }) => rule),
       ["hosted-exception-required", "privileged-hosted-only"],
       `credential variant must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("whole credential contexts and direct credential properties remain hosted", async () => {
+  const variants = [
+    `\${{ toJSON(secrets) }}`,
+    `\${{ toJSON( secrets ) }}`,
+    `\${{ format('{0}', toJSON(secrets)) }}`,
+    `\${{ toJSON(github) }}`,
+    `\${{ secrets }}`,
+    `\${{ format('{0}', github) }}`,
+    `\${{ secrets.PACKAGES_TOKEN }}`,
+    `\${{ format('{0}', github.token) }}`,
+    `\${{ github[format('{0}{1}', 'to', 'ken')] }}`,
+    `\${{ github[fromJSON('"token"')] }}`,
+    `\${{ github['to' + 'ken'] }}`,
+    `\${{ github[*] }}`,
+    `\${{ toJSON(github.*) }}`,
+    `\${{ github['repository' }}`,
+    `\${{ github["repository"] }}`,
+    `prefix \${{ vars.FLAG }} suffix \${{ toJSON(secrets) }}`,
+    `\${{ toJSON(secrets)`,
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          CREDENTIAL_CONTEXT: ${expression}
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "privileged-hosted-only"],
+      `credential context must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("non-credential expression lookalikes remain eligible for the local fleet", async () => {
+  const variants = [
+    "secrets.PACKAGES_TOKEN",
+    `\${{ mysecrets.PACKAGES_TOKEN }}`,
+    `\${{ secretsValue }}`,
+    `\${{ githubish }}`,
+    `\${{ github.tokens }}`,
+    `\${{ github['tokens'] }}`,
+    `\${{ github.repository }}`,
+    `\${{ github['repository'] }}`,
+    `\${{ github['repository-owner'] }}`,
+    `\${{ github.secrets }}`,
+    `\${{ github.token_type }}`,
+    `\${{ github['token_type'] }}`,
+    `\${{ vars.CREDENTIAL }}`,
+    `\${{ vars.secrets }}`,
+    `\${{ vars.github }}`,
+    `\${{ toJSON('secrets') }}`,
+    `\${{ toJSON('github') }}`,
+    `\${{ format('secrets github.token', vars.VALUE) }}`,
+    `\${{ format('It''s github.token and secrets', vars.VALUE) }}`,
+    `prefix \${{ vars.secrets }} suffix \${{ github.repository }}`,
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          BENIGN: ${expression}
+`,
+      },
+    });
+    assert.deepEqual(await audit(root), [], `benign lookalike must pass: ${expression}`);
+  }
+});
+
+test("long repeated expression prefixes without credentials remain eligible", async () => {
+  const repeatedPrefix = "${{".repeat(20_000);
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - run: npm test
+        env:
+          BENIGN: "${repeatedPrefix} github.tokens }}"
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("implicit job conditions keep credential contexts off the local fleet", async () => {
+  const variants = [
+    "github.token",
+    "github['token']",
+    "github[format('{0}{1}', 'to', 'ken')]",
+    `github[fromJSON('"token"')]`,
+    "github[*]",
+    "toJSON(github.*)",
+    "github",
+    "secrets",
+    "format('{0}', toJSON(secrets))",
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: ${expression} && !cancelled()
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps: []
+`,
+      },
+    });
+    const workloadFindings = (await audit(root)).filter(({ job }) => job === "test");
+    assert.ok(
+      workloadFindings.some(({ rule }) => rule === "privileged-hosted-only"),
+      `implicit job credential must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("implicit step conditions keep credential contexts off the local fleet", async () => {
+  const variants = [
+    "github.token",
+    "github['token']",
+    "github[format('{0}{1}', 'to', 'ken')]",
+    `github[fromJSON('"token"')]`,
+    "github[*]",
+    "toJSON(github.*)",
+    "github",
+    "secrets",
+    "format('{0}', toJSON(secrets))",
+  ];
+  for (const expression of variants) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - if: ${expression}
+        run: npm test
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "privileged-hosted-only"],
+      `implicit step credential must remain hosted: ${expression}`,
+    );
+  }
+});
+
+test("implicit conditions allow static noncredential GitHub fields and quoted text", async () => {
+  const conditions = [
+    "github.repository == 'owner/repo'",
+    "github['repository'] == 'owner/repo'",
+    "contains('github.token secrets', github.repository)",
+  ];
+  for (const condition of conditions) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: ${condition} && !cancelled()
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - if: ${condition}
+        run: npm test
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["selector-contract"],
+      `benign implicit condition must add no credential finding: ${condition}`,
     );
   }
 });
@@ -802,6 +1018,7 @@ test("production selector allowlist contains only independently reviewed commits
     "melodic-software": [
       `${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -816,7 +1033,7 @@ test("production selector allowlist contains only independently reviewed commits
     );
     assert.deepEqual(await audit(root), []);
   }
-  for (const sha of [LOCAL_SELECTOR_SHA, LIVENESS_SELECTOR_SHA]) {
+  for (const sha of [LOCAL_SELECTOR_SHA, LIVENESS_SELECTOR_SHA, SECURITY_HARDENING_SHA]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
       workflows: {
@@ -1032,6 +1249,28 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
   );
   assert.deepEqual(
     contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner", "paths"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[
+      `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${SECURITY_HARDENING_SHA}`
+    ],
+    {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner"],
+      allowedSecrets: {},
+    },
+  );
+  assert.deepEqual(
+    contracts[
+      `melodic-software/ci-workflows/.github/workflows/zizmor.yml@${SECURITY_HARDENING_SHA}`
+    ],
     {
       routing: "runner-input",
       runnerInput: "runner",

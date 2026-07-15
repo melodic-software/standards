@@ -1425,12 +1425,195 @@ function permissionHostedRequirement(workflow, job, { requireExplicitReadOnly = 
   };
 }
 
-function containsCredentialExpression(value) {
-  return stringsIn(value).some((item) =>
-    /\$\{\{[\s\S]*?\b(?:secrets\s*(?:\.|\[)|github\s*(?:\.\s*token\b|\[\s*["']token["']\s*\]))/i.test(
-      item,
-    ),
+function isExpressionWordCharacter(codeUnit) {
+  return (
+    (codeUnit >= 48 && codeUnit <= 57) ||
+    (codeUnit >= 65 && codeUnit <= 90) ||
+    codeUnit === 95 ||
+    (codeUnit >= 97 && codeUnit <= 122)
   );
+}
+
+function isExpressionPropertyNameStart(codeUnit) {
+  return (
+    (codeUnit >= 65 && codeUnit <= 90) || codeUnit === 95 || (codeUnit >= 97 && codeUnit <= 122)
+  );
+}
+
+function skipExpressionWhitespace(value, cursor, end) {
+  while (cursor < end && value[cursor].trim() === "") {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function findExpressionEnd(value, cursor) {
+  let quote;
+  while (cursor < value.length) {
+    const character = value[cursor];
+    if (quote !== undefined) {
+      if (character === quote) {
+        if (value[cursor + 1] === quote) {
+          cursor += 2;
+          continue;
+        }
+        quote = undefined;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      cursor += 1;
+      continue;
+    }
+    if (character === "}" && value[cursor + 1] === "}") {
+      return cursor;
+    }
+    cursor += 1;
+  }
+  return value.length;
+}
+
+function skipExpressionQuotedLiteral(value, cursor, end) {
+  const quote = value[cursor];
+  cursor += 1;
+  while (cursor < end) {
+    if (value[cursor] === quote) {
+      if (value[cursor + 1] === quote) {
+        cursor += 2;
+        continue;
+      }
+      return cursor + 1;
+    }
+    cursor += 1;
+  }
+  return end;
+}
+
+function staticExpressionIndex(value, cursor, end) {
+  cursor = skipExpressionWhitespace(value, cursor, end);
+  if (value[cursor] !== "'") {
+    return undefined;
+  }
+  cursor += 1;
+  let literal = "";
+  while (cursor < end) {
+    if (value[cursor] === "'") {
+      if (value[cursor + 1] === "'") {
+        literal += "'";
+        cursor += 2;
+        continue;
+      }
+      cursor = skipExpressionWhitespace(value, cursor + 1, end);
+      return value[cursor] === "]" ? literal : undefined;
+    }
+    literal += value[cursor];
+    cursor += 1;
+  }
+  return undefined;
+}
+
+function expressionContainsCredentialReference(value, cursor, end) {
+  let previousSignificant;
+  while (cursor < end) {
+    const character = value[cursor];
+    if (character.trim() === "") {
+      cursor += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      cursor = skipExpressionQuotedLiteral(value, cursor, end);
+      previousSignificant = character;
+      continue;
+    }
+
+    const previousIsWord =
+      previousSignificant !== undefined &&
+      isExpressionWordCharacter(previousSignificant.charCodeAt(0));
+    const previousIsPropertyDereference = previousSignificant === ".";
+    const secretsEnd = cursor + "secrets".length;
+    if (
+      !previousIsWord &&
+      !previousIsPropertyDereference &&
+      secretsEnd <= end &&
+      value.startsWith("secrets", cursor) &&
+      (secretsEnd === end || !isExpressionWordCharacter(value.charCodeAt(secretsEnd)))
+    ) {
+      return true;
+    }
+
+    const githubEnd = cursor + "github".length;
+    if (
+      !previousIsWord &&
+      !previousIsPropertyDereference &&
+      githubEnd <= end &&
+      value.startsWith("github", cursor) &&
+      (githubEnd === end || !isExpressionWordCharacter(value.charCodeAt(githubEnd)))
+    ) {
+      let property = skipExpressionWhitespace(value, githubEnd, end);
+      if (property < end && value[property] === ".") {
+        property = skipExpressionWhitespace(value, property + 1, end);
+        const propertyStart = property;
+        if (!isExpressionPropertyNameStart(value.charCodeAt(property))) {
+          return true;
+        }
+        while (
+          property < end &&
+          (isExpressionWordCharacter(value.charCodeAt(property)) || value[property] === "-")
+        ) {
+          property += 1;
+        }
+        if (property === propertyStart || value.slice(propertyStart, property) === "token") {
+          return true;
+        }
+      } else if (property < end && value[property] === "[") {
+        const index = staticExpressionIndex(value, property + 1, end);
+        if (index === undefined || index === "token") {
+          return true;
+        }
+      } else {
+        return true;
+      }
+    }
+
+    previousSignificant = character;
+    cursor += 1;
+  }
+  return false;
+}
+
+function stringContainsCredentialExpression(value) {
+  const normalized = value.toLowerCase();
+  let cursor = 0;
+  while (cursor < normalized.length) {
+    const start = normalized.indexOf("${{", cursor);
+    if (start === -1) {
+      return false;
+    }
+    const expressionStart = start + "${{".length;
+    const expressionEnd = findExpressionEnd(normalized, expressionStart);
+    if (expressionContainsCredentialReference(normalized, expressionStart, expressionEnd)) {
+      return true;
+    }
+    if (expressionEnd === normalized.length) {
+      return false;
+    }
+    cursor = expressionEnd + "}}".length;
+  }
+  return false;
+}
+
+function containsCredentialExpression(value) {
+  return stringsIn(value).some(stringContainsCredentialExpression);
+}
+
+function conditionContainsCredentialReference(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.toLowerCase();
+  return expressionContainsCredentialReference(normalized, 0, normalized.length);
 }
 
 function hasStaticallyReadOnlyPermissions(workflow, job) {
@@ -1448,7 +1631,10 @@ function localCredentialRequirement(workflow, job) {
   if (containsCredentialExpression(workflow.env)) {
     return "a credential expression in workflow-level env";
   }
-  const { steps, ...jobWithoutSteps } = job;
+  const { steps, if: jobCondition, ...jobWithoutSteps } = job;
+  if (conditionContainsCredentialReference(jobCondition)) {
+    return "a credential expression in a job condition";
+  }
   if (containsCredentialExpression(jobWithoutSteps)) {
     return "a credential expression outside a narrow step env/with value";
   }
@@ -1460,7 +1646,10 @@ function localCredentialRequirement(workflow, job) {
     if (step === null || typeof step !== "object" || Array.isArray(step)) {
       continue;
     }
-    const { env, with: inputs, ...stepWithoutCredentialMappings } = step;
+    const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
+    if (conditionContainsCredentialReference(stepCondition)) {
+      return "a credential expression in a step condition";
+    }
     if (containsCredentialExpression(stepWithoutCredentialMappings)) {
       return "a credential expression outside a narrow step env/with value";
     }
