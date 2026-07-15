@@ -39,9 +39,25 @@ A suffix dictated by a pattern or framework contract is not the smell — it nam
 
 Words like *service*, *tool*, *context*, *provider*, *handler*, *manager*, *client*, *host*, and *module* mean different things in different domains. When they appear in a public API, registration code, or documentation, qualify them with a domain prefix: an `AddTools()` extension is ambiguous (AI tools? CLI tools?); `AddAiToolDiscovery()` is explicit.
 
+## Branch names: type prefix, then a behavior-naming slug
+
+A branch name states two things: the kind of change, and what changed.
+
+```
+<type>/<short-description>
+```
+
+The type is the Conventional Commits vocabulary — the same eleven types (`feat`, `fix`, `refactor`, `perf`, `style`, `docs`, `test`, `build`, `ci`, `chore`, `revert`) the [Conventional Commits spec](https://www.conventionalcommits.org/en/v1.0.0/) recommends and [`@commitlint/config-conventional`](https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional) codifies — kept to one vocabulary rather than a second, branch-specific one. The description is a kebab-case, lowercase slug that follows the rules above: verbose enough to name what changed (3-5 words is a reasonable aim), not an assumption about scope.
+
+A branch a cloud coding agent (Claude Code, Codex, Cursor, Copilot) or a bot (e.g. Dependabot) generates on its own carries that tool's prefix instead of a type (`claude/`, `codex/`, `cursor/`, `copilot/`, `dependabot/`). Renaming it can orphan the agent's task-designated session or break the tool's own PR-creation path — leave a generated prefix as generated rather than forcing it into the type grammar.
+
+The `<type>/` and tool prefixes are a fixed, exact-match set — deterministic, in the sense `enforceability-tiers.md` uses the word, so a repo may gate the pattern with a commit hook the same way it gates any other exact-match rule. Choosing a slug that actually names the change stays reasoning-only, same as every other rule in this document. Branch name is cosmetic once a PR merges through a squash workflow — the PR title becomes the default-branch history, which is why enforcing the Conventional Commits vocabulary at PR-title time (see `../review/code-quality.md`) matters more for history hygiene than the branch name does; the branch grammar exists to keep local development and in-flight PRs legible in the meantime.
+
 ## Rename across all coupled edges
 
 A rename is only complete when every coupled edge moves with it in the same change: configuration entries, environment-variable prefixes, kill-switch keys, log/output labels, paired test files, task definitions, opt-out markers, and any documentation that cites the name. A partial rename leaves a name that lies.
+
+**Exception: the label-governance seam.** A repository rename's alias in `github-iac`'s `GovernedRepositorySpec.PreviousNames`, and a label rename in `github-iac`'s `Labels.cs` taxonomy (applied through the authoritative `Github.IssueLabels` resource), are not coupled edges that must move in the same change as the rename that motivates them. Both propagate through a separate, reviewed Pulumi deployment on its own cadence, and neither can be forced to apply atomically with the originating change. A repository or label identifier may lag briefly during that propagation without the rename being partial.
 
 ## Sources
 

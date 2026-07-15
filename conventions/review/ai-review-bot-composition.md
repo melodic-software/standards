@@ -1,0 +1,18 @@
+# AI review-bot composition
+
+Which automated AI reviewers a repository runs follows its governance class in `github-iac`'s `GovernedRepositorySpec` registry (`GovernedRepositories.cs`), not an ad hoc per-repo choice. `github-iac`'s Pulumi program and each repo's own `.github/workflows/` are the actual source of truth for what runs; this records the expected composition per class so a repo's live setup can be checked against an intentional baseline instead of an accreted one.
+
+## Classes
+
+- **Archived (`Archived: true`)** — a repository frozen read-only (e.g. a superseded snapshot). No PR-time reviewer: a finding against closed history has no one positioned to act on it.
+- **No CI surface (`RequiresCi: false`, not archived)** — a content, artifact, or single-purpose test repository with no `ci-status`-emitting workflow (for example: an artifact store, or a private acceptance-only canary target). No PR-time reviewer today, because there is no PR-time workflow surface for one to hang off. This is a **deferred**, not a permanent, absence: if such a repo grows a workflow surface, it moves into the governed class below and should adopt that class's default composition. Trigger: the first `.github/workflows/*.yml` lands in the repo.
+- **Governed (`RequiresCi: true`, not archived)** — the default and largest class, spanning both public and private repos, and both org-originated and personal-account-transferred repos alike. One PR-time AI reviewer: the org's `claude-review.yml` reusable-workflow caller, reviewing every non-fork PR (fork PRs receive no secrets and no automated review, by design — see the workflow's own header comment).
+- **High-traffic primary development repo** — a repository whose PR volume and change surface justify a second PR-time reviewer, reconciled against the first via a dedicated gate workflow, plus author-side pre-push review agents that inform the author but never post to the PR. This is an evidence-gated exception, not a default: it follows from a documented per-repo investigation weighing a second bot's marginal catch rate against its added comment volume and PR-cycle-time cost. A repo does not enter this class by assumption — it earns it by running (and keeping current) the same kind of investigation.
+
+## Why the class, not visibility or origin
+
+`GovernedRepositorySpec`'s visibility and origin flags (public/private, org-created/personal-transferred) drive cost posture — which billable security SKUs apply, which repos are eligible for self-hosted CI — but they are not what predicts bot composition. A private, personal-origin repo and a public, org-originated repo in the governed class both run the same single-reviewer default; what moves a repo between classes is whether it has a PR-time workflow surface at all (`RequiresCi`), whether it is still live (`Archived`), and — for the two-bot exception — demonstrated PR throughput, not who owns the repo or who can see it.
+
+## Freshness
+
+The AI review-bot landscape moves fast — pricing, new entrants, and bot-coordination primitives from either lab can change the calculus. This file is a governance record of *when a repo should run how many reviewers*, not a bot-by-bot feature comparison; re-verify a specific repo's live composition against its `.github/workflows/` before citing it, and re-run the evidence-gathering behind the two-bot exception before extending it to a second repo.
