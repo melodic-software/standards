@@ -2934,3 +2934,36 @@ test("a full-length mismatched SHA in the comment fails as provenance drift", as
   });
   assert.equal((await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift").length, 1);
 });
+
+test("a drifted quoted pin is still audited", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml":
+        "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps:\n" +
+        "      - uses: 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0'" +
+        " # 99ac2f8 2026-07-11\n",
+    },
+  });
+  assert.equal((await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift").length, 1);
+});
+
+test("an example uses line inside a run block scalar is not audited", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml":
+        "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps:\n" +
+        "      - run: |\n" +
+        "          cat <<'DOC'\n" +
+        "          uses: actions/checkout@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb # 99ac2f8 2026-07-11\n" +
+        "          DOC\n",
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift"),
+    [],
+  );
+});

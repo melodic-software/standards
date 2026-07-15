@@ -1578,7 +1578,7 @@ function finding(rule, file, job, message) {
 }
 
 const PINNED_USES_WITH_COMMENT =
-  /^\s*(?:-\s+)?uses:\s*\S+@(?<sha>[0-9a-f]{40})\s+#\s*(?<comment>.*)$/u;
+  /^\s*(?:-\s+)?uses:\s*['"]?\S+@(?<sha>[0-9a-f]{40})['"]?\s+#\s*(?<comment>.*)$/u;
 const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/gu;
 
 // A hex run reads as a short-SHA claim only when it mixes digits and letters
@@ -1589,11 +1589,32 @@ function isShaClaim(token) {
   return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/u.test(token));
 }
 
-function pinProvenanceFindings(source, file) {
+// Only SHAs the parsed workflow actually pins are audited, so an example
+// `uses:` line inside a run block scalar or a comment cannot produce a
+// finding for a reference the workflow never resolves.
+function pinnedUsesShas(workflow) {
+  const shas = new Set();
+  for (const job of Object.values(workflow?.jobs ?? {})) {
+    if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      continue;
+    }
+    const steps = Array.isArray(job.steps) ? job.steps : [];
+    for (const uses of [job.uses, ...steps.map((step) => step?.uses)]) {
+      const match = typeof uses === "string" && uses.match(/@([0-9a-f]{40})$/u);
+      if (match) {
+        shas.add(match[1]);
+      }
+    }
+  }
+  return shas;
+}
+
+function pinProvenanceFindings(source, file, workflow) {
   const findings = [];
+  const auditableShas = pinnedUsesShas(workflow);
   for (const [index, line] of source.split(/\r?\n/u).entries()) {
     const pinned = line.match(PINNED_USES_WITH_COMMENT);
-    if (!pinned) {
+    if (!pinned || !auditableShas.has(pinned.groups.sha)) {
       continue;
     }
     const { comment, sha } = pinned.groups;
@@ -1737,7 +1758,7 @@ export async function auditRepository({
   for (const record of workflowIndex.values()) {
     const { file, workflow } = record;
     if (record.source) {
-      findings.push(...pinProvenanceFindings(record.source, file));
+      findings.push(...pinProvenanceFindings(record.source, file, workflow));
     }
     if (!workflow) {
       findings.push(finding("workflow-parse", file, undefined, record.error));
