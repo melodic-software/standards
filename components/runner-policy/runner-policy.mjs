@@ -1740,48 +1740,79 @@ function finding(rule, file, job, message) {
 }
 
 const PINNED_USES_WITH_COMMENT =
-  /^\s*(?:-\s+)?uses:\s*['"]?\S+@(?<sha>[0-9a-f]{40})['"]?\s+#\s*(?<comment>.*)$/u;
-const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/gu;
+  /^\s*(?:-\s+)?uses:\s*['"]?\S+@(?<sha>[0-9a-f]{40})['"]?\s+#\s*(?<comment>.*)$/iu;
+const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/giu;
 
 // A hex run reads as a short-SHA claim only when it mixes digits and letters
 // (or is a full 40-character SHA): all-letter runs are ordinary English words
 // ("acceded") and all-digit runs are dates or counters, and flagging either
 // would fail closed on prose.
 function isShaClaim(token) {
-  return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/u.test(token));
+  return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/iu.test(token));
 }
 
-// Only SHAs the parsed workflow actually pins are audited, so an example
-// `uses:` line inside a run block scalar or a comment cannot produce a
-// finding for a reference the workflow never resolves.
-function pinnedUsesShas(workflow) {
-  const shas = new Set();
-  for (const job of Object.values(workflow?.jobs ?? {})) {
+// Only source lines that provide parsed workflow `uses` scalars are audited,
+// so an example inside a run block or comment cannot borrow a real pin's SHA
+// and masquerade as another executable reference.
+function pinnedUsesLineIndexes(source, workflow) {
+  const document = parseDocument(source, {
+    maxAliasCount: 0,
+    merge: false,
+    prettyErrors: true,
+    strict: true,
+    uniqueKeys: true,
+  });
+  const lineStarts = [0];
+  for (const match of source.matchAll(/\n/gu)) {
+    lineStarts.push(match.index + 1);
+  }
+  const lineIndexAt = (offset) => {
+    let low = 0;
+    let high = lineStarts.length;
+    while (low + 1 < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (lineStarts[middle] <= offset) low = middle;
+      else high = middle;
+    }
+    return low;
+  };
+
+  const lineIndexes = new Set();
+  for (const [jobId, job] of Object.entries(workflow?.jobs ?? {})) {
     if (job === null || typeof job !== "object" || Array.isArray(job)) {
       continue;
     }
-    const steps = Array.isArray(job.steps) ? job.steps : [];
-    for (const uses of [job.uses, ...steps.map((step) => step?.uses)]) {
-      const match = typeof uses === "string" && uses.match(/@([0-9a-f]{40})$/u);
-      if (match) {
-        shas.add(match[1]);
+    const paths = [["jobs", jobId, "uses"]];
+    if (Array.isArray(job.steps)) {
+      for (const index of job.steps.keys()) {
+        paths.push(["jobs", jobId, "steps", index, "uses"]);
+      }
+    }
+    for (const parts of paths) {
+      const node = document.getIn(parts, true);
+      if (
+        typeof node?.value === "string" &&
+        /@[0-9a-f]{40}$/iu.test(node.value) &&
+        Array.isArray(node.range)
+      ) {
+        lineIndexes.add(lineIndexAt(node.range[0]));
       }
     }
   }
-  return shas;
+  return lineIndexes;
 }
 
 function pinProvenanceFindings(source, file, workflow) {
   const findings = [];
-  const auditableShas = pinnedUsesShas(workflow);
+  const auditableLines = pinnedUsesLineIndexes(source, workflow);
   for (const [index, line] of source.split(/\r?\n/u).entries()) {
     const pinned = line.match(PINNED_USES_WITH_COMMENT);
-    if (!pinned || !auditableShas.has(pinned.groups.sha)) {
+    if (!pinned || !auditableLines.has(index)) {
       continue;
     }
     const { comment, sha } = pinned.groups;
     for (const token of comment.match(COMMENT_HEX_TOKENS) ?? []) {
-      if (isShaClaim(token) && !sha.startsWith(token)) {
+      if (isShaClaim(token) && !sha.toLowerCase().startsWith(token.toLowerCase())) {
         findings.push(
           finding(
             "pin-provenance-drift",

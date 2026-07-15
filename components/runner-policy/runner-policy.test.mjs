@@ -3256,3 +3256,55 @@ test("an example uses line inside a run block scalar is not audited", async () =
     [],
   );
 });
+
+test("a block-scalar example cannot borrow the SHA of a real parsed pin", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml":
+        "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps:\n" +
+        "      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" +
+        " # 9c091bb 2026-07-11\n" +
+        "      - run: |\n" +
+        "          uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" +
+        " # 99ac2f8 2026-07-11\n",
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).filter(({ rule }) => rule === "pin-provenance-drift"),
+    [],
+  );
+});
+
+test("uppercase pins and provenance claims are audited case-insensitively", async () => {
+  const matching = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": pinnedStepWorkflow("9C091BB 2026-07-11").replace(
+        "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "9C091BB21B7C1C1D1991BB908D89E4E9DDDFE3E0",
+      ),
+    },
+  });
+  assert.deepEqual(
+    (await audit(matching)).filter(({ rule }) => rule === "pin-provenance-drift"),
+    [],
+  );
+
+  const mismatched = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": pinnedStepWorkflow("99AC2F8 2026-07-11").replace(
+        "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "9C091BB21B7C1C1D1991BB908D89E4E9DDDFE3E0",
+      ),
+    },
+  });
+  assert.equal(
+    (await audit(mismatched)).filter(({ rule }) => rule === "pin-provenance-drift").length,
+    1,
+  );
+});
