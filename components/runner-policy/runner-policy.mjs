@@ -1739,8 +1739,6 @@ function finding(rule, file, job, message) {
   return { rule, file, ...(job ? { job } : {}), message };
 }
 
-const PINNED_USES_WITH_COMMENT =
-  /^\s*(?:-\s+)?uses:\s*['"]?\S+@(?<sha>[0-9a-f]{40})['"]?\s+#\s*(?<comment>.*)$/iu;
 const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/giu;
 
 // A hex run reads as a short-SHA claim only when it mixes digits and letters
@@ -1751,10 +1749,10 @@ function isShaClaim(token) {
   return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/iu.test(token));
 }
 
-// Only source lines that provide parsed workflow `uses` scalars are audited,
-// so an example inside a run block or comment cannot borrow a real pin's SHA
-// and masquerade as another executable reference.
-function pinnedUsesLineIndexes(source, workflow) {
+// Extract the pin and trailing comment from parsed workflow `uses` scalar
+// nodes, so YAML properties such as anchors remain supported while examples
+// inside run blocks or comments can never masquerade as executable references.
+function pinnedUsesEntries(source, workflow) {
   const document = parseDocument(source, {
     maxAliasCount: 0,
     merge: false,
@@ -1777,7 +1775,7 @@ function pinnedUsesLineIndexes(source, workflow) {
     return low;
   };
 
-  const lineIndexes = new Set();
+  const entries = [];
   for (const [jobId, job] of Object.entries(workflow?.jobs ?? {})) {
     if (job === null || typeof job !== "object" || Array.isArray(job)) {
       continue;
@@ -1790,27 +1788,28 @@ function pinnedUsesLineIndexes(source, workflow) {
     }
     for (const parts of paths) {
       const node = document.getIn(parts, true);
-      if (
-        typeof node?.value === "string" &&
-        /@[0-9a-f]{40}$/iu.test(node.value) &&
-        Array.isArray(node.range)
-      ) {
-        lineIndexes.add(lineIndexAt(node.range[0]));
+      const pinned =
+        typeof node?.value === "string" && node.value.match(/@(?<sha>[0-9a-f]{40})$/iu);
+      if (!pinned || !Array.isArray(node.range)) {
+        continue;
+      }
+      const trailing = source.slice(node.range[1], node.range[2] ?? node.range[1]);
+      const comment = trailing.match(/^\s+#\s*(?<comment>[^\r\n]*)(?:\r?\n)?$/u);
+      if (comment) {
+        entries.push({
+          comment: comment.groups.comment,
+          line: lineIndexAt(node.range[0]) + 1,
+          sha: pinned.groups.sha,
+        });
       }
     }
   }
-  return lineIndexes;
+  return entries;
 }
 
 function pinProvenanceFindings(source, file, workflow) {
   const findings = [];
-  const auditableLines = pinnedUsesLineIndexes(source, workflow);
-  for (const [index, line] of source.split(/\r?\n/u).entries()) {
-    const pinned = line.match(PINNED_USES_WITH_COMMENT);
-    if (!pinned || !auditableLines.has(index)) {
-      continue;
-    }
-    const { comment, sha } = pinned.groups;
+  for (const { comment, line, sha } of pinnedUsesEntries(source, workflow)) {
     for (const token of comment.match(COMMENT_HEX_TOKENS) ?? []) {
       if (isShaClaim(token) && !sha.toLowerCase().startsWith(token.toLowerCase())) {
         findings.push(
@@ -1818,7 +1817,7 @@ function pinProvenanceFindings(source, file, workflow) {
             "pin-provenance-drift",
             file,
             undefined,
-            `line ${index + 1}: pin comment claims commit ${token}, but the ` +
+            `line ${line}: pin comment claims commit ${token}, but the ` +
               `reference pins ${sha.slice(0, 12)}; update the provenance ` +
               "comment in the same change as the pin",
           ),
