@@ -1071,6 +1071,30 @@ function malformedWorkflowCallMappingField(surface) {
   return undefined;
 }
 
+// jobPermissionsSurface, jobRoutingSurface, and jobCredentialSurface each
+// filter out a job whose value is not a mapping (e.g. `jobs.extra: []` or a
+// scalar) before comparing surfaces, the same shape auditRepository rejects
+// locally as job-shape. Filtering keeps those surfaces from ever calling
+// privilegedHostedRequirement with a malformed job, but it also makes a
+// malformed job invisible to the diff: a bumped SHA could add one without
+// changing anything the compared surface inspects, and the resulting policy
+// pass would only fail later when GitHub actually validates the called
+// workflow. Auto-approval must treat a malformed fetched job as a failure of
+// its own, on both the candidate and every reviewed basis, before the
+// per-job surfaces are ever computed or diffed.
+function malformedJobIds(workflow) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.keys(jobs)
+    .filter((jobId) => {
+      const job = jobs[jobId];
+      return job === null || typeof job !== "object" || Array.isArray(job);
+    })
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function securitySurfaceDiffField(basis, candidate) {
   for (const key of [
     "workflowCall",
@@ -1202,6 +1226,14 @@ async function resolveAutoApprovedContracts({
       diagnostics.set(reference, error.message);
       continue;
     }
+    const malformedCandidateJobs = malformedJobIds(candidateWorkflow);
+    if (malformedCandidateJobs.length > 0) {
+      diagnostics.set(
+        reference,
+        `job ${malformedCandidateJobs[0]} is malformed; jobs.${malformedCandidateJobs[0]} must be a mapping`,
+      );
+      continue;
+    }
     const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow, policy);
     const malformedField = malformedWorkflowCallMappingField(candidateSurface);
     if (malformedField) {
@@ -1226,6 +1258,12 @@ async function resolveAutoApprovedContracts({
           fetchImpl,
         );
         const basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
+        const malformedBasisJobs = malformedJobIds(basisWorkflow);
+        if (malformedBasisJobs.length > 0) {
+          throw new ConfigurationError(
+            `job ${malformedBasisJobs[0]} is malformed; jobs.${malformedBasisJobs[0]} must be a mapping`,
+          );
+        }
         basisSurface = reusableWorkflowSecuritySurface(basisWorkflow, policy);
         const malformedBasisField = malformedWorkflowCallMappingField(basisSurface);
         if (malformedBasisField) {

@@ -2637,6 +2637,77 @@ test("Dependabot SHA bump preserves equivalent omitted, null, and empty workflow
   }
 });
 
+// Regression test for a gap where jobPermissionsSurface, jobRoutingSurface,
+// and jobCredentialSurface each filtered out a job whose value was not a
+// mapping (the same shape auditRepository rejects locally as job-shape)
+// before comparing surfaces. Filtering made the malformed job invisible to
+// the diff instead of failing closed: a bumped SHA could add
+// `jobs.extra: []` or a scalar job without changing anything the compared
+// surface inspected, so the candidate would still match the reviewed basis
+// and inherit its contract, only to fail later when GitHub actually
+// validated the called workflow.
+test("Dependabot SHA bump that adds a malformed job is declined", async () => {
+  for (const [kind, malformedJob] of [
+    ["array", "  extra: []\n"],
+    ["scalar", "  extra: not-a-job\n"],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}${malformedJob}`,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, kind);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job extra is malformed; jobs\.extra must be a mapping/,
+      kind,
+    );
+  }
+});
+
+test("Dependabot SHA bump is declined when the previously reviewed basis has a malformed job", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}  extra: []\n`,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job extra is malformed; jobs\\.extra must be a mapping`,
+    ),
+  );
+});
+
 test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
   const root = await repository({
     visibility: "public",
