@@ -23,6 +23,8 @@ const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflo
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
+const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
+const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
@@ -111,13 +113,111 @@ async function repository({
   return root;
 }
 
+// Every test in this suite audits a repository against reusable-workflow
+// references that may share a workflow path with an already-approved
+// contract, which makes them auto-approval *candidates*. Without a hermetic
+// default, `auditRepository`'s default `fetchImpl` (the real `fetch`) would
+// reach out to raw.githubusercontent.com during otherwise-offline tests.
+// This stub keeps the whole suite network-free by declining every candidate
+// (as today's fail-closed behavior does); tests that exercise auto-approval
+// itself pass their own `fetchImpl` via `options`.
+const HERMETIC_FETCH_STUB = async () => ({ ok: false, status: 404, statusText: "Not Found" });
+
 function audit(root, options = {}) {
   return auditRepository({
     root,
     policyPath: path.join(root, "runner-policy-policy.json"),
+    fetchImpl: HERMETIC_FETCH_STUB,
     ...options,
   });
 }
+
+function fetchImplFor(sourcesBySha) {
+  return async (url) => {
+    for (const [sha, body] of Object.entries(sourcesBySha)) {
+      if (url.includes(`/${sha}/`)) {
+        return { ok: true, text: async () => body };
+      }
+    }
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+}
+
+const REUSABLE_WORKFLOW_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: false
+    inputs:
+      runner:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo "cosmetic step-body change, not security-relevant"
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: write
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      extra:
+        required: false
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
 
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
@@ -1711,6 +1811,175 @@ test("obsolete reusable workflow SHA is outside the exact reviewed contract", as
     (await audit(root)).map(({ rule }) => rule),
     ["runner-target-contract"],
   );
+});
+
+test("Dependabot SHA bump with an identical security surface is auto-approved", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
+test("Dependabot SHA bump that adds write permissions is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(contractFinding.message, /no reviewed runner-input contract/);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that adds a workflow_call input is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: inputs changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: async () => ({ ok: false, status: 500, statusText: "Internal Server Error" }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(contractFinding.message, /auto-approval declined: could not fetch/);
+});
+
+test("disableAutoApproval escape hatch skips fetching and reproduces the unchanged pre-patch diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  let fetchCalled = false;
+  const findings = await audit(root, {
+    disableAutoApproval: true,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch must not be called when auto-approval is disabled");
+    },
+  });
+  assert.equal(fetchCalled, false);
+  assert.deepEqual(findings, [
+    {
+      rule: "runner-target-contract",
+      file: ".github/workflows/ci.yml",
+      job: "scan",
+      message: "the reusable workflow path@SHA has no reviewed runner-input contract",
+    },
+  ]);
+});
+
+test("CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true disables auto-approval by default", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const priorValue = process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
+  process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = "true";
+  let fetchCalled = false;
+  try {
+    const findings = await audit(root, {
+      fetchImpl: async () => {
+        fetchCalled = true;
+        throw new Error("fetch must not be called when the escape-hatch env var is set");
+      },
+    });
+    assert.equal(fetchCalled, false);
+    assert.equal(
+      findings[0]?.message,
+      "the reusable workflow path@SHA has no reviewed runner-input contract",
+    );
+  } finally {
+    if (priorValue === undefined) {
+      delete process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
+    } else {
+      process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = priorValue;
+    }
+  }
 });
 
 test("public opaque reusable call and alternate runner-label input are rejected", async () => {

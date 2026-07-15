@@ -795,10 +795,13 @@ function reusableWorkflowStatus(job, policy) {
   }
   const contract = policy.approvedReusableWorkflowContracts.get(job.uses);
   if (!contract) {
+    const declinedAutoApproval = policy.autoApprovalDiagnostics?.get(job.uses);
     return {
       isReusable: true,
       approved: false,
-      reason: "the reusable workflow path@SHA has no reviewed runner-input contract",
+      reason: declinedAutoApproval
+        ? `the reusable workflow path@SHA has no reviewed runner-input contract (auto-approval declined: ${declinedAutoApproval})`
+        : "the reusable workflow path@SHA has no reviewed runner-input contract",
     };
   }
   if (job.secrets === "inherit") {
@@ -846,6 +849,204 @@ function reusableWorkflowStatus(job, policy) {
     };
   }
   return { isReusable: true, approved: true, contract };
+}
+
+const RAW_GITHUB_CONTENT_BASE = "https://raw.githubusercontent.com";
+
+function normalizePermissionsSurface(permissions) {
+  if (permissions === undefined) {
+    return {};
+  }
+  if (permissions === "read-all" || permissions === "write-all") {
+    return { "*": permissions };
+  }
+  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+    return { "*": "invalid" };
+  }
+  return Object.fromEntries(
+    Object.entries(permissions).sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function normalizeDeclarationSurface(declaration) {
+  if (declaration === null || typeof declaration !== "object" || Array.isArray(declaration)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(declaration)
+      .map(([name, spec]) => [
+        name,
+        spec !== null && typeof spec === "object" && !Array.isArray(spec)
+          ? Object.fromEntries(
+              Object.entries(spec).sort(([left], [right]) => left.localeCompare(right)),
+            )
+          : spec,
+      ])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+// The security-relevant surface of a reusable workflow: the GITHUB_TOKEN
+// permissions it requests plus the workflow_call inputs/secrets contract it
+// exposes to callers. Dependabot SHA bumps are eligible for deterministic
+// auto-approval only when this surface is byte-for-byte identical between a
+// previously reviewed SHA and the new SHA; any other change (job logic,
+// steps, actions pinned inside the workflow, etc.) still requires a human to
+// add a new approvedReusableWorkflowContracts entry.
+function reusableWorkflowSecuritySurface(workflow) {
+  const workflowCall =
+    workflow.on !== null && typeof workflow.on === "object" && !Array.isArray(workflow.on)
+      ? workflow.on.workflow_call
+      : undefined;
+  const declaration =
+    workflowCall !== null && typeof workflowCall === "object" && !Array.isArray(workflowCall)
+      ? workflowCall
+      : {};
+  return {
+    permissions: normalizePermissionsSurface(workflow.permissions),
+    inputs: normalizeDeclarationSurface(declaration.inputs),
+    secrets: normalizeDeclarationSurface(declaration.secrets),
+  };
+}
+
+function securitySurfaceDiffField(basis, candidate) {
+  for (const key of ["permissions", "inputs", "secrets"]) {
+    if (JSON.stringify(basis[key]) !== JSON.stringify(candidate[key])) {
+      return key;
+    }
+  }
+  return undefined;
+}
+
+async function fetchReusableWorkflowSource(workflowPath, revision, fetchImpl) {
+  const [owner, repo, , , file] = workflowPath.split("/", 5);
+  const url = `${RAW_GITHUB_CONTENT_BASE}/${owner}/${repo}/${revision}/.github/workflows/${file}`;
+  let response;
+  try {
+    response = await fetchImpl(url);
+  } catch (error) {
+    throw new ConfigurationError(
+      `could not fetch ${workflowPath}@${revision} for auto-approval diffing: ${error.message}`,
+    );
+  }
+  if (!response.ok) {
+    throw new ConfigurationError(
+      `could not fetch ${workflowPath}@${revision} for auto-approval diffing: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.text();
+}
+
+// Deterministic, non-LLM auto-approval: a new path@SHA reusable-workflow
+// reference that has no reviewed contract yet is eligible only when (a) the
+// exact same workflow path already has at least one reviewed contract at a
+// different SHA (i.e. the source is already trusted), and (b) fetching both
+// the previously approved SHA and the new SHA from the source repository and
+// structurally diffing permissions/workflow_call.inputs/workflow_call.secrets
+// shows no change. Any fetch failure, parse failure, or surface diff fails
+// closed and is surfaced back to the operator via diagnostics.
+async function resolveAutoApprovedContracts({
+  policy,
+  workflowIndex,
+  fetchImpl = fetch,
+  now = () => new Date(),
+}) {
+  const approved = new Map();
+  const diagnostics = new Map();
+
+  const basesByWorkflowPath = new Map();
+  for (const [reference, contract] of policy.approvedReusableWorkflowContracts) {
+    const parsed = parseReusableWorkflowReference(reference);
+    const bases = basesByWorkflowPath.get(parsed.workflow) ?? [];
+    bases.push({ revision: parsed.revision, contract });
+    basesByWorkflowPath.set(parsed.workflow, bases);
+  }
+
+  const candidates = new Map();
+  for (const record of workflowIndex.values()) {
+    if (!record.workflow) {
+      continue;
+    }
+    for (const job of Object.values(record.workflow.jobs)) {
+      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+        continue;
+      }
+      const parsed = parseReusableWorkflowReference(job.uses);
+      if (
+        !parsed ||
+        !REUSABLE_WORKFLOW_PATH.test(parsed.workflow) ||
+        !FULL_SHA.test(parsed.revision) ||
+        policy.selectorWorkflowPaths.has(parsed.workflow) ||
+        policy.approvedReusableWorkflowContracts.has(job.uses) ||
+        candidates.has(job.uses)
+      ) {
+        continue;
+      }
+      candidates.set(job.uses, parsed);
+    }
+  }
+
+  for (const [reference, parsed] of candidates) {
+    const bases = basesByWorkflowPath.get(parsed.workflow);
+    if (!bases || bases.length === 0) {
+      continue; // no already-trusted source for this workflow path; fail closed as today
+    }
+
+    let candidateWorkflow;
+    try {
+      const candidateSource = await fetchReusableWorkflowSource(
+        parsed.workflow,
+        parsed.revision,
+        fetchImpl,
+      );
+      candidateWorkflow = parseWorkflow(candidateSource, parsed.workflow);
+    } catch (error) {
+      diagnostics.set(reference, error.message);
+      continue;
+    }
+    const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow);
+
+    let matchedBasis;
+    let declineReason;
+    for (const basis of bases) {
+      let basisWorkflow;
+      try {
+        const basisSource = await fetchReusableWorkflowSource(
+          parsed.workflow,
+          basis.revision,
+          fetchImpl,
+        );
+        basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
+      } catch (error) {
+        declineReason = error.message;
+        continue;
+      }
+      const diffField = securitySurfaceDiffField(
+        reusableWorkflowSecuritySurface(basisWorkflow),
+        candidateSurface,
+      );
+      if (!diffField) {
+        matchedBasis = basis;
+        break;
+      }
+      declineReason = `${diffField} changed since the previously reviewed ${parsed.workflow}@${basis.revision}`;
+    }
+
+    if (!matchedBasis) {
+      diagnostics.set(
+        reference,
+        declineReason ?? `no previously approved revision of ${parsed.workflow} could be diffed`,
+      );
+      continue;
+    }
+
+    approved.set(reference, {
+      ...matchedBasis.contract,
+      autoApproved: { basisSha: matchedBasis.revision, approvedAt: now().toISOString() },
+    });
+  }
+
+  return { approved, diagnostics };
 }
 
 function routeStatus(jobId, target, job, jobs, policy, reusableContract) {
@@ -1644,6 +1845,8 @@ export async function auditRepository({
   policyPath = DEFAULT_POLICY_PATH,
   repositoryVisibility,
   githubRepository,
+  disableAutoApproval = process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL === "true",
+  fetchImpl = fetch,
 } = {}) {
   const resolvedRoot = path.resolve(root);
   const resolvedConfig = path.isAbsolute(configPath)
@@ -1679,6 +1882,16 @@ export async function auditRepository({
   const findings = [];
   const consumedExceptions = new Set();
   const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
+  if (!disableAutoApproval) {
+    const autoApproval = await resolveAutoApprovedContracts({ policy, workflowIndex, fetchImpl });
+    if (autoApproval.approved.size > 0) {
+      policy.approvedReusableWorkflowContracts = new Map([
+        ...policy.approvedReusableWorkflowContracts,
+        ...autoApproval.approved,
+      ]);
+    }
+    policy.autoApprovalDiagnostics = autoApproval.diagnostics;
+  }
   const localPermissionVisits = new Set();
   const localIncomingFiles = new Set();
   for (const record of workflowIndex.values()) {

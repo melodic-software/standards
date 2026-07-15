@@ -41,6 +41,11 @@ availability.
 - GitHub supplies repository visibility and `GITHUB_REPOSITORY` identity and
   later evaluates the accepted workflow. Those facts cross an external control-
   plane boundary.
+- `raw.githubusercontent.com` supplies the previously reviewed and candidate
+  workflow bytes used for auto-approval's structural diff. It is fetched at
+  audit time, over HTTPS, by immutable commit SHA; it is trusted only to the
+  extent of that byte-for-byte comparison, never as a source of new,
+  independently unreviewed contract terms.
 
 Checked-in `.github/runner-policy.json` and `.github/workflows/*.yml` are
 untrusted subjects of the audit. The distributed central policy and schemas are
@@ -59,10 +64,22 @@ GitHub is independent evidence; it must agree with checked-in inventory.
 3. The analyzer indexes regular top-level workflow YAML files, rejects workflow
    symlinks, and parses with aliases and merge keys disabled, strict parsing,
    and unique keys required.
-4. It follows repository-local reusable calls, evaluates routing, permission
+4. Before per-job checks run, the analyzer looks for path@SHA references that
+   share a workflow path with an already-reviewed contract but have no
+   contract of their own (a Dependabot SHA bump). For each, it fetches the
+   previously reviewed revision and the candidate revision from the source
+   repository over HTTPS and structurally diffs `permissions` and
+   `on.workflow_call.inputs`/`secrets`. A byte-identical surface auto-approves
+   the candidate under the reviewed contract; any fetch failure, parse
+   failure, or surface change leaves it unapproved and folds the reason into
+   the existing fail-closed diagnostic. This is the only network access the
+   analyzer performs, and it never widens a contract's declared inputs,
+   secrets, or permissions — it only extends a byte-identical, already-
+   reviewed surface to a new SHA.
+5. It follows repository-local reusable calls, evaluates routing, permission
    flow, credentials, structural hosted requirements, immutable external
    contracts, and exact exception consumption.
-5. Findings and the process exit status cross back to CI. No repository file,
+6. Findings and the process exit status cross back to CI. No repository file,
    GitHub setting, runner, or remote workflow is changed.
 
 ## Threats, controls, and evidence
@@ -77,6 +94,7 @@ GitHub is independent evidence; it must agree with checked-in inventory.
 | Selector failure silently drops required work or routes through an unvalidated variable. | Workloads require the exact selector dependency, a cancellation-safe condition, and the governed literal hosted fallback. Fail-closed reporting contracts forward the selector result exactly. | Selector recovery, cancellation, dependency identity, fallback, and result-reporting cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | An exception becomes a blanket bypass or outlives its job. | Exceptions are keyed to one workflow and job, use allowlisted categories with justification, do not suppress runner-target rules, and fail on unused inventory. | Exception category, consumption, drift, and indirection cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | A policy or dependency change weakens validation unnoticed. | Central and repository schemas reject unknown shapes; component dependencies are exactly locked; CI runs behavioral tests and then audits this repository with external visibility evidence. | [`policy.schema.json`](policy.schema.json), [`repository-policy.schema.json`](repository-policy.schema.json), [`package-lock.json`](package-lock.json), and the `runner-policy` CI job. |
+| A Dependabot SHA bump of an already-reviewed reusable workflow is auto-approved even though the bump silently widened its permissions, inputs, or secrets contract. | Auto-approval requires a byte-identical structural match of `permissions` and `on.workflow_call.inputs`/`secrets` between the previously reviewed revision and the candidate, both fetched fresh from the source repository; any diff, fetch failure, or parse failure fails closed with the declined reason surfaced in the diagnostic. `disableAutoApproval`/`CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true` restores the pre-auto-approval behavior for any repository that wants no automatic extension at all. | Identical-surface, changed-permissions, changed-inputs, fetch-failure, and escape-hatch cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 
 The detailed operational contract and current approved references live in the
 [component README](README.md) and [`policy.json`](policy.json); this model does
@@ -84,10 +102,19 @@ not duplicate those changing inventories.
 
 ## Residual and accepted risk
 
-- The analyzer does not fetch or interpret the bytes behind an external
-  path-at-SHA. Standards maintainers must independently review those bytes
-  before updating the central contract; a compromised remote repository or
-  incorrect review remains a supply-chain risk.
+- Standards maintainers must independently review the bytes behind an
+  external path-at-SHA before it becomes the first `approvedReusableWorkflowContracts`
+  entry for that workflow path; a compromised remote repository or incorrect
+  review remains a supply-chain risk. Auto-approval never substitutes for
+  this initial review — it only extends an already-reviewed, byte-identical
+  security surface to a later SHA of the same workflow path, and it fetches
+  the diffed bytes fresh from the source repository at audit time rather than
+  trusting a cached or asserted copy.
+- The auto-approval fetch depends on `raw.githubusercontent.com` availability.
+  A network outage or block does not approve an unreviewed candidate; the
+  audit fails closed on the fetch error, the same as an unreviewed reference.
+  Repositories that want zero audit-time network access can set
+  `disableAutoApproval`/`CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`.
 - Credential detection is conservative static analysis, not shell or action
   semantic evaluation. A novel credential-minting action, obfuscated script, or
   GitHub feature may evade a specific pattern. Least `GITHUB_TOKEN` permissions,

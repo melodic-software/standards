@@ -182,6 +182,25 @@ unknown secret names, and alternate expressions:
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
 
+A path@SHA with no `approvedReusableWorkflowContracts` entry is not
+automatically rejected if the same workflow path already has a reviewed
+contract at a different SHA: this is the common Dependabot-bump case. Before
+the per-job checks run, the policy fetches both the previously reviewed
+revision and the candidate revision from the source repository and
+structurally diffs their security-relevant surface — `permissions`,
+`on.workflow_call.inputs`, and `on.workflow_call.secrets`. A byte-for-byte
+match on that surface auto-approves the candidate under the previously
+reviewed contract, stamped with `autoApproved: { basisSha, approvedAt }`
+provenance; anything else (a fetch failure, a parse failure, or any change to
+that surface) fails closed exactly as an unreviewed reference does, with the
+declined reason folded into the diagnostic. This is a deterministic structural
+comparison, not a judgment call, and it grants no blanket trust to a source
+repository — every other file in the called workflow, and any change to the
+security surface itself, still requires a human to add a new contract entry.
+Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
+in CI) to restore today's behavior and require an explicit contract for every
+SHA.
+
 Repository-local calls use only the canonical
 `./.github/workflows/<file>.yml` form. The policy resolves the regular checked-in
 file directly: traversal, subdirectories, symlinks, missing files, parse
