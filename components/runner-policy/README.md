@@ -192,20 +192,23 @@ of `on.workflow_call`, workflow- and effective job-level `permissions`,
 `on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
 runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls)
 and execution boundaries (`container`, `services`, and `environment`). A
-structural match on that surface auto-approves the candidate only when every
-successfully fetched, surface-matching reviewed revision agrees on the same
-effective contract terms. Multiple matching revisions with different input,
-secret, runner-input, or hosted-only contracts are ambiguous and fail closed;
-policy insertion order never selects the inherited authority. An approved
-candidate inherits that single agreed reviewed contract,
+structural match on that surface auto-approves the candidate only after every
+reviewed revision for that workflow path has been fetched, parsed, and
+validated, and every surface-matching revision agrees on the same effective
+contract terms. An unreachable or invalid reviewed basis leaves insufficient
+evidence and fails closed; multiple matching revisions with different input,
+secret, runner-input, or hosted-only contracts are likewise ambiguous and fail
+closed. Policy insertion order never selects the inherited authority. An
+approved candidate inherits that single agreed reviewed contract,
 stamped with `autoApproved: { basisSha, approvedAt }`
-provenance; anything else (no successfully fetched matching basis, any change
-to that surface, or disagreement among matching reviewed contracts) fails closed
-exactly as an unreviewed reference does, with the declined reason folded into
-the diagnostic. This is a deterministic structural comparison, not a judgment
-call, and it grants no blanket trust to a source repository. Changes outside
-that bounded runner-contract surface may be auto-approved; any change to the
-surface itself requires a human to add a new contract entry.
+provenance; anything else (incomplete reviewed-basis evidence, no matching
+basis, any change to that surface, or disagreement among matching reviewed
+contracts) fails closed exactly as an unreviewed reference does, with the
+declined reason folded into the diagnostic. This is a deterministic structural
+comparison, not a judgment call, and it grants no blanket trust to a source
+repository. Changes outside that bounded runner-contract surface may be
+auto-approved; any change to the surface itself requires a human to add a new
+contract entry.
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every
 SHA.

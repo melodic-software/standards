@@ -1099,9 +1099,11 @@ async function fetchReusableWorkflowSource(workflowPath, revision, fetchImpl) {
 // workflow_call inputs/secrets, and job routing shows no change. If multiple
 // reviewed revisions match that fetched surface, their effective reviewed
 // contracts must also agree; contract ambiguity fails closed rather than
-// letting policy insertion order select the inherited authority. Any fetch
-// Candidate fetch/parse failures, lack of a usable match, surface diffs, and
-// contract disagreement are surfaced back to the operator via diagnostics.
+// letting policy insertion order select the inherited authority. Every
+// reviewed basis must be fetched, parsed, and validated before any matching
+// basis can confer authority; partial evidence fails closed. Candidate or basis
+// failures, lack of a usable match, surface diffs, and contract disagreement
+// are surfaced back to the operator via deterministic diagnostics.
 async function resolveAutoApprovedContracts({
   policy,
   workflowIndex,
@@ -1172,26 +1174,33 @@ async function resolveAutoApprovedContracts({
     }
 
     const matchingBases = [];
+    const basisFailures = [];
     const declineReasons = [];
     for (const basis of [...bases].sort((left, right) =>
       left.revision.localeCompare(right.revision),
     )) {
-      let basisWorkflow;
+      let basisSurface;
       try {
         const basisSource = await fetchReusableWorkflowSource(
           parsed.workflow,
           basis.revision,
           fetchImpl,
         );
-        basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
+        const basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
+        basisSurface = reusableWorkflowSecuritySurface(basisWorkflow);
+        const malformedBasisField = malformedWorkflowCallMappingField(basisSurface);
+        if (malformedBasisField) {
+          throw new ConfigurationError(
+            `${malformedBasisField} declaration is malformed; on.workflow_call.${malformedBasisField} must be a mapping when declared`,
+          );
+        }
       } catch (error) {
-        declineReasons.push(error.message);
+        basisFailures.push(
+          `reviewed basis ${parsed.workflow}@${basis.revision} could not be fetched, parsed, or validated: ${error.message}`,
+        );
         continue;
       }
-      const diffField = securitySurfaceDiffField(
-        reusableWorkflowSecuritySurface(basisWorkflow),
-        candidateSurface,
-      );
+      const diffField = securitySurfaceDiffField(basisSurface, candidateSurface);
       if (!diffField) {
         matchingBases.push(basis);
         continue;
@@ -1199,6 +1208,11 @@ async function resolveAutoApprovedContracts({
       declineReasons.push(
         `${diffField} changed since the previously reviewed ${parsed.workflow}@${basis.revision}`,
       );
+    }
+
+    if (basisFailures.length > 0) {
+      diagnostics.set(reference, basisFailures.join("; "));
+      continue;
     }
 
     if (matchingBases.length === 0) {

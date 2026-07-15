@@ -2080,7 +2080,77 @@ test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts
   }
 });
 
-test("Dependabot SHA bump accepts multiple surface-matching bases with one effective contract", async () => {
+test("Dependabot SHA bump declines partial reviewed-basis evidence independent of insertion order", async () => {
+  const strictContract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  const broaderContract = {
+    ...strictContract,
+    allowedInputs: ["runner", "extra"],
+  };
+  const failures = [
+    ["unreachable", undefined, /404 Not Found/u],
+    ["parse-invalid", "name: [unterminated\n", /flow sequence|parse/iu],
+  ];
+
+  for (const [name, alternateSource, reasonPattern] of failures) {
+    let expectedDiagnostic;
+    for (const reverse of [false, true]) {
+      const entries = [
+        [REUSABLE_REFERENCE, strictContract],
+        [ALTERNATE_REUSABLE_REFERENCE, broaderContract],
+      ];
+      if (reverse) {
+        entries.reverse();
+      }
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: Object.fromEntries(entries),
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+        },
+      });
+      const sources = {
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        ...(alternateSource === undefined ? {} : { [ALTERNATE_REVIEWED_SHA]: alternateSource }),
+      };
+      const findings = await audit(root, { fetchImpl: fetchImplFor(sources) });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
+      const diagnostic = contractFinding.message.match(
+        /auto-approval declined: ([\s\S]*)\)$/u,
+      )?.[1];
+      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
+      assert.match(
+        diagnostic,
+        new RegExp(
+          `^reviewed basis ${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA} could not be fetched, parsed, or validated: `,
+        ),
+        `${name}, reverse=${reverse}`,
+      );
+      assert.match(diagnostic, reasonPattern, `${name}, reverse=${reverse}`);
+      if (expectedDiagnostic === undefined) {
+        expectedDiagnostic = diagnostic;
+      } else {
+        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
+      }
+    }
+  }
+});
+
+test("Dependabot SHA bump accepts all reachable surface-matching bases with one effective contract", async () => {
   const contract = {
     routing: "runner-input",
     runnerInput: "runner",
