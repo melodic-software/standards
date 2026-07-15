@@ -907,10 +907,13 @@ function normalizePermissionsSurface(permissions) {
 }
 
 function normalizeDeclarationSurface(declaration) {
-  if (declaration === null || typeof declaration !== "object" || Array.isArray(declaration)) {
-    return {};
+  if (declaration === undefined || declaration === null) {
+    return { declaration: "mapping", value: {} };
   }
-  return normalizeStructuralValue(declaration);
+  if (typeof declaration !== "object" || Array.isArray(declaration)) {
+    return { declaration: "invalid", value: normalizeStructuralValue(declaration) };
+  }
+  return { declaration: "mapping", value: normalizeStructuralValue(declaration) };
 }
 
 // The security-relevant surface of a reusable workflow: whether it remains
@@ -1021,6 +1024,15 @@ function reusableWorkflowSecuritySurface(workflow) {
   };
 }
 
+function malformedWorkflowCallMappingField(surface) {
+  for (const field of ["inputs", "secrets"]) {
+    if (surface[field].declaration === "invalid") {
+      return field;
+    }
+  }
+  return undefined;
+}
+
 function securitySurfaceDiffField(basis, candidate) {
   for (const key of [
     "workflowCall",
@@ -1125,6 +1137,14 @@ async function resolveAutoApprovedContracts({
       continue;
     }
     const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow);
+    const malformedField = malformedWorkflowCallMappingField(candidateSurface);
+    if (malformedField) {
+      diagnostics.set(
+        reference,
+        `${malformedField} declaration is malformed; on.workflow_call.${malformedField} must be a mapping when declared`,
+      );
+      continue;
+    }
 
     let matchedBasis;
     let declineReason;

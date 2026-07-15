@@ -331,6 +331,24 @@ jobs:
     steps: []
 `;
 
+function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
+  const declaration = [
+    "  workflow_call:",
+    ...(inputs === undefined ? [] : [`    inputs:${inputs === null ? "" : ` ${inputs}`}`]),
+    ...(secrets === undefined ? [] : [`    secrets:${secrets === null ? "" : ` ${secrets}`}`]),
+  ].join("\n");
+  return `name: hosted-check
+on:
+${declaration}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps: []
+`;
+}
+
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
 });
@@ -2251,6 +2269,103 @@ test("Dependabot SHA bump with a malformed workflow_call declaration is declined
       `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
     ),
   );
+});
+
+test("Dependabot SHA bump with malformed workflow_call input or secret maps is declined", async () => {
+  for (const field of ["inputs", "secrets"]) {
+    for (const [kind, value] of [
+      ["boolean", "false"],
+      ["scalar", "malformed"],
+      ["array", "[]"],
+    ]) {
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: {
+            [REUSABLE_REFERENCE]: {
+              routing: "hosted-only",
+              allowedInputs: [],
+              allowedSecrets: {},
+              fixedRunsOn: ["ubuntu-24.04"],
+            },
+          },
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  check:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+`,
+        },
+      });
+      const findings = await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: reusableWorkflowWithCallMappings(),
+          [DEPENDABOT_BUMP_SHA]: reusableWorkflowWithCallMappings({ [field]: value }),
+        }),
+      });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${field} ${kind}`);
+      assert.match(
+        contractFinding.message,
+        new RegExp(
+          `auto-approval declined: ${field} declaration is malformed; on\\.workflow_call\\.${field} must be a mapping when declared`,
+        ),
+        `${field} ${kind}`,
+      );
+    }
+  }
+});
+
+test("Dependabot SHA bump preserves equivalent omitted, null, and empty workflow_call maps", async () => {
+  for (const [name, basisSource, candidateSource] of [
+    [
+      "omitted to explicit empty",
+      reusableWorkflowWithCallMappings(),
+      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
+    ],
+    [
+      "explicit empty to null",
+      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
+      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
+    ],
+    [
+      "null to omitted",
+      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
+      reusableWorkflowWithCallMappings(),
+    ],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [REUSABLE_REFERENCE]: {
+            routing: "hosted-only",
+            allowedInputs: [],
+            allowedSecrets: {},
+            fixedRunsOn: ["ubuntu-24.04"],
+          },
+        },
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  check:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+`,
+      },
+    });
+    assert.deepEqual(
+      await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: basisSource,
+          [DEPENDABOT_BUMP_SHA]: candidateSource,
+        }),
+      }),
+      [],
+      name,
+    );
+  }
 });
 
 test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
