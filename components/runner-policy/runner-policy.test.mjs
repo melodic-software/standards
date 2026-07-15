@@ -242,6 +242,24 @@ jobs:
     steps: []
 `;
 
+const REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: self-hosted
+    steps: []
+`;
+
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
 });
@@ -1956,6 +1974,33 @@ test("Dependabot SHA bump that adds a job-level permissions grant is declined wi
     new RegExp(
       `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
     ),
+  );
+});
+
+test("Dependabot SHA bump that flips a job's runs-on to self-hosted is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
   );
 });
 

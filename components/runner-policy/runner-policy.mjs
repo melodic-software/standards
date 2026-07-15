@@ -940,6 +940,31 @@ function jobPermissionsSurface(workflow) {
   );
 }
 
+// The reusable contract this feature auto-approves is specifically a
+// routing contract (runner-input or hosted-only), so the candidate's actual
+// runner target is part of its security surface: a bumped SHA that keeps the
+// same workflow_call inputs/secrets and permissions but flips jobs.*.runs-on
+// (e.g. from `${{ inputs.runner }}` to a hardcoded `self-hosted`) must not be
+// silently auto-approved. jobs.*.strategy is captured alongside runs-on
+// because a matrix-driven runs-on (e.g. `${{ matrix.os }}`) can change its
+// resolved runner target purely by the matrix values changing, without the
+// runs-on literal itself changing.
+function jobRoutingSurface(workflow) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.fromEntries(
+    Object.entries(jobs)
+      .filter(([, job]) => job !== null && typeof job === "object" && !Array.isArray(job))
+      .map(([jobId, job]) => [
+        jobId,
+        { runsOn: job["runs-on"] ?? null, strategy: job.strategy ?? null },
+      ])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
 function reusableWorkflowSecuritySurface(workflow) {
   const workflowCall =
     workflow.on !== null && typeof workflow.on === "object" && !Array.isArray(workflow.on)
@@ -954,11 +979,12 @@ function reusableWorkflowSecuritySurface(workflow) {
     inputs: normalizeDeclarationSurface(declaration.inputs),
     secrets: normalizeDeclarationSurface(declaration.secrets),
     jobPermissions: jobPermissionsSurface(workflow),
+    routing: jobRoutingSurface(workflow),
   };
 }
 
 function securitySurfaceDiffField(basis, candidate) {
-  for (const key of ["permissions", "inputs", "secrets", "jobPermissions"]) {
+  for (const key of ["permissions", "inputs", "secrets", "jobPermissions", "routing"]) {
     if (JSON.stringify(basis[key]) !== JSON.stringify(candidate[key])) {
       return key;
     }
