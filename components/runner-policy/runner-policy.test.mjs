@@ -21,6 +21,8 @@ const FAIL_CLOSED_SEMANTIC_PR_REFERENCE = `melodic-software/ci-workflows/.github
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PRODUCTION_SHA}`;
+const RETIREMENT_ALIGNED_GUARD_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
+const RETIREMENT_PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${RETIREMENT_ALIGNED_GUARD_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
@@ -1008,6 +1010,12 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     },
   );
   assert.deepEqual(contracts[PULUMI_DRIFT_REUSABLE_REFERENCE], {
+    routing: "hosted-only",
+    allowedInputs: [],
+    allowedSecrets: {},
+    fixedRunsOn: ["ubuntu-24.04"],
+  });
+  assert.deepEqual(contracts[RETIREMENT_PULUMI_DRIFT_REUSABLE_REFERENCE], {
     routing: "hosted-only",
     allowedInputs: [],
     allowedSecrets: {},
