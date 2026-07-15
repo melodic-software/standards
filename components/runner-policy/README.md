@@ -190,8 +190,12 @@ revision and the candidate revision from the source repository and
 structurally diffs their security-relevant surface — the presence and validity
 of `on.workflow_call`, workflow- and effective job-level `permissions`,
 `on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
-runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls)
-and execution boundaries (`container`, `services`, and `environment`). A
+runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
+execution boundaries (`container`, `services`, and `environment`), and whether
+any job trips the same privileged-control-plane credential detection already
+enforced against every directly declared or repository-local job (deployment
+environments, unapproved credential expressions, and `localCredentialActions`
+entries such as `actions/create-github-app-token`). A
 structural match on that surface auto-approves the candidate only after every
 reviewed revision for that workflow path has been fetched, parsed, and
 validated, and every surface-matching revision agrees on the same effective

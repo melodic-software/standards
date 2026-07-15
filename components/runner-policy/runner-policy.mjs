@@ -918,11 +918,14 @@ function normalizeDeclarationSurface(declaration) {
 
 // The security-relevant surface of a reusable workflow: whether it remains
 // callable, the GITHUB_TOKEN permissions it requests, the workflow_call
-// inputs/secrets contract it exposes to callers, and its job routing.
-// Dependabot SHA bumps are eligible for deterministic auto-approval only when
-// this surface is structurally identical between a previously reviewed SHA
-// and the new SHA. Changes outside this deliberately bounded surface do not
-// change the runner contract and can be auto-approved.
+// inputs/secrets contract it exposes to callers, its job routing, and
+// whether any job trips the same privileged-control-plane credential
+// detection already enforced against every directly declared or
+// repository-local job. Dependabot SHA bumps are eligible for deterministic
+// auto-approval only when this surface is structurally identical between a
+// previously reviewed SHA and the new SHA. Changes outside this deliberately
+// bounded surface do not change the runner contract and can be
+// auto-approved.
 //
 // The workflow-level permissions block is only the caller-visible default: a
 // job can declare its own permissions: block that grants more than that
@@ -1012,7 +1015,41 @@ function workflowCallSurface(workflow) {
   return { declared: true, valid: true };
 }
 
-function reusableWorkflowSecuritySurface(workflow) {
+// A fetched external reusable workflow's jobs are never added to the local
+// workflowIndex, so without this they never pass through
+// privilegedHostedRequirement the way every directly declared or
+// repository-local job does. That gap would let a Dependabot SHA bump add a
+// localCredentialActions entry (e.g. actions/create-github-app-token) or an
+// unapproved credential expression to a called job's steps/env while leaving
+// permissions, workflow_call, and runs-on unchanged, and auto-approval would
+// never observe it. Applying privilegedHostedRequirement here, per job, with
+// no selector/target/localCall context (so the credential and environment
+// checks are not skipped), closes that gap using the exact same detection
+// logic already trusted for direct/local jobs.
+function jobCredentialSurface(workflow, policy) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.fromEntries(
+    Object.entries(jobs)
+      .filter(([, job]) => job !== null && typeof job === "object" && !Array.isArray(job))
+      .map(([jobId, job]) => [
+        jobId,
+        privilegedHostedRequirement(
+          workflow,
+          job,
+          { isSelector: false },
+          undefined,
+          policy,
+          undefined,
+        ) ?? null,
+      ])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function reusableWorkflowSecuritySurface(workflow, policy) {
   const declaration = workflowCallDeclaration(workflow) ?? {};
   return {
     workflowCall: workflowCallSurface(workflow),
@@ -1021,6 +1058,7 @@ function reusableWorkflowSecuritySurface(workflow) {
     secrets: normalizeDeclarationSurface(declaration.secrets),
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),
+    credentials: jobCredentialSurface(workflow, policy),
   };
 }
 
@@ -1041,6 +1079,7 @@ function securitySurfaceDiffField(basis, candidate) {
     "secrets",
     "jobPermissions",
     "routing",
+    "credentials",
   ]) {
     if (JSON.stringify(basis[key]) !== JSON.stringify(candidate[key])) {
       return key;
@@ -1163,7 +1202,7 @@ async function resolveAutoApprovedContracts({
       diagnostics.set(reference, error.message);
       continue;
     }
-    const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow);
+    const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow, policy);
     const malformedField = malformedWorkflowCallMappingField(candidateSurface);
     if (malformedField) {
       diagnostics.set(
@@ -1187,7 +1226,7 @@ async function resolveAutoApprovedContracts({
           fetchImpl,
         );
         const basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
-        basisSurface = reusableWorkflowSecuritySurface(basisWorkflow);
+        basisSurface = reusableWorkflowSecuritySurface(basisWorkflow, policy);
         const malformedBasisField = malformedWorkflowCallMappingField(basisSurface);
         if (malformedBasisField) {
           throw new ConfigurationError(

@@ -262,6 +262,25 @@ jobs:
     steps: []
 `;
 
+const REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+`;
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -2304,6 +2323,42 @@ test("Dependabot SHA bump that flips a job's runs-on to self-hosted is declined 
   assert.match(
     contractFinding.message,
     new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+// Regression test for a gap where a called job's fetched steps/env were
+// outside the compared auto-approval surface: permissions, workflow_call,
+// and runs-on could stay identical while a bumped SHA added a
+// localCredentialActions entry (e.g. actions/create-github-app-token) to a
+// called job's steps, and the reusable job would still be auto-approved and
+// inherit the old self-hosted contract without the same privileged-hosted
+// credential check already enforced against direct/local jobs.
+test("Dependabot SHA bump that adds a credential-minting action to a called job's steps is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentials changed since the previously reviewed .*@${SHA}`,
+    ),
   );
 });
 
