@@ -1,0 +1,47 @@
+# Multi-tenancy review criteria
+
+Diff-time checks for a multi-tenant system, where one deployment serves many tenants over shared infrastructure. These bars are about **horizontal authorization** — keeping an already-authenticated, already-in-boundary request confined to its own tenant. [security.md](security.md) owns the vertical boundary (is the request authentic, sanitized, non-injecting); this file owns everything downstream of "we know who is calling": that every data touch, cache read, queued job, and configuration lookup is scoped to that caller's tenant and no other. A cross-tenant read or write is a confidentiality and data-integrity defect, so its default severity is Critical. Severity labels are defined in [README.md](README.md).
+
+Only shared-infrastructure ("pool") paths are in scope. Where a path runs on infrastructure physically dedicated to one tenant, the scoping predicate is redundant and these bars do not apply.
+
+## Tenant-scoped data access
+
+- **Missing tenant predicate** — a new or changed data-access path (repository method, ORM query, raw SQL, aggregate load, batch operation, search-index query, report) that reaches tenant-owned data with no tenant scope: a `WHERE tenant_id = …`, a tenant-scoped session, or a row-level-security context. The classic hunk is a new query added beside tenant-scoped siblings that omits the clause, or a raw query bypassing the shared tenant-scoped data layer. Critical. Isolation belongs to a shared mechanism outside each developer's view, not to the individual query author — repeatedly catching a missing predicate in review is the signal to enforce scoping in the data layer itself ([AWS SaaS Lens — the isolation mindset](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/isolation-mindset.html)).
+- **Fetch-by-id without ownership** — a lookup keyed only by an object id that returns it without confirming the record belongs to the caller's tenant. The tenant predicate is what makes a guessed id return nothing. Critical.
+- **Per-tenant key selection** — *only where a per-tenant customer-managed key is an established design invariant* — a new encrypt or decrypt path that resolves the key by something other than the request's tenant, or falls back to a shared key where the design mandates a per-tenant one. Important; Critical where a per-tenant key is a stated compliance obligation.
+
+## Tenant identity and trust
+
+- **Client-supplied tenant used for scoping** — a handler that re-derives the tenant from a client-controlled field (body, query string, `Tenant-Id` header, path segment) to make an authorization or scoping decision, instead of the tenant established in the security context at ingress. A `?? defaultTenant` fallback, or the tenant re-parsed from a different source deeper in the stack, is the same defect. Critical when the value governs access; Important when it feeds only routing or telemetry. The presence of a client-supplied tenant id is not the finding — *using it to grant access* is ([Azure — map requests to tenants](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests)).
+- **Enumerable cross-tenant identifiers** — a sequential or otherwise guessable id for tenant-owned data exposed as an external reference (URL segment, API field, redirect parameter), which turns one missing scope check into mass harvesting. Prefer an opaque, unpredictable reference. Critical as the tenant-crossing case of broken object-level authorization; softens to Suggestion only where the id is already non-enumerable and the scope check is demonstrably present — opacity layers onto scoping, it does not replace it ([OWASP API1:2023](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)).
+
+## Shared state and configuration
+
+- **Cache key omits the tenant** — a cache entry, memoization key, or shared in-process or static structure holding tenant-varying data whose key lacks the tenant discriminator, so one tenant is served another's cached value. Critical. Carve-out: genuinely tenant-invariant reference data (a shared lookup table, a global feature list) needs no tenant key ([Azure — app configuration for multitenancy](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/app-configuration)).
+- **Global config or flag driving a tenant decision** — a feature flag, limit, or setting read from a process-wide scope where the decision is tenant-varying, or a flag whose default opens a feature for every tenant when it should be per-tenant opt-in. Important; Critical when the flag governs a data-exposure or authorization decision, such as a cross-tenant admin view.
+
+## Asynchronous work
+
+- **Tenant context lost across the async boundary** — work enqueued (message, job, domain or integration event, scheduled task) without the tenant carried in its payload or metadata; a consumer that reads an ambient or default tenant instead of the one the message carries; a fan-out or scheduled job that runs tenant-scoped queries under a leaked or absent tenant. Critical when the worker performs tenant-scoped access under the wrong or absent tenant; Important when only correlation is lost ([Azure — messaging approaches](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/messaging)).
+
+## Fairness
+
+- **Unbounded tenant-triggerable work** — a new shared, resource-intensive path reachable by a tenant (large export, fan-out, heavy report, bulk job, shared worker pool) added with no per-tenant fairness control: a rate limit, quota, or per-tenant concurrency cap. Important; Critical where the unbounded path enables a cross-tenant denial of service on a critical shared resource ([Azure — noisy-neighbor antipattern](https://learn.microsoft.com/en-us/azure/architecture/antipatterns/noisy-neighbor/noisy-neighbor)).
+
+## Tenant lifecycle
+
+- **Offboarding misses a store** — a change that adds a new place tenant data lives (a table, denormalized copy, search index, cache, blob container, queue, external-system record) without extending the tenant deletion or retention path to purge it. Residual data is both a legal-destruction failure and a latent exposure surface. The review action is diff-local: a new tenant-data store appears, so confirm the deletion path covers it. Critical ([Azure — tenant lifecycle](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenant-life-cycle)).
+- **Provisioning defaults** — onboarding that seeds a new tenant with global-scope access or another tenant's defaults. Important.
+
+## Boundaries
+
+- **vs `security.md`** — security owns the vertical boundary: authentication, input validation, injection, secrets, transport. This file owns horizontal confinement of an authenticated request. General same-tenant object-level authorization stays with security; multi-tenancy carves out only the tenant-crossing case.
+- **vs `performance.md`** — performance owns absolute efficiency and cache invalidation. This file owns the fairness dimension (one tenant cannot exhaust shared capacity) and the tenant-in-the-key dimension of caching.
+- **vs `concurrency.md`** — concurrency owns the mechanism of carrying ambient context across async boundaries and the thread-safety of shared state. This file owns that the tenant specifically survives the hop and that shared state is keyed by tenant.
+- **vs `observability.md`** — observability owns trace and log context and treats the tenant as a correlation tag. This file owns that losing the tenant is a scoping failure, not only a telemetry gap.
+
+## Sources
+
+- AWS Well-Architected SaaS Lens — [the isolation mindset](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/isolation-mindset.html), [tenant isolation](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/tenant-isolation.html)
+- OWASP — [API1:2023 Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- Azure Architecture Center — [map requests to tenants](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests), [storage and data approaches](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data), [messaging approaches](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/messaging), [app configuration](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/app-configuration), [noisy-neighbor antipattern](https://learn.microsoft.com/en-us/azure/architecture/antipatterns/noisy-neighbor/noisy-neighbor), [tenant lifecycle](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenant-life-cycle)
