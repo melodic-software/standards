@@ -205,13 +205,23 @@ selector for adaptive policies. The liveness-routing revision at
 `3415de3ff2fafee40e4d087eb6073d2f6952b595` routes to the managed fleet
 whenever a matching runner is online — busy runners queue instead of falling
 back to hosted — removes the rerun-to-hosted branch so a re-run keeps its
-original route, and reports `online-runner-count`. Five selector revisions
-remain approved for an ordered consumer rollout. GitHub does not allow a
-reusable workflow to target a self-hosted runner group owned by a different
-repository owner, so these two strict-scheduling revisions are approved only
-for `melodic-software`; `kyle-sexton` repositories cannot select them. The
-three older revisions remain globally approved until compatible consumers
-migrate.
+original route, and reports `online-runner-count`. The revision at
+`f2d5e06757201f2fce187096a2c6fa805836c3d2` carries that selector
+byte-identical; it is approved so consumer pins adopting the repository's
+non-shallow Gitleaks scan fix keep a reviewed selector reference. The
+Dependabot-routing revision at `3931f91ccba9bfe97500196091ae2cc039672952`
+retires the Dependabot hosted-only guard with the owner's named approval:
+same-repository Dependabot runs route like pushes, sourcing the observer key
+from the organization's Dependabot secrets store, while fork and public guards
+are unchanged and the key stays confined to the selector job. Until
+`CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
+keep falling back hosted (`missing-secret`), so rollout is fail-safe.
+Seven selector revisions remain approved for an ordered consumer rollout.
+GitHub does not allow a reusable workflow to target a self-hosted runner group
+owned by a different repository owner, so these four strict-scheduling
+revisions are approved only for `melodic-software`; `kyle-sexton` repositories
+cannot select them. The three older revisions remain globally approved until
+compatible consumers migrate.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 strict consumers may route that advisory lane through the approved selector
