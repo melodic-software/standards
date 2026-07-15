@@ -74,7 +74,7 @@ GitHub is independent evidence; it must agree with checked-in inventory.
 | A moving reference or opaque wrapper changes reviewed execution. | Selector and external reusable workflows use exact path-at-40-character-SHA contracts. Local wrappers are recursively inspected; traversal, missing files, cycles, undeclared inputs or secrets, and `secrets: inherit` fail closed. | Selector-pin, reusable-contract, local-call traversal, recursion, input, secret, and wrapper cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | YAML ambiguity hides a different workflow graph. | The parser requires unique keys, disables aliases and merge keys, and records parse failures. Only regular top-level workflow files are indexed; symlinks are findings. | Duplicate-key and workflow-symlink cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | Duplicate JSON member names make a policy or schema interpretation-dependent. | Raw central policy, repository policy, and both schemas are preflighted with the pinned parser's strict unique-key mode before `JSON.parse`; diagnostics identify the affected path. This enforces the interoperability guidance in [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). | Top-level and nested duplicate-member cases for all four load classes in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
-| Selector failure silently drops required work or routes through an unvalidated variable. | Workloads require the exact selector dependency and a cancellation-safe condition. Ordinary routes use the governed literal hosted fallback; required no-default local calls require the raw output plus exact self-hosted proof. A scheduled zero-cost rejection guard uses one reserved unmatched label only under the exact complement, including selector failure. Fail-closed reporting contracts forward the selector result exactly. | Selector recovery, cancellation, dependency identity, fallback, required-input, sentinel-shape, and result-reporting cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| Selector failure silently drops required work or routes through an unvalidated variable. | Workloads require the exact selector dependency and a cancellation-safe condition. Ordinary routes use the governed literal hosted fallback; required no-default local calls require the raw output plus exact self-hosted proof, and the analyzer requires that same workflow to also declare the reserved unmatched-label rejection job for the same selector, so a caller-condition skip cannot silently report Success in place of the sentinel's forced failure. Fail-closed reporting contracts forward the selector result exactly. | Selector recovery, cancellation, dependency identity, fallback, required-input, required-input-sentinel-pairing, sentinel-shape, and result-reporting cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | An exception becomes a blanket bypass or outlives its job. | Exceptions are keyed to one workflow and job, use allowlisted categories with justification, do not suppress runner-target rules, and fail on unused inventory. | Exception category, consumption, drift, and indirection cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | A policy or dependency change weakens validation unnoticed. | Central and repository schemas reject unknown shapes; component dependencies are exactly locked; CI runs behavioral tests and then audits this repository with external visibility evidence. | [`policy.schema.json`](policy.schema.json), [`repository-policy.schema.json`](repository-policy.schema.json), [`package-lock.json`](package-lock.json), and the `runner-policy` CI job. |
 
@@ -105,10 +105,12 @@ not duplicate those changing inventories.
 - The literal hosted fallback preserves scheduling availability but spends
   hosted capacity and does not make a failed selector healthy. Operational
   monitoring must still surface selector failures.
-- The zero-cost rejection sentinel intentionally delays terminal failure until
-  GitHub's 24-hour unmatched self-hosted queue limit. Its safety also depends on
-  the external runner inventory never assigning `ci-runner-selection-failed`;
-  the one-minute timeout only bounds execution after an accidental assignment.
+- The rejection sentinel intentionally delays terminal failure until GitHub's
+  24-hour unmatched self-hosted queue limit; this applies to every workflow
+  that uses the required no-default local runner input, not only scheduled
+  ones. Its safety also depends on the external runner inventory never
+  assigning `ci-runner-selection-failed`; the one-minute timeout only bounds
+  execution after an accidental assignment.
 
 No exception inside `.github/runner-policy.json` accepts these model-level
 risks. A risk acceptance is recorded in the owning repository with scope,

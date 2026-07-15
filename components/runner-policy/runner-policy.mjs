@@ -1035,7 +1035,7 @@ function routeStatus(jobId, target, job, jobs, policy, reusableContract, localRu
   if (!condition.approved) {
     return { attempted: true, approved: false, reason: condition.reason };
   }
-  return { attempted: true, approved: true, selectorId };
+  return { attempted: true, approved: true, selectorId, required: usesRequiredInput };
 }
 
 function failClosedSelectorConditionStatus(job, selectorId, selectorResultInput) {
@@ -1957,6 +1957,23 @@ export async function auditRepository({
       continue;
     }
 
+    const unroutableFailureSelectorIds = new Set();
+    for (const [innerJobId, innerJob] of Object.entries(workflow.jobs)) {
+      if (innerJob === null || typeof innerJob !== "object" || Array.isArray(innerJob)) {
+        continue;
+      }
+      const innerUnroutableFailure = unroutableFailureStatus(
+        innerJobId,
+        innerJob["runs-on"],
+        innerJob,
+        workflow.jobs,
+        policy,
+      );
+      if (innerUnroutableFailure?.approved) {
+        unroutableFailureSelectorIds.add(innerUnroutableFailure.selectorId);
+      }
+    }
+
     for (const [jobId, job] of Object.entries(workflow.jobs)) {
       if (job === null || typeof job !== "object" || Array.isArray(job)) {
         findings.push(finding("job-shape", file, jobId, "job must be a mapping"));
@@ -2105,6 +2122,25 @@ export async function auditRepository({
         continue;
       }
       if (target?.kind === "selector-output" && target.approved) {
+        // Only the required no-default form needs a paired sentinel: the
+        // optional-default form's literal `|| 'default'` fallback keeps the
+        // job running on selector failure, while the required form's caller
+        // condition instead skips the job outright, and GitHub reports a
+        // condition-skipped job Success.
+        if (target.route.required && !unroutableFailureSelectorIds.has(target.route.selectorId)) {
+          findings.push(
+            finding(
+              "selector-required-input-sentinel",
+              file,
+              jobId,
+              `${jobId} consumes the raw selector output for a required no-default runner input; ` +
+                `the workflow must also declare an approved unroutable-failure sentinel job ` +
+                `(runs-on: ${policy.governedReusableRunnerInput.failureSentinel}) depending on ` +
+                `${target.route.selectorId}, or a condition-skipped selector failure reports Success ` +
+                `and cannot fail the required check`,
+            ),
+          );
+        }
         continue;
       }
       if (attemptsSelectorRoute) {

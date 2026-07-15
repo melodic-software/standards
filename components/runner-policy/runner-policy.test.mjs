@@ -2112,6 +2112,17 @@ ${SELECTOR}  build:
     uses: ./.github/workflows/build.yml
     with:
       runner: \${{ needs.choose.outputs.runner }}
+  reject-route:
+    needs: choose
+    if: \${{ !cancelled() && (needs.choose.result != 'success' || !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}
+    runs-on: ci-runner-selection-failed
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Reject non-governed route
+        run: |
+          echo "::error::A governed self-hosted route is required"
+          exit 1
 `,
       "build.yml": `on:
   workflow_call:
@@ -2127,6 +2138,90 @@ jobs:
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("required repository-local runner input without its companion unroutable-failure sentinel fails closed", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, job, message }) =>
+        rule === "selector-required-input-sentinel" &&
+        job === "build" &&
+        message.includes("unroutable-failure sentinel"),
+    ),
+  );
+});
+
+test("required repository-local runner input rejects a sentinel wired to a different selector", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  chooseOther:
+${SELECTOR}  build:
+    needs: choose
+    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner }}
+  reject-route:
+    needs: chooseOther
+    if: \${{ !cancelled() && (needs.chooseOther.result != 'success' || !(needs.chooseOther.outputs.route == 'self-hosted' && needs.chooseOther.outputs.runner != '' && needs.chooseOther.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}
+    runs-on: ci-runner-selection-failed
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Reject non-governed route
+        run: |
+          echo "::error::A governed self-hosted route is required"
+          exit 1
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, job }) => rule === "selector-required-input-sentinel" && job === "build",
+    ),
+    "a sentinel job wired to an unrelated selector must not satisfy the pairing requirement",
+  );
 });
 
 test("required local runner input rejects weak routes and ambiguous declarations", async () => {

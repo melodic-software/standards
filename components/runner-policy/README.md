@@ -313,6 +313,13 @@ co-trigger invalidates either routing contract because those entry points share
 the workflow's `inputs` context. GitHub documents required reusable-workflow
 inputs; separately, an optional string without a default becomes `""`, which is
 why the no-fallback form is required rather than merely omitting `default`.[9]
+Because the required form has no literal fallback, a selector that fails,
+returns empty, or resolves outside `self-hosted` makes the caller condition
+false and GitHub skips the job instead of running it. A skipped job reports
+Success, so the workflow that declares the required form must also declare the
+reserved unroutable-failure sentinel job below for the same selector; the
+analyzer reports `selector-required-input-sentinel` when that companion job is
+missing.
 
 One exact literal, `ci-runner-selection-failed`, is reserved as an unroutable
 failure sentinel. It is not a general runner target or fallback. The analyzer
