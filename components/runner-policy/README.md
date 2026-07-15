@@ -286,10 +286,29 @@ literal-fallback expression through its canonical `runner` input:
 The exact contract applies equally to cross-repository and repository-local
 reusable callers. Reusable workflow definitions may use
 `runs-on: ${{ inputs.runner }}` only when `workflow_call` is the file's exclusive
-trigger and `on.workflow_call.inputs.runner` is an optional string with the
-governed `ubuntu-24.04` default. A `workflow_dispatch`, schedule, push, or other
-co-trigger invalidates that routing contract because those entry points share
-the workflow's `inputs` context.
+trigger. The runner input must be either an optional string with the governed
+`ubuntu-24.04` default, or `required: true` with no `default`. The required form
+accepts only the raw selector output and requires the caller condition to prove
+selector success, the `self-hosted` route, a non-empty runner, and equality with
+`vars.CI_SELF_HOSTED_LABEL`. A `workflow_dispatch`, schedule, push, or other
+co-trigger invalidates either routing contract because those entry points share
+the workflow's `inputs` context. GitHub documents required reusable-workflow
+inputs; separately, an optional string without a default becomes `""`, which is
+why the no-fallback form is required rather than merely omitting `default`.[9]
+
+One exact literal, `ci-runner-selection-failed`, is reserved as an unroutable
+failure sentinel. It is not a general runner target or fallback. The analyzer
+accepts it only for a selector-dependent rejection job with one selector in
+`needs`, the exact complement of a successful governed self-hosted route
+(including an explicit selector-failure arm),
+`timeout-minutes: 1`, `permissions: {}`, no environment, secrets, action, or
+other executable surface, and one static error annotation followed by `exit 1`.
+GitHub leaves a self-hosted-labelled job queued when no matching runner exists
+and fails it after 24 hours,[10] so this exceptional guard fails a scheduled run
+without consuming a hosted minute. The one-minute execution timeout does not
+shorten that queue period; it limits execution only if a runner is mistakenly
+given the reserved label. The guard exists because a condition-skipped job
+reports Success and cannot by itself make a required check fail.[11]
 
 The only other dynamic `runs-on` form is a configured hosted matrix expression
 (`matrix.os` or `matrix.runner`) backed by a non-empty, static array containing
@@ -373,3 +392,6 @@ default `GITHUB_TOKEN` permissions][7].
 [6]: https://docs.github.com/en/actions/reference/evaluate-expressions-in-workflows-and-actions#status-check-functions
 [7]: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#setting-the-permissions-of-the-github_token-for-your-repository
 [8]: https://json-schema.org/draft/2020-12/json-schema-validation#section-6.4.2
+[9]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow
+[10]: https://docs.github.com/en/actions/reference/runners/self-hosted-runners#routing-precedence-for-self-hosted-runners
+[11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions

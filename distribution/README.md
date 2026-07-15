@@ -150,12 +150,19 @@ must add all of the following in the same integration PR:
 4. Workflow routing and exception inventory that pass the gate at the reviewed
    selector/reusable-workflow SHA in the distributed `policy.json`.
 
-Every selector-dependent direct job and reusable caller uses the same recovery
+Selector-dependent direct jobs and ordinary reusable callers use the recovery
 contract: `if: ${{ !cancelled() }}` (safely conjoined with any existing
 predicate) and `${{ needs.<selector>.outputs.runner || 'ubuntu-24.04' }}` as the
 direct `runs-on` value or canonical `with.runner` input. The fallback never
 reads `vars.CI_HOSTED_RUNNER`, because selector failure means that value was not
 validated by the selector.
+
+A repository-local reusable workflow may instead require its runner input with
+no default. That zero-hosted-fallback form passes the raw selector output only
+behind the exact successful self-hosted-route proof. The reserved
+`ci-runner-selection-failed` literal is accepted solely for the narrowly shaped
+scheduled rejection guard documented by the runner-policy component; it is not
+a general workload runner or fallback.
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
