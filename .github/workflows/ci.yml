@@ -478,12 +478,16 @@ jobs:
       paths: .
 
   osv-scanner:
+    needs: select-runner
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c # 99ac2f8 2026-07-11
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+    with:
+      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
 
   go-fixtures:
     needs: select-runner
