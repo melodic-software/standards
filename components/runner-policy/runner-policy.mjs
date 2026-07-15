@@ -1173,6 +1173,7 @@ async function resolveAutoApprovedContracts({
 
     const matchingBases = [];
     const declineReasons = [];
+    const unreachableBases = [];
     for (const basis of [...bases].sort((left, right) =>
       left.revision.localeCompare(right.revision),
     )) {
@@ -1185,7 +1186,7 @@ async function resolveAutoApprovedContracts({
         );
         basisWorkflow = parseWorkflow(basisSource, parsed.workflow);
       } catch (error) {
-        declineReasons.push(error.message);
+        unreachableBases.push({ revision: basis.revision, message: error.message });
         continue;
       }
       const diffField = securitySurfaceDiffField(
@@ -1199,6 +1200,18 @@ async function resolveAutoApprovedContracts({
       declineReasons.push(
         `${diffField} changed since the previously reviewed ${parsed.workflow}@${basis.revision}`,
       );
+    }
+
+    // An unreachable basis could disagree with the reviewed contract terms this candidate would
+    // otherwise inherit from a matching basis, so its absence must fail closed rather than being
+    // silently dropped from the ambiguity check.
+    if (unreachableBases.length > 0) {
+      diagnostics.set(
+        reference,
+        `previously reviewed ${parsed.workflow}@${unreachableBases[0].revision} could not be diffed ` +
+          `(${unreachableBases[0].message}); refusing to auto-approve while a reviewed basis is unreachable`,
+      );
+      continue;
     }
 
     if (matchingBases.length === 0) {

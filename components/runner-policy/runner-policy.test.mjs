@@ -2124,6 +2124,56 @@ test("Dependabot SHA bump accepts multiple surface-matching bases with one effec
   }
 });
 
+test("Dependabot SHA bump is declined when a reviewed basis cannot be fetched, even if another basis matches", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  for (const reverse of [false, true]) {
+    const entries = [
+      [REUSABLE_REFERENCE, contract],
+      [ALTERNATE_REUSABLE_REFERENCE, { ...contract }],
+    ];
+    if (reverse) {
+      entries.reverse();
+    }
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: Object.fromEntries(entries),
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        // ALTERNATE_REVIEWED_SHA is deliberately omitted so it 404s: the matching basis
+        // (SHA) must not be enough to approve while the other reviewed basis is unreachable.
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, `reverse=${reverse}`);
+    assert.match(
+      contractFinding.message,
+      new RegExp(
+        `auto-approval declined: previously reviewed .*@${ALTERNATE_REVIEWED_SHA} could not be diffed .*refusing to auto-approve while a reviewed basis is unreachable`,
+      ),
+      `reverse=${reverse}`,
+    );
+  }
+});
+
 test("Dependabot SHA bump that adds write permissions is declined with a specific diagnostic", async () => {
   const root = await repository({
     visibility: "public",
