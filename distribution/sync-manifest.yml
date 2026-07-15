@@ -180,6 +180,8 @@ targets:
       - architecture-decisions
       - node-runtime
       - runner-policy
+    locally-owned:
+      - gitleaks
   melodic-software/provisioning:
     managed:
       - editorconfig-checker
