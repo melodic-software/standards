@@ -212,7 +212,10 @@ non-shallow Gitleaks scan fix keep a reviewed selector reference. The
 Dependabot-routing revision at `3931f91ccba9bfe97500196091ae2cc039672952`
 retires the Dependabot hosted-only guard with the owner's named approval:
 same-repository Dependabot runs route like pushes, sourcing the observer key
-from the Dependabot secrets store, while fork and public guards are unchanged.
+from the organization's Dependabot secrets store, while fork and public guards
+are unchanged and the key stays confined to the selector job. Until
+`CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
+keep falling back hosted (`missing-secret`), so rollout is fail-safe.
 Seven selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these four strict-scheduling
@@ -244,15 +247,6 @@ same integration that enables its policy gate, and the legacy entries are
 removed after the six consumer migrations. The policy records each complete
 path@SHA, fixed runner label, caller-input allowlist, and exact secret map;
 changing any field requires another review.
-The Dependabot-routing revision at
-`3931f91ccba9bfe97500196091ae2cc039672952` was independently reviewed: it
-retires the selector's Dependabot-must-stay-hosted guard so same-repository
-Dependabot bump PRs route through the fleet like any other push. Fork PRs and
-public repositories remain hosted-only, the observer key stays confined to
-the selector job, and on Dependabot events it resolves from the organization's
-Dependabot secrets store; until `CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored
-there, Dependabot runs keep falling back hosted (`missing-secret`), so
-rollout is fail-safe.
 
 ## Selector revision lockstep
 
