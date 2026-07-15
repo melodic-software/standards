@@ -12,6 +12,8 @@ trap 'rm -rf "$tmp_root"' EXIT
 command -v yq >/dev/null 2>&1 || skip_suite 'Mike Farah yq v4 is not installed'
 [[ "$(yq --version 2>/dev/null)" =~ version[[:space:]]+v?4\. ]] ||
   skip_suite 'Mike Farah yq v4 is required'
+[[ -f "$root/distribution/node_modules/ajv/package.json" ]] ||
+  skip_suite 'distribution dependencies are not installed (run npm ci --prefix distribution)'
 
 valid_manifest() {
   cat <<'YAML'
@@ -57,8 +59,9 @@ make_source() {
 }
 
 make_target() {
-  local dir="$1"
+  local dir="$1" target="${2:-alpha/one}"
   make_repo "$dir"
+  git -C "$dir" remote add origin "https://github.com/$target.git"
 }
 
 run_engine() {
@@ -71,17 +74,25 @@ manifest="$(valid_manifest)"
 source_repo="$tmp_root/valid-source"
 make_source "$source_repo" "$manifest"
 
-out="$(run_engine "$source_repo" validate 2>&1)"; rc=$?
+out="$({ printf '%s\n' "$manifest" | yq eval -o=json -I=0 '.' -; } |
+  node "$root/distribution/validate-sync-manifest.mjs" 2>&1)"
+rc=$?
+assert_exit 'schema and Bash entrypoint agree that the fixture structure is valid' 0 "$rc"
+
+out="$(run_engine "$source_repo" validate 2>&1)"
+rc=$?
 assert_exit 'valid multi-file manifest validates' 0 "$rc"
 assert_contains 'validation reports catalog size' "$out" '2 components, 2 targets'
 
-out="$(run_engine "$source_repo" matrix --targets ' beta/two , alpha/one ' 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" matrix --targets ' beta/two , alpha/one ' 2>&1)"
+rc=$?
 assert_exit 'matrix accepts an exact whitespace-trimmed filter' 0 "$rc"
 assert_eq 'matrix stays in manifest order' \
   '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"},{"repo":"beta/two","repo_owner":"beta","repo_name":"two"}]}' \
   "$out"
 
-out="$(run_engine "$source_repo" plan --targets beta/two 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" plan --targets beta/two 2>&1)"
+rc=$?
 assert_exit 'filtered plan succeeds' 0 "$rc"
 assert_contains 'plan logs managed mapping' "$out" 'consumer.txt -> consumer.txt'
 assert_contains 'plan identifies local ownership' "$out" 'locally-owned base (not modified)'
@@ -89,28 +100,32 @@ assert_not_contains 'plan excludes unselected target' "$out" 'alpha/one'
 
 # Regression: target selection must not inherit the false status of the last
 # manifest target when that target is outside the filter.
-out="$(run_engine "$source_repo" matrix --targets alpha/one 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" matrix --targets alpha/one 2>&1)"
+rc=$?
 assert_exit 'filtered matrix succeeds when the last manifest target is omitted' 0 "$rc"
 assert_eq 'filtered matrix contains only the requested earlier target' \
   '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"}]}' \
   "$out"
 
-out="$(run_engine "$source_repo" plan --targets alpha/one 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" plan --targets alpha/one 2>&1)"
+rc=$?
 assert_exit 'filtered plan succeeds when the last manifest target is omitted' 0 "$rc"
 assert_contains 'earlier-target plan includes the requested target' "$out" 'alpha/one'
 assert_not_contains 'earlier-target plan excludes the last manifest target' "$out" 'beta/two'
 
-out="$(run_engine "$source_repo" mappings --target beta/two 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" mappings --target beta/two 2>&1)"
+rc=$?
 assert_exit 'managed mapping renderer succeeds' 0 "$rc"
 assert_contains 'mapping renderer includes managed component' "$out" '**consumer**'
 assert_not_contains 'mapping renderer excludes locally-owned payload' "$out" '**base**'
 
 target_repo="$tmp_root/target-beta"
-make_target "$target_repo"
+make_target "$target_repo" beta/two
 printf 'local policy\n' >"$target_repo/.policy"
 git -C "$target_repo" add .policy
 git -C "$target_repo" commit -m local -q
-out="$(run_engine "$source_repo" apply --target beta/two --target-root "$target_repo" 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" apply --target beta/two --target-root "$target_repo" 2>&1)"
+rc=$?
 assert_exit 'apply accepts a dependency satisfied by locally-owned' 0 "$rc"
 assert_eq 'managed file content copied' 'consumer' "$(tr -d '\r\n' <"$target_repo/consumer.txt")"
 assert_eq 'locally-owned file remains untouched' 'local policy' "$(tr -d '\r\n' <"$target_repo/.policy")"
@@ -118,7 +133,8 @@ assert_file_absent 'locally-owned component support file is not copied' "$target
 
 target_repo="$tmp_root/target-alpha"
 make_target "$target_repo"
-out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+rc=$?
 assert_exit 'multi-file component applies in one operation' 0 "$rc"
 assert_file_exists 'root destination copied' "$target_repo/.policy"
 assert_file_exists 'nested destination copied' "$target_repo/tools/check.sh"
@@ -135,14 +151,101 @@ fi
 target_repo="$tmp_root/target-preflight"
 make_target "$target_repo"
 printf 'untracked collision\n' >"$target_repo/consumer.txt"
-out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+rc=$?
 assert_nonzero 'untracked destination is rejected' "$rc"
 assert_contains 'untracked rejection is explicit' "$out" 'refusing to overwrite untracked destination'
 assert_file_absent 'failed preflight writes none of the earlier files' "$target_repo/.policy"
 assert_file_absent 'failed preflight creates no earlier nested file' "$target_repo/tools/check.sh"
 
+target_repo="$tmp_root/target-no-origin"
+make_repo "$target_repo"
+out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+rc=$?
+assert_nonzero 'target without origin is rejected' "$rc"
+assert_contains 'missing origin diagnostic names identity evidence' "$out" 'no readable origin remote'
+assert_file_absent 'missing origin writes no destination' "$target_repo/.policy"
+
+target_repo="$tmp_root/target-wrong-origin"
+make_target "$target_repo" beta/two
+out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+rc=$?
+assert_nonzero 'mismatched target origin is rejected' "$rc"
+assert_contains 'mismatched origin diagnostic names expected target' "$out" "expected 'alpha/one'"
+assert_file_absent 'mismatched origin writes no destination' "$target_repo/.policy"
+
+target_repo="$tmp_root/target-index-failure"
+make_target "$target_repo"
+mock_bin="$tmp_root/mock-git-bin"
+mkdir -p "$mock_bin"
+mock_git="$mock_bin/git"
+cat >"$mock_git" <<'SH'
+#!/usr/bin/env bash
+has_ls_files=false
+has_failed_root=false
+for argument in "$@"; do
+  [[ "$argument" == ls-files ]] && has_ls_files=true
+  [[ "$argument" == "$FAIL_GIT_ROOT" ]] && has_failed_root=true
+done
+if [[ "$has_ls_files" == true && "$has_failed_root" == true ]]; then exit 78; fi
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$mock_git"
+failed_git_root="$(cd -- "$target_repo" && pwd -P)"
+real_git="$(command -v git)"
+out="$(
+  REAL_GIT="$real_git" FAIL_GIT_ROOT="$failed_git_root" PATH="$mock_bin:$PATH" \
+    "$engine" apply --source-root "$source_repo" --manifest manifest.yml \
+    --target alpha/one --target-root "$target_repo" 2>&1
+)"
+rc=$?
+assert_nonzero 'target index inspection failure is rejected' "$rc"
+assert_contains 'index failure diagnostic is explicit' "$out" 'could not inspect Git index path'
+assert_file_absent 'index inspection failure writes no destination' "$target_repo/.policy"
+
+# The merged distribution workflow installs only yq. Prove the production
+# interpreter does not discover or invoke Node/Ajv after authoring validation.
+runtime_bin="$tmp_root/yq-only-bin"
+mkdir -p "$runtime_bin"
+cat >"$runtime_bin/node" <<'SH'
+#!/usr/bin/env bash
+exit 99
+SH
+chmod +x "$runtime_bin/node"
+runtime_engine_dir="$tmp_root/yq-only-runtime/distribution"
+mkdir -p "$runtime_engine_dir"
+cp "$engine" "$runtime_engine_dir/sync-manifest.sh"
+runtime_engine="$runtime_engine_dir/sync-manifest.sh"
+out="$(
+  PATH="$runtime_bin:$PATH" "$runtime_engine" validate \
+    --source-root "$source_repo" --manifest manifest.yml 2>&1
+)"
+validate_rc=$?
+matrix_out="$(
+  PATH="$runtime_bin:$PATH" "$runtime_engine" matrix \
+    --source-root "$source_repo" --manifest manifest.yml --targets alpha/one 2>&1
+)"
+matrix_rc=$?
+runtime_target="$tmp_root/yq-only-target"
+make_target "$runtime_target"
+apply_out="$(
+  PATH="$runtime_bin:$PATH" "$runtime_engine" apply \
+    --source-root "$source_repo" --manifest manifest.yml \
+    --target alpha/one --target-root "$runtime_target" 2>&1
+)"
+apply_rc=$?
+assert_exit 'yq-only production validate succeeds' 0 "$validate_rc"
+assert_exit 'yq-only production matrix succeeds' 0 "$matrix_rc"
+assert_eq 'yq-only matrix remains exact' \
+  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"}]}' "$matrix_out"
+assert_exit 'yq-only production apply succeeds' 0 "$apply_rc"
+assert_file_exists 'yq-only production apply writes the managed destination' \
+  "$runtime_target/.policy"
+assert_not_contains 'yq-only production path never invokes the Node shim' "$out$apply_out" '99'
+
 for filter in 'unknown/repo' 'alpha/one,alpha/one' 'alpha/one,,beta/two' ',alpha/one'; do
-  out="$(run_engine "$source_repo" matrix --targets "$filter" 2>&1)"; rc=$?
+  out="$(run_engine "$source_repo" matrix --targets "$filter" 2>&1)"
+  rc=$?
   assert_nonzero "invalid target filter fails: $filter" "$rc"
 done
 
@@ -152,16 +255,26 @@ invalid_case() {
   slug="${label//[^A-Za-z0-9]/-}"
   dir="$tmp_root/invalid-$slug"
   make_source "$dir" "$bad_manifest"
-  output="$(run_engine "$dir" validate 2>&1)"; status=$?
+  output="$(run_engine "$dir" validate 2>&1)"
+  status=$?
   assert_nonzero "$label is rejected" "$status"
   assert_contains "$label has a useful diagnostic" "$output" "$needle"
 }
 
 bad="${manifest/version: 2/version: 1}"
-invalid_case 'wrong version' "$bad" 'integer 2'
+invalid_case 'wrong version' "$bad" 'manifest version must be the integer 2'
 
 bad="$manifest"$'\n''unexpected: true'
-invalid_case 'unknown root key' "$bad" 'unknown key'
+invalid_case 'unknown root key' "$bad" "manifest root contains unknown key 'unexpected'"
+
+bad="${manifest/files:/unknown: true$'\n'    files:}"
+invalid_case 'unknown component key' "$bad" "component 'base' contains unknown key 'unknown'"
+
+bad="${manifest/$'      - base\n      - consumer'/$'      - base\n      - base\n      - consumer'}"
+invalid_case 'duplicate managed component' "$bad" "managed components contains duplicate 'base'"
+
+bad="${manifest/$'    files:\n      consumer.txt: consumer.txt'/'    files: {}'}"
+invalid_case 'empty component files' "$bad" "component 'consumer' files must be a non-empty mapping"
 
 bad="version: 2"$'\n'"version: 2"$'\n'"${manifest#*$'\n'}"
 invalid_case 'duplicate YAML key' "$bad" 'duplicate mapping key'
@@ -183,14 +296,41 @@ invalid_case 'destination child before file collision' "$bad" 'file/directory co
 bad="${manifest/policy.txt: .policy/policy.txt: bad\"name}"
 invalid_case 'destination outside portable path alphabet' "$bad" 'unsafe destination path'
 
-bad="$(printf '%s\n' "$manifest" | sed 's|^  alpha/one:|  Alpha/one:|')"
-invalid_case 'noncanonical uppercase target' "$bad" 'expected lowercase owner/repo'
+# An escaped NUL must fail both authoring-schema and production Bash validation,
+# and apply must not reach target mutation.
+bad_control="${manifest/policy.txt: .policy/policy.txt: \".policy\\u0000managed\\u0000consumer\"}"
+invalid_case 'control-character mapping injection' "$bad_control" 'may not contain control characters'
 
-# Remove every selected base entry while retaining consumer's dependency.
+control_error="$tmp_root/control-records.err"
+{ printf '%s\n' "$bad_control" | yq eval -o=json -I=0 '.' -; } |
+  node "$root/distribution/validate-sync-manifest.mjs" 2>"$control_error"
+rc=$?
+assert_nonzero 'control-character mapping fails authoring schema validation' "$rc"
+assert_contains 'control-character mapping reports schema rejection' \
+  "$(cat "$control_error")" 'must match pattern'
+
+control_source="$tmp_root/control-source"
+control_target="$tmp_root/control-target"
+make_source "$control_source" "$bad_control"
+make_target "$control_target"
+out="$(run_engine "$control_source" apply --target alpha/one --target-root "$control_target" 2>&1)"
+rc=$?
+assert_nonzero 'control-character mapping fails before target apply' "$rc"
+assert_file_absent 'control-character mapping writes no root destination' "$control_target/.policy"
+assert_file_absent 'control-character mapping writes no consumer destination' \
+  "$control_target/consumer.txt"
+
+bad="$(printf '%s\n' "$manifest" | sed 's|^  alpha/one:|  Alpha/one:|')"
+invalid_case 'noncanonical uppercase target' "$bad" "invalid target repository 'Alpha/one'"
+
+# Remove alpha/one's selected base while retaining consumer's dependency. Keep
+# beta/two's locally-owned base so the fixture remains schema-valid and reaches
+# the dependency-graph validator.
 bad="$(printf '%s\n' "$manifest" |
-  awk 'BEGIN { in_targets = 0 }
-       /^targets:/ { in_targets = 1 }
-       !(in_targets && $0 == "      - base") { print }')"
+  awk 'BEGIN { in_alpha = 0 }
+       /^  alpha\/one:$/ { in_alpha = 1 }
+       /^  beta\/two:$/ { in_alpha = 0 }
+       !(in_alpha && $0 == "      - base") { print }')"
 invalid_case 'missing target dependency' "$bad" "does not select required 'base'"
 
 # Make base depend on consumer, completing a two-node cycle.
@@ -203,7 +343,8 @@ source_repo="$tmp_root/untracked-source"
 make_source "$source_repo" "$manifest"
 git -C "$source_repo" rm --cached policy.txt -q
 git -C "$source_repo" commit -m 'untrack policy' -q
-out="$(run_engine "$source_repo" validate 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" validate 2>&1)"
+rc=$?
 assert_nonzero 'untracked source is rejected' "$rc"
 assert_contains 'untracked source diagnostic identifies tracked-file contract' \
   "$out" 'exactly one tracked stage-0 file'
@@ -211,7 +352,8 @@ assert_contains 'untracked source diagnostic identifies tracked-file contract' \
 source_repo="$tmp_root/dirty-source"
 make_source "$source_repo" "$manifest"
 printf 'unreviewed worktree bytes\n' >"$source_repo/policy.txt"
-out="$(run_engine "$source_repo" validate 2>&1)"; rc=$?
+out="$(run_engine "$source_repo" validate 2>&1)"
+rc=$?
 assert_nonzero 'dirty tracked source is rejected' "$rc"
 assert_contains 'dirty source diagnostic identifies index mismatch' \
   "$out" 'worktree bytes differ from the indexed object'
@@ -223,7 +365,8 @@ if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   make_target "$target_repo"
   mkdir -p "$target_repo/tools"
   ln -s ../escape "$target_repo/tools/check.sh"
-  out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"; rc=$?
+  out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+  rc=$?
   assert_nonzero 'symlink destination is rejected' "$rc"
 else
   skip_case 'symlink destination case unavailable on this platform'
@@ -235,12 +378,14 @@ fi
 actual_manifest="$root/distribution/sync-manifest.yml"
 assert_eq 'runner-policy requires the shared Node runtime pin' 'node-runtime' \
   "$(yq -r '.components.runner-policy.requires | join(",")' "$actual_manifest")"
-assert_eq 'runner-policy materializes exactly four runtime files' '4' \
+assert_eq 'runner-policy materializes exactly six runtime files' '6' \
   "$(yq -r '.components.runner-policy.files | length' "$actual_manifest")"
 
 for mapping in \
   'components/runner-policy/runner-policy.mjs=.github/standards/runner-policy/runner-policy.mjs' \
   'components/runner-policy/policy.json=.github/standards/runner-policy/policy.json' \
+  'components/runner-policy/policy.schema.json=.github/standards/runner-policy/policy.schema.json' \
+  'components/runner-policy/repository-policy.schema.json=.github/standards/runner-policy/repository-policy.schema.json' \
   'components/runner-policy/package.json=.github/standards/runner-policy/package.json' \
   'components/runner-policy/package-lock.json=.github/standards/runner-policy/package-lock.json'; do
   source_path="${mapping%%=*}"
@@ -264,14 +409,15 @@ assert_eq 'lefthook-dotnet production CLI source is executable in the Git index'
 # platform-independent and fail before apply if either production mode regresses.
 while IFS=$'\t' read -r production_slug includes_dotnet; do
   production_target="$tmp_root/production-${production_slug//\//-}"
-  make_target "$production_target"
+  make_target "$production_target" "$production_slug"
   out="$(
     "$engine" apply \
       --source-root "$root" \
       --manifest distribution/sync-manifest.yml \
       --target "$production_slug" \
       --target-root "$production_target" 2>&1
-  )"; rc=$?
+  )"
+  rc=$?
   assert_exit "$production_slug production mapping applies" 0 "$rc"
   assert_contains "$production_slug runner-policy apply reports executable mode" "$out" \
     "$runner_policy_source -> $runner_policy_destination (100755)"
@@ -371,5 +517,18 @@ for component in ruff lefthook-python pyright; do
       '[.targets."melodic-software/dotfiles".managed[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"
 done
+
+assert_eq 'Go analysis materializes at the root discovery path' \
+  '.golangci.yml' \
+  "$(yq -r '.components.go-analysis.files.".golangci.yml"' "$actual_manifest")"
+assert_eq 'ci-runner enrolls the managed Go analyzer policy exactly once' '1' \
+  "$(yq -r \
+    '[.targets."melodic-software/ci-runner".managed[] | select(. == "go-analysis")] | length' \
+    "$actual_manifest")"
+assert_eq 'Go analysis covers exactly the ci-runner target' \
+  '["melodic-software/ci-runner"]' \
+  "$(yq -o=json -I=0 \
+    '[.targets | to_entries[] | select(.value.managed[]? == "go-analysis") | .key]' \
+    "$actual_manifest")"
 
 [[ $FAILED -eq 0 ]] || exit 1

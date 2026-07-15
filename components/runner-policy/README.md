@@ -19,7 +19,15 @@ node components/runner-policy/runner-policy.mjs --root .
 ```
 
 The distributed component lives at `.github/standards/runner-policy/` and owns
-its own `package.json` and lockfile with the exact `yaml@2.9.0` runtime pin.
+its own `package.json` and lockfile with exact `ajv@8.20.0` and `yaml@2.9.0`
+runtime pins. `policy.schema.json` and `repository-policy.schema.json` are the
+Draft 2020-12 structural authorities. Ajv compiles them in strict mode; the
+runtime retains only cross-record semantics and workflow/path checks that JSON
+Schema cannot express.
+
+The security boundaries, fail-closed behavior, and required review triggers are
+documented in the component [threat model](THREAT-MODEL.md).
+
 Consumers install and invoke that dependency root directly, supplying their own
 `owner/repository` identity for local analysis:
 
@@ -253,7 +261,12 @@ the workflow's `inputs` context.
 The only other dynamic `runs-on` form is a configured hosted matrix expression
 (`matrix.os` or `matrix.runner`) backed by a non-empty, static array containing
 only approved hosted labels; `include` and `exclude` are rejected because they
-can alter the runner target.
+can alter the runner target. Set the required `hostedMatrixExpressions` policy
+field to `[]` to explicitly disable matrix routing fail closed while continuing
+to permit approved literal hosted labels. The [JSON Schema Draft 2020-12
+specification][8] defines an omitted `minItems` as zero; keeping the field
+required distinguishes that deliberate empty policy from a missing
+configuration.
 
 An exception is keyed by `<workflow path>#<job id>` and requires both an
 allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
@@ -326,3 +339,4 @@ default `GITHUB_TOKEN` permissions][7].
 [5]: https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#supported-keywords-for-jobs-that-call-a-reusable-workflow
 [6]: https://docs.github.com/en/actions/reference/evaluate-expressions-in-workflows-and-actions#status-check-functions
 [7]: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#setting-the-permissions-of-the-github_token-for-your-repository
+[8]: https://json-schema.org/draft/2020-12/json-schema-validation#section-6.4.2

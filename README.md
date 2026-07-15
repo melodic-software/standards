@@ -45,9 +45,18 @@ lifecycle. It may export one file or an atomic group of heterogeneous files.
 Tests, fixtures, and maintainer documentation stay upstream unless a consumer
 operationally needs them.
 
+Admission, update, and retirement evidence follow the
+[`docs/component-lifecycle.md`](docs/component-lifecycle.md) contract. A tool
+without a live consumer remains a consumer-local experiment rather than an
+orphan catalog component.
+
 `components/runner-policy/` owns the YAML-aware GitHub Actions routing contract:
 public work remains hosted, enrolled private jobs use only an approved selector,
 and every hosted exception is explicit machine-readable inventory.
+
+`components/go-analysis/` owns the exact golangci-lint v2 analyzer allowlist and
+suppression contract. The root `.golangci.yml` is its canonical exported policy;
+reusable execution remains owned by `melodic-software/ci-workflows`.
 
 Delivery preference is: platform control plane, native package/reference,
 tool-native extension, exact-file synchronization, then explicit local
@@ -59,12 +68,21 @@ a reusable change flows upstream first.
 
 CI dogfoods every root policy, runs each component's contract tests, validates
 the composed Lefthook adapter, and aggregates blocking lanes into `ci-status`.
-Locally, install pinned Node dependencies with `npm ci`, then run:
+Locally, install all three pinned Node dependency roots, then run:
+
+```bash
+npm ci
+npm ci --prefix components/runner-policy
+npm ci --prefix distribution
+```
+
+Run the local gates with:
 
 ```bash
 npm run lint:md
 npm run lint:hooks
 npm run test:lefthook-dotnet
+npm run test:packages
 npm run test:runner-policy
 npm run lint:runner-policy
 bash harness/shell/run-tests.sh harness/shell/lib.test.sh

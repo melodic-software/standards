@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { auditRepository, ConfigurationError } from "./runner-policy.mjs";
+import { auditRepository, ConfigurationError, parseUniqueJson } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
@@ -29,6 +29,26 @@ const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
 const temporaryRoots = [];
+
+test("duplicate JSON object members fail closed with their policy or schema path", () => {
+  for (const [location, source] of [
+    ["central policy at /tmp/policy.json", '{"schemaVersion":1,"schemaVersion":1}'],
+    ["repository policy at /tmp/repository.json", '{"exceptions":{"job":{},"job":{}}}'],
+    ["policy schema at /tmp/policy.schema.json", '{"properties":{"a":{},"a":{}}}'],
+    [
+      "repository policy schema at /tmp/repository-policy.schema.json",
+      '{"$defs":{"exception":{"type":"object","type":"array"}}}',
+    ],
+  ]) {
+    assert.throws(
+      () => parseUniqueJson(source, location),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.includes(location) &&
+        error.message.includes("duplicate"),
+    );
+  }
+});
 const SELECTOR = `    uses: ${SELECTOR_REFERENCE}
     secrets:
       observer-private-key: \${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
@@ -1121,7 +1141,7 @@ test("malformed repository ownership evidence fails closed", async () => {
     const root = await repository({ repositoryOwner });
     await assert.rejects(
       () => audit(root),
-      /repositoryOwner must be a lowercase GitHub repository owner/,
+      /repository config\.repositoryOwner must match pattern/,
     );
   }
   const root = await repository({ repositoryOwner: "melodic-software" });
@@ -1187,6 +1207,31 @@ test("policy schema rejects malformed or ambiguous owner-scoped approvals", asyn
   for (const policyOverrides of invalidPolicies) {
     const root = await repository({ policyOverrides });
     await assert.rejects(() => audit(root), ConfigurationError);
+  }
+});
+
+test("hosted matrix expression policy remains required, unique, and structurally exact", async () => {
+  const omittedRoot = await repository({
+    policyOverrides: { hostedMatrixExpressions: undefined },
+  });
+  await assert.rejects(
+    () => audit(omittedRoot),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message === "policy must have required property 'hostedMatrixExpressions'",
+  );
+
+  for (const hostedMatrixExpressions of [
+    [`\${{ matrix.os }}`, `\${{ matrix.os }}`],
+    [`\${{ matrix.os || 'ubuntu-24.04' }}`],
+  ]) {
+    const root = await repository({ policyOverrides: { hostedMatrixExpressions } });
+    await assert.rejects(
+      () => audit(root),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.startsWith("policy.hostedMatrixExpressions"),
+    );
   }
 });
 
@@ -2473,6 +2518,44 @@ test("static allowlisted hosted matrix is supported", async () => {
   assert.deepEqual(await audit(root), []);
 });
 
+test("empty hosted matrix expression policy permits approved literals", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: { hostedMatrixExpressions: [] },
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("empty hosted matrix expression policy disables matrix routing fail closed", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: { hostedMatrixExpressions: [] },
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+    runs-on: \${{ matrix.os }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+});
+
 test("hosted matrix include cannot override the proven runner axis", async () => {
   const root = await repository({
     visibility: "public",
@@ -2485,6 +2568,29 @@ test("hosted matrix include cannot override the proven runner axis", async () =>
         os: [ubuntu-24.04]
         include:
           - os: ubuntu-24.04
+    runs-on: \${{ matrix.os }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+});
+
+test("hosted matrix exclude cannot alter the proven runner axis", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        exclude:
+          - os: windows-2025
     runs-on: \${{ matrix.os }}
     steps: []
 `,

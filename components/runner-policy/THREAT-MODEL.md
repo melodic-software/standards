@@ -1,0 +1,131 @@
+# Runner-policy threat model
+
+This model covers the read-only analyzer in
+[`runner-policy.mjs`](runner-policy.mjs), its central and repository schemas,
+and the workflow and repository configuration it evaluates. The GitHub Actions
+control plane, reusable-workflow implementations in `ci-workflows`, and the
+self-hosted runner fleet are external systems. Their behavior is modeled where
+it crosses this analyzer's boundary, but this component does not operate or
+attest to them.
+
+The model follows OWASP's maintained threat-modeling loop: describe the system,
+identify what can go wrong, map concrete responses, and validate the result.
+
+## Security objectives and assets
+
+- Privileged, credential-bearing, containerized, and otherwise excluded work
+  stays on an explicitly approved GitHub-hosted runner.
+- Eligible private, read-only workloads reach the managed fleet only through a
+  reviewed selector contract with a literal hosted recovery path.
+- Workflow, selector, reusable-workflow, permission, secret, and exception
+  contracts cannot be widened through YAML ambiguity or local indirection.
+- Repository visibility and owner-scoped approvals use evidence that the
+  checked-out repository cannot grant to itself.
+- Policy findings fail the CI gate clearly without modifying the repository or
+  workflow files.
+
+The protected assets are repository and organization credentials, the
+`GITHUB_TOKEN` permission boundary, deployment environments, self-hosted fleet
+isolation, reviewed workflow identities, exception inventory, and CI
+availability.
+
+## Actors and trust boundaries
+
+- A repository maintainer changes governed configuration and reviews findings.
+- A pull-request contributor may control workflow YAML, local reusable
+  workflows, action inputs, scripts, and checked-in repository inventory.
+- A compromised action or reusable workflow may attempt to obtain credentials
+  or move execution onto the managed fleet.
+- Standards maintainers review central policy, schemas, and immutable workflow
+  contracts.
+- GitHub supplies repository visibility and `GITHUB_REPOSITORY` identity and
+  later evaluates the accepted workflow. Those facts cross an external control-
+  plane boundary.
+
+Checked-in `.github/runner-policy.json` and `.github/workflows/*.yml` are
+untrusted subjects of the audit. The distributed central policy and schemas are
+trusted only at their reviewed Git revision. Environment identity supplied by
+GitHub is independent evidence; it must agree with checked-in inventory.
+
+## Data flow
+
+1. The caller selects a repository root, central policy, repository policy, and
+   optional external visibility and repository-identity evidence.
+2. The pinned YAML parser preflights raw central policy, repository policy, and
+   both schema JSON files with unique object members required; `JSON.parse`
+   remains the JSON syntax and runtime-value authority. Ajv then validates both
+   policies against strict Draft 2020-12 schemas, and the runtime validates
+   cross-record invariants that schema cannot express.
+3. The analyzer indexes regular top-level workflow YAML files, rejects workflow
+   symlinks, and parses with aliases and merge keys disabled, strict parsing,
+   and unique keys required.
+4. It follows repository-local reusable calls, evaluates routing, permission
+   flow, credentials, structural hosted requirements, immutable external
+   contracts, and exact exception consumption.
+5. Findings and the process exit status cross back to CI. No repository file,
+   GitHub setting, runner, or remote workflow is changed.
+
+## Threats, controls, and evidence
+
+| Threat | Control | Executable evidence |
+| --- | --- | --- |
+| Checked-in inventory forges a private visibility or approved owner. | GitHub-supplied visibility must match inventory. Owner-scoped approvals require valid `GITHUB_REPOSITORY` evidence, and an owner mismatch fails configuration. | `GitHub visibility evidence must agree with governed inventory`, owner-evidence, and malformed-identity cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| A privileged or credential-bearing job reaches a self-hosted runner. | Local routes require statically read-only permissions; deployment environments, secret expressions, credential-minting actions, job containers, and services remain hosted with an exact categorized exception. | Permission, credential, environment, action, container, and service cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| A moving reference or opaque wrapper changes reviewed execution. | Selector and external reusable workflows use exact path-at-40-character-SHA contracts. Local wrappers are recursively inspected; traversal, missing files, cycles, undeclared inputs or secrets, and `secrets: inherit` fail closed. | Selector-pin, reusable-contract, local-call traversal, recursion, input, secret, and wrapper cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| YAML ambiguity hides a different workflow graph. | The parser requires unique keys, disables aliases and merge keys, and records parse failures. Only regular top-level workflow files are indexed; symlinks are findings. | Duplicate-key and workflow-symlink cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| Duplicate JSON member names make a policy or schema interpretation-dependent. | Raw central policy, repository policy, and both schemas are preflighted with the pinned parser's strict unique-key mode before `JSON.parse`; diagnostics identify the affected path. This enforces the interoperability guidance in [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). | Top-level and nested duplicate-member cases for all four load classes in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| Selector failure silently drops required work or routes through an unvalidated variable. | Workloads require the exact selector dependency, a cancellation-safe condition, and the governed literal hosted fallback. Fail-closed reporting contracts forward the selector result exactly. | Selector recovery, cancellation, dependency identity, fallback, and result-reporting cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| An exception becomes a blanket bypass or outlives its job. | Exceptions are keyed to one workflow and job, use allowlisted categories with justification, do not suppress runner-target rules, and fail on unused inventory. | Exception category, consumption, drift, and indirection cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| A policy or dependency change weakens validation unnoticed. | Central and repository schemas reject unknown shapes; component dependencies are exactly locked; CI runs behavioral tests and then audits this repository with external visibility evidence. | [`policy.schema.json`](policy.schema.json), [`repository-policy.schema.json`](repository-policy.schema.json), [`package-lock.json`](package-lock.json), and the `runner-policy` CI job. |
+
+The detailed operational contract and current approved references live in the
+[component README](README.md) and [`policy.json`](policy.json); this model does
+not duplicate those changing inventories.
+
+## Residual and accepted risk
+
+- The analyzer does not fetch or interpret the bytes behind an external
+  path-at-SHA. Standards maintainers must independently review those bytes
+  before updating the central contract; a compromised remote repository or
+  incorrect review remains a supply-chain risk.
+- Credential detection is conservative static analysis, not shell or action
+  semantic evaluation. A novel credential-minting action, obfuscated script, or
+  GitHub feature may evade a specific pattern. Least `GITHUB_TOKEN` permissions,
+  immutable action review, code review, and updates to `localCredentialActions`
+  remain necessary.
+- The analyzer cannot establish that a self-hosted runner or its host is clean.
+  Fleet hardening, ephemeral operation, network boundaries, and incident
+  response remain outside this component.
+- A pull request can change the analyzer, policy, and tests together. Required
+  review, branch governance, pinned CI dependencies, and review of reduced
+  negative coverage are repository controls outside the analyzer itself.
+- GitHub Actions expression and reusable-workflow semantics can evolve after a
+  passing audit. The policy proves only the modeled syntax and reviewed
+  platform behavior, not all future control-plane interpretation.
+- The literal hosted fallback preserves scheduling availability but spends
+  hosted capacity and does not make a failed selector healthy. Operational
+  monitoring must still surface selector failures.
+
+No exception inside `.github/runner-policy.json` accepts these model-level
+risks. A risk acceptance is recorded in the owning repository with scope,
+owner, compensating controls, and a review trigger.
+
+## Review triggers
+
+Re-run this threat model when the analyzer accepts a new runner expression,
+credential source, permission form, local-call shape, external contract type,
+exception reason, YAML parser behavior, or repository-identity source. Also
+review it when GitHub changes runner, token, expression, reusable-workflow, or
+self-hosted security semantics; when a central schema version changes; or after
+an incident crosses the hosted/self-hosted boundary.
+
+Each review confirms the data flow, adds a negative test for every new failure
+mode, and updates residual risk instead of merely changing the allowlist.
+
+## External authorities
+
+- [OWASP Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html)
+- [NIST SP 800-218, Secure Software Development Framework](https://csrc.nist.gov/pubs/sp/800/218/final)
+- [GitHub secure use of self-hosted runners](https://docs.github.com/en/actions/reference/security/secure-use)
+- [GitHub reusable workflows](https://docs.github.com/en/actions/how-tos/sharing-automations/reuse-workflows)
+- [GitHub `GITHUB_TOKEN` permissions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#setting-the-permissions-of-the-github_token-for-a-repository)

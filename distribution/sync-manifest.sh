@@ -77,31 +77,47 @@ canonical_git_root() {
 # Emit mode/object/stage for index entries whose recorded path is exactly the
 # supplied literal path. A directory-shaped pathspec may also select descendants.
 exact_index_entries() {
-  local root="$1" path="$2" line metadata recorded mode object stage
-  while IFS= read -r line; do
+  local root="$1" path="$2" line metadata recorded mode object stage index_output
+  index_output="$(mktemp "${TMPDIR:-/tmp}/standards-index.XXXXXX")" || return 1
+  if ! git -C "$root" --literal-pathspecs -c core.quotePath=false \
+    ls-files --stage -z -- "$path" >"$index_output"; then
+    rm -f -- "$index_output"
+    return 1
+  fi
+  while IFS= read -r -d '' line; do
     [[ "$line" == *$'\t'* ]] || continue
     metadata="${line%%$'\t'*}"
     recorded="${line#*$'\t'}"
     [[ "$recorded" == "$path" ]] || continue
     read -r mode object stage <<<"$metadata"
     printf '%s %s %s\n' "$mode" "$object" "$stage"
-  done < <(
-    git -C "$root" --literal-pathspecs -c core.quotePath=false \
-      ls-files --stage -- "$path"
-  )
+  done <"$index_output"
+  rm -f -- "$index_output"
+}
+
+read_exact_index_entries() {
+  local root="$1" path="$2" output
+  INDEX_ENTRIES=()
+  # exact_index_entries checks each fallible command and intentionally runs as
+  # the condition whose status is propagated here.
+  # shellcheck disable=SC2310
+  output="$(exact_index_entries "$root" "$path")" ||
+    die "could not inspect Git index path: $path"
+  [[ -z "$output" ]] || mapfile -t INDEX_ENTRIES <<<"$output"
 }
 
 tracked_regular_mode() {
   local root="$1" path="$2" purpose="$3" mode object stage worktree_object
   local -a entries
-  mapfile -t entries < <(exact_index_entries "$root" "$path")
+  read_exact_index_entries "$root" "$path"
+  entries=("${INDEX_ENTRIES[@]}")
   [[ "${#entries[@]}" -eq 1 ]] ||
     die "$purpose must be exactly one tracked stage-0 file: $path"
   read -r mode object stage <<<"${entries[0]}"
   [[ "$stage" == 0 ]] || die "$purpose is unmerged in the Git index: $path"
   case "$mode" in
-    100644 | 100755) ;;
-    *) die "$purpose must be a regular Git file (mode is $mode): $path" ;;
+  100644 | 100755) ;;
+  *) die "$purpose must be a regular Git file (mode is $mode): $path" ;;
   esac
   [[ ! "$object" =~ ^0+$ ]] || die "$purpose has no indexed object yet: $path"
   [[ -f "$root/$path" && ! -L "$root/$path" ]] ||
@@ -158,12 +174,15 @@ declare -a VISIT_PATH=()
 visit_component() {
   local component="$1" dependency cycle
   case "${VISIT_STATE[$component]-}" in
-    done) return 0 ;;
-    visiting)
-      cycle="$(IFS=' -> '; printf '%s' "${VISIT_PATH[*]}")"
-      die "component dependency cycle: $cycle -> $component"
-      ;;
-    *) ;;
+  done) return 0 ;;
+  visiting)
+    cycle="$(
+      IFS=' -> '
+      printf '%s' "${VISIT_PATH[*]}"
+    )"
+    die "component dependency cycle: $cycle -> $component"
+    ;;
+  *) ;;
   esac
   VISIT_STATE["$component"]=visiting
   VISIT_PATH+=("$component")
@@ -191,8 +210,8 @@ validate_manifest() {
   mapfile -t root_keys < <(yq eval -r 'keys[]' "$MANIFEST_ABS")
   for root_key in "${root_keys[@]}"; do
     case "$root_key" in
-      version | components | targets) ;;
-      *) die "manifest root contains unknown key '$root_key'" ;;
+    version | components | targets) ;;
+    *) die "manifest root contains unknown key '$root_key'" ;;
     esac
   done
   for root_key in version components targets; do
@@ -276,7 +295,7 @@ validate_manifest() {
         die "destination '$destination' is owned by both '${destination_owner[$destination]}' and '$component'"
       for existing_destination in "${!destination_owner[@]}"; do
         if [[ "$destination" == "$existing_destination/"* ||
-              "$existing_destination" == "$destination/"* ]]; then
+          "$existing_destination" == "$destination/"* ]]; then
           die "destination '$destination' in '$component' has a file/directory conflict with '$existing_destination' in '${destination_owner[$existing_destination]}'"
         fi
       done
@@ -501,6 +520,30 @@ emit_plan() {
   done
 }
 
+verify_target_identity() {
+  local target_root="$1" expected="$2" output url identity
+  local -a urls
+  output="$(git -C "$target_root" remote get-url --all origin 2>/dev/null)" ||
+    die "target checkout has no readable origin remote: $expected"
+  urls=()
+  [[ -z "$output" ]] || mapfile -t urls <<<"$output"
+  [[ "${#urls[@]}" -eq 1 ]] ||
+    die "target checkout must have exactly one origin URL: $expected"
+  url="${urls[0]}"
+  if [[ "$url" =~ ^https://github\.com/([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)(\.git)?/?$ ]]; then
+    identity="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^git@github\.com:([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)(\.git)?$ ]]; then
+    identity="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^ssh://git@github\.com/([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)(\.git)?$ ]]; then
+    identity="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  else
+    die "target origin is not an approved GitHub repository URL: $url"
+  fi
+  identity="${identity%.git}"
+  [[ "${identity,,}" == "$expected" ]] ||
+    die "target origin identifies '$identity', expected '$expected'"
+}
+
 preflight_destination() {
   local target_root="$1" destination="$2" parent prefix='' segment path mode object stage
   local -a segments entries
@@ -514,14 +557,16 @@ preflight_destination() {
       [[ ! -L "$path" ]] || die "destination parent is a symlink: $prefix"
       [[ ! -e "$path" || -d "$path" ]] ||
         die "destination parent is not a directory: $prefix"
-      mapfile -t entries < <(exact_index_entries "$target_root" "$prefix")
+      read_exact_index_entries "$target_root" "$prefix"
+      entries=("${INDEX_ENTRIES[@]}")
       [[ "${#entries[@]}" -eq 0 ]] ||
         die "destination parent is a tracked non-directory entry: $prefix"
     done
   fi
   path="$target_root/$destination"
   [[ ! -L "$path" ]] || die "destination is a symlink: $destination"
-  mapfile -t entries < <(exact_index_entries "$target_root" "$destination")
+  read_exact_index_entries "$target_root" "$destination"
+  entries=("${INDEX_ENTRIES[@]}")
   [[ "${#entries[@]}" -le 1 ]] ||
     die "destination has multiple Git index entries: $destination"
   if [[ -e "$path" ]]; then
@@ -529,7 +574,7 @@ preflight_destination() {
     [[ "${#entries[@]}" -eq 1 ]] ||
       die "refusing to overwrite untracked destination: $destination"
     read -r mode object stage <<<"${entries[0]}"
-    [[ "$stage" == 0 && ( "$mode" == 100644 || "$mode" == 100755 ) ]] ||
+    [[ "$stage" == 0 && ("$mode" == 100644 || "$mode" == 100755) ]] ||
       die "existing destination is not a tracked stage-0 regular file: $destination"
   elif [[ "${#entries[@]}" -ne 0 ]]; then
     die "tracked destination is missing from the worktree: $destination"
@@ -540,6 +585,7 @@ apply_target() {
   local target="$1" target_root="$2" component source destination mode index
   local -a components sources=() destinations=() modes=()
   target_root="$(canonical_git_root "$target_root")"
+  verify_target_identity "$target_root" "$target"
   mapfile -t components < <(
     while IFS= read -r component; do
       [[ -n "$component" ]] && printf '%s\n' "$component"
@@ -563,21 +609,30 @@ apply_target() {
     mkdir -p -- "$target_root/$(dirname -- "$destination")"
     cp -- "$SOURCE_ROOT/$source" "$target_root/$destination"
     case "$mode" in
-      100644) chmod 0644 "$target_root/$destination" ;;
-      100755) chmod 0755 "$target_root/$destination" ;;
-      *) die "internal error: unsupported validated mode '$mode'" ;;
+    100644) chmod 0644 "$target_root/$destination" ;;
+    100755) chmod 0755 "$target_root/$destination" ;;
+    *) die "internal error: unsupported validated mode '$mode'" ;;
     esac
     printf 'synced %s -> %s (%s)\n' "$source" "$destination" "$mode"
   done
 }
 
-[[ $# -gt 0 ]] || { usage >&2; exit 2; }
+[[ $# -gt 0 ]] || {
+  usage >&2
+  exit 2
+}
 COMMAND="$1"
 shift
 case "$COMMAND" in
-  validate | matrix | plan | mappings | apply) ;;
-  -h | --help) usage; exit 0 ;;
-  *) usage >&2; die "unknown command '$COMMAND'" ;;
+validate | matrix | plan | mappings | apply) ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+*)
+  usage >&2
+  die "unknown command '$COMMAND'"
+  ;;
 esac
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -588,13 +643,36 @@ TARGET=''
 TARGET_ROOT=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --source-root) [[ $# -ge 2 ]] || die '--source-root requires a value'; SOURCE_ROOT="$2"; shift 2 ;;
-    --manifest) [[ $# -ge 2 ]] || die '--manifest requires a value'; MANIFEST="$2"; shift 2 ;;
-    --targets) [[ $# -ge 2 ]] || die '--targets requires a value'; TARGETS_FILTER="$2"; shift 2 ;;
-    --target) [[ $# -ge 2 ]] || die '--target requires a value'; TARGET="$2"; shift 2 ;;
-    --target-root) [[ $# -ge 2 ]] || die '--target-root requires a value'; TARGET_ROOT="$2"; shift 2 ;;
-    -h | --help) usage; exit 0 ;;
-    *) die "unknown argument '$1'" ;;
+  --source-root)
+    [[ $# -ge 2 ]] || die '--source-root requires a value'
+    SOURCE_ROOT="$2"
+    shift 2
+    ;;
+  --manifest)
+    [[ $# -ge 2 ]] || die '--manifest requires a value'
+    MANIFEST="$2"
+    shift 2
+    ;;
+  --targets)
+    [[ $# -ge 2 ]] || die '--targets requires a value'
+    TARGETS_FILTER="$2"
+    shift 2
+    ;;
+  --target)
+    [[ $# -ge 2 ]] || die '--target requires a value'
+    TARGET="$2"
+    shift 2
+    ;;
+  --target-root)
+    [[ $# -ge 2 ]] || die '--target-root requires a value'
+    TARGET_ROOT="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *) die "unknown argument '$1'" ;;
   esac
 done
 
@@ -612,50 +690,50 @@ tracked_regular_mode "$SOURCE_ROOT" "$MANIFEST" manifest >/dev/null
 MANIFEST_ABS="$SOURCE_ROOT/$MANIFEST"
 
 case "$COMMAND" in
-  validate)
-    [[ -z "$TARGETS_FILTER" && -z "$TARGET" && -z "$TARGET_ROOT" ]] ||
-      die 'validate does not accept --targets, --target, or --target-root'
-    ;;
-  matrix | plan)
-    [[ -z "$TARGET" && -z "$TARGET_ROOT" ]] ||
-      die "$COMMAND does not accept --target or --target-root"
-    ;;
-  mappings)
-    [[ -z "$TARGETS_FILTER" && -z "$TARGET_ROOT" ]] ||
-      die 'mappings does not accept --targets or --target-root'
-    [[ -n "$TARGET" ]] || die 'mappings requires --target OWNER/REPO'
-    ;;
-  apply)
-    [[ -z "$TARGETS_FILTER" ]] || die 'apply does not accept --targets'
-    [[ -n "$TARGET" ]] || die 'apply requires --target OWNER/REPO'
-    [[ -n "$TARGET_ROOT" ]] || die 'apply requires --target-root DIR'
-    ;;
-  *) die "internal error: unsupported command '$COMMAND'" ;;
+validate)
+  [[ -z "$TARGETS_FILTER" && -z "$TARGET" && -z "$TARGET_ROOT" ]] ||
+    die 'validate does not accept --targets, --target, or --target-root'
+  ;;
+matrix | plan)
+  [[ -z "$TARGET" && -z "$TARGET_ROOT" ]] ||
+    die "$COMMAND does not accept --target or --target-root"
+  ;;
+mappings)
+  [[ -z "$TARGETS_FILTER" && -z "$TARGET_ROOT" ]] ||
+    die 'mappings does not accept --targets or --target-root'
+  [[ -n "$TARGET" ]] || die 'mappings requires --target OWNER/REPO'
+  ;;
+apply)
+  [[ -z "$TARGETS_FILTER" ]] || die 'apply does not accept --targets'
+  [[ -n "$TARGET" ]] || die 'apply requires --target OWNER/REPO'
+  [[ -n "$TARGET_ROOT" ]] || die 'apply requires --target-root DIR'
+  ;;
+*) die "internal error: unsupported command '$COMMAND'" ;;
 esac
 
 validate_manifest
 case "$COMMAND" in
-  validate)
-    printf 'Manifest valid: %d components, %d targets\n' \
-      "${#COMPONENT_NAMES[@]}" "${#TARGET_NAMES[@]}"
-    ;;
-  matrix)
-    declare -a SELECTED_TARGETS=()
-    select_targets "$TARGETS_FILTER"
-    emit_matrix
-    ;;
-  plan)
-    declare -a SELECTED_TARGETS=()
-    select_targets "$TARGETS_FILTER"
-    emit_plan
-    ;;
-  mappings)
-    [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
-    emit_managed_mappings "$TARGET"
-    ;;
-  apply)
-    [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
-    apply_target "$TARGET" "$TARGET_ROOT"
-    ;;
-  *) die "internal error: unsupported command '$COMMAND'" ;;
+validate)
+  printf 'Manifest valid: %d components, %d targets\n' \
+    "${#COMPONENT_NAMES[@]}" "${#TARGET_NAMES[@]}"
+  ;;
+matrix)
+  declare -a SELECTED_TARGETS=()
+  select_targets "$TARGETS_FILTER"
+  emit_matrix
+  ;;
+plan)
+  declare -a SELECTED_TARGETS=()
+  select_targets "$TARGETS_FILTER"
+  emit_plan
+  ;;
+mappings)
+  [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
+  emit_managed_mappings "$TARGET"
+  ;;
+apply)
+  [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
+  apply_target "$TARGET" "$TARGET_ROOT"
+  ;;
+*) die "internal error: unsupported command '$COMMAND'" ;;
 esac

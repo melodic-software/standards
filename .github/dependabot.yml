@@ -66,3 +66,17 @@ updates:
         update-types:
           - "minor"
           - "patch"
+  # Distribution validation is an independent runtime dependency root.
+  - package-ecosystem: npm
+    directory: /distribution
+    labels: ["dependencies"]
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

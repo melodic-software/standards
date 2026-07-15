@@ -199,14 +199,26 @@ jobs:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: .node-version
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            components/runner-policy/package-lock.json
       - name: Install pinned dependencies
         run: npm ci
+      - name: Install runner-policy dependencies
+        run: npm ci --prefix components/runner-policy
+      - name: Test package lifecycle
+        run: npm run test:packages
+      - name: Enforce package lifecycle
+        env:
+          PACKAGE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: node harness/packages/package-lifecycle.mjs
       - name: Test runner policy
         run: npm run test:runner-policy
       - name: Test .NET staged adapter
@@ -356,33 +368,45 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check JS/TS
-        # Biome has no CLI exclude, so scope at the conforming fixture and the
-        # runner-policy implementation. The bad fixture is non-conforming by
-        # design.
+        # Scope at authored runtime surfaces and the conforming fixture. Bad
+        # fixtures are non-conforming by design; node_modules and locks are
+        # excluded by Biome's normal traversal rules.
         uses: melodic-software/ci-workflows/.github/actions/biome@c2654182bc2d78f7909795df78304d482aa69226 # 1d3762c 2026-07-10
         with:
           config: components/biome/biome.json
-          paths: components/biome/fixtures/good components/runner-policy
+          paths: components/biome/fixtures/good components/runner-policy distribution harness/packages
 
   tsc:
+    name: TypeScript ${{ matrix.typescript }}
     needs: select-runner
     if: ${{ !cancelled() }}
     permissions:
       contents: read
     runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        typescript: [5.9.3, 6.0.3, 7.0.2]
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - name: Type-check TypeScript
-        # The shipped ruleset carries no project-scope `include`, so point tsc at
-        # the conforming fixture's project, which extends the base and supplies
-        # `include` (the bad fixture is non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/tsc@c2654182bc2d78f7909795df78304d482aa69226 # 1d3762c 2026-07-10
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          project: components/tsconfig/fixtures/good/tsconfig.json
+          node-version-file: .node-version
+      - name: Install exact TypeScript release
+        env:
+          TYPESCRIPT_VERSION: ${{ matrix.typescript }}
+        run: npm install --global "typescript@$TYPESCRIPT_VERSION"
+      - name: Verify exact TypeScript release
+        env:
+          TYPESCRIPT_VERSION: ${{ matrix.typescript }}
+        run: test "$(tsc --version)" = "Version $TYPESCRIPT_VERSION"
+      - name: Test packed tsconfig contract
+        run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-build:
     needs: select-runner
@@ -460,6 +484,53 @@ jobs:
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
     uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@99ac2f8c5b09dbb785d4eaf18465cbd96c30290c # 99ac2f8 2026-07-11
+
+  go-fixtures:
+    needs: select-runner
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    env:
+      GO_VERSION: 1.26.5
+      GOLANGCI_LINT_VERSION: 2.12.2
+      GOLANGCI_LINT_SHA256: 8df580d2670fed8fa984aac0507099af8df275e665215f5c7a2ae3943893a553
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Install golangci-lint from the official release
+        run: |
+          set -euo pipefail
+          archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
+          url="https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${archive}"
+          curl -q --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 120 \
+            --retry 2 --retry-max-time 300 \
+            --output "$archive" -- "$url"
+          echo "${GOLANGCI_LINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive"
+          install_dir="$RUNNER_TEMP/standards-bin"
+          mkdir -p "$install_dir"
+          install -m 0755 \
+            "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint" \
+            "$install_dir/golangci-lint"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          rm -rf "$archive" "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
+      - name: Verify exact toolchain
+        run: |
+          test "$(go env GOVERSION)" = "go${GO_VERSION}"
+          golangci-lint version | grep -F "version ${GOLANGCI_LINT_VERSION}"
+      - name: Go analysis contract test
+        run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
   python-fixtures:
     needs: select-runner
@@ -600,6 +671,14 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: distribution/package-lock.json
+      - name: Install distribution dependencies
+        run: npm ci --prefix distribution
       - name: Install yq 4.53.3
         run: |
           set -euo pipefail
@@ -739,6 +818,7 @@ jobs:
       - ruff
       - pyright
       - python-fixtures
+      - go-fixtures
       - biome
       - tsc
       - typescript-fixtures
@@ -776,6 +856,7 @@ jobs:
             ${{ needs.ruff.result }}
             ${{ needs.pyright.result }}
             ${{ needs.python-fixtures.result }}
+            ${{ needs.go-fixtures.result }}
             ${{ needs.biome.result }}
             ${{ needs.tsc.result }}
             ${{ needs.typescript-fixtures.result }}
