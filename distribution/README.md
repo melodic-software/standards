@@ -17,7 +17,11 @@ repository path, Git-index, ownership, dependency-graph, target-identity, and
 apply safety checks that JSON Schema cannot express.
 
 The distribution [threat model](THREAT-MODEL.md) records trust boundaries,
-fail-closed guarantees, residual risks, and security review triggers.
+fail-closed guarantees, residual risks, and security review triggers. The
+[governance process](governance-process.md) records the copy-adoption
+back-link and drift-check requirement and the cross-doc reconciliation step
+for normative-doc changes — both outside this manifest's automated
+reconciliation loop.
 
 ## Ownership model
 
