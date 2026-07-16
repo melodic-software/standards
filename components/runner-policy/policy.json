@@ -167,6 +167,26 @@
       "runnerInput": "runner",
       "allowedInputs": ["runner", "paths"],
       "allowedSecrets": {}
+    },
+    "melodic-software/ci-workflows/.github/workflows/link-check.yml@3dfb18452a8c6059a22e62456390d84feb10b42f": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner", "args"],
+      "allowedSecrets": {},
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "issues": "write"
+      }
+    },
+    "melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@3dfb18452a8c6059a22e62456390d84feb10b42f": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner"],
+      "allowedSecrets": {},
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "issues": "write"
+      }
     }
   },
   "canonicalSelectorInputs": {

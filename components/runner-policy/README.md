@@ -256,10 +256,8 @@ which lets a caller report selector failure without making the required check
 disappear. A fail-closed caller must declare the selector as its only `needs`
 prerequisite so the forwarded result covers every dependency outcome. The
 selector and `semantic-pr` workflow expose only the governed
-runner contract; Windows Pester, Docker-dependent scans, and privileged
-control-plane workflows
-such as the Pulumi version-drift monitor remain fixed to explicit GitHub-hosted
-images. The production Claude review
+runner contract; Windows Pester remains fixed to an explicit GitHub-hosted
+image. The production Claude review
 contract permits its general `skip-actors` string input without constraining the
 caller-owned value; every other input name remains denied by default. The
 earlier hosted-only contracts
@@ -271,8 +269,20 @@ removed after the six consumer migrations. The link-check contract was bumped
 to `09dd32ae40e270614e251fddafa16bab9a487de5`, which only adds a step that
 closes a recovered tracking issue; permissions, inputs, and `runs-on` stay
 byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
-contract, so the existing hosted-only shape carries over unmodified. The
-policy records each complete path@SHA, fixed runner label, caller-input
+contract, so the existing hosted-only shape carries over unmodified.
+
+The link-check and Pulumi version-drift monitor contracts were converted to
+`runner-input` at `3dfb18452a8c6059a22e62456390d84feb10b42f`, the reviewed
+ci-workflows floor-conversion merge (Wave 1 of the private-repo hosted-floor
+elimination, melodic-software/github-iac#78), so strict consumers route these
+privileged scheduled maintenance lanes through the approved selector instead of a
+fixed hosted image. Each names an exact `allowedCallerPermissions` of
+`contents: read` plus `issues: write` — the narrow write-capable caller token its
+rolling tracking-issue lane needs — which the policy honors only while the call is
+genuinely selector-routed; the reusables' own permissions are unchanged. Their
+earlier hosted-only contracts stay registered until every consumer migrates.
+
+The policy records each complete path@SHA, fixed runner label, caller-input
 allowlist, and exact secret map; changing any field requires another review.
 
 ## Selector revision lockstep
