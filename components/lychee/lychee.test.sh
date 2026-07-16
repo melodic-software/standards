@@ -21,6 +21,11 @@ private_org_rule="$(grep -F \
 assert_eq 'private GitHub exclusion is one exact transferred-org inventory' \
   "  '^https?://github\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)(\\.git)?([/#?]|$)'," \
   "$private_org_rule"
+private_raw_rule="$(grep -F \
+  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/" "$config" || true)"
+assert_eq 'private raw-content exclusion uses the same exact inventory' \
+  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)/'," \
+  "$private_raw_rule"
 assert_eq 'obsolete personal-owner private exclusion is absent' '0' \
   "$(grep -cF 'github\.com/kyle-sexton/' "$config" || true)"
 
@@ -32,10 +37,29 @@ for repo in claude-code-plugins dotfiles github-iac medley provisioning standard
   assert_not_contains "private inventory excludes melodic-software/$repo" \
     "$dump_out" "https://github.com/melodic-software/$repo"
 done
+assert_not_contains 'private raw-content URL is excluded' \
+  "$dump_out" 'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/'
+assert_not_contains 'current Medium article is excluded' "$dump_out" \
+  'https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f'
+assert_not_contains 'current Miro article is excluded' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/31624028247058'
+assert_not_contains 'current IsDown page is excluded' "$dump_out" \
+  'https://isdown.app/status/anthropic'
+assert_not_contains 'current firecrawl-cli package page is excluded' "$dump_out" \
+  'https://www.npmjs.com/package/firecrawl-cli'
+assert_not_contains 'current Miro API package page is excluded' "$dump_out" \
+  'https://www.npmjs.com/package/@mirohq/miro-api'
+assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
+assert_contains 'another Miro help path remains checked' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/example'
+assert_contains 'another IsDown path remains checked' "$dump_out" 'https://isdown.app/status/example'
+assert_contains 'another npm package remains checked' "$dump_out" 'https://www.npmjs.com/package/example'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \
   "$dump_out" 'https://github.com/kyle-sexton/provisioning'
+assert_contains 'public raw-content sibling remains checked' \
+  "$dump_out" 'https://raw.githubusercontent.com/melodic-software/ci-runner/'
 
 lychee --offline --config "$config" \
   components/lychee/fixtures/good/Clean.md components/lychee/fixtures/good/Target.md >/dev/null 2>&1

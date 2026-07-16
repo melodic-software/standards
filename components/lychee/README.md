@@ -11,11 +11,15 @@ advisorially because network health is inherently transient.
 Managed consumers do not edit the config. `fixtures/` and `lychee.test.sh`
 prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 
-The online lane excludes only explicitly inventoried private GitHub repositories
-whose auth boundary makes a calling repository's token receive a 404. The
-current inventory is `melodic-software/claude-code-plugins`, `dotfiles`,
-`github-iac`, `medley`, `provisioning`, and `standards`; public siblings and
-stale pre-transfer owner URLs remain checked. Lychee documents `exclude` values
-as URL regular expressions in its [configuration guide][1].
+The online lane excludes explicitly inventoried private GitHub repository and
+raw-content URLs whose auth boundary makes a calling repository's token receive
+a 404. The current inventory is `melodic-software/claude-code-plugins`,
+`dotfiles`, `github-iac`, `medley`, `provisioning`, and `standards`; public
+siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
+exceptions are path-scoped to the current Medium Dungeon Master article, Miro
+article `31624028247058`, IsDown's Anthropic status page, and the npm package
+pages for `firecrawl-cli` and `@mirohq/miro-api`; every other URL on those hosts
+remains checked. Lychee documents `exclude` values as URL regular expressions
+in its [configuration guide][1].
 
 [1]: https://lychee.cli.rs/guides/config/#excluding-links

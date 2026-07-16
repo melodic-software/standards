@@ -182,6 +182,7 @@ targets:
       - gitleaks
       - lefthook-base
       - lefthook-dotnet
+      - lychee
       - markdownlint
       - node-runtime
       - repository-text

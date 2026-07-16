@@ -17,6 +17,10 @@ Diff-time checks for the security concerns automated tooling cannot fully catch 
 - **Error-detail leaking** — production error responses do not include stack traces, internal paths, or connection strings; surfaced error messages are safe to show a caller.
 - **Idempotency-key hygiene** — an idempotency key contains no sensitive data and is not predictable.
 
+## Object-level authorization
+
+- **Object-level authorization on every object-scoped request** — an endpoint or handler that receives an object id (a path segment, body field, or query parameter) and returns or mutates that object checks that the requesting principal is authorized for that specific record, not just that a well-formed id was supplied or that the caller holds some role over the object's type. A lookup-by-id, update-by-id, or delete-by-id path added with no per-object ownership or ACL check is the classic gap — an interface may render only the caller's own records while the endpoint itself still accepts and serves any id ([CWE-639](https://cwe.mitre.org/data/definitions/639.html)). An unguessable id (a GUID) is defense in depth, never a substitute for the check ([OWASP API1:2023](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)).
+
 ## Third-party and supply chain
 
 Every external integration — a package, a CI action, a plugin, a tool server, a browser extension, a reusable workflow — is vetted before adoption and monitored after:
@@ -25,3 +29,8 @@ Every external integration — a package, a CI action, a plugin, a tool server, 
 - Check maintainer identity and bus factor, a published security scorecard where available, recent release activity, the count of unaddressed advisories, and license compatibility.
 - Treat abandonment signals (no commits in a year, an archived repo, unpatched critical issues) as a trigger to plan migration.
 - Re-audit critical dependencies and direct dependencies on a recurring schedule.
+
+## Sources
+
+- OWASP — [API1:2023 Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- MITRE — [CWE-639: Authorization Bypass Through User-Controlled Key](https://cwe.mitre.org/data/definitions/639.html)

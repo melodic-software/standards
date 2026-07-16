@@ -82,6 +82,60 @@ author diligence at merge time. That extension is future work; this document
 records the requirement and its interim owner so the gap is a tracked
 decision, not an unaddressed one.
 
+## Review-criterion graduation and retirement
+
+[`../conventions/engineering/enforceability-tiers.md`](../conventions/engineering/enforceability-tiers.md)
+already says a finding climbs from reasoning-only prose toward mechanical
+enforcement as far as its nature allows. This section is the missing other
+half: what happens to the *prose bullet itself*, in `REVIEW.md` or a
+`conventions/review/` criterion, once the mechanization it describes
+actually exists downstream.
+
+Retiring the prose line is a **self-review checklist item the author
+performs when landing the mechanization**, not a bespoke CI job — the same
+shape as the cross-doc reconciliation check above, and for the same
+underlying reason: `required_approving_review_count` is `0` here, so nothing
+else backstops it. Before removing a criterion bullet because a linter,
+analyzer, or hook now covers it, the author confirms in the pull request
+that the automated check:
+
+- actually covers the same cases the prose bullet described, not a narrower
+  subset that would silently regress coverage;
+- is already landed and enforcing in every consumer the criterion currently
+  reaches — removing the prose line before the automation exists downstream
+  leaves those consumers with neither the check nor the reasoning that used
+  to stand in for it, a real coverage gap, not a paperwork one.
+
+**Ordering, not just presence.** A retirement is safe only after the
+automated component has propagated to every consumer that still reads the
+prose line — for a `managed` sync-manifest component that means the
+materialization PR is merged in each enrolled target, not merely opened; for
+a native-reference criterion it means the mechanized check is live in the
+consuming repo's own CI. Retiring the prose line first, and trusting the
+automation to catch up, creates exactly the propagation-lag window this
+checklist item exists to close: a period where a consumer has neither the
+reasoning-only bar nor its mechanical replacement.
+
+**Not yet automatable.** A currency check (is a graduated criterion's
+mechanization still enforcing what the retired prose described) and a
+graduation-candidate scan (which criteria are ready to climb) both need a
+stable per-criterion tag or ID to key off — none exists yet, so neither is a
+CI job today. This is the same precondition the root `REVIEW.md`'s
+`blocking` escalation tag already names for tag-selective enforcement: the
+tagging groundwork comes first.
+
+**Feedback loop.** What actually justifies a graduation-candidate scan
+existing at all is a live signal that a criterion is (or isn't) worth its
+prose: managed Code Review's own reaction counts and the self-hosted
+`bughunter-severity` check-run JSON both carry a real per-finding usefulness
+signal today, but nothing routes either back into revising `REVIEW.md` or a
+`conventions/review/` criterion — a criterion that fires constantly as a
+false positive, or one that never fires at all, currently gets no different
+treatment than one earning its keep. Closing this loop is itself gated on
+the same per-criterion tag/ID scheme above (the signal has to attach to a
+specific criterion to be actionable), so it stays recorded here as a
+precondition, not built.
+
 ## Related
 
 - [`README.md`](README.md) — the managed/locally-owned ownership model and
@@ -91,3 +145,5 @@ decision, not an unaddressed one.
 - [`../docs/component-lifecycle.md`](../docs/component-lifecycle.md) — the
   admission evidence a copy needs before it can graduate to a managed
   component.
+- [`../conventions/engineering/enforceability-tiers.md`](../conventions/engineering/enforceability-tiers.md) —
+  the climb this section's retirement half completes.
