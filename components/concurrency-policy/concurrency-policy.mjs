@@ -163,17 +163,6 @@ function topLevelConcurrency(workflow) {
   return { present: true, malformed: true, group: undefined, cancelInProgress: undefined };
 }
 
-function conformsToCanonical(workflow) {
-  const concurrency = topLevelConcurrency(workflow);
-  return (
-    concurrency.present &&
-    !concurrency.malformed &&
-    typeof concurrency.group === "string" &&
-    CANONICAL_GROUP.test(concurrency.group) &&
-    concurrency.cancelInProgress === true
-  );
-}
-
 function concurrencyFindings(file, workflow) {
   const concurrency = topLevelConcurrency(workflow);
   if (!concurrency.present) {
@@ -291,17 +280,20 @@ export async function auditRepository({
     }
     if (Object.hasOwn(exceptions, record.file)) {
       consumedExceptions.add(record.file);
-      // An exception waives the top-level requirement only when the requirement
-      // is otherwise unmet; a workflow that already conforms does not need one.
-      if (conformsToCanonical(record.workflow)) {
+      // A delegated-job-level exception waives only the missing top-level block.
+      // A present block is still active, so it is validated regardless of the
+      // exception, and the now-unnecessary exception is reported: an exception
+      // must never license an unsafe or non-canonical block.
+      if (topLevelConcurrency(record.workflow).present) {
         findings.push(
           finding(
             "exception-inventory-drift",
             record.file,
-            "declares a concurrency-policy exception but already carries the canonical " +
-              "top-level block; remove the unnecessary exception",
+            "declares a concurrency-policy exception but carries a top-level concurrency " +
+              "block; remove the exception or the block",
           ),
         );
+        findings.push(...concurrencyFindings(record.file, record.workflow));
       }
       continue;
     }

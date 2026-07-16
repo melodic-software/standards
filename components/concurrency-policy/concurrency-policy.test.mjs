@@ -222,6 +222,29 @@ test("an exception on an already-conformant workflow is unconsumed drift", async
   ]);
 });
 
+test("an exception does not license a present non-canonical block", async () => {
+  const refBlock = `concurrency:
+  group: \${{ github.workflow }}-\${{ github.ref }}
+  cancel-in-progress: true
+`;
+  const root = await repository({
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        ".github/workflows/claude-review.yml": {
+          reason: "delegated-job-level",
+          justification: "Delegates to a reusable but also carries a stray top-level block.",
+        },
+      },
+    },
+    workflows: { "claude-review.yml": workflow("on: pull_request", refBlock) },
+  });
+  assert.deepEqual(rules(await auditRepository({ root })), [
+    ".github/workflows/claude-review.yml:concurrency-group-drift",
+    ".github/workflows/claude-review.yml:exception-inventory-drift",
+  ]);
+});
+
 test("an exception on a missing or non-pull-request workflow is drift", async () => {
   const missing = await repository({
     config: {
