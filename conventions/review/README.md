@@ -34,6 +34,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [messaging.md](messaging.md) | delivery integrity, ordering, message-contract evolution |
 | [performance.md](performance.md) | queries, allocation, caching, pagination, streaming |
 | [security.md](security.md) | secrets, injection, trust boundaries, supply chain |
+| [multi-tenancy.md](multi-tenancy.md) | horizontal (cross-tenant) authorization, isolation, tenant lifecycle |
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
