@@ -23,7 +23,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [error-handling.md](error-handling.md) | result-modeling, exception boundaries, resilience, idempotency |
 | [concurrency.md](concurrency.md) | shared state, cancellation, async hazards, deadlocks |
 | [performance.md](performance.md) | queries, allocation, caching, pagination, streaming |
-| [security.md](security.md) | secrets, injection, trust boundaries, supply chain |
+| [security.md](security.md) | secrets, injection, trust boundaries, object-level authorization, supply chain |
 | [multi-tenancy.md](multi-tenancy.md) | horizontal (cross-tenant) authorization, isolation, tenant lifecycle |
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |

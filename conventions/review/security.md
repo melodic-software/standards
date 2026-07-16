@@ -1,6 +1,6 @@
 # Security review criteria
 
-Diff-time checks for the security concerns automated tooling cannot fully catch — trust boundaries, injection, data exposure, and supply chain. Severity labels are defined in [README.md](README.md). Mechanical backstops include the [`gitleaks`](../../components/gitleaks/) policy and the OSV-Scanner workflow in `ci-workflows`; review owns the judgment they cannot make.
+Diff-time checks for the security concerns automated tooling cannot fully catch — trust boundaries, injection, object-level authorization, data exposure, and supply chain. Severity labels are defined in [README.md](README.md). Mechanical backstops include the [`gitleaks`](../../components/gitleaks/) policy and the OSV-Scanner workflow in `ci-workflows`; review owns the judgment they cannot make.
 
 ## Secrets and credentials
 
@@ -16,6 +16,7 @@ Diff-time checks for the security concerns automated tooling cannot fully catch 
 - **Transport security** — external endpoints use encrypted transport with no plaintext fallback in production.
 - **Error-detail leaking** — production error responses do not include stack traces, internal paths, or connection strings; surfaced error messages are safe to show a caller.
 - **Idempotency-key hygiene** — an idempotency key contains no sensitive data and is not predictable.
+- **Object-level authorization** — a lookup or mutation keyed by an object id (record, file, resource) that returns or changes it without confirming the authenticated caller is authorized for that specific object, not merely authenticated in general. The classic hunk is a fetch-by-id or update-by-id handler that trusts the id alone once the caller is logged in. Critical. This is the general (including same-tenant) case; [multi-tenancy.md](multi-tenancy.md) owns the tenant-crossing case of the same defect ([OWASP API1:2023 — Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)).
 
 ## Third-party and supply chain
 
@@ -25,3 +26,7 @@ Every external integration — a package, a CI action, a plugin, a tool server, 
 - Check maintainer identity and bus factor, a published security scorecard where available, recent release activity, the count of unaddressed advisories, and license compatibility.
 - Treat abandonment signals (no commits in a year, an archived repo, unpatched critical issues) as a trigger to plan migration.
 - Re-audit critical dependencies and direct dependencies on a recurring schedule.
+
+## Sources
+
+- OWASP — [API1:2023 Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
