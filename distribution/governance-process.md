@@ -124,6 +124,18 @@ CI job today. This is the same precondition the root `REVIEW.md`'s
 `blocking` escalation tag already names for tag-selective enforcement: the
 tagging groundwork comes first.
 
+**Feedback loop.** What actually justifies a graduation-candidate scan
+existing at all is a live signal that a criterion is (or isn't) worth its
+prose: managed Code Review's own reaction counts and the self-hosted
+`bughunter-severity` check-run JSON both carry a real per-finding usefulness
+signal today, but nothing routes either back into revising `REVIEW.md` or a
+`conventions/review/` criterion — a criterion that fires constantly as a
+false positive, or one that never fires at all, currently gets no different
+treatment than one earning its keep. Closing this loop is itself gated on
+the same per-criterion tag/ID scheme above (the signal has to attach to a
+specific criterion to be actionable), so it stays recorded here as a
+precondition, not built.
+
 ## Related
 
 - [`README.md`](README.md) — the managed/locally-owned ownership model and
