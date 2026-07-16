@@ -47,13 +47,19 @@ silently.
   `claude-code-plugins` (the second only if/when the B4 upstream plugin PR
   and a private-marketplace install both require it — see the open question
   below). **`Contents: Read-only`** and no other permission.
-- **Storage:** an org-level Actions secret whose visibility is restricted to
-  the private calling repos that run the review wiring
-  (`dotfiles`, `provisioning`, `github-iac`, `claude-code-plugins`,
-  `medley`) — **never `ci-workflows`**, so the secret is not resolvable in a
-  public-repo workflow run regardless of which reusable workflow it calls.
-  `ci-workflows` defines the reusable workflow only; the calling private
-  repo's job supplies the token.
+- **Storage:** the App's own credentials — its client ID and private key —
+  as org-level Actions secrets whose visibility is restricted to the private
+  calling repos that run the review wiring (`dotfiles`, `provisioning`,
+  `github-iac`, `claude-code-plugins`, `medley`) — **never `ci-workflows`**,
+  so neither secret is resolvable in a public-repo workflow run regardless
+  of which reusable workflow it calls. `ci-workflows` defines the reusable
+  workflow only; the calling private repo's job supplies both secrets to it.
+  **Never the installation token itself** — that token is minted fresh
+  inside each job from the App credentials via
+  [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token),
+  expires in about an hour, and is never stored; storing it instead of the
+  App credentials would break the mount after the first hour and would need
+  manual rotation as it expires or is revoked.
 - **Rotation:** GitHub Apps support multiple simultaneous keys, so the
   private key rotates on a fixed cadence with no downtime; the per-job
   installation token these keys mint is already ephemeral and needs no
