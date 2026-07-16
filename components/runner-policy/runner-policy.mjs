@@ -918,10 +918,11 @@ function normalizeDeclarationSurface(declaration) {
 
 // The security-relevant surface of a reusable workflow: whether it remains
 // callable, the GITHUB_TOKEN permissions it requests, the workflow_call
-// inputs/secrets contract it exposes to callers, its job routing, and
-// whether any job trips the same privileged-control-plane credential
-// detection already enforced against every directly declared or
-// repository-local job. Dependabot SHA bumps are eligible for deterministic
+// inputs/secrets contract it exposes to callers, its job routing, whether
+// any job trips the same privileged-control-plane credential detection
+// already enforced against every directly declared or repository-local job,
+// and the exact credential-bearing values (not just that category) each job
+// references. Dependabot SHA bumps are eligible for deterministic
 // auto-approval only when this surface is structurally identical between a
 // previously reviewed SHA and the new SHA. Changes outside this deliberately
 // bounded surface do not change the runner contract and can be
@@ -1049,6 +1050,80 @@ function jobCredentialSurface(workflow, policy) {
   );
 }
 
+// jobCredentialSurface records only privilegedHostedRequirement()'s category
+// (reason/description/rule), the same generic description — e.g. "an
+// unapproved or transformed credential expression" — regardless of which
+// exact secret or GitHub context property the expression references. A
+// candidate revision that swaps one already-declared/allowed secret for a
+// different secret in the identical env/with position trips the same
+// category and produces an identical requirement object, so that coarse
+// comparison alone lets the candidate silently inherit the previously
+// reviewed contract even though the actual credential changed. This mirrors
+// localCredentialRequirement's own traversal (workflow-level env, job
+// condition, job fields outside steps, then each step's condition,
+// non-credential fields, env, and with), but instead of stopping at the
+// first credential-bearing value and returning a category, it records every
+// credential-bearing value's own normalized text, so a same-category,
+// different-secret change becomes a visible diff.
+function credentialBearingEntries(mapping) {
+  if (mapping === null || typeof mapping !== "object" || Array.isArray(mapping)) {
+    return containsCredentialExpression(mapping)
+      ? { "*": normalizeStructuralValue(mapping) }
+      : undefined;
+  }
+  const entries = Object.entries(mapping)
+    .filter(([, value]) => containsCredentialExpression(value))
+    .map(([key, value]) => [key, normalizeStructuralValue(value)])
+    .sort(([left], [right]) => left.localeCompare(right));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function jobCredentialReferenceSurface(workflow, job) {
+  const { steps, if: jobCondition, ...jobWithoutSteps } = job;
+  const stepEntries = Array.isArray(steps)
+    ? steps
+        .map((step, index) => {
+          if (step === null || typeof step !== "object" || Array.isArray(step)) {
+            return undefined;
+          }
+          const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
+          const entry = {
+            condition: conditionContainsCredentialReference(stepCondition)
+              ? normalizeStructuralValue(stepCondition)
+              : undefined,
+            other: credentialBearingEntries(stepWithoutCredentialMappings),
+            env: credentialBearingEntries(env),
+            with: credentialBearingEntries(inputs),
+          };
+          return Object.values(entry).some((value) => value !== undefined)
+            ? { index, ...entry }
+            : undefined;
+        })
+        .filter((entry) => entry !== undefined)
+    : [];
+  return {
+    workflowEnv: credentialBearingEntries(workflow.env),
+    jobCondition: conditionContainsCredentialReference(jobCondition)
+      ? normalizeStructuralValue(jobCondition)
+      : undefined,
+    job: credentialBearingEntries(jobWithoutSteps),
+    steps: stepEntries,
+  };
+}
+
+function jobCredentialReferencesSurface(workflow) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.fromEntries(
+    Object.entries(jobs)
+      .filter(([, job]) => job !== null && typeof job === "object" && !Array.isArray(job))
+      .map(([jobId, job]) => [jobId, jobCredentialReferenceSurface(workflow, job)])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
 function reusableWorkflowSecuritySurface(workflow, policy) {
   const declaration = workflowCallDeclaration(workflow) ?? {};
   return {
@@ -1059,6 +1134,7 @@ function reusableWorkflowSecuritySurface(workflow, policy) {
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),
     credentials: jobCredentialSurface(workflow, policy),
+    credentialReferences: jobCredentialReferencesSurface(workflow),
   };
 }
 
@@ -1104,6 +1180,7 @@ function securitySurfaceDiffField(basis, candidate) {
     "jobPermissions",
     "routing",
     "credentials",
+    "credentialReferences",
   ]) {
     if (JSON.stringify(basis[key]) !== JSON.stringify(candidate[key])) {
       return key;

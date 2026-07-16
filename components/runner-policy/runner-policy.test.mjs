@@ -281,6 +281,48 @@ jobs:
       - uses: actions/create-github-app-token@v2
 `;
 
+const REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_B }}
+`;
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -2358,6 +2400,43 @@ test("Dependabot SHA bump that adds a credential-minting action to a called job'
     contractFinding.message,
     new RegExp(
       `auto-approval declined: credentials changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test for a gap where jobCredentialSurface recorded only
+// privilegedHostedRequirement()'s category (e.g. "an unapproved or
+// transformed credential expression"), not the exact credential-bearing
+// value itself. A bumped SHA that swaps one already-declared/allowed secret
+// for a different secret in the identical step env position trips the same
+// category on both revisions, so that coarse comparison alone would let the
+// candidate silently inherit the previously reviewed contract even though
+// the actual secret referenced changed.
+test("Dependabot SHA bump that changes only the exact secret referenced in a called job's step env is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
     ),
   );
 });
