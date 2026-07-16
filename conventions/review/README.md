@@ -31,6 +31,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [architecture.md](architecture.md) | structural integrity, contract evolution, build-system coupling |
 | [error-handling.md](error-handling.md) | result-modeling, exception boundaries, resilience, idempotency |
 | [concurrency.md](concurrency.md) | shared state, cancellation, async hazards, deadlocks |
+| [messaging.md](messaging.md) | delivery integrity, ordering, message-contract evolution |
 | [performance.md](performance.md) | queries, allocation, caching, pagination, streaming |
 | [security.md](security.md) | secrets, injection, trust boundaries, supply chain |
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
