@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://standards.melodic.software/dependabot-policy/dependabot-policy.schema.json",
+  "title": "Repository Dependabot policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "exceptions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exceptions": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/entryKey" },
+      "additionalProperties": { "$ref": "#/$defs/exception" }
+    }
+  },
+  "$defs": {
+    "entryKey": {
+      "type": "string",
+      "pattern": "^[a-z-]+:\\S"
+    },
+    "nonWhitespaceString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "justification", "waives"],
+      "properties": {
+        "reason": { "enum": ["tracks-upstream-release", "single-tool-ecosystem"] },
+        "justification": { "$ref": "#/$defs/nonWhitespaceString" },
+        "waives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["schedule", "cooldown", "groups"] }
+        }
+      }
+    }
+  }
+}

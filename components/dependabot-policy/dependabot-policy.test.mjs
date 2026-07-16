@@ -1,0 +1,290 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+import { auditRepository, ConfigurationError, parseUniqueJson } from "./dependabot-policy.mjs";
+
+const temporaryRoots = [];
+
+const CONFORMANT = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+`;
+
+function dependabot(entries) {
+  return `version: 2\nupdates:\n${entries}`;
+}
+
+async function repository({ config, dependabotYaml } = {}) {
+  const root = await mkdtemp(path.join(tmpdir(), "dependabot-policy-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github"), { recursive: true });
+  if (dependabotYaml !== undefined) {
+    await writeFile(path.join(root, ".github", "dependabot.yml"), dependabotYaml);
+  }
+  if (config !== undefined) {
+    await writeFile(
+      path.join(root, ".github", "dependabot-policy.json"),
+      typeof config === "string" ? config : `${JSON.stringify(config, null, 2)}\n`,
+    );
+  }
+  return root;
+}
+
+function rules(findings) {
+  return findings.map((item) => `${item.entry ?? item.file}:${item.rule}`).sort();
+}
+
+test.after(async () => {
+  await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
+});
+
+test("a fully conformant config passes", async () => {
+  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("multiple conformant entries including the directories plural form pass", async () => {
+  const entries = `${CONFORMANT}  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entries) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("a longer cooldown than the floor passes", async () => {
+  const entry = CONFORMANT.replace("default-days: 7", "default-days: 14");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("a missing dependabot.yml is flagged", async () => {
+  const root = await repository({});
+  assert.deepEqual(rules(await auditRepository({ root })), [
+    ".github/dependabot.yml:dependabot-config-missing",
+  ]);
+});
+
+test("a non-weekly schedule is flagged", async () => {
+  const entry = CONFORMANT.replace("interval: weekly", "interval: daily");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:schedule-not-standard"]);
+});
+
+test("a missing cooldown is flagged", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
+});
+
+test("a cooldown below the floor is flagged", async () => {
+  const entry = CONFORMANT.replace("default-days: 7", "default-days: 3");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
+});
+
+test("a missing groups block is flagged", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
+});
+
+test("an open-pull-requests-limit above the maximum is flagged", async () => {
+  const entry = CONFORMANT.replace("open-pull-requests-limit: 5", "open-pull-requests-limit: 10");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:pr-limit-too-high"]);
+});
+
+test("an omitted open-pull-requests-limit is accepted (GitHub default is the maximum)", async () => {
+  const entry = CONFORMANT.replace("    open-pull-requests-limit: 5\n", "");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("an unsupported version is flagged", async () => {
+  const root = await repository({ dependabotYaml: `version: 1\nupdates:\n${CONFORMANT}` });
+  assert.deepEqual(rules(await auditRepository({ root })), [
+    ".github/dependabot.yml:unsupported-version",
+  ]);
+});
+
+test("tracks-upstream-release waives schedule and cooldown for a fast-tracked entry", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: daily
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+`;
+  const root = await repository({
+    dependabotYaml: dependabot(entry),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": {
+          reason: "tracks-upstream-release",
+          justification: "This root tracks the latest upstream release deliberately.",
+          waives: ["schedule", "cooldown"],
+        },
+      },
+    },
+  });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("single-tool-ecosystem waives the groups requirement", async () => {
+  const entry = `  - package-ecosystem: pip
+    directory: /.github
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+`;
+  const root = await repository({
+    dependabotYaml: dependabot(entry),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "pip:/.github": {
+          reason: "single-tool-ecosystem",
+          justification: "One pinned tool; grouping is a no-op.",
+          waives: ["groups"],
+        },
+      },
+    },
+  });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("an exception on a non-existent entry is drift", async () => {
+  const root = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "gomod:/": {
+          reason: "single-tool-ecosystem",
+          justification: "No such entry.",
+          waives: ["groups"],
+        },
+      },
+    },
+  });
+  assert.deepEqual(rules(await auditRepository({ root })), ["gomod:/:exception-inventory-drift"]);
+});
+
+test("a waiver for an already-satisfied rule is drift", async () => {
+  const root = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": {
+          reason: "single-tool-ecosystem",
+          justification: "Groups are actually present, so this waiver is unused.",
+          waives: ["groups"],
+        },
+      },
+    },
+  });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:exception-inventory-drift"]);
+});
+
+test("an unknown reason, unknown waiver, or missing justification fails closed", async () => {
+  const badReason = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: { "npm:/": { reason: "because", justification: "x", waives: ["groups"] } },
+    },
+  });
+  await assert.rejects(
+    auditRepository({ root: badReason }),
+    (error) => error instanceof ConfigurationError,
+  );
+  const badWaive = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": { reason: "single-tool-ecosystem", justification: "x", waives: ["limit"] },
+      },
+    },
+  });
+  await assert.rejects(
+    auditRepository({ root: badWaive }),
+    (error) => error instanceof ConfigurationError,
+  );
+  const noJustification = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: { "npm:/": { reason: "single-tool-ecosystem", waives: ["groups"] } },
+    },
+  });
+  await assert.rejects(
+    auditRepository({ root: noJustification }),
+    (error) => error instanceof ConfigurationError,
+  );
+});
+
+test("an unknown config key fails closed", async () => {
+  const root = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: { schemaVersion: 1, exceptions: {}, extra: true },
+  });
+  await assert.rejects(auditRepository({ root }), (error) => error instanceof ConfigurationError);
+});
+
+test("a malformed dependabot.yml fails closed", async () => {
+  const root = await repository({ dependabotYaml: "version: 2\nupdates: : :\n" });
+  await assert.rejects(auditRepository({ root }), (error) => error instanceof ConfigurationError);
+});
+
+test("duplicate JSON members in the config fail closed", () => {
+  assert.throws(
+    () => parseUniqueJson('{"schemaVersion":1,"schemaVersion":1}', "config at /tmp/c.json"),
+    (error) => error instanceof ConfigurationError && error.message.includes("duplicate"),
+  );
+});

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "scheduleInterval": "weekly",
+  "cooldownMinimumDays": 7,
+  "maxOpenPullRequests": 5,
+  "requireGroups": true
+}
