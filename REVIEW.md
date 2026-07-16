@@ -23,11 +23,12 @@ surface's three markers:
 detection-time judgment of whether a finding predates the diff, orthogonal
 to the three-tier vocabulary above and not something a criterion assigns.
 
-A finding tagged `blocking` (`conventions/review/README.md#escalation-tags`)
-is always 🔴 Important here, regardless of what severity its underlying
-criterion would otherwise carry in context. Recognizing that a specific
-diff hunk matches a `blocking`-tagged criterion is reviewer judgment, piloted
-rather than asserted reliable — see that same section.
+A finding tagged `blocking` is always 🔴 Important here, regardless of what
+severity its underlying criterion would otherwise carry in context.
+Recognizing that a specific diff hunk matches a `blocking`-tagged criterion
+is reviewer judgment, piloted rather than asserted reliable. `blocking` is
+this file's own tag, not a severity a `conventions/review/` criterion
+assigns — no criterion file currently carries one.
 
 ## Depth
 
