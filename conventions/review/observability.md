@@ -36,6 +36,7 @@ New apps, services, long-lived tool servers, and non-trivial scripts expose insp
 - **Reuse semantic conventions before inventing keys** — use the stable standard attribute names for HTTP, database, and messaging rather than minting new ones, and isolate any attribute drawn from a still-evolving convention so a future rename is contained.
 - **Namespace custom attributes** — app-specific tags use a reverse-domain or app-unique prefix; never an OpenTelemetry-reserved prefix or an existing standard namespace.
 - **Log-trace correlation** — high-volume diagnostics go through the logging pipeline (which captures the active trace and span identities) while the relevant span is current, so logs and traces correlate. Sensitive-data redaction in a log line is owned by the security criteria.
+- **Tenant as a correlation tag** — a multi-tenant system's logs or traces for a tenant-scoped operation omit the tenant identifier, or an async hop (message, job, event) drops it from the telemetry context, leaving cross-tenant issues impossible to isolate. This is a correlation gap, not a scoping defect — a tenant value that governs data access or an authorization decision is [multi-tenancy.md](multi-tenancy.md)'s concern instead. Metrics are excluded: with many or unbounded tenants, a raw tenant id as a metric tag is the unbounded-identity case the cardinality bar above already rules out — correlate a tenant-scoped metric through its log/trace context, or tag it with a bounded tenant grouping (tier, plan, region) instead of the raw id.
 
 ## Sources
 
