@@ -341,6 +341,46 @@ test("a malformed dependabot.yml fails closed", async () => {
   await assert.rejects(auditRepository({ root }), (error) => error instanceof ConfigurationError);
 });
 
+test("a scalar or null update entry is flagged", async () => {
+  const scalar = await repository({ dependabotYaml: "version: 2\nupdates:\n  - just-a-string\n" });
+  assert.deepEqual(rules(await auditRepository({ root: scalar })), [
+    "updates[0]:malformed-update-entry",
+  ]);
+  const nullEntry = await repository({ dependabotYaml: "version: 2\nupdates:\n  - null\n" });
+  assert.deepEqual(rules(await auditRepository({ root: nullEntry })), [
+    "updates[0]:malformed-update-entry",
+  ]);
+});
+
+test("a waiver outside the reason's scope fails closed", async () => {
+  const single = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": { reason: "single-tool-ecosystem", justification: "x", waives: ["cooldown"] },
+      },
+    },
+  });
+  await assert.rejects(
+    auditRepository({ root: single }),
+    (error) => error instanceof ConfigurationError,
+  );
+  const tracks = await repository({
+    dependabotYaml: dependabot(CONFORMANT),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": { reason: "tracks-upstream-release", justification: "x", waives: ["groups"] },
+      },
+    },
+  });
+  await assert.rejects(
+    auditRepository({ root: tracks }),
+    (error) => error instanceof ConfigurationError,
+  );
+});
+
 test("duplicate JSON members in the config fail closed", () => {
   assert.throws(
     () => parseUniqueJson('{"schemaVersion":1,"schemaVersion":1}', "config at /tmp/c.json"),

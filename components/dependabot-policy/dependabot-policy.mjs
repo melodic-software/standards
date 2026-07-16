@@ -289,8 +289,16 @@ export async function auditRepository({
   // (entryKey, waivedRule) pairs that suppressed a real finding.
   const consumedWaives = new Set();
   const seenKeys = new Set();
-  for (const entry of updates) {
+  for (const [index, entry] of updates.entries()) {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      findings.push(
+        finding(
+          "malformed-update-entry",
+          file,
+          `updates[${index}]`,
+          "each updates entry must be a mapping with a package-ecosystem and a directory",
+        ),
+      );
       continue;
     }
     const key = entryKey(entry);

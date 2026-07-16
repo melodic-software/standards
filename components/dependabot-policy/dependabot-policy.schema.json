@@ -35,7 +35,31 @@
           "uniqueItems": true,
           "items": { "enum": ["schedule", "cooldown", "groups"] }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["reason"],
+            "properties": { "reason": { "const": "tracks-upstream-release" } }
+          },
+          "then": {
+            "properties": {
+              "waives": { "type": "array", "items": { "enum": ["schedule", "cooldown"] } }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["reason"],
+            "properties": { "reason": { "const": "single-tool-ecosystem" } }
+          },
+          "then": {
+            "properties": {
+              "waives": { "type": "array", "items": { "enum": ["groups"] } }
+            }
+          }
+        }
+      ]
     }
   }
 }

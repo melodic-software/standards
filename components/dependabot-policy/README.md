@@ -53,11 +53,15 @@ Per `updates` entry, keyed by `<package-ecosystem>:<directory>` (the plural
 - `schedule-not-standard` — `schedule.interval` is not the standard interval.
 - `cooldown-below-minimum` — `cooldown.default-days` is missing or below the
   minimum.
+- `cooldown-soak-bypassed` — a match-all `cooldown.exclude` (`"*"`) or a
+  `cooldown.include` list defeats the soak even though `default-days` is set.
 - `groups-missing` — no `groups` block.
 - `pr-limit-too-high` — `open-pull-requests-limit` exceeds the maximum.
+- `malformed-update-entry` — an `updates` item is not a mapping.
 
 File-level: `dependabot-config-missing` when there is no `.github/dependabot.yml`
-at all, and `unsupported-version` when the config is not `version: 2`.
+at all, `unsupported-version` when the config is not `version: 2`, and
+`updates-missing` when the config declares no `updates` entries.
 
 ## Exceptions
 
@@ -80,11 +84,13 @@ owned `.github/dependabot-policy.json`:
 ```
 
 An exception is keyed by the same `<ecosystem>:<directory>` as the entry it
-covers. `reason` is one of `tracks-upstream-release` or `single-tool-ecosystem`;
-`waives` lists the rules it suppresses (`schedule`, `cooldown`, `groups`);
-`justification` is required. Unknown reasons or waivers, unknown keys, and a
-missing justification fail closed at schema time. An exception that names an
-entry that does not exist, or that waives a rule the entry already satisfies, is
+covers. `reason` is one of `tracks-upstream-release` (which may waive `schedule`
+and `cooldown`) or `single-tool-ecosystem` (which may waive `groups`); `waives`
+lists the rules it suppresses, and each must fall within its reason's scope;
+`justification` is required. Unknown reasons or waivers, a waiver outside its
+reason's scope, unknown keys, and a missing justification fail closed at schema
+time. An exception that names an entry that does not exist, or that waives a rule
+the entry already satisfies, is
 reported as `exception-inventory-drift`, so the inventory cannot silently widen
 or rot. The `open-pull-requests-limit` cap is not waivable.
 
