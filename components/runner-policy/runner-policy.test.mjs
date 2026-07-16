@@ -16,6 +16,7 @@ const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
+const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
@@ -31,6 +32,9 @@ const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
+const CANONICAL_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_SELF_HOSTED_LABEL }}`;
+const REVIEW_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}`;
+const ARBITRARY_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.ARBITRARY_SELF_HOSTED_LABEL }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
 const temporaryRoots = [];
 
@@ -1044,6 +1048,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
       `${SELECTOR_PATH}@${DEPENDABOT_ROUTING_SHA}`,
+      `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -1063,6 +1068,7 @@ test("production selector allowlist contains only independently reviewed commits
     LIVENESS_SELECTOR_SHA,
     SECURITY_HARDENING_SHA,
     DEPENDABOT_ROUTING_SHA,
+    REVIEW_TIER_SELECTOR_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
@@ -1410,6 +1416,67 @@ test("selector policy rejects arbitrary variable indirection", async () => {
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, "selector-pin");
   assert.match(findings[0].message, /selector inputs\.policy must be exactly/);
+});
+
+test("selector self-hosted-label accepts the governed review-tier variable", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
+        REVIEW_SELF_HOSTED_LABEL_EXPRESSION,
+      )}`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("selector self-hosted-label rejects an ungoverned variable expression", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
+        ARBITRARY_SELF_HOSTED_LABEL_EXPRESSION,
+      )}`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(findings[0].message, /selector inputs\.self-hosted-label must be one of/);
+});
+
+test("a claude-review caller routes to the review tier through the governed selector without findings", async () => {
+  // Executable spec for the Campaign A flip: a dedicated select-review job
+  // resolves the review-tier label, and the claude-review reusable call takes
+  // its runner from that selector output under the reviewed #140 caller-perms
+  // waiver. Zero findings proves the review label threads end to end and never
+  // trips the hardcoded default-label routing-condition guards.
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner", "skip-actors"],
+          allowedSecrets: {
+            CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+          },
+          allowedCallerPermissions: {
+            contents: "read",
+            "pull-requests": "write",
+            "id-token": "write",
+          },
+        },
+      },
+    },
+    workflows: {
+      "claude-review.yml": `jobs:\n  select-review:\n${SELECTOR.replace(
+        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
+        REVIEW_SELF_HOSTED_LABEL_EXPRESSION,
+      )}  review:\n    needs: select-review\n    if: \${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}\n    with:\n      runner: \${{ needs.select-review.outputs.runner || 'ubuntu-24.04' }}\n      skip-actors: "dependabot[bot]"\n    secrets:\n      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
 });
 
 test("selector observer key must use the exact governed secret expression", async () => {

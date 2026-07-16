@@ -158,9 +158,14 @@ label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to
 `ubuntu-24.04`.
 
-Personal-repository callers may additionally pass
+The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
+(the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
+dedicated capped review tier). A review-lane caller passes the latter from a
+separate selector job so its review workload routes to that tier while the
+repository's other self-hosted jobs keep the default. Personal-repository
+callers may additionally pass
 `self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`. No other
-selector input is allowed by the policy.
+selector input or expression is allowed by the policy.
 
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
@@ -226,10 +231,17 @@ same-repository Dependabot runs route like pushes, sourcing the observer key
 from the organization's Dependabot secrets store, while fork and public guards
 are unchanged and the key stays confined to the selector job. Until
 `CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
-keep falling back hosted (`missing-secret`), so rollout is fail-safe.
-Seven selector revisions remain approved for an ordered consumer rollout.
+keep falling back hosted (`missing-secret`), so rollout is fail-safe. The
+review-tier admission revision at `cdc5917c15aade1995bd810b60d818cadc635b52`
+adds `melodic-review-ubuntu-24.04-x64` to the strict `self-hosted-only`
+allowlist so a review-lane caller routes `claude-review` to the dedicated
+capped tier, while the selector control-plane job itself still runs on the
+default fleet label. A review lane must pin this revision: older approved
+revisions do not admit the review-tier label, and a `self-hosted-only` selector
+at an older pin fails closed on it (`unapproved-label`).
+Eight selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these four strict-scheduling
+owned by a different repository owner, so these five strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -323,8 +335,11 @@ trigger. The runner input must be either an optional string with the governed
 `ubuntu-24.04` default, or `required: true` with no `default`. The required form
 accepts only the raw selector output and requires the caller condition to prove
 selector success, the `self-hosted` route, a non-empty runner, and equality with
-`vars.CI_SELF_HOSTED_LABEL`. The same caller workflow must also contain exactly
-one approved unroutable failure sentinel for that selector; one sentinel may
+`vars.CI_SELF_HOSTED_LABEL`. The required no-default form therefore routes only
+to the default fleet tier; the capped review tier is reached through the
+optional-default runner form above. The same caller workflow must also contain
+exactly one approved unroutable failure sentinel for that selector; one sentinel
+may
 cover multiple required calls sharing the selector, but a sentinel in another
 workflow or for another selector does not satisfy the contract. Optional calls
 with the governed hosted fallback do not require this guard. A
