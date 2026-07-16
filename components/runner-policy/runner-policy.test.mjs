@@ -502,6 +502,23 @@ const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURC
     '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
   );
 
+// Index syntax is a generic property accessor, not special-cased to the
+// final `<name>` segment: `needs['pick']` is as valid as `needs.pick`. This
+// fixture brackets every segment (`needs['pick']['outputs']['runner']`) to
+// prove the detector does not miss bracket indexing on the job-id or the
+// literal `outputs` segment, only on the output name.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs['pick']['outputs']['runner']",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
   const declaration = [
     "  workflow_call:",
@@ -3395,6 +3412,11 @@ for (const [label, source, cosmeticSource] of [
     "double-quoted index syntax",
     REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE,
     REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE,
+  ],
+  [
+    "fully bracketed index syntax on the job-id and outputs segments",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE,
   ],
 ]) {
   test(`Dependabot SHA bump that routes through a needs.<job>.outputs ${label} indirection is declined`, async () => {

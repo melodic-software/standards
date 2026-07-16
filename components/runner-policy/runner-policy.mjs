@@ -1238,19 +1238,32 @@ function malformedJobIds(workflow) {
 // chain generically, through arbitrary steps or scripts, cannot be done
 // statically and safely, so any job whose routing-relevant fields reference
 // another job's outputs is ineligible for surface-diff auto-approval and
-// fails closed instead of being silently treated as unchanged. GitHub's
-// expression syntax accepts both property-dereference (`needs.<job>.outputs.<name>`)
-// and equivalent index syntax (`needs.<job>.outputs['<name>']` or
-// `needs.<job>.outputs["<name>"]`) for the same output; matching only the dot
-// form would let a candidate written with bracket indexing keep a
-// byte-identical `runs-on` (or other routing field) while the producing
-// job's output value changes underneath it, exactly the gap this detector
-// exists to close. Matching `outputs` followed by either `.` or `[`, rather
-// than enumerating every quoting style, also fails closed on any other
-// bracket-index spelling (extra whitespace, double vs. single quotes, or a
-// non-literal index) without relying on a more permissive quoted-string
-// pattern to stay exhaustive.
-const NEEDS_OUTPUT_REFERENCE = /needs\.[A-Za-z0-9_-]+\.outputs(?:\.[A-Za-z0-9_-]+|\[)/;
+// fails closed instead of being silently treated as unchanged.
+//
+// GitHub's expression syntax documents `.` (property de-reference) and `[ ]`
+// (index) as generically interchangeable operators for any property access,
+// not a special case reserved for the final `<name>` segment -- so
+// `needs['<job>'].outputs.<name>`, `needs.<job>['outputs'].<name>`, and
+// `needs['<job>']['outputs']['<name>']` are equally valid spellings of
+// `needs.<job>.outputs.<name>`. Matching only a literal `needs.` prefix and
+// a literal `.outputs` (as an earlier revision of this detector did) missed
+// every one of those besides the final-segment case, letting a candidate
+// keep a byte-identical routing field while the producing job's output
+// value changed underneath it. The pattern below therefore accepts dot or
+// bracket form (with optional whitespace) for both the job-id segment and
+// the literal `outputs` segment, so any GitHub-valid spelling of a
+// needs-output reference is caught, not just the ones this detector has
+// been shown so far.
+const NEEDS_OUTPUT_IDENTIFIER_SOURCE = "[A-Za-z0-9_-]+";
+const NEEDS_OUTPUT_SINGLE_QUOTED_SOURCE = "'(?:[^'\\\\]|\\\\.)*'";
+const NEEDS_OUTPUT_DOUBLE_QUOTED_SOURCE = '"(?:[^"\\\\]|\\\\.)*"';
+const NEEDS_OUTPUT_QUOTED_SOURCE = `(?:${NEEDS_OUTPUT_SINGLE_QUOTED_SOURCE}|${NEEDS_OUTPUT_DOUBLE_QUOTED_SOURCE})`;
+const NEEDS_OUTPUT_JOB_ACCESS_SOURCE = `(?:\\.\\s*${NEEDS_OUTPUT_IDENTIFIER_SOURCE}|\\[\\s*${NEEDS_OUTPUT_QUOTED_SOURCE}\\s*\\])`;
+const NEEDS_OUTPUT_OUTPUTS_ACCESS_SOURCE =
+  "(?:\\.\\s*outputs\\b|\\[\\s*(?:'outputs'|\"outputs\")\\s*\\])";
+const NEEDS_OUTPUT_REFERENCE = new RegExp(
+  `needs\\s*${NEEDS_OUTPUT_JOB_ACCESS_SOURCE}\\s*${NEEDS_OUTPUT_OUTPUTS_ACCESS_SOURCE}`,
+);
 
 function containsNeedsOutputReference(value) {
   if (typeof value === "string") {

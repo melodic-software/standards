@@ -239,10 +239,11 @@ no structural surface comparison can prove them unchanged. First, a job whose
 routing-relevant fields (`runs-on`, `strategy`, the reusable-call
 `uses`/`with`/`secrets`, or the `container`/`services`/`environment`
 execution boundary) reference another job's output through
-`needs.<job-id>.outputs.<name>` or GitHub's equivalent index syntax
-`needs.<job-id>.outputs['<name>']` — the same needs-output pattern this policy
-already supports for local selector routing — declines auto-approval for
-that path: the referencing expression can stay byte-identical while the
+`needs.<job-id>.outputs.<name>` or GitHub's equivalent index syntax on any
+segment of that reference (`needs['<job-id>']`, `.outputs['<name>']`, or any
+dot/bracket combination of the two) — the same needs-output pattern this
+policy already supports for local selector routing — declines auto-approval
+for that path: the referencing expression can stay byte-identical while the
 producing job's own value changes the real routing boundary underneath it.
 Second, a reviewed contract with `selectorResultInput` declines
 auto-approval unconditionally, even on an otherwise identical surface: that
