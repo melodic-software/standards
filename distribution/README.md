@@ -17,11 +17,15 @@ repository path, Git-index, ownership, dependency-graph, target-identity, and
 apply safety checks that JSON Schema cannot express.
 
 The distribution [threat model](THREAT-MODEL.md) records trust boundaries,
-fail-closed guarantees, residual risks, and security review triggers. The
-[governance process](governance-process.md) records the copy-adoption
-back-link and drift-check requirement and the cross-doc reconciliation step
-for normative-doc changes — both outside this manifest's automated
-reconciliation loop.
+fail-closed guarantees, residual risks, and security review triggers for the
+reconciliation engine itself. The
+[native-reference review credential](REVIEW-CREDENTIAL.md) classifies the
+separate, read-only credential a private calling repo's review job uses to
+mount `conventions/review` by native reference, and its republication
+limits. The [governance process](governance-process.md) records the
+copy-adoption back-link and drift-check requirement and the cross-doc
+reconciliation step for normative-doc changes — all three outside this
+manifest's automated reconciliation loop.
 
 ## Ownership model
 
@@ -33,6 +37,17 @@ in a component move together.
   opt-out. The synchronizer never reads, changes, or deletes it.
 - Omission means the component is irrelevant or has not been classified for
   that target.
+
+This repository's own root files — currently just `README.md` — are neither
+`managed` nor `locally-owned` here — those labels describe a *downstream*
+copy's relationship to an upstream source. In `standards` itself a root file
+is simply the canonical source: no manifest entry, because there is no
+synchronization to record. The same holds for any root file `standards`
+adds later, such as `AGENTS.md` or `CLAUDE.md`. Once a downstream target
+gains a manifest component for a root file — for example a future
+`REVIEW.md` or `AGENTS.md` component — that downstream copy is what carries
+the `managed` label; this repository's own originals never carry an
+ownership label themselves.
 
 There are no layouts, per-target paths, transforms, patches, profiles, receipts,
 or generated downstream metadata. A component that needs a different
