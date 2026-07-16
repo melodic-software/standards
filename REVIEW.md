@@ -68,9 +68,12 @@ criterion; a citation here never substitutes prose that isn't needed, per
 
 ## Do not report
 
-- Anything CI already enforces: lint, formatting, type errors, and whatever
-  a stack overlay under `conventions/review/overlays/` names as its
-  component's mechanical backstop.
+- Anything CI already enforces and that is not also tagged `blocking`
+  above: lint, formatting, type errors, and whatever a stack overlay under
+  `conventions/review/overlays/` names as its component's mechanical
+  backstop. A CI backstop (for example a `gitleaks` lane) catches an
+  instance mechanically; it does not make the `blocking` check itself
+  skippable here.
 - Generated files and lockfiles.
 
 ## Cap the nits
