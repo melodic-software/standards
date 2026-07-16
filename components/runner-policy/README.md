@@ -255,9 +255,13 @@ at `1d3762c2ace413db0f347048307946c46850161c` are compatibility-only entries for
 the dependency-ordered consumer PRs; they do not authorize new adoption. Each
 consumer must move every reusable call to the reviewed production SHA in the
 same integration that enables its policy gate, and the legacy entries are
-removed after the six consumer migrations. The policy records each complete
-path@SHA, fixed runner label, caller-input allowlist, and exact secret map;
-changing any field requires another review.
+removed after the six consumer migrations. The link-check contract was bumped
+to `09dd32ae40e270614e251fddafa16bab9a487de5`, which only adds a step that
+closes a recovered tracking issue; permissions, inputs, and `runs-on` stay
+byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
+contract, so the existing hosted-only shape carries over unmodified. The
+policy records each complete path@SHA, fixed runner label, caller-input
+allowlist, and exact secret map; changing any field requires another review.
 
 ## Selector revision lockstep
 
