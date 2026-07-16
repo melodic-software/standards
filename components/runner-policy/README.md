@@ -444,7 +444,7 @@ environments, credential-minting actions, job containers, and services retain
 their existing hosted-only rules.
 
 The policy also forbids `ubuntu-latest`, direct `self-hosted` use, owner-prefixed
-managed scale-set labels (including tiered and canary forms), unknown literal
+managed scale-set labels (including tiered forms), unknown literal
 labels, and arbitrary expression/variable indirection. Hosted targets must come
 from the policy's explicit label allowlist. A policy exception permits hosted
 execution; it does not suppress the runner-target, selector-contract, or
