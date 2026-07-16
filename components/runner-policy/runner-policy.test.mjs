@@ -30,7 +30,7 @@ const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/w
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 // Shared placeholder for the reviewed ci-workflows merge commit that carries
 // these reusables' runner input; not a real commit SHA.
-const WAVE1_FLOOR_CONVERSION_SHA = "feedfacefeedfacefeedfacefeedfacefeedface";
+const WAVE1_FLOOR_CONVERSION_SHA = "3dfb18452a8c6059a22e62456390d84feb10b42f";
 const LINK_CHECK_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
 const PULUMI_DRIFT_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;

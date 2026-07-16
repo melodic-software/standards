@@ -260,7 +260,7 @@ byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
 contract, so the existing hosted-only shape carries over unmodified.
 
 The link-check and Pulumi version-drift monitor contracts were converted to
-`runner-input` at `feedfacefeedfacefeedfacefeedfacefeedface` (placeholder pending
+`runner-input` at `3dfb18452a8c6059a22e62456390d84feb10b42f` (placeholder pending
 the ci-workflows floor-conversion merge; Wave 1 of the private-repo hosted-floor
 elimination, melodic-software/github-iac#78) so strict consumers route these
 privileged scheduled maintenance lanes through the approved selector instead of a
