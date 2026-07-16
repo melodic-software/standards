@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://standards.melodic.software/concurrency-policy/concurrency-policy.schema.json",
+  "title": "Repository concurrency policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "exceptions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exceptions": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/workflowPath" },
+      "additionalProperties": { "$ref": "#/$defs/exception" }
+    }
+  },
+  "$defs": {
+    "workflowPath": {
+      "type": "string",
+      "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"
+    },
+    "nonWhitespaceString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "justification"],
+      "properties": {
+        "reason": { "enum": ["delegated-job-level"] },
+        "justification": { "$ref": "#/$defs/nonWhitespaceString" }
+      }
+    }
+  }
+}

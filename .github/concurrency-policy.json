@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "exceptions": {
+    ".github/workflows/claude-review.yml": {
+      "reason": "delegated-job-level",
+      "justification": "The ci-workflows/claude-review.yml reusable already supersedes in-flight reviews per pull request via job-level concurrency (claude-review-<pr>); a caller-level group of the same name would deadlock the called job, so the top-level block is deliberately omitted."
+    }
+  }
+}

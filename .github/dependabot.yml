@@ -66,6 +66,23 @@ updates:
         update-types:
           - "minor"
           - "patch"
+  # The concurrency policy analyzer is distributed with its own runtime
+  # lockfile, so it is a separate npm dependency root. Keep this entry in sync
+  # with that component; every downstream materialization must add the
+  # equivalent destination path.
+  - package-ecosystem: npm
+    directory: /components/concurrency-policy
+    labels: ["dependencies"]
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
   # Distribution validation is an independent runtime dependency root.
   - package-ecosystem: npm
     directory: /distribution
