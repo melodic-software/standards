@@ -2,7 +2,7 @@
 
 Diff-time checks for a multi-tenant system, where one deployment serves many tenants over shared infrastructure. These bars are about **horizontal authorization** — keeping an already-authenticated, already-in-boundary request confined to its own tenant. [security.md](security.md) owns the vertical boundary (is the request authentic, sanitized, non-injecting); this file owns everything downstream of "we know who is calling": that every data touch, cache read, queued job, and configuration lookup is scoped to that caller's tenant and no other. A cross-tenant read or write is a confidentiality and data-integrity defect, so its default severity is Critical. Severity labels are defined in [README.md](README.md).
 
-Only shared-infrastructure ("pool") paths are in scope. Where a path runs on infrastructure physically dedicated to one tenant, the scoping predicate is redundant and these bars do not apply.
+Where a path runs on infrastructure physically dedicated to one tenant (a silo database, stamp, or container), the data-scoping predicate is redundant — but the lifecycle bars still apply, since a dedicated store must still be covered by the tenant's deletion and retention path. On shared ("pool") infrastructure, every bar applies.
 
 ## Tenant-scoped data access
 
@@ -13,7 +13,7 @@ Only shared-infrastructure ("pool") paths are in scope. Where a path runs on inf
 ## Tenant identity and trust
 
 - **Client-supplied tenant used for scoping** — a handler that re-derives the tenant from a client-controlled field (body, query string, `Tenant-Id` header, path segment) to make an authorization or scoping decision, instead of the tenant established in the security context at ingress. A `?? defaultTenant` fallback, or the tenant re-parsed from a different source deeper in the stack, is the same defect. Critical when the value governs access; Important when it feeds only routing or telemetry. The presence of a client-supplied tenant id is not the finding — *using it to grant access* is ([Azure — map requests to tenants](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests)).
-- **Enumerable cross-tenant identifiers** — a sequential or otherwise guessable id for tenant-owned data exposed as an external reference (URL segment, API field, redirect parameter), which turns one missing scope check into mass harvesting. Prefer an opaque, unpredictable reference. Critical as the tenant-crossing case of broken object-level authorization; softens to Suggestion only where the id is already non-enumerable and the scope check is demonstrably present — opacity layers onto scoping, it does not replace it ([OWASP API1:2023](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)).
+- **Enumerable cross-tenant identifiers** — a sequential or otherwise guessable id for tenant-owned data exposed as an external reference (URL segment, API field, redirect parameter). A guessable id does not itself cross tenants — the *missing tenant predicate* above is what leaks — but it turns any such gap into mass harvesting, so an opaque, unpredictable reference is the defense-in-depth default. The Critical case is the missing or bypassed tenant check, owned above, not the id's shape; a guessable id where the scope check is present is a Suggestion ([OWASP API1:2023](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)).
 
 ## Shared state and configuration
 
