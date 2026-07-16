@@ -1537,6 +1537,31 @@ async function resolveAutoApprovedContracts({
       continue;
     }
 
+    // allowedCallerPermissions is the same category of unobservable trust as
+    // selectorResultInput, with a larger blast radius. It exists specifically
+    // to let a caller's job keep a privileged, potentially self-hosted-
+    // reachable grant (e.g. pull-requests:write, id-token:write) that
+    // privilegedHostedRequirement would otherwise force hosted or reject
+    // outright -- see the reviewedCallerPermissions exception it carves out
+    // of permissionHostedRequirement and localCredentialRequirement. The
+    // compared surface proves the reusable workflow's declared permissions,
+    // routing, and credential *references* are unchanged, but it never reads
+    // step bodies (run: scripts, non-credential-bearing uses:) for content, so
+    // it cannot prove the bumped SHA's steps still use that grant safely
+    // rather than, say, exfiltrating the id-token or misusing pull-requests:
+    // write. Carrying an already-approved privileged grant forward onto
+    // unreviewed executable content would silently defeat the human review
+    // that grant exists to require. Auto-approval must decline every
+    // privileged-caller-permission contract and require human review of the
+    // new SHA's content.
+    if (matchedBasis.contract.allowedCallerPermissions) {
+      diagnostics.set(
+        reference,
+        `${parsed.workflow} carries a reviewed allowedCallerPermissions grant; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+      );
+      continue;
+    }
+
     approved.set(reference, {
       ...matchedBasis.contract,
       autoApproved: { basisSha: matchedBasis.revision, approvedAt: now().toISOString() },
