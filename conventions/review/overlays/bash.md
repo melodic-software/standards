@@ -66,10 +66,12 @@ brings it under ShellCheck.
   [BashPitfalls][7].
 - **Right dialect for the shebang** — a script using bash-only features
   (`[[ ]]`, arrays, `local`, `${var//}`) under a `#!/bin/sh` shebang breaks on
-  dash or ash. ShellCheck catches this only when the dialect is declared, and the
-  component defaults to bash, so a genuinely POSIX script must declare `#!/bin/sh`
-  or `# shellcheck shell=sh` for the check to fire — that declaration is the
-  review-relevant gap. `cross-platform.md` owns shell portability. Important.
+  dash or ash. The component's `.shellcheckrc` sets `shell=bash`, which
+  *overrides* shebang-based detection entirely, so a `#!/bin/sh` shebang alone
+  does not make ShellCheck check it as POSIX sh — a genuinely POSIX script needs
+  an explicit `# shellcheck shell=sh` directive for the check to fire. That
+  directive is the review-relevant gap. `cross-platform.md` owns shell
+  portability. Important.
 - **Past the shell threshold** — a script that has grown non-straightforward
   control flow, nested data structures, or heavy string or arithmetic parsing
   should be rewritten in a structured language, not extended. Suggestion,
