@@ -1102,7 +1102,19 @@ function jobCredentialSurface(workflow, policy) {
 // non-credential fields, env, and with), but instead of stopping at the
 // first credential-bearing value and returning a category, it records every
 // credential-bearing value's own normalized text, so a same-category,
-// different-secret change becomes a visible diff.
+// different-secret change becomes a visible diff. The same coarseness
+// applies to a step's `uses:` reference for a localCredentialActions entry
+// (e.g. `actions/create-github-app-token`): that reference mints no
+// credential expression itself, so credentialBearingEntries never records
+// it, and jobCredentialSurface's privilegedHostedRequirement category names
+// only the bare action, not its pinned `@ref`. A candidate that repoints the
+// same credential-minting action at a different, unreviewed ref therefore
+// left every compared field byte-identical. jobCredentialReferenceSurface
+// closes that gap by recording each step's normalized credential-action
+// `uses:` value directly, via credentialActionUses (the same
+// localCredentialActions detection credentialAction() uses), so a ref-only
+// change becomes a visible diff here even though it changes no credential
+// expression and no category.
 function credentialBearingEntries(mapping) {
   if (mapping === null || typeof mapping !== "object" || Array.isArray(mapping)) {
     return containsCredentialExpression(mapping)
@@ -1116,7 +1128,7 @@ function credentialBearingEntries(mapping) {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function jobCredentialReferenceSurface(workflow, job) {
+function jobCredentialReferenceSurface(workflow, job, policy) {
   const { steps, if: jobCondition, ...jobWithoutSteps } = job;
   const stepEntries = Array.isArray(steps)
     ? steps
@@ -1125,6 +1137,7 @@ function jobCredentialReferenceSurface(workflow, job) {
             return undefined;
           }
           const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
+          const credentialActionRef = credentialActionUses(step, policy);
           const entry = {
             condition: conditionContainsCredentialReference(stepCondition)
               ? normalizeStructuralValue(stepCondition)
@@ -1132,6 +1145,10 @@ function jobCredentialReferenceSurface(workflow, job) {
             other: credentialBearingEntries(stepWithoutCredentialMappings),
             env: credentialBearingEntries(env),
             with: credentialBearingEntries(inputs),
+            credentialAction:
+              credentialActionRef !== undefined
+                ? normalizeStructuralValue(credentialActionRef)
+                : undefined,
           };
           return Object.values(entry).some((value) => value !== undefined)
             ? { index, ...entry }
@@ -1149,7 +1166,7 @@ function jobCredentialReferenceSurface(workflow, job) {
   };
 }
 
-function jobCredentialReferencesSurface(workflow) {
+function jobCredentialReferencesSurface(workflow, policy) {
   const jobs =
     workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
       ? workflow.jobs
@@ -1157,7 +1174,7 @@ function jobCredentialReferencesSurface(workflow) {
   return Object.fromEntries(
     Object.entries(jobs)
       .filter(([, job]) => job !== null && typeof job === "object" && !Array.isArray(job))
-      .map(([jobId, job]) => [jobId, jobCredentialReferenceSurface(workflow, job)])
+      .map(([jobId, job]) => [jobId, jobCredentialReferenceSurface(workflow, job, policy)])
       .sort(([left], [right]) => left.localeCompare(right)),
   );
 }
@@ -1172,7 +1189,7 @@ function reusableWorkflowSecuritySurface(workflow, policy) {
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),
     credentials: jobCredentialSurface(workflow, policy),
-    credentialReferences: jobCredentialReferencesSurface(workflow),
+    credentialReferences: jobCredentialReferencesSurface(workflow, policy),
   };
 }
 
@@ -1221,8 +1238,19 @@ function malformedJobIds(workflow) {
 // chain generically, through arbitrary steps or scripts, cannot be done
 // statically and safely, so any job whose routing-relevant fields reference
 // another job's outputs is ineligible for surface-diff auto-approval and
-// fails closed instead of being silently treated as unchanged.
-const NEEDS_OUTPUT_REFERENCE = /needs\.[A-Za-z0-9_-]+\.outputs\.[A-Za-z0-9_-]+/;
+// fails closed instead of being silently treated as unchanged. GitHub's
+// expression syntax accepts both property-dereference (`needs.<job>.outputs.<name>`)
+// and equivalent index syntax (`needs.<job>.outputs['<name>']` or
+// `needs.<job>.outputs["<name>"]`) for the same output; matching only the dot
+// form would let a candidate written with bracket indexing keep a
+// byte-identical `runs-on` (or other routing field) while the producing
+// job's output value changes underneath it, exactly the gap this detector
+// exists to close. Matching `outputs` followed by either `.` or `[`, rather
+// than enumerating every quoting style, also fails closed on any other
+// bracket-index spelling (extra whitespace, double vs. single quotes, or a
+// non-literal index) without relying on a more permissive quoted-string
+// pattern to stay exhaustive.
+const NEEDS_OUTPUT_REFERENCE = /needs\.[A-Za-z0-9_-]+\.outputs(?:\.[A-Za-z0-9_-]+|\[)/;
 
 function containsNeedsOutputReference(value) {
   if (typeof value === "string") {
@@ -2353,19 +2381,32 @@ function localCredentialRequirement(workflow, job) {
   return undefined;
 }
 
+// Returns the step's full, unmodified `uses:` value (owner/repo action plus
+// its `@ref`) when that action is a policy-listed credential-minting action,
+// or undefined otherwise. This is the one place that decides whether a step
+// mints credentials; credentialAction() (the category used for findings and
+// jobCredentialSurface) and jobCredentialReferenceSurface (the exact-ref
+// value used for auto-approval's surface diff) both derive from it so the
+// two can never disagree on which steps count.
+function credentialActionUses(step, policy) {
+  if (step === null || typeof step !== "object" || Array.isArray(step)) {
+    return undefined;
+  }
+  if (typeof step.uses !== "string") {
+    return undefined;
+  }
+  const action = step.uses.split("@", 1)[0].toLowerCase();
+  return policy.localCredentialActions.has(action) ? step.uses : undefined;
+}
+
 function credentialAction(job, policy) {
   if (!Array.isArray(job.steps)) {
     return undefined;
   }
   for (const step of job.steps) {
-    if (step === null || typeof step !== "object" || Array.isArray(step)) {
-      continue;
-    }
-    if (typeof step.uses !== "string") {
-      continue;
-    }
-    const action = step.uses.split("@", 1)[0].toLowerCase();
-    if (policy.localCredentialActions.has(action)) {
+    const uses = credentialActionUses(step, policy);
+    if (uses !== undefined) {
+      const action = uses.split("@", 1)[0].toLowerCase();
       return action;
     }
   }

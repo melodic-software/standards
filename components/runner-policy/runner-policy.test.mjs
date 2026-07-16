@@ -325,6 +325,48 @@ jobs:
           SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_B }}
 `;
 
+// The reviewed basis already contains a localCredentialActions entry
+// (actions/create-github-app-token), pinned to one ref. The changed source
+// below pins the identical action to a different ref only -- the same
+// Dependabot-bump shape as any other credential-minting-action SHA/tag bump.
+const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@c1a285145b9d317df6ced56c09f525b5c2b6f49
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@df432f6cf7f0b4bd6dd8b7f9c0a4b1a0d33ba0d2
+`;
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -428,6 +470,34 @@ jobs:
 
 const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE =
   REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Same needs-output indirection as REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+// but through GitHub's equivalent index syntax (`outputs['runner']`) instead
+// of property dereference (`outputs.runner`). Both spellings resolve the
+// same producing job's output value at evaluation time.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs.pick.outputs['runner']",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    'needs.pick.outputs["runner"]',
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE.replace(
     "    steps: []",
     '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
   );
@@ -2886,6 +2956,45 @@ test("Dependabot SHA bump that changes only the exact secret referenced in a cal
   );
 });
 
+// Regression test for a gap where a reviewed contract already containing a
+// localCredentialActions step (e.g. actions/create-github-app-token) only
+// had its category -- not its pinned `@ref` -- recorded anywhere in the
+// compared surface: jobCredentialSurface's privilegedHostedRequirement names
+// only the bare action, and credentialBearingEntries never records a plain
+// `uses:` action reference because it mints no credential expression by
+// itself. A Dependabot bump that repoints the same credential-minting action
+// at a different, unreviewed ref left every compared field byte-identical
+// and was auto-approved, letting newly unreviewed token-minting code run
+// under the previously reviewed runner-input contract.
+test("Dependabot SHA bump that changes only the pinned ref of an existing credential-minting action is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
 test("Dependabot SHA bump that changes a privileged execution boundary is declined", async () => {
   const nestedSha = "0123456789abcdef0123456789abcdef01234567";
   const candidates = [
@@ -3267,6 +3376,54 @@ test("Dependabot SHA bump that routes through a needs.<job>.outputs indirection 
     /auto-approval declined: job scan routes through a needs\.<job>\.outputs reference, which cannot be safely diffed for auto-approval/,
   );
 });
+
+// Regression test for a gap where the needs-output detector matched only
+// property-dereference syntax (`needs.<job>.outputs.<name>`). GitHub's
+// expression syntax accepts the equivalent index syntax
+// (`needs.<job>.outputs['<name>']`) for the same output; a fetched reusable
+// workflow using that spelling was not declined, and because jobRoutingSurface
+// also omits the producer job's own outputs, a SHA bump could keep the
+// consuming job's `runs-on` string byte-identical while the producing job's
+// value (and therefore the real runner boundary) changed underneath it.
+for (const [label, source, cosmeticSource] of [
+  [
+    "single-quoted index syntax",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE,
+  ],
+  [
+    "double-quoted index syntax",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE,
+  ],
+]) {
+  test(`Dependabot SHA bump that routes through a needs.<job>.outputs ${label} indirection is declined`, async () => {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: source,
+        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job scan routes through a needs\.<job>\.outputs reference, which cannot be safely diffed for auto-approval/,
+    );
+  });
+}
 
 test("Dependabot SHA bump is declined when the previously reviewed basis routes through a needs.<job>.outputs indirection", async () => {
   const root = await repository({

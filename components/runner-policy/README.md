@@ -210,7 +210,12 @@ entries such as `actions/create-github-app-token`), and the exact
 credential-bearing values each job references — not just that detection's
 category, so a bump that swaps an already-declared/allowed secret for a
 different secret in the identical position is a visible diff even when both
-trip the same category. A structural match on that surface auto-approves the
+trip the same category. The same exactness applies to a `localCredentialActions`
+step's own normalized `uses:` reference: the compared surface records that
+full owner/repo-plus-`@ref` value, not just the bare action name, so a bump
+that repoints an already-reviewed credential-minting action at a different,
+unreviewed ref is a visible diff even though the action name and category
+stay identical. A structural match on that surface auto-approves the
 candidate only after every
 reviewed revision for that workflow path has been fetched, parsed, and
 validated, and every surface-matching revision agrees on the same effective
@@ -234,7 +239,8 @@ no structural surface comparison can prove them unchanged. First, a job whose
 routing-relevant fields (`runs-on`, `strategy`, the reusable-call
 `uses`/`with`/`secrets`, or the `container`/`services`/`environment`
 execution boundary) reference another job's output through
-`needs.<job-id>.outputs.<name>` — the same needs-output pattern this policy
+`needs.<job-id>.outputs.<name>` or GitHub's equivalent index syntax
+`needs.<job-id>.outputs['<name>']` — the same needs-output pattern this policy
 already supports for local selector routing — declines auto-approval for
 that path: the referencing expression can stay byte-identical while the
 producing job's own value changes the real routing boundary underneath it.
