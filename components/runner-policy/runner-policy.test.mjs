@@ -519,6 +519,63 @@ const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE =
     '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
   );
 
+// The finding that motivated replacing the precise needs.<job>.outputs.<name>
+// (plus index-syntax) detector with a coarse needs-reference catch-all: an
+// object filter such as `needs.*.outputs.runner` -- typically wrapped in
+// `join(needs.*.outputs.runner, '')` -- has no named job-id segment at all,
+// so a detector shaped around "job-id segment, then outputs segment, then
+// name segment" can never enumerate it structurally, no matter how many
+// dot/bracket spellings of the job-id and outputs segments it special-cases.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "join(needs.*.outputs.runner, '')",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// GitHub's expression evaluator treats context and property names
+// case-insensitively (documented for the `secrets` context; empirically
+// confirmed more broadly for functions and context access). A candidate
+// that spelled the indirection in another letter case would defeat a
+// case-sensitive literal match while remaining functionally identical to
+// the lowercase form GitHub actually evaluates.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "NEEDS.pick.OUTPUTS.runner",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Proves the coarse catch-all catches strictly more than the precise
+// needs.<job>.outputs.<name>-shaped detector it replaced, not just the
+// reported object-filter gap. A job can route on another job's `result` (or
+// any other needs property) without ever mentioning `outputs`; the old
+// detector's pattern required a literal `outputs` segment, so
+// `needs.pick.result` passed through undetected even though the producing
+// job's result is exactly as unresolvable through static surface-diffing as
+// its outputs would be.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs.pick.result == 'success' && 'self-hosted' || 'ubuntu-24.04'",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
   const declaration = [
     "  workflow_call:",
@@ -3358,6 +3415,15 @@ test("Dependabot SHA bump is declined when the previously reviewed basis has a m
   );
 });
 
+// The tests below this point cover every needs-indirection spelling this
+// detector has previously been shown to miss (property dereference, then
+// each index-syntax variant). They predate the switch from a precise
+// needs.<job>.outputs.<name>-shaped blocklist to the coarse needs-reference
+// catch-all above (`containsNeedsReference`/`NEEDS_REFERENCE` in
+// runner-policy.mjs), and are kept and re-verified here rather than deleted:
+// the coarse catch-all must still decline every one of these previously
+// fixed cases, not just the new ones it was built to close.
+//
 // Regression test for a gap where jobRoutingSurface recorded only the
 // literal declared runs-on expression. A fetched reusable workflow's job can
 // route through needs.<job>.outputs.<name> -- the same needs-output pattern
@@ -3390,7 +3456,7 @@ test("Dependabot SHA bump that routes through a needs.<job>.outputs indirection 
   assert.ok(contractFinding);
   assert.match(
     contractFinding.message,
-    /auto-approval declined: job scan routes through a needs\.<job>\.outputs reference, which cannot be safely diffed for auto-approval/,
+    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
   );
 });
 
@@ -3442,7 +3508,68 @@ for (const [label, source, cosmeticSource] of [
     assert.ok(contractFinding);
     assert.match(
       contractFinding.message,
-      /auto-approval declined: job scan routes through a needs\.<job>\.outputs reference, which cannot be safely diffed for auto-approval/,
+      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
+    );
+  });
+}
+
+// Regression tests for the coarse needs-reference catch-all that replaced
+// the precise needs.<job>.outputs.<name>-shaped detector. The catch-all
+// declines whenever a routing-relevant field mentions `needs` at all,
+// instead of enumerating specific dangerous spellings, so each case below
+// is a syntax the *old* precise detector would have missed:
+//
+// - "object-filter output route" is the exact P1 finding that motivated the
+//   rewrite: `needs.*.outputs.runner` has no named job-id segment, so a
+//   job-id-shaped pattern can never enumerate it.
+// - "case-variant needs reference" proves the catch-all is case-insensitive,
+//   matching GitHub's own case-insensitive context/property evaluation.
+// - "needs job-result reference (no outputs segment)" proves the catch-all
+//   catches more than just outputs indirection: any `needs` property access
+//   in a routing field is equally unresolvable through static surface
+//   diffing, and the old detector's required `.outputs` segment would have
+//   missed this one entirely, not merely spelled it differently.
+for (const [label, source, cosmeticSource] of [
+  [
+    "object-filter output route",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE,
+  ],
+  [
+    "case-variant needs reference",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE,
+  ],
+  [
+    "needs job-result reference (no outputs segment)",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE,
+  ],
+]) {
+  test(`Dependabot SHA bump that routes through a ${label} is declined`, async () => {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: source,
+        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
     );
   });
 }
@@ -3471,7 +3598,7 @@ test("Dependabot SHA bump is declined when the previously reviewed basis routes 
   assert.match(
     contractFinding.message,
     new RegExp(
-      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan routes through a needs\\.<job>\\.outputs reference, which cannot be safely diffed for auto-approval`,
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
     ),
   );
 });

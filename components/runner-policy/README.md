@@ -238,13 +238,23 @@ Two categories are excluded from this diff-based extension entirely, because
 no structural surface comparison can prove them unchanged. First, a job whose
 routing-relevant fields (`runs-on`, `strategy`, the reusable-call
 `uses`/`with`/`secrets`, or the `container`/`services`/`environment`
-execution boundary) reference another job's output through
-`needs.<job-id>.outputs.<name>` or GitHub's equivalent index syntax on any
-segment of that reference (`needs['<job-id>']`, `.outputs['<name>']`, or any
-dot/bracket combination of the two) — the same needs-output pattern this
-policy already supports for local selector routing — declines auto-approval
-for that path: the referencing expression can stay byte-identical while the
-producing job's own value changes the real routing boundary underneath it.
+execution boundary) reference the `needs` context in any form declines
+auto-approval for that path: the referencing expression can stay
+byte-identical while another job's own value — an output, a `result`, or
+anything else reachable off `needs` — changes the real routing boundary
+underneath it. This check is deliberately coarse rather than an enumerated
+list of dangerous `needs` spellings. Earlier revisions matched only
+`needs.<job-id>.outputs.<name>`, then that plus GitHub's equivalent index
+syntax on the job-id and `outputs` segments (`needs['<job-id>']`,
+`.outputs['<name>']`); each closed one gap and left the next syntax open,
+most recently an object filter such as `needs.*.outputs.runner` (typically
+wrapped in `join(...)`), which has no named job-id segment for a
+job-id-shaped pattern to match. Rather than continuing to chase individual
+syntaxes, the policy now allowlists only routing fields that provably do not
+mention `needs` at all: any occurrence of the `needs` context followed by a
+property or index accessor, matched case-insensitively because GitHub's
+expression evaluator treats context and property names case-insensitively,
+declines auto-approval regardless of what follows or how it is spelled.
 Second, a reviewed contract with `selectorResultInput` declines
 auto-approval unconditionally, even on an otherwise identical surface: that
 contract is trusted for a fail-closed guarantee — that the called workflow's

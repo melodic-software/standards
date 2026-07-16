@@ -1229,51 +1229,54 @@ function malformedJobIds(workflow) {
 // jobRoutingSurface records only the literal declared value of each routing
 // field (runs-on, strategy, the reusable-call uses/with/secrets, and the
 // container/services/environment execution boundary). A fetched reusable
-// workflow's own job graph can route indirectly through
-// needs.<job-id>.outputs.<name> -- the same needs-output pattern this
-// analyzer already trusts for local selector routing -- so a job's routing
-// field can stay a byte-identical expression across a SHA bump while the
-// producing job's output value (and therefore the actual runner, container,
-// or environment boundary) changes underneath it. Resolving that producer
-// chain generically, through arbitrary steps or scripts, cannot be done
-// statically and safely, so any job whose routing-relevant fields reference
-// another job's outputs is ineligible for surface-diff auto-approval and
-// fails closed instead of being silently treated as unchanged.
+// workflow's own job graph can route indirectly through another job's
+// `needs` context -- most commonly needs.<job-id>.outputs.<name>, the same
+// pattern this analyzer already trusts for local selector routing -- so a
+// job's routing field can stay a byte-identical expression across a SHA
+// bump while the producer side of that reference (an output value, a job
+// `result`, or an entire needs.<job-id>/needs object passed through a
+// function or an object filter) changes the actual runner, container, or
+// environment boundary underneath it. Resolving that producer chain
+// generically, through arbitrary steps, scripts, or GitHub's own expression
+// functions, cannot be done statically and safely, so any job whose
+// routing-relevant fields reference `needs` in any form is ineligible for
+// surface-diff auto-approval and fails closed instead of being silently
+// treated as unchanged.
 //
-// GitHub's expression syntax documents `.` (property de-reference) and `[ ]`
-// (index) as generically interchangeable operators for any property access,
-// not a special case reserved for the final `<name>` segment -- so
-// `needs['<job>'].outputs.<name>`, `needs.<job>['outputs'].<name>`, and
-// `needs['<job>']['outputs']['<name>']` are equally valid spellings of
-// `needs.<job>.outputs.<name>`. Matching only a literal `needs.` prefix and
-// a literal `.outputs` (as an earlier revision of this detector did) missed
-// every one of those besides the final-segment case, letting a candidate
-// keep a byte-identical routing field while the producing job's output
-// value changed underneath it. The pattern below therefore accepts dot or
-// bracket form (with optional whitespace) for both the job-id segment and
-// the literal `outputs` segment, so any GitHub-valid spelling of a
-// needs-output reference is caught, not just the ones this detector has
-// been shown so far.
-const NEEDS_OUTPUT_IDENTIFIER_SOURCE = "[A-Za-z0-9_-]+";
-const NEEDS_OUTPUT_SINGLE_QUOTED_SOURCE = "'(?:[^'\\\\]|\\\\.)*'";
-const NEEDS_OUTPUT_DOUBLE_QUOTED_SOURCE = '"(?:[^"\\\\]|\\\\.)*"';
-const NEEDS_OUTPUT_QUOTED_SOURCE = `(?:${NEEDS_OUTPUT_SINGLE_QUOTED_SOURCE}|${NEEDS_OUTPUT_DOUBLE_QUOTED_SOURCE})`;
-const NEEDS_OUTPUT_JOB_ACCESS_SOURCE = `(?:\\.\\s*${NEEDS_OUTPUT_IDENTIFIER_SOURCE}|\\[\\s*${NEEDS_OUTPUT_QUOTED_SOURCE}\\s*\\])`;
-const NEEDS_OUTPUT_OUTPUTS_ACCESS_SOURCE =
-  "(?:\\.\\s*outputs\\b|\\[\\s*(?:'outputs'|\"outputs\")\\s*\\])";
-const NEEDS_OUTPUT_REFERENCE = new RegExp(
-  `needs\\s*${NEEDS_OUTPUT_JOB_ACCESS_SOURCE}\\s*${NEEDS_OUTPUT_OUTPUTS_ACCESS_SOURCE}`,
-);
+// This is deliberately a coarse, allowlist-style catch-all rather than a
+// blocklist of specific indirection spellings. Earlier revisions of this
+// detector matched only `needs.<job>.outputs.<name>` (property dereference),
+// then only that plus GitHub's equivalent index syntax on the job-id and
+// `outputs` segments (`needs['<job>']`, `.outputs['<name>']`). Each revision
+// closed one gap and left the next one open -- most recently, an object
+// filter such as `needs.*.outputs.runner` (GitHub's `*` wildcard, commonly
+// used inside `join(needs.*.outputs.runner, '')`) has no named job-id
+// segment at all, so a job-id-shaped pattern can never enumerate it. GitHub's
+// expression grammar for context/property access is large and can grow
+// (object filters, new functions, new index forms); precisely pattern
+// matching every syntax that can dereference `needs` is an open-ended
+// arms race this analyzer will keep losing one finding at a time. Instead of
+// enumerating dangerous `needs` spellings, this check only recognizes
+// definitely-safe routing fields: ones that do not mention `needs` at all.
+// Any occurrence of the `needs` context followed by a property or index
+// accessor -- `needs.` or `needs[`, in any letter case (GitHub's expression
+// evaluator treats context and property names case-insensitively; see the
+// case-insensitive `NEEDS_REFERENCE` flag below) -- declines auto-approval
+// for that job, regardless of what follows. False positives (a routing field
+// that happens to mention `needs` but is not actually exploitable) are
+// accepted: they only cost a human review instead of an auto-approval, which
+// is the safe direction to err for a security gate.
+const NEEDS_REFERENCE = /\bneeds\b\s*[.[]/i;
 
-function containsNeedsOutputReference(value) {
+function containsNeedsReference(value) {
   if (typeof value === "string") {
-    return NEEDS_OUTPUT_REFERENCE.test(value);
+    return NEEDS_REFERENCE.test(value);
   }
   if (Array.isArray(value)) {
-    return value.some(containsNeedsOutputReference);
+    return value.some(containsNeedsReference);
   }
   if (value !== null && typeof value === "object") {
-    return Object.values(value).some(containsNeedsOutputReference);
+    return Object.values(value).some(containsNeedsReference);
   }
   return false;
 }
@@ -1301,7 +1304,7 @@ function dynamicRoutingReferenceJobIds(workflow) {
         return false;
       }
       return DYNAMIC_ROUTING_FIELDS.some(
-        (field) => Object.hasOwn(job, field) && containsNeedsOutputReference(job[field]),
+        (field) => Object.hasOwn(job, field) && containsNeedsReference(job[field]),
       );
     })
     .sort((left, right) => left.localeCompare(right));
@@ -1465,7 +1468,7 @@ async function resolveAutoApprovedContracts({
     if (dynamicRoutingCandidateJobs.length > 0) {
       diagnostics.set(
         reference,
-        `job ${dynamicRoutingCandidateJobs[0]} routes through a needs.<job>.outputs reference, which cannot be safely diffed for auto-approval`,
+        `job ${dynamicRoutingCandidateJobs[0]} references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
       );
       continue;
     }
@@ -1502,7 +1505,7 @@ async function resolveAutoApprovedContracts({
         const dynamicRoutingBasisJobs = dynamicRoutingReferenceJobIds(basisWorkflow);
         if (dynamicRoutingBasisJobs.length > 0) {
           throw new ConfigurationError(
-            `job ${dynamicRoutingBasisJobs[0]} routes through a needs.<job>.outputs reference, which cannot be safely diffed for auto-approval`,
+            `job ${dynamicRoutingBasisJobs[0]} references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
           );
         }
         basisSurface = reusableWorkflowSecuritySurface(basisWorkflow, policy);
