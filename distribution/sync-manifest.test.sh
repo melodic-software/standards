@@ -549,6 +549,11 @@ actual_agent_orientation_targets="$(
 assert_eq 'AGENTS.md reaches exactly the four whole-file-managed private consumers (medley reconciles locally instead; ci-workflows is public and gets REVIEW.md only)' \
   "$expected_agent_orientation_targets" "$actual_agent_orientation_targets"
 
+assert_eq 'ci-workflows does not whole-file-manage agent-orientation (public repo; AGENTS.md excluded)' '0' \
+  "$(yq -r \
+    '[.targets."melodic-software/ci-workflows".managed[] | select(. == "agent-orientation")] | length' \
+    "$actual_manifest")"
+
 for component in agent-orientation review-instructions; do
   assert_eq "medley locally-owns $component rather than whole-file-managing it" '1' \
     "$(COMPONENT="$component" yq -r \
