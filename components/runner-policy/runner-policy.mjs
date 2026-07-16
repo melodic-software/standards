@@ -1294,8 +1294,7 @@ function securitySurfaceDiffField(basis, candidate) {
 // caller-side permission grant a human approved for a specific reviewed
 // SHA, not something the diffed callee surface encodes -- so it must be
 // compared here on the same basis as allowedInputs, allowedSecrets, and
-// fixedRunsOn. It has no effect until a contract carries this field, and is
-// safe to include ahead of that.
+// fixedRunsOn.
 function reviewedContractSurface(contract) {
   return normalizeStructuralValue({
     routing: contract.routing,

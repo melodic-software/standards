@@ -3369,6 +3369,55 @@ jobs:
   );
 });
 
+// Regression test: allowedCallerPermissions is trusted for something the
+// compared auto-approval surface (workflow_call, permissions, routing,
+// credential references) cannot observe -- that the called workflow's steps
+// still use the privileged, potentially self-hosted-reachable grant safely
+// rather than, say, exfiltrating an id-token-derived credential or misusing
+// a pull-requests:write grant. A bumped SHA could keep every compared field
+// identical while its steps do something different with that already-
+// reviewed grant, so auto-approval must decline every allowedCallerPermissions
+// contract even when the structural surface is otherwise unchanged.
+test("Dependabot SHA bump of an allowedCallerPermissions contract is declined regardless of surface match", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {},
+          allowedCallerPermissions: { "pull-requests": "write" },
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: ${REUSABLE_PATH} carries a reviewed allowedCallerPermissions grant; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+    ),
+  );
+});
+
 test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
   const root = await repository({
     visibility: "public",
