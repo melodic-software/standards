@@ -34,6 +34,14 @@ in a component move together.
 - Omission means the component is irrelevant or has not been classified for
   that target.
 
+This repository's own root files (`README.md`, `AGENTS.md`, `CLAUDE.md`) are
+neither `managed` nor `locally-owned` here — those labels describe a
+*downstream* copy's relationship to an upstream source. In `standards`
+itself they are simply the canonical source: no manifest entry, because
+there is no synchronization to record. A downstream target's copy of
+`REVIEW.md` or `AGENTS.md` is what carries the `managed` label; this
+repository's own originals do not carry any ownership label at all.
+
 There are no layouts, per-target paths, transforms, patches, profiles, receipts,
 or generated downstream metadata. A component that needs a different
 destination or partial ownership is the wrong component boundary and must be
