@@ -55,8 +55,11 @@ Per `updates` entry, keyed by `<package-ecosystem>:<directory>` (the plural
   override, is missing or below the minimum.
 - `cooldown-soak-bypassed` — a match-all `cooldown.exclude` (`"*"`) or a
   `cooldown.include` list defeats the soak even though `default-days` is set.
-- `groups-missing` — no `groups` block.
+- `groups-missing` — no `groups` block covers version updates (a
+  `security-updates`-only group does not batch regular bumps).
 - `pr-limit-too-high` — `open-pull-requests-limit` exceeds the maximum.
+- `pr-limit-disables-updates` — `open-pull-requests-limit` is `0`, which turns
+  version updates off entirely rather than capping volume.
 - `malformed-update-entry` — an `updates` item is not a mapping.
 - `incomplete-update-entry` — an `updates` item omits `package-ecosystem` or
   `directory`/`directories`.

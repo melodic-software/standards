@@ -191,6 +191,48 @@ test("an open-pull-requests-limit above the maximum is flagged", async () => {
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:pr-limit-too-high"]);
 });
 
+test("a zero open-pull-requests-limit disables updates and is flagged", async () => {
+  const entry = CONFORMANT.replace("open-pull-requests-limit: 5", "open-pull-requests-limit: 0");
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:pr-limit-disables-updates"]);
+});
+
+test("a groups block that only applies to security updates is flagged", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      security-only:
+        applies-to: security-updates
+        patterns:
+          - "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
+});
+
+test("a groups block that explicitly applies to version updates passes", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      versions:
+        applies-to: version-updates
+        patterns:
+          - "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
 test("an omitted open-pull-requests-limit is accepted (GitHub default is the maximum)", async () => {
   const entry = CONFORMANT.replace("    open-pull-requests-limit: 5\n", "");
   const root = await repository({ dependabotYaml: dependabot(entry) });

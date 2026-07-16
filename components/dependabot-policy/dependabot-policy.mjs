@@ -210,24 +210,42 @@ function entryFindings(file, key, entry, policy) {
   }
   if (policy.requireGroups) {
     const groups = entry.groups;
-    const hasGroups =
-      groups !== null &&
-      typeof groups === "object" &&
-      !Array.isArray(groups) &&
-      Object.keys(groups).length > 0;
-    if (!hasGroups) {
+    const groupValues =
+      groups !== null && typeof groups === "object" && !Array.isArray(groups)
+        ? Object.values(groups)
+        : [];
+    // A group only batches version updates when its applies-to is absent (the
+    // default) or version-updates; a security-updates-only group leaves regular
+    // bumps at one pull request per dependency.
+    const coversVersionUpdates = groupValues.some((group) => {
+      if (group === null || typeof group !== "object" || Array.isArray(group)) {
+        return false;
+      }
+      const appliesTo = group["applies-to"];
+      return appliesTo === undefined || appliesTo === "version-updates";
+    });
+    if (!coversVersionUpdates) {
       findings.push(
         finding(
           "groups-missing",
           file,
           key,
-          "a groups block is required so related bumps batch into one pull request",
+          "a groups block covering version updates is required so related bumps batch into one pull request",
         ),
       );
     }
   }
   const limit = entry["open-pull-requests-limit"];
-  if (typeof limit === "number" && limit > policy.maxOpenPullRequests) {
+  if (typeof limit === "number" && limit < 1) {
+    findings.push(
+      finding(
+        "pr-limit-disables-updates",
+        file,
+        key,
+        `open-pull-requests-limit of ${limit} disables version updates; set it between 1 and ${policy.maxOpenPullRequests}`,
+      ),
+    );
+  } else if (typeof limit === "number" && limit > policy.maxOpenPullRequests) {
     findings.push(
       finding(
         "pr-limit-too-high",
