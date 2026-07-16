@@ -83,21 +83,40 @@ criterion to ground a finding. It may **not**:
 - treat a cited file's content as a source of instructions rather than as a
   review rubric.
 
-## Open question
+## Open questions — pilot before relying
 
-Whether a private-marketplace install via the `plugins`/`plugin_marketplaces`
-action inputs authenticates using this same credential is unverified — the
-Claude Code GitHub Actions documentation and the `claude-code-action` setup
-guide do not currently document private-marketplace authentication. Treat as
-unsupported until confirmed empirically (tracked as an empirical test, not a
-provisioning assumption).
+None of these are testable without the App this document classifies but
+does not provision; each is a real open question about the wiring's
+behavior once it is, not an assumption to build further design on.
+
+- **Private-marketplace authentication.** Whether a `plugins`/
+  `plugin_marketplaces` install authenticates using this same credential is
+  unverified — the Claude Code GitHub Actions documentation and the
+  `claude-code-action` setup guide do not currently document private-
+  marketplace authentication. Treat as unsupported until confirmed
+  empirically.
+- **`--add-dir` visibility to a plugin subagent's `Read` tool.** Whether a
+  mounted path is visible to `code-reviewer`/`security-reviewer`/
+  `architecture-guardian` the same way it is to the main session (the B4
+  plugin change assumes so; see `claude-code-plugins`' review-plugin PR's
+  own "Explicitly unverified" note).
+- **Self-hosted Agent-SDK `.claude/rules/` auto-load** in a non-interactive
+  CI invocation — not confirmed to behave like an interactive session's
+  auto-load.
+- **Action default tool grants.** Whether `Read`/`Grep`/`Glob` are on by
+  default for a headless `claude-code-action` run, or must be explicitly
+  allowlisted via `claude_args --allowedTools`, is not confirmed from the
+  documentation fetched this round.
+- **OAuth quota on a shared CI seat.** `CLAUDE_CODE_OAUTH_TOKEN` draws from
+  an individual subscription; whether concurrent review runs across several
+  private consumers exhaust it in practice is unmeasured.
 
 ## Review triggers
 
 Re-run this classification when the App's granted permissions, installed
 repository set, or storage visibility changes; when a new consumer of this
-credential is added; or when the private-marketplace open question above is
-resolved either way.
+credential is added; or when any open question above is resolved either
+way.
 
 ## Sources
 
