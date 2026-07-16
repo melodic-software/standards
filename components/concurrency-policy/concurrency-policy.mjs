@@ -62,6 +62,7 @@ const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 const CANONICAL_GROUP =
   /^\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.run_id\s*\}\}$/u;
 const CANONICAL_GROUP_TEXT = `\${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}`;
+const ALLOWED_CONCURRENCY_KEYS = new Set(["group", "cancel-in-progress"]);
 
 function finding(rule, file, message) {
   return { rule, file, message };
@@ -147,10 +148,22 @@ function isPullRequestTriggered(workflow) {
 function topLevelConcurrency(workflow) {
   const concurrency = workflow.concurrency;
   if (concurrency === undefined) {
-    return { present: false, malformed: false, group: undefined, cancelInProgress: undefined };
+    return {
+      present: false,
+      malformed: false,
+      group: undefined,
+      cancelInProgress: undefined,
+      keys: [],
+    };
   }
   if (typeof concurrency === "string") {
-    return { present: true, malformed: false, group: concurrency, cancelInProgress: false };
+    return {
+      present: true,
+      malformed: false,
+      group: concurrency,
+      cancelInProgress: false,
+      keys: [],
+    };
   }
   if (concurrency !== null && typeof concurrency === "object" && !Array.isArray(concurrency)) {
     return {
@@ -158,9 +171,16 @@ function topLevelConcurrency(workflow) {
       malformed: false,
       group: concurrency.group,
       cancelInProgress: concurrency["cancel-in-progress"],
+      keys: Object.keys(concurrency),
     };
   }
-  return { present: true, malformed: true, group: undefined, cancelInProgress: undefined };
+  return {
+    present: true,
+    malformed: true,
+    group: undefined,
+    cancelInProgress: undefined,
+    keys: [],
+  };
 }
 
 function concurrencyFindings(file, workflow) {
@@ -202,6 +222,20 @@ function concurrencyFindings(file, workflow) {
         file,
         `top-level concurrency.cancel-in-progress must be the literal true, found ` +
           `${JSON.stringify(concurrency.cancelInProgress ?? null)}`,
+      ),
+    );
+  }
+  // The canonical block is exactly group and cancel-in-progress. GitHub also
+  // accepts `queue`, but a pending queue is meaningless once cancel-in-progress
+  // supersedes the in-flight run, so any extra key is drift from the standard.
+  const extraKeys = concurrency.keys.filter((key) => !ALLOWED_CONCURRENCY_KEYS.has(key));
+  if (extraKeys.length > 0) {
+    findings.push(
+      finding(
+        "concurrency-extra-keys",
+        file,
+        `top-level concurrency has unexpected keys ${JSON.stringify(extraKeys)}; the canonical ` +
+          "block is exactly group and cancel-in-progress",
       ),
     );
   }

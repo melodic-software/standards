@@ -188,6 +188,16 @@ test("array concurrency is malformed", async () => {
   ]);
 });
 
+test("an extra key on the canonical block is flagged", async () => {
+  const withQueue = `${CANONICAL}  queue: max\n`;
+  const root = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", withQueue) },
+  });
+  assert.deepEqual(rules(await auditRepository({ root })), [
+    ".github/workflows/ci.yml:concurrency-extra-keys",
+  ]);
+});
+
 test("a delegated-job-level exception waives the missing top-level block", async () => {
   const root = await repository({
     config: {

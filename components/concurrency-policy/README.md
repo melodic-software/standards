@@ -73,6 +73,9 @@ For each pull-request-triggered workflow that is not excepted:
 - `concurrency-cancel-missing` — `cancel-in-progress` is not the literal `true`.
 - `concurrency-malformed` — `concurrency` is neither a group string nor a
   mapping.
+- `concurrency-extra-keys` — the block carries a key other than `group` and
+  `cancel-in-progress` (for example `queue`), so it is not the exact canonical
+  shape.
 
 Reusable workflows (`on: workflow_call`) and workflows triggered only by
 `push`, `schedule`, or `workflow_dispatch` are out of scope: a called workflow's
