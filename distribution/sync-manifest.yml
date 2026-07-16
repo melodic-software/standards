@@ -11,6 +11,14 @@ components:
   comment-hygiene-action:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
+  concurrency-policy:
+    requires:
+      - node-runtime
+    files:
+      components/concurrency-policy/concurrency-policy.mjs: .github/standards/concurrency-policy/concurrency-policy.mjs
+      components/concurrency-policy/concurrency-policy.schema.json: .github/standards/concurrency-policy/concurrency-policy.schema.json
+      components/concurrency-policy/package-lock.json: .github/standards/concurrency-policy/package-lock.json
+      components/concurrency-policy/package.json: .github/standards/concurrency-policy/package.json
   dotnet-analysis:
     files:
       components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
