@@ -31,6 +31,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
 | [ai-generated-code.md](ai-generated-code.md) | the empirical failure modes of AI-authored changes |
 | [ai-review-bot-composition.md](ai-review-bot-composition.md) | expected automated AI-reviewer composition per repository governance class |
+| [mcp.md](mcp.md) | tools and MCP servers exposed to LLM agents |
 | [reply-protocol.md](reply-protocol.md) | how a review-comment thread closes once its finding is addressed |
 | [overlays/containers.md](overlays/containers.md) · [overlays/dotnet.md](overlays/dotnet.md) · [overlays/go.md](overlays/go.md) · [overlays/python.md](overlays/python.md) · [overlays/typescript.md](overlays/typescript.md) | per-stack review bars |
 
