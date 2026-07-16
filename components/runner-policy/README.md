@@ -158,9 +158,14 @@ label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to
 `ubuntu-24.04`.
 
-Personal-repository callers may additionally pass
+The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
+(the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
+dedicated capped review tier). A review-lane caller passes the latter from a
+separate selector job so its review workload routes to that tier while the
+repository's other self-hosted jobs keep the default. Personal-repository
+callers may additionally pass
 `self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`. No other
-selector input is allowed by the policy.
+selector input or expression is allowed by the policy.
 
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
@@ -323,8 +328,11 @@ trigger. The runner input must be either an optional string with the governed
 `ubuntu-24.04` default, or `required: true` with no `default`. The required form
 accepts only the raw selector output and requires the caller condition to prove
 selector success, the `self-hosted` route, a non-empty runner, and equality with
-`vars.CI_SELF_HOSTED_LABEL`. The same caller workflow must also contain exactly
-one approved unroutable failure sentinel for that selector; one sentinel may
+`vars.CI_SELF_HOSTED_LABEL`. The required no-default form therefore routes only
+to the default fleet tier; the capped review tier is reached through the
+optional-default runner form above. The same caller workflow must also contain
+exactly one approved unroutable failure sentinel for that selector; one sentinel
+may
 cover multiple required calls sharing the selector, but a sentinel in another
 workflow or for another selector does not satisfy the contract. Optional calls
 with the governed hosted fallback do not require this guard. A
