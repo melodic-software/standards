@@ -1284,6 +1284,18 @@ function securitySurfaceDiffField(basis, candidate) {
   return undefined;
 }
 
+// Every field here is a human-reviewed contract term that this module's
+// surface diff cannot re-derive from the fetched workflow bytes alone, so
+// two matching reviewed revisions could otherwise disagree on it without
+// differingReviewedContractFields ever noticing: a candidate SHA would
+// silently inherit whichever matching basis sorts first, even though a
+// second matching basis was reviewed with different terms.
+// allowedCallerPermissions is that same kind of term -- an exact
+// caller-side permission grant a human approved for a specific reviewed
+// SHA, not something the diffed callee surface encodes -- so it must be
+// compared here on the same basis as allowedInputs, allowedSecrets, and
+// fixedRunsOn. It has no effect until a contract carries this field, and is
+// safe to include ahead of that.
 function reviewedContractSurface(contract) {
   return normalizeStructuralValue({
     routing: contract.routing,
@@ -1295,6 +1307,9 @@ function reviewedContractSurface(contract) {
       ? {
           fixedRunsOn: [...contract.fixedRunsOn].sort((left, right) => left.localeCompare(right)),
         }
+      : {}),
+    ...(contract.allowedCallerPermissions
+      ? { allowedCallerPermissions: contract.allowedCallerPermissions }
       : {}),
   });
 }
