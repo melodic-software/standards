@@ -352,6 +352,32 @@ test("a scalar or null update entry is flagged", async () => {
   ]);
 });
 
+test("an update entry missing identity keys is flagged", async () => {
+  const noEcosystem = await repository({
+    dependabotYaml:
+      "version: 2\nupdates:\n  - directory: /\n    schedule:\n      interval: weekly\n",
+  });
+  assert.deepEqual(rules(await auditRepository({ root: noEcosystem })), [
+    "updates[0]:incomplete-update-entry",
+  ]);
+  const noDirectory = await repository({
+    dependabotYaml:
+      "version: 2\nupdates:\n  - package-ecosystem: npm\n    schedule:\n      interval: weekly\n",
+  });
+  assert.deepEqual(rules(await auditRepository({ root: noDirectory })), [
+    "updates[0]:incomplete-update-entry",
+  ]);
+});
+
+test("a semver-specific cooldown below the floor is flagged", async () => {
+  const entry = CONFORMANT.replace(
+    "    cooldown:\n      default-days: 7\n",
+    "    cooldown:\n      default-days: 7\n      semver-patch-days: 0\n",
+  );
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
+});
+
 test("a waiver outside the reason's scope fails closed", async () => {
   const single = await repository({
     dependabotYaml: dependabot(CONFORMANT),

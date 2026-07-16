@@ -164,14 +164,26 @@ function entryFindings(file, key, entry, policy) {
       ),
     );
   }
-  const cooldownDays = entry.cooldown?.["default-days"];
-  if (typeof cooldownDays !== "number" || cooldownDays < policy.cooldownMinimumDays) {
+  // Every configured cooldown day-count must meet the floor. A semver-specific
+  // override (semver-patch-days: 0, say) takes precedence over default-days for
+  // that update type, so a short override reintroduces the bot burst the soak
+  // exists to prevent.
+  const cooldown = entry.cooldown;
+  const dayKeys = ["default-days", "semver-major-days", "semver-minor-days", "semver-patch-days"];
+  const belowFloor = dayKeys.filter((dayKey) => {
+    const value = cooldown?.[dayKey];
+    if (dayKey === "default-days") {
+      return typeof value !== "number" || value < policy.cooldownMinimumDays;
+    }
+    return typeof value === "number" && value < policy.cooldownMinimumDays;
+  });
+  if (belowFloor.length > 0) {
     findings.push(
       finding(
         "cooldown-below-minimum",
         file,
         key,
-        `cooldown.default-days must be an integer >= ${policy.cooldownMinimumDays}, found ${JSON.stringify(cooldownDays ?? null)}`,
+        `cooldown ${belowFloor.join(", ")} must each be an integer >= ${policy.cooldownMinimumDays}`,
       ),
     );
   } else {
@@ -179,8 +191,8 @@ function entryFindings(file, key, entry, policy) {
     // `exclude` skips the soak for every dependency, and an `include` list
     // inverts the soak to opt-in, so both defeat the control. A narrow exclude
     // (a fast-tracked first-party owner, say) still soaks everything else.
-    const exclude = entry.cooldown?.exclude;
-    const include = entry.cooldown?.include;
+    const exclude = cooldown?.exclude;
+    const include = cooldown?.include;
     const matchAllExclude = Array.isArray(exclude) && exclude.includes("*");
     const restrictiveInclude = Array.isArray(include) && include.length > 0;
     if (matchAllExclude || restrictiveInclude) {
@@ -297,6 +309,19 @@ export async function auditRepository({
           file,
           `updates[${index}]`,
           "each updates entry must be a mapping with a package-ecosystem and a directory",
+        ),
+      );
+      continue;
+    }
+    const ecosystem = entry["package-ecosystem"];
+    const hasDirectory = typeof entry.directory === "string" || Array.isArray(entry.directories);
+    if (typeof ecosystem !== "string" || ecosystem.length === 0 || !hasDirectory) {
+      findings.push(
+        finding(
+          "incomplete-update-entry",
+          file,
+          `updates[${index}]`,
+          "each updates entry requires package-ecosystem and directory or directories",
         ),
       );
       continue;

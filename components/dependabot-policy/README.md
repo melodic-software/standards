@@ -51,13 +51,15 @@ Per `updates` entry, keyed by `<package-ecosystem>:<directory>` (the plural
 `directories` list is joined, so a multi-root entry has one key):
 
 - `schedule-not-standard` — `schedule.interval` is not the standard interval.
-- `cooldown-below-minimum` — `cooldown.default-days` is missing or below the
-  minimum.
+- `cooldown-below-minimum` — `cooldown.default-days`, or any `semver-*-days`
+  override, is missing or below the minimum.
 - `cooldown-soak-bypassed` — a match-all `cooldown.exclude` (`"*"`) or a
   `cooldown.include` list defeats the soak even though `default-days` is set.
 - `groups-missing` — no `groups` block.
 - `pr-limit-too-high` — `open-pull-requests-limit` exceeds the maximum.
 - `malformed-update-entry` — an `updates` item is not a mapping.
+- `incomplete-update-entry` — an `updates` item omits `package-ecosystem` or
+  `directory`/`directories`.
 
 File-level: `dependabot-config-missing` when there is no `.github/dependabot.yml`
 at all, `unsupported-version` when the config is not `version: 2`, and
