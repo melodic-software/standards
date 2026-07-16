@@ -28,6 +28,11 @@ const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/wor
 const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
+// Shared placeholder for the reviewed ci-workflows merge commit that carries
+// these reusables' runner input; not a real commit SHA.
+const WAVE1_FLOOR_CONVERSION_SHA = "feedfacefeedfacefeedfacefeedfacefeedface";
+const LINK_CHECK_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
+const PULUMI_DRIFT_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
 const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
 const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
@@ -1348,6 +1353,20 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       allowedSecrets: {},
     },
   );
+  assert.deepEqual(contracts[LINK_CHECK_RUNNER_INPUT_REFERENCE], {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "args"],
+    allowedSecrets: {},
+    allowedCallerPermissions: { contents: "read", issues: "write" },
+  });
+  assert.deepEqual(contracts[PULUMI_DRIFT_RUNNER_INPUT_REFERENCE], {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+    allowedCallerPermissions: { contents: "read", issues: "write" },
+  });
 });
 
 test("policy rejects invalid selector-result contract shapes", async () => {
