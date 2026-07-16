@@ -222,7 +222,10 @@ function entryFindings(file, key, entry, policy) {
         return false;
       }
       const appliesTo = group["applies-to"];
-      return appliesTo === undefined || appliesTo === "version-updates";
+      const isVersionGroup = appliesTo === undefined || appliesTo === "version-updates";
+      const excludePatterns = group["exclude-patterns"];
+      const excludesEverything = Array.isArray(excludePatterns) && excludePatterns.includes("*");
+      return isVersionGroup && !excludesEverything;
     });
     if (!coversVersionUpdates) {
       findings.push(
@@ -252,6 +255,29 @@ function entryFindings(file, key, entry, policy) {
         file,
         key,
         `open-pull-requests-limit must be <= ${policy.maxOpenPullRequests}, found ${limit}`,
+      ),
+    );
+  }
+  // A match-all ignore with no version or update-type narrowing suppresses every
+  // update for the ecosystem, disabling the policy instead of shaping volume. A
+  // narrow ignore (a specific dependency or first-party owner) is unaffected.
+  const ignore = Array.isArray(entry.ignore) ? entry.ignore : [];
+  const disablingIgnore = ignore.some(
+    (rule) =>
+      rule !== null &&
+      typeof rule === "object" &&
+      !Array.isArray(rule) &&
+      rule["dependency-name"] === "*" &&
+      rule.versions === undefined &&
+      rule["update-types"] === undefined,
+  );
+  if (disablingIgnore) {
+    findings.push(
+      finding(
+        "ignore-disables-updates",
+        file,
+        key,
+        'an ignore rule for dependency-name "*" with no version or update-type narrowing suppresses every update',
       ),
     );
   }

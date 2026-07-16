@@ -233,6 +233,65 @@ test("a groups block that explicitly applies to version updates passes", async (
   assert.deepEqual(await auditRepository({ root }), []);
 });
 
+test("a version group that excludes every pattern is flagged", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      versions:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
+});
+
+test("a match-all ignore rule disables updates and is flagged", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:ignore-disables-updates"]);
+});
+
+test("a narrow ignore rule still passes", async () => {
+  const entry = `  - package-ecosystem: npm
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "melodic-software/ci-workflows/*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
 test("an omitted open-pull-requests-limit is accepted (GitHub default is the maximum)", async () => {
   const entry = CONFORMANT.replace("    open-pull-requests-limit: 5\n", "");
   const root = await repository({ dependabotYaml: dependabot(entry) });
