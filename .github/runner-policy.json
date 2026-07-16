@@ -12,10 +12,6 @@
       "reason": "hosted-control-plane",
       "justification": "The required status gateway remains independent of local capacity while aggregating every workload result."
     },
-    ".github/workflows/claude-review.yml#review": {
-      "reason": "privileged-control-plane",
-      "justification": "Automated review mints a Claude token and writes pull-request feedback, so it remains on GitHub-hosted infrastructure."
-    },
     ".github/workflows/link-check.yml#link-check": {
       "reason": "privileged-control-plane",
       "justification": "The scheduled link monitor can write its tracking issue and remains on GitHub-hosted infrastructure."
