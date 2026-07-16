@@ -7,11 +7,18 @@ a coding agent working in this repository. For repository shape, ownership
 boundaries, the component model, and validation commands, read
 [`README.md`](README.md) first.
 
-This file lives at the repository root only. Do not add a nested copy —
-Codex concatenates every `AGENTS.md` it finds rather than having the nearest
-one override, so a nested copy would compound instructions instead of
-scoping them; use a nested `CLAUDE.md` or a `.claude/rules/` overlay for a
-subtree-local instruction instead.
+This file lives at the repository root only. Do not add a nested copy of
+it — its content (dogfooding, cross-doc reconciliation, PR conventions) is
+repository-wide, not subtree-scoped, so a nested copy would duplicate
+root-wide instructions rather than add anything new. For a genuine
+subtree-local instruction, add a nested `AGENTS.md` in that subtree instead
+(or `AGENTS.override.md` to fully replace rather than append): Codex
+concatenates every `AGENTS.md` it finds root-down, joining them with blank
+lines, and a file closer to the working directory is read later in that
+combined prompt and can supersede the broader guidance above it —
+`AGENTS.override.md` at a directory level replaces rather than appends.
+Codex does not read a nested `CLAUDE.md` or a `.claude/rules/` overlay for
+this purpose.
 
 ## Before changing anything here
 
