@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://standards.melodic.software/dependabot-policy/policy.schema.json",
+  "title": "Dependabot policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scheduleInterval",
+    "cooldownMinimumDays",
+    "maxOpenPullRequests",
+    "requireGroups"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "scheduleInterval": { "enum": ["daily", "weekly", "monthly"] },
+    "cooldownMinimumDays": { "type": "integer", "minimum": 1 },
+    "maxOpenPullRequests": { "type": "integer", "minimum": 1 },
+    "requireGroups": { "type": "boolean" }
+  }
+}

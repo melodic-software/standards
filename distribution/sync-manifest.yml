@@ -19,6 +19,16 @@ components:
       components/concurrency-policy/concurrency-policy.schema.json: .github/standards/concurrency-policy/concurrency-policy.schema.json
       components/concurrency-policy/package-lock.json: .github/standards/concurrency-policy/package-lock.json
       components/concurrency-policy/package.json: .github/standards/concurrency-policy/package.json
+  dependabot-policy:
+    requires:
+      - node-runtime
+    files:
+      components/dependabot-policy/dependabot-policy.mjs: .github/standards/dependabot-policy/dependabot-policy.mjs
+      components/dependabot-policy/dependabot-policy.schema.json: .github/standards/dependabot-policy/dependabot-policy.schema.json
+      components/dependabot-policy/package-lock.json: .github/standards/dependabot-policy/package-lock.json
+      components/dependabot-policy/package.json: .github/standards/dependabot-policy/package.json
+      components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
+      components/dependabot-policy/policy.schema.json: .github/standards/dependabot-policy/policy.schema.json
   dotnet-analysis:
     files:
       components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
