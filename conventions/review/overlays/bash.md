@@ -34,9 +34,10 @@ brings it under ShellCheck.
 - **Masked failure in a command substitution on a critical path** — the component
   leaves the general `var=$(cmd)` return check off as too noisy, so a swallowed
   failure inside a substitution on a correctness- or safety-critical path is
-  review's job: `dir=$(mktemp -d); rm -rf "$dir"` deletes the wrong thing if
-  `mktemp` failed and `$dir` is empty. Important; Critical on a destructive path.
-  See [SC2312][5].
+  review's job: `backup=$(mktemp -d); cp -a "$src" "$backup"; rm -rf "$src"`
+  destroys the source with no backup if `mktemp` failed — the copy to an empty
+  destination fails silently and the removal still runs. Important; Critical on a
+  destructive path. See [SC2312][5].
 
 ## Resources and safety
 
