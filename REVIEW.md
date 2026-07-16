@@ -74,7 +74,10 @@ criterion; a citation here never substitutes prose that isn't needed, per
   backstop. A CI backstop (for example a `gitleaks` lane) catches an
   instance mechanically; it does not make the `blocking` check itself
   skippable here.
-- Generated files and lockfiles.
+- Generated files and lockfiles, except a `blocking` finding — a leaked
+  secret in a lockfile or a supply-chain regression visible only there is
+  still reportable; this rule only waives low-signal mechanical noise
+  (formatting, regenerated diffs) in those files.
 
 ## Cap the nits
 
