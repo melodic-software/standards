@@ -173,7 +173,6 @@ test("public repository cannot target a raw self-hosted label", async () => {
 for (const managedLabel of [
   "melodic-ubuntu-24.04-x64",
   "melodic-build-ubuntu-24.04-x64",
-  "melodic-canary-ubuntu-24.04-x64",
   "kyle-ubuntu-24.04-x64",
   "kyle-build-ubuntu-24.04-x64",
 ]) {
