@@ -12,9 +12,17 @@ Three concerns live here:
 
 Prose is read, not executed. A reviewer or an authoring agent reads these files; no tool walks the directory tree to find them. That makes the distribution model deliberately simple and decoupled:
 
-- **Adopt by copy or by pointer.** A consuming repo either copies the files it adopts into its own tree, or points its contributor and review guides at this directory. Either way there is **no runtime coupling** to this repo — nothing here is fetched or imported at build or review time.
+- **Adopt by copy or by pointer.** `engineering/` and `process/` are copy-or-pointer only: a consuming repo either copies the files it adopts into its own tree, or points its contributor and review guides at this directory, and either way there is **no runtime coupling** to this repo — nothing there is fetched or imported at build or review time. A copy carries the back-link and drift-check requirement in [`../distribution/governance-process.md`](../distribution/governance-process.md).
+- **`review/` additionally supports native reference.** A private consuming repo's `REVIEW.md` can cite a heading in this tree, and a self-hosted or local review running the `review` plugin follows that citation into a pinned `standards` checkout mounted via `--add-dir` — depth that genuinely is fetched at review time. `REVIEW.md` itself (`../REVIEW.md`) states the mechanism and its severity crosswalk in full; this is a pointer, not a restatement of it.
 - **Curate on adoption.** These are agent-agnostic standards. A consumer wires them into whatever harness it uses (a contributor guide, a review checklist, an agent's instructions) without this catalog dictating that harness. Adopt the files that fit; the standards do not assume a particular toolchain, repository layout, or agent.
 - **Single owner, no double-statement.** Where a component config or hook lane already enforces a convention, prose references that enforcement rather than restating the rule, keeping executable policy the one source of truth.
+
+## Changing a normative file
+
+A change to a rule another file cites or assumes needs the cross-doc
+reconciliation step in
+[`../distribution/governance-process.md`](../distribution/governance-process.md)
+before it merges, not after.
 
 ## On testing this directory
 

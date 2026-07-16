@@ -1,18 +1,14 @@
 # Code quality review criteria
 
-Diff-time checks for design, shape, style, and authoring hygiene — the quality bars automated tooling cannot fully decide. Severity labels (Critical / Important / Suggestion) are defined in [README.md](README.md). Where a check restates a principle owned by an engineering convention, it points there rather than re-explaining it; where a component mechanically enforces a check, it points to that component instead of duplicating the rule.
+Diff-time checks for local design, parameter and model shape, style, and authoring hygiene — the quality bars automated tooling cannot fully decide. Cross-unit design judgment — cohesion, coupling, abstraction fit, substitutability, and pattern use — is owned by [code-design.md](code-design.md). Severity labels (Critical / Important / Suggestion) are defined in [README.md](README.md). Where a check restates a principle owned by an engineering convention, it points there rather than re-explaining it; where a component mechanically enforces a check, it points to that component instead of duplicating the rule.
 
-## Design
+## Local design
 
-- **Duplicated structure, not just duplicated lines** — repeated field/property/method scaffolding across three or more classes signals a missing base or helper. A new class in an established family should extend it, not re-implement it. (Rule of three; see `../engineering/simpler-code.md`.)
 - **Magic literals** — bare numeric, string, or boolean *policy* values that recur or whose meaning is not self-evident, where a named constant belongs. A status string (`"active"`), a protocol keyword, or a boolean policy flag counts, not only numbers. Carve-outs: universal arithmetic idioms, values already named via a lookup, one-off literals obvious in context. Usually Suggestion; Important when the literal is a tunable threshold duplicated across sites.
 - **Constants placement** — prefer a module-local named constant; promote to a shared location only when two or more consumers share the value or it is cross-cutting protocol. Avoid premature shared constant god-files bundling unrelated values.
-- **Missing abstractions** — third-party libraries, infrastructure, or volatile dependencies referenced directly from domain or application code instead of behind an owned interface.
 - **Principle of least astonishment** — names, signatures, and behavior that would surprise a competent newcomer to the codebase.
 - **Fail-slow patterns** — errors deferred, swallowed, or hidden instead of failing fast at the entry point.
 - **Deep nesting** — prefer early returns and guard clauses over nested conditional ladders.
-- **God class / large type** — a type or file mixing unrelated reasons to change (I/O plus business rules plus registration in one unit). Remediation: extract by responsibility. Suggestion by default; Important at a public, shared, or contract surface. Carve-outs: composition roots, declarative config-only files, generated code, legitimate template-method bases.
-- **Law of Demeter and the Hollywood Principle** — reach-through chains and service-locator pulls are flagged at module and layer boundaries (Critical there); see `../engineering/architecture-and-design.md`.
 - **Exceptions for expected failures** — a thrown exception where the failure was anticipable and should be an explicit result; see `../engineering/architecture-and-design.md`.
 
 ## Parameter and model shape
@@ -43,10 +39,10 @@ Review owns parameter shape: where a stack toolchain enforces an arity ceiling, 
 - **Lint exclusions instead of fixes** — default to fixing. Never add a suppression to bypass a pre-existing error; a justified exclusion lives in the tool's config with a recorded reason, never inline as a silencer.
 - **Embedded cross-language scripts** — a multi-line script of one language inlined inside another (a shell heredoc of another language, say) belongs in its own co-located file.
 - **Self-executing importable modules** — an entry script that other modules import needs a main guard so its CLI body does not run on import.
-- **Conventional-commit titles** — pull-request titles and descriptions follow Conventional Commits.
+- **PR-title format** — deterministic; tool-owned by the `pr-title` gate (`ci-workflows/.github/workflows/semantic-pr.yml`, wired into each consumer as `.github/workflows/pr-title.yml`), not review prose. See `../engineering/enforceability-tiers.md`.
 
 ## Sources
 
-- Fowler & Beck, *Refactoring* — [Large Class](https://refactoring.guru/smells/large-class), [Introduce Parameter Object](https://martinfowler.com/refactoring/catalog/introduceParameterObject.html), [Data Clump](https://martinfowler.com/bliki/DataClump.html), [Primitive Obsession](https://www.informit.com/articles/article.aspx?p=2952392&seqNum=11)
+- Fowler & Beck, *Refactoring* — [Introduce Parameter Object](https://martinfowler.com/refactoring/catalog/introduceParameterObject.html), [Data Clump](https://martinfowler.com/bliki/DataClump.html), [Primitive Obsession](https://www.informit.com/articles/article.aspx?p=2952392&seqNum=11)
 - Martin, *Clean Code* — Ch. 3 (function arguments), Ch. 10 (classes)
 - Ousterhout, *A Philosophy of Software Design* ([PDF](https://milkov.tech/assets/psd.pdf)) — configuration parameters, shallow wrappers

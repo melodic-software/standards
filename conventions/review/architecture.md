@@ -9,6 +9,7 @@ Diff-time checks for structural integrity, contract evolution, and build-system 
 - **Domain events as forward-compatible contracts** — events are designed serializable with a versionable shape so a later move to asynchronous messaging does not break them.
 - **Operations return results, not raw types or thrown exceptions** for anticipable failures; see `../engineering/architecture-and-design.md`.
 - **Module-to-module coupling** — shared internal types or direct reach into another module's internals instead of going through its published contract.
+- **Incumbency as the only justification** — a boundary or design decision defended purely descriptively, with no normative argument; see [`../engineering/engineering-philosophy.md`](../engineering/engineering-philosophy.md#judgment-and-process).
 
 ## Contract evolution
 

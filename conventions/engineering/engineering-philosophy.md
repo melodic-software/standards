@@ -22,6 +22,7 @@ The default posture for any code in a consuming repo: write like a senior engine
 - **Reversibility-weighted rigor.** For easily reversible decisions, bias to action and revert if wrong. For hard-to-reverse decisions, widen options first, prefer the reversible path, and record the rationale in a decision record.
 - **Research before deciding.** A change that feels "too simple to research" is a signal to verify, not to skip. Exhaust the obvious approaches before declaring a problem intractable.
 - **Stress-test before presenting.** Attack your own design — edge cases, concurrency, state leaks — and reject proposals that duplicate a source of truth, over-build, or reinvent an existing mechanism.
+- **Current state is evidence, never justification.** How code is structured, coupled, or "has always been done" describes what *is*; it does not argue for what *should be*. When a design or boundary's only support is descriptive — incumbency, precedent, existing coupling — re-derive it from first principles and challenge it.
 
 ## Cross-cutting design defaults
 

@@ -14,6 +14,7 @@ const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3"
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
 const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
+const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -23,6 +24,7 @@ const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
 const FAIL_CLOSED_SEMANTIC_PR_REFERENCE = `melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${FAIL_CLOSED_SEMANTIC_PR_SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
+const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
 const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
 const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
@@ -1758,6 +1760,413 @@ test("reusable workflow caller passes the approved runner input", async () => {
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("reviewed runner-input workflow may receive one exact local permission boundary", async () => {
+  const localPermissions = {
+    contents: "read",
+    "pull-requests": "write",
+    "id-token": "write",
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner", "skip-actors"],
+          allowedSecrets: {
+            CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+          },
+          allowedCallerPermissions: localPermissions,
+        },
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the reviewed caller permission waiver applies only to selector-routed calls", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const permissions = `    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+`;
+
+  const selectorRouted = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(selectorRouted),
+    [],
+    "selector-routed call must still waive cleanly",
+  );
+
+  const fixedHostedNoException = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.ok(
+    (await audit(fixedHostedNoException)).some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-required" && message.includes("privileged-control-plane"),
+    ),
+    "fixed-hosted caller with write and id-token permissions must still demand a privileged-control-plane exception",
+  );
+
+  const fixedHostedWrongCategory = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/claude-review.yml#review": {
+        reason: "hosted-control-plane",
+        justification: "This intentionally exercises privilege-category validation.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(fixedHostedWrongCategory)).map(({ rule }) => rule),
+    ["hosted-exception-category"],
+    "a fixed-hosted write/id-token caller must not be satisfied by the weaker hosted-control-plane category",
+  );
+
+  const fixedHostedCorrectCategory = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/claude-review.yml#review": {
+        reason: "privileged-control-plane",
+        justification: "Fixed hosted claude-review caller retains write and id-token scopes.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(fixedHostedCorrectCategory),
+    [],
+    "the exact privileged-control-plane category must clear the finding",
+  );
+});
+
+test("runner-input local permission boundary rejects every caller permission drift", async () => {
+  for (const permissions of [
+    "contents: read\n      pull-requests: write",
+    "contents: read\n      pull-requests: write\n      id-token: write\n      issues: write",
+    "contents: write\n      pull-requests: write\n      id-token: write",
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: ["runner"],
+            allowedSecrets: {
+              CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+            },
+            allowedCallerPermissions: {
+              contents: "read",
+              "pull-requests": "write",
+              "id-token": "write",
+            },
+          },
+        },
+      },
+      workflows: {
+        "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      ${permissions}
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+      },
+    });
+    assert.ok(
+      (await audit(root)).some(({ rule }) => rule === "runner-target-contract"),
+      permissions,
+    );
+  }
+});
+
+test("reviewed caller permissions do not authorize other credential surfaces", async () => {
+  for (const scenario of [
+    {
+      label: "write-all",
+      allowedInputs: ["runner", "skip-actors"],
+      condition: `    if: \${{ !cancelled() }}\n`,
+      permissions: "    permissions: write-all\n",
+      input: "",
+    },
+    {
+      label: "secret-bearing input",
+      allowedInputs: ["runner", "skip-actors", "prompt"],
+      condition: `    if: \${{ !cancelled() }}\n`,
+      permissions:
+        "    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n",
+      input: `      prompt: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n`,
+    },
+    {
+      label: "credential condition",
+      allowedInputs: ["runner", "skip-actors"],
+      condition: `    if: \${{ !cancelled() && secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}\n`,
+      permissions:
+        "    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n",
+      input: "",
+    },
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: scenario.allowedInputs,
+            allowedSecrets: {
+              CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+            },
+            allowedCallerPermissions: {
+              contents: "read",
+              "pull-requests": "write",
+              "id-token": "write",
+            },
+          },
+        },
+      },
+      workflows: {
+        "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+${scenario.condition}${scenario.permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+${scenario.input}    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+      },
+    });
+    assert.notDeepEqual(await audit(root), [], scenario.label);
+  }
+});
+
+test("reviewed caller secret mapping remains exact", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {
+            CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+          },
+          allowedCallerPermissions: {
+            contents: "read",
+            "pull-requests": "write",
+            "id-token": "write",
+          },
+        },
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}-suffix
+`,
+    },
+  });
+  assert.ok(
+    (await audit(root)).some(
+      ({ rule, message }) =>
+        rule === "runner-target-contract" &&
+        message.includes("reusable workflow secrets.CLAUDE_CODE_OAUTH_TOKEN must be exactly"),
+    ),
+  );
+});
+
+test("privileged reusable contracts accept only direct same-name secret mappings", async () => {
+  for (const expression of [
+    `\${{ toJSON(secrets) }}`,
+    `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}-suffix`,
+    `\${{ secrets.OTHER_TOKEN }}`,
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: ["runner"],
+            allowedSecrets: { CLAUDE_CODE_OAUTH_TOKEN: expression },
+            allowedCallerPermissions: { contents: "write" },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      () => audit(root),
+      /allowedSecrets\.CLAUDE_CODE_OAUTH_TOKEN must be exactly/,
+      expression,
+    );
+  }
+});
+
+test("privileged reusable contracts use only official permission scope access values", async () => {
+  for (const allowedCallerPermissions of [
+    { "future-scope": "write" },
+    { "id-token": "read" },
+    { models: "write" },
+    { "vulnerability-alerts": "write" },
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: ["runner"],
+            allowedSecrets: {},
+            allowedCallerPermissions,
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      () => audit(root),
+      (error) =>
+        error instanceof ConfigurationError && error.message.includes("allowedCallerPermissions"),
+      JSON.stringify(allowedCallerPermissions),
+    );
+  }
+});
+
+test("local permission contract must authorize at least one exact write scope", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {},
+          allowedCallerPermissions: { contents: "read" },
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    /allowedCallerPermissions must include at least one write permission/,
+  );
 });
 
 test("fail-closed reusable gate reports every selector result", async () => {
