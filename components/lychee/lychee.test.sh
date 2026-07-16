@@ -21,6 +21,11 @@ private_org_rule="$(grep -F \
 assert_eq 'private GitHub exclusion is one exact transferred-org inventory' \
   "  '^https?://github\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)(\\.git)?([/#?]|$)'," \
   "$private_org_rule"
+private_raw_rule="$(grep -F \
+  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/" "$config" || true)"
+assert_eq 'private raw-content exclusion uses the same exact inventory' \
+  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)/'," \
+  "$private_raw_rule"
 assert_eq 'obsolete personal-owner private exclusion is absent' '0' \
   "$(grep -cF 'github\.com/kyle-sexton/' "$config" || true)"
 
@@ -32,10 +37,17 @@ for repo in claude-code-plugins dotfiles github-iac medley provisioning standard
   assert_not_contains "private inventory excludes melodic-software/$repo" \
     "$dump_out" "https://github.com/melodic-software/$repo"
 done
+assert_not_contains 'private raw-content URL is excluded' \
+  "$dump_out" 'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/'
+for host in medium.com help.miro.com isdown.app www.npmjs.com; do
+  assert_not_contains "auth-walled host is excluded: $host" "$dump_out" "https://$host/"
+done
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \
   "$dump_out" 'https://github.com/kyle-sexton/provisioning'
+assert_contains 'public raw-content sibling remains checked' \
+  "$dump_out" 'https://raw.githubusercontent.com/melodic-software/ci-runner/'
 
 lychee --offline --config "$config" \
   components/lychee/fixtures/good/Clean.md components/lychee/fixtures/good/Target.md >/dev/null 2>&1

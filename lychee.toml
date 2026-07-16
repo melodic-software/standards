@@ -23,6 +23,10 @@ exclude = [
   '^https?://twitter\.com/',
   '^https?://(www\.)?linkedin\.com/',
   '^https?://bsky\.app/',
+  '^https?://(www\.)?medium\.com/',
+  '^https?://help\.miro\.com/',
+  '^https?://isdown\.app/',
+  '^https?://(www\.)?npmjs\.com/',
   '^https?://localhost',
   '^https?://127\.0\.0\.1',
   '^https?://example\.(com|org)',
@@ -35,4 +39,5 @@ exclude = [
   # HTTPS clone URLs: the dot after the repo name would otherwise miss the
   # [/#?] boundary.
   '^https?://github\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)(\.git)?([/#?]|$)',
+  '^https?://raw\.githubusercontent\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)/',
 ]
