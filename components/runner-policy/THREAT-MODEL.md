@@ -79,10 +79,16 @@ GitHub is independent evidence; it must agree with checked-in inventory.
    every surface-matching revision agrees on the same effective contract terms.
    Incomplete basis evidence, no matching basis, any surface change, or
    disagreement among matching contracts leaves it unapproved and folds the
-   reason into the existing fail-closed diagnostic. This is the only network
-   access the analyzer performs, and it never widens a contract's declared
-   inputs, secrets, permissions, or routing — it only extends a structurally
-   identical, unambiguous already-reviewed contract to a new SHA.
+   reason into the existing fail-closed diagnostic. A job whose
+   routing-relevant fields reference another job's output through
+   `needs.<job-id>.outputs.<name>`, on either the reviewed basis or the
+   candidate, and any reviewed contract carrying `selectorResultInput`, both
+   decline unconditionally regardless of surface match, because neither can
+   be proven unchanged by this structural diff alone. This is the only
+   network access the analyzer performs, and it never widens a contract's
+   declared inputs, secrets, permissions, or routing — it only extends a
+   structurally identical, unambiguous already-reviewed contract to a new
+   SHA.
 5. It follows repository-local reusable calls, evaluates routing, permission
    flow, credentials, structural hosted requirements, immutable external
    contracts, and exact exception consumption.
@@ -102,6 +108,7 @@ GitHub is independent evidence; it must agree with checked-in inventory.
 | An exception becomes a blanket bypass or outlives its job. | Exceptions are keyed to one workflow and job, use allowlisted categories with justification, do not suppress runner-target rules, and fail on unused inventory. | Exception category, consumption, drift, and indirection cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 | A policy or dependency change weakens validation unnoticed. | Central and repository schemas reject unknown shapes; component dependencies are exactly locked; CI runs behavioral tests and then audits this repository with external visibility evidence. | [`policy.schema.json`](policy.schema.json), [`repository-policy.schema.json`](repository-policy.schema.json), [`package-lock.json`](package-lock.json), and the `runner-policy` CI job. |
 | A Dependabot SHA bump of an already-reviewed reusable workflow is auto-approved even though the bump silently removes callability, changes permissions/inputs/secrets/routing/boundaries, adds a called job's credential-minting action or unapproved credential expression, swaps an already-declared/allowed secret for a different secret in the identical position, or inherits a broader contract from one of several matching reviewed revisions by insertion order or partial fetch evidence. | Auto-approval requires a structurally identical match of `on.workflow_call` presence/validity, workflow- and effective job-level permissions, declared inputs/secrets, job routing/nested calls, container/service/environment declarations, the same privileged-control-plane credential detection enforced against every directly declared or repository-local job, and the exact credential-bearing values each job references (not just that detection's category), between reviewed revisions and the candidate, all fetched fresh from the source repository. Every reviewed revision for the path must fetch, parse, and validate before every surface-matching revision is compared for agreement on the effective input, secret, runner-input, and hosted-only contract; incomplete evidence, any diff, or ambiguity fails closed with a deterministic diagnostic. `disableAutoApproval`/`CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true` restores the pre-auto-approval behavior for any repository that wants no automatic extension at all. | Identical-surface and identical-contract, contract-ambiguity/permutation, partial-evidence fetch/parse failures, removed/malformed-callability, omitted/empty and widened-permissions, changed-inputs, changed-routing/boundaries, added-credential-action, changed-credential-reference, and escape-hatch cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
+| A Dependabot SHA bump keeps a job's literal `runs-on` (or other routing field) unchanged while the value it indirectly resolves through `needs.<job-id>.outputs.<name>` changes the actual runner/container/environment boundary, or a bump silently stops honoring a `selectorResultInput` fail-closed contract's forwarded selector result while every compared field stays identical, and either is still auto-approved because the structural surface diff cannot observe the change. | Any job on either the reviewed basis or the candidate whose routing-relevant fields reference another job's output declines auto-approval unconditionally. Any reviewed contract carrying `selectorResultInput` declines auto-approval unconditionally regardless of surface match, because the fail-closed guarantee it is trusted for depends on the called workflow's own steps, which sit outside the compared surface. Both require a human to add a new contract entry. | Needs-output-indirection (candidate and basis) and selector-result-contract cases in [`runner-policy.test.mjs`](runner-policy.test.mjs). |
 
 The detailed operational contract and current approved references live in the
 [component README](README.md) and [`policy.json`](policy.json); this model does

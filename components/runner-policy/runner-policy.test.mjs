@@ -394,6 +394,42 @@ jobs:
     steps: []
 `;
 
+// scan's runs-on stays a byte-identical expression across the two revisions
+// below; only pick's producing step differs (ubuntu-24.04 vs. self-hosted).
+// A surface diff that inspects only the literal runs-on declaration would
+// see no change and auto-approve a routing boundary that actually moved.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  pick:
+    runs-on: ubuntu-24.04
+    outputs:
+      runner: \${{ steps.pick.outputs.runner }}
+    steps:
+      - id: pick
+        run: echo "runner=ubuntu-24.04" >> "$GITHUB_OUTPUT"
+  scan:
+    needs: pick
+    runs-on: \${{ needs.pick.outputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
   const declaration = [
     "  workflow_call:",
@@ -2783,6 +2819,143 @@ test("Dependabot SHA bump is declined when the previously reviewed basis has a m
     contractFinding.message,
     new RegExp(
       `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job extra is malformed; jobs\\.extra must be a mapping`,
+    ),
+  );
+});
+
+// Regression test for a gap where jobRoutingSurface recorded only the
+// literal declared runs-on expression. A fetched reusable workflow's job can
+// route through needs.<job>.outputs.<name> -- the same needs-output pattern
+// this analyzer already trusts for local selector routing -- so the
+// producing job's output value (here pick's runs-on) can change the actual
+// runner boundary while the consuming job's runs-on expression stays a
+// byte-identical `needs.pick.outputs.runner`. Auto-approval cannot safely
+// resolve that indirection, so it must decline rather than treat the surface
+// as unchanged.
+test("Dependabot SHA bump that routes through a needs.<job>.outputs indirection is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job scan routes through a needs\.<job>\.outputs reference, which cannot be safely diffed for auto-approval/,
+  );
+});
+
+test("Dependabot SHA bump is declined when the previously reviewed basis routes through a needs.<job>.outputs indirection", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan routes through a needs\\.<job>\\.outputs reference, which cannot be safely diffed for auto-approval`,
+    ),
+  );
+});
+
+// Regression test: the compared auto-approval surface (workflow_call,
+// permissions, routing, credentials) proves a bumped SHA's caller-facing
+// contract and execution boundary are unchanged, but a selectorResultInput
+// contract is trusted for something outside that surface entirely: that the
+// called workflow's own steps still fail the job when the forwarded
+// needs.<selector>.result did not succeed. Nothing in the compared surface
+// inspects the reusable workflow's steps, so a bumped SHA could silently
+// stop honoring that input (always exiting 0) while every compared field
+// stays identical, defeating the fail-closed guarantee a required check
+// relies on. Auto-approval must decline every selector-result contract.
+test("Dependabot SHA bump of a selector-result reporter contract is declined regardless of surface match", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          selectorResultInput: "prerequisite-result",
+          allowedInputs: ["runner", "prerequisite-result"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      prerequisite-result: success
+`,
+    },
+  });
+  const selectorResultBasisSource = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      prerequisite-result:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    if: \${{ inputs.prerequisite-result == 'success' }}
+    steps: []
+`;
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: selectorResultBasisSource,
+      [DEPENDABOT_BUMP_SHA]: selectorResultBasisSource,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: ${REUSABLE_PATH} is a fail-closed selector-result reporter; its required-check behavior cannot be proven unchanged by this surface diff, so auto-approval is declined`,
     ),
   );
 });

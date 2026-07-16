@@ -217,6 +217,25 @@ comparison, not a judgment call, and it grants no blanket trust to a source
 repository. Changes outside that bounded runner-contract surface may be
 auto-approved; any change to the surface itself requires a human to add a new
 contract entry.
+
+Two categories are excluded from this diff-based extension entirely, because
+no structural surface comparison can prove them unchanged. First, a job whose
+routing-relevant fields (`runs-on`, `strategy`, the reusable-call
+`uses`/`with`/`secrets`, or the `container`/`services`/`environment`
+execution boundary) reference another job's output through
+`needs.<job-id>.outputs.<name>` — the same needs-output pattern this policy
+already supports for local selector routing — declines auto-approval for
+that path: the referencing expression can stay byte-identical while the
+producing job's own value changes the real routing boundary underneath it.
+Second, a reviewed contract with `selectorResultInput` declines
+auto-approval unconditionally, even on an otherwise identical surface: that
+contract is trusted for a fail-closed guarantee — that the called workflow's
+own steps still honor the forwarded `needs.<selector>.result` — which sits
+entirely outside the compared workflow_call/permissions/routing/credential
+surface, so a bump could silently defeat it without moving anything this
+diff inspects. Both cases fail closed with a specific diagnostic and require
+a human to add a new contract entry.
+
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every
 SHA.

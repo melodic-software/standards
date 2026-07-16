@@ -1171,6 +1171,63 @@ function malformedJobIds(workflow) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+// jobRoutingSurface records only the literal declared value of each routing
+// field (runs-on, strategy, the reusable-call uses/with/secrets, and the
+// container/services/environment execution boundary). A fetched reusable
+// workflow's own job graph can route indirectly through
+// needs.<job-id>.outputs.<name> -- the same needs-output pattern this
+// analyzer already trusts for local selector routing -- so a job's routing
+// field can stay a byte-identical expression across a SHA bump while the
+// producing job's output value (and therefore the actual runner, container,
+// or environment boundary) changes underneath it. Resolving that producer
+// chain generically, through arbitrary steps or scripts, cannot be done
+// statically and safely, so any job whose routing-relevant fields reference
+// another job's outputs is ineligible for surface-diff auto-approval and
+// fails closed instead of being silently treated as unchanged.
+const NEEDS_OUTPUT_REFERENCE = /needs\.[A-Za-z0-9_-]+\.outputs\.[A-Za-z0-9_-]+/;
+
+function containsNeedsOutputReference(value) {
+  if (typeof value === "string") {
+    return NEEDS_OUTPUT_REFERENCE.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some(containsNeedsOutputReference);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).some(containsNeedsOutputReference);
+  }
+  return false;
+}
+
+const DYNAMIC_ROUTING_FIELDS = [
+  "runs-on",
+  "strategy",
+  "uses",
+  "with",
+  "secrets",
+  "container",
+  "services",
+  "environment",
+];
+
+function dynamicRoutingReferenceJobIds(workflow) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.keys(jobs)
+    .filter((jobId) => {
+      const job = jobs[jobId];
+      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+        return false;
+      }
+      return DYNAMIC_ROUTING_FIELDS.some(
+        (field) => Object.hasOwn(job, field) && containsNeedsOutputReference(job[field]),
+      );
+    })
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function securitySurfaceDiffField(basis, candidate) {
   for (const key of [
     "workflowCall",
@@ -1311,6 +1368,14 @@ async function resolveAutoApprovedContracts({
       );
       continue;
     }
+    const dynamicRoutingCandidateJobs = dynamicRoutingReferenceJobIds(candidateWorkflow);
+    if (dynamicRoutingCandidateJobs.length > 0) {
+      diagnostics.set(
+        reference,
+        `job ${dynamicRoutingCandidateJobs[0]} routes through a needs.<job>.outputs reference, which cannot be safely diffed for auto-approval`,
+      );
+      continue;
+    }
     const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow, policy);
     const malformedField = malformedWorkflowCallMappingField(candidateSurface);
     if (malformedField) {
@@ -1339,6 +1404,12 @@ async function resolveAutoApprovedContracts({
         if (malformedBasisJobs.length > 0) {
           throw new ConfigurationError(
             `job ${malformedBasisJobs[0]} is malformed; jobs.${malformedBasisJobs[0]} must be a mapping`,
+          );
+        }
+        const dynamicRoutingBasisJobs = dynamicRoutingReferenceJobIds(basisWorkflow);
+        if (dynamicRoutingBasisJobs.length > 0) {
+          throw new ConfigurationError(
+            `job ${dynamicRoutingBasisJobs[0]} routes through a needs.<job>.outputs reference, which cannot be safely diffed for auto-approval`,
           );
         }
         basisSurface = reusableWorkflowSecuritySurface(basisWorkflow, policy);
@@ -1391,6 +1462,27 @@ async function resolveAutoApprovedContracts({
     }
 
     const matchedBasis = matchingBases[0];
+
+    // The compared surface (workflow_call declaration, permissions, job
+    // routing, and credential use) proves the reusable workflow's caller-
+    // facing contract and execution boundary are unchanged, but a
+    // selectorResultInput contract is trusted for something this surface
+    // cannot observe: that the called workflow's own steps actually consume
+    // the forwarded needs.<selector>.result and fail the job when the
+    // selector did not succeed. failClosedSelectorConditionStatus only
+    // proves the caller passes that input; nothing here inspects the
+    // reusable workflow's steps to prove it still honors that input rather
+    // than, say, ignoring it and exiting 0. A bumped SHA could therefore
+    // keep every compared field identical while silently defeating the
+    // fail-closed guarantee a required check relies on. Auto-approval must
+    // decline every selector-result contract and require human review.
+    if (matchedBasis.contract.selectorResultInput) {
+      diagnostics.set(
+        reference,
+        `${parsed.workflow} is a fail-closed selector-result reporter; its required-check behavior cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+      );
+      continue;
+    }
 
     approved.set(reference, {
       ...matchedBasis.contract,
