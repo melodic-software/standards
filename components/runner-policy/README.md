@@ -231,10 +231,17 @@ same-repository Dependabot runs route like pushes, sourcing the observer key
 from the organization's Dependabot secrets store, while fork and public guards
 are unchanged and the key stays confined to the selector job. Until
 `CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
-keep falling back hosted (`missing-secret`), so rollout is fail-safe.
-Seven selector revisions remain approved for an ordered consumer rollout.
+keep falling back hosted (`missing-secret`), so rollout is fail-safe. The
+review-tier admission revision at `cdc5917c15aade1995bd810b60d818cadc635b52`
+adds `melodic-review-ubuntu-24.04-x64` to the strict `self-hosted-only`
+allowlist so a review-lane caller routes `claude-review` to the dedicated
+capped tier, while the selector control-plane job itself still runs on the
+default fleet label. A review lane must pin this revision: older approved
+revisions do not admit the review-tier label, and a `self-hosted-only` selector
+at an older pin fails closed on it (`unapproved-label`).
+Eight selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these four strict-scheduling
+owned by a different repository owner, so these five strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
