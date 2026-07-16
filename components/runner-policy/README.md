@@ -172,6 +172,12 @@ unknown secret names, and alternate expressions:
 
 - `runner-input` names the one canonical runner input. Unknown workflows,
   obsolete SHAs, omitted runner inputs, and extra inputs fail closed.
+  A contract may additionally name one exact `allowedCallerPermissions`
+  mapping when an independently reviewed immutable workflow needs a narrowly
+  scoped write-capable caller token. The caller's effective job permissions
+  must match every scope and access level exactly; missing scopes, additional
+  scopes, `write-all`, and access drift fail closed. Omitting this field keeps
+  the ordinary read-only local-workload boundary.
   A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
   and the matching `${{ needs.<selector>.result }}` mapping so a required gate
   can report every selector outcome without authorizing general workloads to
@@ -393,6 +399,15 @@ immutable `approvedReusableWorkflowContracts` entry. GitHub notes that actions
 can access `github.token` implicitly, so full-SHA action policy and least token
 permissions remain the actual boundary; banning only one equivalent spelling
 would add no isolation.
+
+A runner-input contract with `allowedCallerPermissions` may also carry only
+its exact reviewed named `secrets` mapping while using selector routing. After
+that mapping passes the reusable-workflow contract, the generic credential scan
+omits only the caller's `secrets` property. Secret expressions in `with`, `if`,
+workflow or job environment values, or any other caller field remain forbidden,
+as do transformed secret expressions and `secrets: inherit`. Deployment
+environments, credential-minting actions, job containers, and services retain
+their existing hosted-only rules.
 
 The policy also forbids `ubuntu-latest`, direct `self-hosted` use, owner-prefixed
 managed scale-set labels (including tiered and canary forms), unknown literal
