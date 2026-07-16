@@ -31,7 +31,7 @@ Where the data store itself runs on infrastructure physically dedicated to one t
 ## Tenant lifecycle
 
 - **Offboarding misses a store** — a change that adds a new place tenant data lives (a table, denormalized copy, search index, cache, blob container, queue, external-system record) without extending the tenant deletion or retention path to purge it. Residual data is both a legal-destruction failure and a latent exposure surface. The review action is diff-local: a new tenant-data store appears, so confirm the deletion path covers it. Critical ([Azure — tenant lifecycle](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenant-life-cycle)).
-- **Provisioning defaults** — onboarding that seeds a new tenant with global-scope access or another tenant's defaults. Important.
+- **Provisioning defaults** — onboarding that seeds a new tenant by copying a template or another tenant's defaults. Important where the copied default has no access implications; Critical where it carries global-scope or cross-tenant access — a default role that grants read or write outside the new tenant is the same cross-tenant break this file treats as Critical everywhere else, not a lesser onboarding-specific case.
 
 ## Boundaries
 
