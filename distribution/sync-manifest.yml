@@ -194,7 +194,9 @@ targets:
       - node-runtime
       - runner-policy
     locally-owned:
+      - agent-orientation
       - gitleaks
+      - review-instructions
   melodic-software/provisioning:
     managed:
       - agent-orientation

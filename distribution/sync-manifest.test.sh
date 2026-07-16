@@ -546,7 +546,18 @@ actual_agent_orientation_targets="$(
     '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'AGENTS.md reaches exactly the four enrolled private consumers (medley gated behind its migration path; ci-workflows is public and gets REVIEW.md only)' \
+assert_eq 'AGENTS.md reaches exactly the four whole-file-managed private consumers (medley reconciles locally instead; ci-workflows is public and gets REVIEW.md only)' \
   "$expected_agent_orientation_targets" "$actual_agent_orientation_targets"
+
+for component in agent-orientation review-instructions; do
+  assert_eq "medley locally-owns $component rather than whole-file-managing it" '1' \
+    "$(COMPONENT="$component" yq -r \
+      '[.targets."melodic-software/medley".locally-owned[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
+  assert_eq "medley's managed list does not also claim $component" '0' \
+    "$(COMPONENT="$component" yq -r \
+      '[.targets."melodic-software/medley".managed[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
+done
 
 [[ $FAILED -eq 0 ]] || exit 1
