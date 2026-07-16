@@ -39,9 +39,21 @@ for repo in claude-code-plugins dotfiles github-iac medley provisioning standard
 done
 assert_not_contains 'private raw-content URL is excluded' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/'
-for host in medium.com help.miro.com isdown.app www.npmjs.com; do
-  assert_not_contains "auth-walled host is excluded: $host" "$dump_out" "https://$host/"
-done
+assert_not_contains 'current Medium article is excluded' "$dump_out" \
+  'https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f'
+assert_not_contains 'current Miro article is excluded' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/31624028247058'
+assert_not_contains 'current IsDown page is excluded' "$dump_out" \
+  'https://isdown.app/status/anthropic'
+assert_not_contains 'current firecrawl-cli package page is excluded' "$dump_out" \
+  'https://www.npmjs.com/package/firecrawl-cli'
+assert_not_contains 'current Miro API package page is excluded' "$dump_out" \
+  'https://www.npmjs.com/package/@mirohq/miro-api'
+assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
+assert_contains 'another Miro help path remains checked' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/example'
+assert_contains 'another IsDown path remains checked' "$dump_out" 'https://isdown.app/status/example'
+assert_contains 'another npm package remains checked' "$dump_out" 'https://www.npmjs.com/package/example'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \
