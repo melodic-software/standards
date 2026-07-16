@@ -177,7 +177,12 @@ unknown secret names, and alternate expressions:
   scoped write-capable caller token. The caller's effective job permissions
   must match every scope and access level exactly; missing scopes, additional
   scopes, `write-all`, and access drift fail closed. Omitting this field keeps
-  the ordinary read-only local-workload boundary.
+  the ordinary read-only local-workload boundary. This waiver applies only
+  while the call's runner input is genuinely selector-routed; a caller that
+  instead pins a fixed hosted runner literal through the same input gets no
+  permission waiver and still needs proven hosted execution under the
+  `privileged-control-plane` exception category like any other write- or
+  `id-token`-capable job.
   A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
   and the matching `${{ needs.<selector>.result }}` mapping so a required gate
   can report every selector outcome without authorizing general workloads to

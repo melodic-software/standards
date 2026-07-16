@@ -1479,6 +1479,136 @@ ${SELECTOR}  review:
   assert.deepEqual(await audit(root), []);
 });
 
+test("the reviewed caller permission waiver applies only to selector-routed calls", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const permissions = `    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+`;
+
+  const selectorRouted = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(selectorRouted),
+    [],
+    "selector-routed call must still waive cleanly",
+  );
+
+  const fixedHostedNoException = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.ok(
+    (await audit(fixedHostedNoException)).some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-required" && message.includes("privileged-control-plane"),
+    ),
+    "fixed-hosted caller with write and id-token permissions must still demand a privileged-control-plane exception",
+  );
+
+  const fixedHostedWrongCategory = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/claude-review.yml#review": {
+        reason: "hosted-control-plane",
+        justification: "This intentionally exercises privilege-category validation.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(fixedHostedWrongCategory)).map(({ rule }) => rule),
+    ["hosted-exception-category"],
+    "a fixed-hosted write/id-token caller must not be satisfied by the weaker hosted-control-plane category",
+  );
+
+  const fixedHostedCorrectCategory = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/claude-review.yml#review": {
+        reason: "privileged-control-plane",
+        justification: "Fixed hosted claude-review caller retains write and id-token scopes.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      skip-actors: dependabot[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(fixedHostedCorrectCategory),
+    [],
+    "the exact privileged-control-plane category must clear the finding",
+  );
+});
+
 test("runner-input local permission boundary rejects every caller permission drift", async () => {
   for (const permissions of [
     "contents: read\n      pull-requests: write",

@@ -1714,7 +1714,9 @@ function credentialAction(job, policy) {
 function privilegedHostedRequirement(workflow, job, selector, target, policy, localCall) {
   const reusable = reusableWorkflowStatus(job, policy, workflow);
   const reviewedCallerPermissions =
-    reusable.approved && reusable.contract.allowedCallerPermissions !== undefined;
+    target?.kind === "selector-output" &&
+    reusable.approved &&
+    reusable.contract.allowedCallerPermissions !== undefined;
   const permissionRequirement =
     localCall?.approved || reviewedCallerPermissions
       ? undefined
