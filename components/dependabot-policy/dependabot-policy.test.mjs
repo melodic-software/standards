@@ -114,6 +114,65 @@ test("a cooldown below the floor is flagged", async () => {
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
 });
 
+test("a match-all cooldown exclude bypasses the soak and is flagged", async () => {
+  const entry = CONFORMANT.replace(
+    "    cooldown:\n      default-days: 7\n",
+    '    cooldown:\n      default-days: 7\n      exclude:\n        - "*"\n',
+  );
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
+});
+
+test("a cooldown include restricts the soak and is flagged", async () => {
+  const entry = CONFORMANT.replace(
+    "    cooldown:\n      default-days: 7\n",
+    '    cooldown:\n      default-days: 7\n      include:\n        - "some-dep"\n',
+  );
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
+});
+
+test("a narrow first-party cooldown exclude still passes", async () => {
+  const entry = CONFORMANT.replace(
+    "    cooldown:\n      default-days: 7\n",
+    '    cooldown:\n      default-days: 7\n      exclude:\n        - "melodic-software/*"\n',
+  );
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("a cooldown waiver also suppresses a bypassed soak", async () => {
+  const entry = CONFORMANT.replace(
+    "    cooldown:\n      default-days: 7\n",
+    '    cooldown:\n      default-days: 7\n      exclude:\n        - "*"\n',
+  );
+  const root = await repository({
+    dependabotYaml: dependabot(entry),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "npm:/": {
+          reason: "tracks-upstream-release",
+          justification: "This root intentionally opts out of the soak.",
+          waives: ["cooldown"],
+        },
+      },
+    },
+  });
+  assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("a version 2 config with no updates entries fails closed", async () => {
+  const noUpdates = await repository({ dependabotYaml: "version: 2\n" });
+  assert.deepEqual(rules(await auditRepository({ root: noUpdates })), [
+    ".github/dependabot.yml:updates-missing",
+  ]);
+  const nonArray = await repository({ dependabotYaml: "version: 2\nupdates:\n  foo: bar\n" });
+  assert.deepEqual(rules(await auditRepository({ root: nonArray })), [
+    ".github/dependabot.yml:updates-missing",
+  ]);
+});
+
 test("a missing groups block is flagged", async () => {
   const entry = `  - package-ecosystem: npm
     directory: /

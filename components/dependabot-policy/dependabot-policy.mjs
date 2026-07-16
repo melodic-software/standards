@@ -62,6 +62,7 @@ const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 const WAIVE_BY_RULE = {
   "schedule-not-standard": "schedule",
   "cooldown-below-minimum": "cooldown",
+  "cooldown-soak-bypassed": "cooldown",
   "groups-missing": "groups",
 };
 
@@ -173,6 +174,27 @@ function entryFindings(file, key, entry, policy) {
         `cooldown.default-days must be an integer >= ${policy.cooldownMinimumDays}, found ${JSON.stringify(cooldownDays ?? null)}`,
       ),
     );
+  } else {
+    // A default-days floor is only a soak if it actually applies. A match-all
+    // `exclude` skips the soak for every dependency, and an `include` list
+    // inverts the soak to opt-in, so both defeat the control. A narrow exclude
+    // (a fast-tracked first-party owner, say) still soaks everything else.
+    const exclude = entry.cooldown?.exclude;
+    const include = entry.cooldown?.include;
+    const matchAllExclude = Array.isArray(exclude) && exclude.includes("*");
+    const restrictiveInclude = Array.isArray(include) && include.length > 0;
+    if (matchAllExclude || restrictiveInclude) {
+      findings.push(
+        finding(
+          "cooldown-soak-bypassed",
+          file,
+          key,
+          matchAllExclude
+            ? 'cooldown.exclude contains the match-all pattern "*", so the soak applies to nothing'
+            : "cooldown.include restricts the soak to a subset, so most updates skip it",
+        ),
+      );
+    }
   }
   if (policy.requireGroups) {
     const groups = entry.groups;
@@ -253,6 +275,16 @@ export async function auditRepository({
     );
   }
   const updates = Array.isArray(dependabot.updates) ? dependabot.updates : [];
+  if (updates.length === 0) {
+    findings.push(
+      finding(
+        "updates-missing",
+        file,
+        undefined,
+        "dependabot config declares no updates entries, so no dependency-update policy is enforced",
+      ),
+    );
+  }
 
   // (entryKey, waivedRule) pairs that suppressed a real finding.
   const consumedWaives = new Set();
