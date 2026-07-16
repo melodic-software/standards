@@ -16,6 +16,7 @@ const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
+const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
@@ -1047,6 +1048,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
       `${SELECTOR_PATH}@${DEPENDABOT_ROUTING_SHA}`,
+      `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -1066,6 +1068,7 @@ test("production selector allowlist contains only independently reviewed commits
     LIVENESS_SELECTOR_SHA,
     SECURITY_HARDENING_SHA,
     DEPENDABOT_ROUTING_SHA,
+    REVIEW_TIER_SELECTOR_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
