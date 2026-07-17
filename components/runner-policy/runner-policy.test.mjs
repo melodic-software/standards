@@ -1924,7 +1924,7 @@ test("a local-routing grant admits exact named secrets and credential-minting ac
         permissions: { contents: "read", "id-token": "write" },
         environment: "github-iac-production",
         secrets: ["APP_PRIVATE_KEY"],
-        credentialActions: ["actions/create-github-app-token"],
+        credentialActions: [`actions/create-github-app-token@${SHA}`],
         justification: "The protected governance apply mints its App token on the managed fleet.",
       },
     },
@@ -1989,7 +1989,7 @@ test("a local-routing grant naming unexercised allowances is inventory drift", a
           permissions: { contents: "read", "id-token": "write" },
           environment: "github-iac-production",
           secrets: scenario.secrets,
-          credentialActions: ["actions/create-github-app-token"],
+          credentialActions: [`actions/create-github-app-token@${SHA}`],
           justification: "This intentionally exercises per-allowance drift detection.",
         },
       },
@@ -2110,6 +2110,22 @@ test("a local-routing grant rejects every privilege outside its exact reviewed t
       issues: write
     steps:
       - uses: actions/create-github-app-token@${SHA}
+        with:
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+`,
+    },
+    {
+      label: "credential-minting action at a ref outside the granted pin",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+        credentialActions: [`actions/create-github-app-token@${SHA}`],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/create-github-app-token@main
         with:
           private-key: \${{ secrets.APP_PRIVATE_KEY }}
 `,
@@ -2372,8 +2388,20 @@ test("contradictory, empty, or unrecognized local-routing grants fail configurat
         localRoutingGrants: {
           ".github/workflows/ci.yml#workload": {
             permissions: { contents: "read", issues: "write" },
-            credentialActions: ["actions/unknown-minter"],
+            credentialActions: [`actions/unknown-minter@${SHA}`],
             justification: "This intentionally names an unrecognized credential action.",
+          },
+        },
+      },
+    ],
+    [
+      /must name one literal deployment environment/,
+      {
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read", issues: "write" },
+            environment: `\${{ vars.DEPLOY_ENV }}`,
+            justification: "This intentionally names an expression-valued environment.",
           },
         },
       },
@@ -2392,6 +2420,16 @@ test("local-routing grant structure rejects malformed permission maps and fields
     { justification: "x" },
     { permissions: { issues: "write" }, secrets: [], justification: "x" },
     { permissions: { issues: "write" }, routing: "local", justification: "x" },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["actions/create-github-app-token"],
+      justification: "x",
+    },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["actions/create-github-app-token@main"],
+      justification: "x",
+    },
   ]) {
     const root = await repository({
       localRoutingGrants: { ".github/workflows/ci.yml#workload": grant },

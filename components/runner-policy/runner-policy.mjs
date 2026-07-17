@@ -328,6 +328,15 @@ function validateRepositoryConfig(value, policy) {
         `local-routing grant ${key} admits nothing beyond the ordinary read-only local boundary; declare a write permission, environment, secret, or credential action, or remove the grant`,
       );
     }
+    // GitHub evaluates expression-valued environment names (vars, needs,
+    // matrix contexts), so an expression could change the protected
+    // environment without any grant-inventory diff; only a literal name is
+    // an exact reviewed surface.
+    if (Object.hasOwn(grant, "environment") && grant.environment.includes("${{")) {
+      throw new ConfigurationError(
+        `local-routing grant ${key} must name one literal deployment environment, not an expression`,
+      );
+    }
     for (const name of grant.secrets ?? []) {
       if (name.toUpperCase() === "GITHUB_TOKEN") {
         throw new ConfigurationError(
@@ -335,7 +344,8 @@ function validateRepositoryConfig(value, policy) {
         );
       }
     }
-    for (const action of grant.credentialActions ?? []) {
+    for (const reference of grant.credentialActions ?? []) {
+      const action = reference.split("@", 1)[0];
       if (!policy.localCredentialActions.has(action)) {
         throw new ConfigurationError(
           `local-routing grant ${key} names credential action ${action}, which is not in policy.localCredentialActions`,
@@ -2784,15 +2794,18 @@ function privilegedHostedRequirement(
       if (uses === undefined) {
         continue;
       }
-      const action = uses.split("@", 1)[0].toLowerCase();
-      if (!(grantApplies && (grant.credentialActions ?? []).includes(action))) {
+      // A grant pins the full ref, not the action name: the same action at a
+      // different ref is different credential-minting code, which must not
+      // reach the fleet on a workflow-only change.
+      const reference = uses.toLowerCase();
+      if (!(grantApplies && (grant.credentialActions ?? []).includes(reference))) {
         return {
           reason: "privileged-control-plane",
-          description: `credential-minting action ${action}`,
+          description: `credential-minting action ${uses.split("@", 1)[0].toLowerCase()}`,
           rule: "privileged-hosted-only",
         };
       }
-      usedCredentialActions.add(action);
+      usedCredentialActions.add(reference);
     }
   }
 

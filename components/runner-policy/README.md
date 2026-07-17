@@ -527,15 +527,22 @@ otherwise require hosted execution. A grant is keyed by
 - `environment` (optional) — one exact deployment environment name the job
   must declare in plain string form. A differing name, a mapping-form or
   expression-valued environment, and an environment the grant does not name
-  all stay privileged-hosted.
+  all stay privileged-hosted; an expression-valued grant name itself fails
+  configuration, because GitHub evaluates environment expressions (`vars`,
+  `needs`, `matrix`) and the protected environment could then change without
+  a grant-inventory diff.
 - `secrets` (optional) — repository or organization secret names the job may
   reference, each only as the exact complete `${{ secrets.NAME }}` value of a
   job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
   here; transformed expressions, workflow-level env values, `run:`
   interpolation, and conditions stay privileged-hosted.
-- `credentialActions` (optional) — the `localCredentialActions` entries the
-  job's steps may invoke (for example `actions/create-github-app-token`).
-  Actions outside that central list cannot be granted.
+- `credentialActions` (optional) — full `owner/action@<40-hex-SHA>`
+  references the job's steps may invoke, whose action name must be a central
+  `localCredentialActions` entry (for example
+  `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
+  ref because a different ref of the same action is different
+  credential-minting code; a tag, branch, or other SHA stays
+  privileged-hosted, and actions outside the central list cannot be granted.
 
 A grant applies only while the job genuinely consumes the approved selector
 output under the unchanged cancellation-safe condition and literal-fallback
