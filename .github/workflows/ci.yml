@@ -778,8 +778,12 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - name: Check for machine-specific paths
+      - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
         uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        with:
+          exclude: ':(exclude)components/path-detection/**'
+      - name: Path-detection contract test
+        run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
 
   eol-renormalize:
     needs: select-runner
