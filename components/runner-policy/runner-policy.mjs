@@ -1128,6 +1128,25 @@ function credentialBearingEntries(mapping) {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+// Once a step is identified as credential-bearing (its condition, env, with,
+// or any other field such as `run:` holds a credential expression, or it
+// invokes a localCredentialActions entry), every field the diff records for
+// that step -- `other`, `env`, `with` -- switches from credentialBearingEntries'
+// filtered subset (only the entries that themselves contain a credential
+// expression) to the step's full normalized content. A candidate can keep an
+// already-reviewed credential expression byte-identical while rewriting the
+// step's `run:` body or swapping a non-localCredentialActions `uses:` action
+// to consume that same credential differently; neither change touches a
+// field that itself contains a credential expression, so the filtered subset
+// alone would stay unchanged and the diff would never see it. Recording the
+// full step once it is known to be credential-bearing closes that gap
+// without also treating every ordinary, non-credential-bearing step's
+// cosmetic changes as security-relevant. The credential-bearing gate itself
+// must check every field family (condition, env, with, the remaining step
+// body, and credentialAction) -- omitting one, e.g. a step whose only
+// credential expression lives directly in `run:` with no env/with block,
+// would drop that step out of the surface entirely instead of narrowing what
+// is recorded for it.
 function jobCredentialReferenceSurface(workflow, job, policy) {
   const { steps, if: jobCondition, ...jobWithoutSteps } = job;
   const stepEntries = Array.isArray(steps)
@@ -1138,21 +1157,29 @@ function jobCredentialReferenceSurface(workflow, job, policy) {
           }
           const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
           const credentialActionRef = credentialActionUses(step, policy);
-          const entry = {
-            condition: conditionContainsCredentialReference(stepCondition)
+          const conditionIsCredentialBearing = conditionContainsCredentialReference(stepCondition);
+          const isCredentialBearing =
+            conditionIsCredentialBearing ||
+            credentialBearingEntries(env) !== undefined ||
+            credentialBearingEntries(inputs) !== undefined ||
+            credentialBearingEntries(stepWithoutCredentialMappings) !== undefined ||
+            credentialActionRef !== undefined;
+          if (!isCredentialBearing) {
+            return undefined;
+          }
+          return {
+            index,
+            condition: conditionIsCredentialBearing
               ? normalizeStructuralValue(stepCondition)
               : undefined,
-            other: credentialBearingEntries(stepWithoutCredentialMappings),
-            env: credentialBearingEntries(env),
-            with: credentialBearingEntries(inputs),
+            other: normalizeStructuralValue(stepWithoutCredentialMappings),
+            env: normalizeStructuralValue(env),
+            with: normalizeStructuralValue(inputs),
             credentialAction:
               credentialActionRef !== undefined
                 ? normalizeStructuralValue(credentialActionRef)
                 : undefined,
           };
-          return Object.values(entry).some((value) => value !== undefined)
-            ? { index, ...entry }
-            : undefined;
         })
         .filter((entry) => entry !== undefined)
     : [];
