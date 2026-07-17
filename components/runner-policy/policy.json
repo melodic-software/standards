@@ -237,6 +237,49 @@
         "contents": "read",
         "issues": "write"
       }
+    },
+    "melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "selectorResultInput": "prerequisite-result",
+      "allowedInputs": ["runner", "prerequisite-result"],
+      "allowedSecrets": {}
+    },
+    "melodic-software/ci-workflows/.github/workflows/do-not-merge-gate.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "selectorResultInput": "prerequisite-result",
+      "allowedInputs": ["runner", "prerequisite-result", "label"],
+      "allowedSecrets": {}
+    },
+    "melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "selectorResultInput": "prerequisite-result",
+      "allowedInputs": ["runner", "prerequisite-result"],
+      "allowedSecrets": {}
+    },
+    "melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner"],
+      "allowedSecrets": {},
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "issues": "write"
+      }
+    },
+    "melodic-software/ci-workflows/.github/workflows/pester.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5": {
+      "routing": "hosted-only",
+      "allowedInputs": [
+        "run",
+        "pester-version",
+        "working-directory",
+        "sparse-checkout",
+        "sparse-checkout-cone-mode"
+      ],
+      "allowedSecrets": {},
+      "fixedRunsOn": ["windows-2025"]
     }
   },
   "canonicalSelectorInputs": {
