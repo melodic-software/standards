@@ -1258,15 +1258,21 @@ function malformedJobIds(workflow) {
 // arms race this analyzer will keep losing one finding at a time. Instead of
 // enumerating dangerous `needs` spellings, this check only recognizes
 // definitely-safe routing fields: ones that do not mention `needs` at all.
-// Any occurrence of the `needs` context followed by a property or index
-// accessor -- `needs.` or `needs[`, in any letter case (GitHub's expression
-// evaluator treats context and property names case-insensitively; see the
-// case-insensitive `NEEDS_REFERENCE` flag below) -- declines auto-approval
-// for that job, regardless of what follows. False positives (a routing field
-// that happens to mention `needs` but is not actually exploitable) are
-// accepted: they only cost a human review instead of an auto-approval, which
-// is the safe direction to err for a security gate.
-const NEEDS_REFERENCE = /\bneeds\b\s*[.[]/i;
+// Requiring a property or index accessor immediately after the word --
+// `needs.` or `needs[` -- is itself an enumeration of one dereference shape
+// and reopens the same gap: GitHub's expression functions can accept `needs`
+// as a bare argument and return a dereferenceable object, for example
+// `fromJSON(toJSON(needs)).pick.outputs.runner`, where the token immediately
+// following `needs` is the function's closing `)`, not `.` or `[`. The
+// catch-all therefore matches the bare `needs` word on its own, in any
+// letter case (GitHub's expression evaluator treats context and property
+// names case-insensitively; see the case-insensitive `NEEDS_REFERENCE` flag
+// below) -- declines auto-approval for that job regardless of what precedes
+// or follows the token. False positives (a routing field that happens to
+// mention `needs` but is not actually exploitable) are accepted: they only
+// cost a human review instead of an auto-approval, which is the safe
+// direction to err for a security gate.
+const NEEDS_REFERENCE = /\bneeds\b/i;
 
 function containsNeedsReference(value) {
   if (typeof value === "string") {

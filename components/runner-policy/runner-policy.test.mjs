@@ -576,6 +576,25 @@ const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE =
     '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
   );
 
+// Proves the catch-all matches the bare `needs` token itself, not only
+// `needs` immediately followed by `.` or `[`. GitHub's expression functions
+// can take `needs` as a bare argument and return a dereferenceable object,
+// e.g. `fromJSON(toJSON(needs)).pick.outputs.runner`: the token right after
+// `needs` is the function's closing `)`, so a detector that required an
+// immediate `.`/`[` accessor would miss this even though the routing field
+// still ultimately dereferences an unresolvable producer-side value.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "fromJSON(toJSON(needs)).pick.outputs.runner",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
   const declaration = [
     "  workflow_call:",
@@ -3529,6 +3548,12 @@ for (const [label, source, cosmeticSource] of [
 //   in a routing field is equally unresolvable through static surface
 //   diffing, and the old detector's required `.outputs` segment would have
 //   missed this one entirely, not merely spelled it differently.
+// - "function-wrapped needs reference" proves the catch-all matches the bare
+//   `needs` token itself rather than requiring an immediate `.`/`[`
+//   accessor: GitHub's expression functions can take `needs` as a bare
+//   argument (`fromJSON(toJSON(needs)).pick.outputs.runner`), so a detector
+//   that required `needs` to be immediately followed by a dereference
+//   accessor would miss this indirection entirely.
 for (const [label, source, cosmeticSource] of [
   [
     "object-filter output route",
@@ -3544,6 +3569,11 @@ for (const [label, source, cosmeticSource] of [
     "needs job-result reference (no outputs segment)",
     REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE,
     REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE,
+  ],
+  [
+    "function-wrapped needs reference",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE,
   ],
 ]) {
   test(`Dependabot SHA bump that routes through a ${label} is declined`, async () => {
