@@ -285,6 +285,14 @@ invalid_case 'unsafe traversal source' "$bad" 'unsafe source path'
 bad="${manifest/consumer.txt: consumer.txt/consumer.txt: .policy}"
 invalid_case 'destination ownership collision' "$bad" 'owned by both'
 
+# One canonical source MAY back multiple components (per-destination fan-out);
+# only destinations are single-owner.
+shared="${manifest/consumer.txt: consumer.txt/policy.txt: consumer-policy.txt}"
+shared_dir="$tmp_root/valid-shared-source"
+make_source "$shared_dir" "$shared"
+run_engine "$shared_dir" validate >/dev/null 2>&1
+assert_exit 'shared source across components validates' 0 "$?"
+
 bad="${manifest/policy.txt: .policy/policy.txt: path}"
 bad="${bad/consumer.txt: consumer.txt/consumer.txt: path\/child}"
 invalid_case 'destination file before child collision' "$bad" 'file/directory conflict'

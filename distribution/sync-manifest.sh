@@ -198,7 +198,7 @@ validate_manifest() {
   local root_key component key source destination existing_destination mode dependency target selected_component
   local has_requires has_local
   local -a root_keys component_keys file_sources dependencies target_keys managed locally_owned
-  local -A source_owner=() destination_owner=() selected=()
+  local -A destination_owner=() selected=()
 
   yq eval-all --exit-status '[.] | length == 1' "$MANIFEST_ABS" >/dev/null 2>&1 ||
     die 'manifest must be valid, single-document YAML'
@@ -289,8 +289,10 @@ validate_manifest() {
       if ! is_safe_repo_path "$destination"; then
         die "component '$component' has unsafe destination path '$destination'"
       fi
-      [[ -z "${source_owner[$source]+present}" ]] ||
-        die "source '$source' is owned by both '${source_owner[$source]}' and '$component'"
+      # A source MAY back multiple components: one canonical file fanning out
+      # to per-destination components (e.g. path-detection) is the manifest's
+      # own answer to consumers with different layouts. Destinations stay
+      # globally unique below — that is the write-conflict invariant.
       [[ -z "${destination_owner[$destination]+present}" ]] ||
         die "destination '$destination' is owned by both '${destination_owner[$destination]}' and '$component'"
       for existing_destination in "${!destination_owner[@]}"; do
@@ -299,7 +301,6 @@ validate_manifest() {
           die "destination '$destination' in '$component' has a file/directory conflict with '$existing_destination' in '${destination_owner[$existing_destination]}'"
         fi
       done
-      source_owner["$source"]="$component"
       destination_owner["$destination"]="$component"
       mode="$(tracked_regular_mode "$SOURCE_ROOT" "$source" "component '$component' source")"
       SOURCE_MODES["$source"]="$mode"
