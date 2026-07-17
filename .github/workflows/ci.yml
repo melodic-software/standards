@@ -856,7 +856,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
 
   ci-status:
-    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
+    if: ${{ !cancelled() }}
     permissions: {}
     needs:
       - select-runner

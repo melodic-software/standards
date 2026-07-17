@@ -32,7 +32,7 @@ jobs:
 
   pr-title:
     needs: select-runner
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     permissions:
       pull-requests: read
     uses: melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@51012e2c7b8bf74bc26e08c6446b488254a8770f # 51012e2 2026-07-12

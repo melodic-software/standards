@@ -1,12 +1,14 @@
 name: do-not-merge
 
 # Standalone required check that blocks merge while the PR carries the
-# `do-not-merge` label (the reusable's default). It reads PR label metadata only
-# and checks out no head code, so it stays on the pull_request event. The
-# emitted required-check context is `do-not-merge / do-not-merge`.
+# `do-not-merge` label (the reusable's default). It runs on pull_request_target
+# so the base-branch definition gates and a head-branch edit cannot neuter it; it
+# reads PR label metadata only and checks out no head code. The emitted
+# required-check context is `do-not-merge / do-not-merge`.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled]
+  merge_group:
 
 permissions:
   pull-requests: read
@@ -31,7 +33,7 @@ jobs:
 
   do-not-merge:
     needs: select-runner
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     permissions:
       pull-requests: read
     uses: melodic-software/ci-workflows/.github/workflows/do-not-merge-gate.yml@885302176345486ca6c2c392d83131f9b5389251 # 8853021 2026-07-16

@@ -26,27 +26,11 @@ permissions:
   contents: read
 
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@cdc5917c15aade1995bd810b60d818cadc635b52 # cdc5917 2026-07-16
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   sync:
-    needs: select-runner
-    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
     # Real runs attest App access for the complete unfiltered manifest before
     # mutation; `targets` limits reconciliation only, never attestation.
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@3dfb18452a8c6059a22e62456390d84feb10b42f # 3dfb184 2026-07-16
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@35f2684ac953794b854bac1959df00e74eeca1d9 # 35f2684 2026-07-15
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
       # Schedule and push run for real (inputs is empty on those events, so
       # `|| false` makes them real runs); manual dispatch keeps its dry-run
       # preview default. Do NOT flip to `== 'schedule'` — that inverts it and
