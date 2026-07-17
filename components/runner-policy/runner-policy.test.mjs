@@ -1934,6 +1934,49 @@ ${SELECTOR}  workload:
   );
 });
 
+test("a local-routing grant never applies to a reusable-call job", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner", "skip-actors"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    localRoutingGrants: {
+      ".github/workflows/claude-review.yml#review": {
+        permissions: { contents: "read", "pull-requests": "write", "id-token": "write" },
+        justification: "This intentionally exercises the directly-declared-job scope.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift", "privileged-hosted-only"],
+    "a caller's write permissions must stay behind allowedCallerPermissions, never a repository grant",
+  );
+});
+
 test("an unused local-routing grant is inventory drift", async () => {
   const missingJob = await repository({
     localRoutingGrants: {

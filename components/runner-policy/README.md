@@ -520,6 +520,11 @@ A grant applies only while the job genuinely consumes the approved selector
 output under the unchanged cancellation-safe condition and literal-fallback
 contract; a fixed hosted target keeps the ordinary privileged exception
 inventory, and job/service containers remain structurally hosted regardless.
+A reusable-call (`uses:`) job never takes the grant path: its caller
+permissions flow into an external workflow whose behavior at the pinned SHA
+only the central contract review sees, so `allowedCallerPermissions` remains
+the sole write-capable waiver for callers and a grant keyed to such a job
+fails as `local-routing-grant-drift`.
 One key cannot carry both an exception and a grant, a grant that admits
 nothing beyond the ordinary read-only boundary fails configuration, and an
 unconsumed grant fails as `local-routing-grant-drift`, exactly like exception

@@ -2574,10 +2574,16 @@ function privilegedHostedRequirement(workflow, job, selector, target, policy, lo
   // write-capable waiver, and secret-capable runner-input contracts decline
   // auto-approval so every new SHA of such a workflow is human-reviewed.
   const reviewedSecretBoundary = target?.kind === "selector-output" && reusable.approved;
-  // A local-routing grant admits only a genuinely selector-routed job: a
-  // fixed hosted target keeps the ordinary privileged rules and exception
-  // inventory, mirroring the allowedCallerPermissions waiver's scope.
-  const grantApplies = grant !== undefined && target?.kind === "selector-output";
+  // A local-routing grant admits only a directly declared, genuinely
+  // selector-routed job: a fixed hosted target keeps the ordinary privileged
+  // rules and exception inventory, mirroring the allowedCallerPermissions
+  // waiver's scope. A reusable-call job never takes the grant path — its
+  // caller permissions flow into an external workflow whose behavior at the
+  // pinned SHA only the central contract review sees, so
+  // allowedCallerPermissions stays the sole write-capable waiver for callers
+  // and a grant keyed to such a job surfaces as local-routing-grant-drift.
+  const grantApplies =
+    grant !== undefined && target?.kind === "selector-output" && typeof job.uses !== "string";
   if (grantApplies) {
     const permissionError = exactCanonicalMap(
       effectivePermissions(workflow, job),
@@ -2981,7 +2987,13 @@ export async function auditRepository({
         ? privilegedHostedRequirement(workflow, job, selector, target, policy, localCall, grant)
         : undefined;
       const hostedRequirement = privilegedHosted ?? structuralHostedRequirement(job);
-      if (grant && routingEnabled && target?.kind === "selector-output" && !hostedRequirement) {
+      if (
+        grant &&
+        routingEnabled &&
+        target?.kind === "selector-output" &&
+        typeof job.uses !== "string" &&
+        !hostedRequirement
+      ) {
         consumedLocalRoutingGrants.add(key);
       }
       let hasForbiddenHostedLabel = false;
