@@ -9,6 +9,7 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 | [domain-driven-design.md](domain-driven-design.md) | tactical patterns (entities, value objects, aggregates, repositories) and ubiquitous language |
 | [naming.md](naming.md) | verbose behavior-naming, name-by-responsibility, disambiguating overloaded terms |
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |
+| [concise-prose.md](concise-prose.md) | removing prose overhead without losing meaning, force, or clarity |
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
