@@ -200,6 +200,19 @@ function validatePolicy(value) {
           }
         }
       }
+      // Every runner-input contract's reviewed secret mapping feeds a
+      // selector-routed caller whose secrets: block the generic credential
+      // scan then trusts, so each value must be one exact whole named-secret
+      // expression (the workflow_call input name may differ from the
+      // repository secret name) — a transformed or indirect expression would
+      // ride the reviewed boundary onto the fleet.
+      for (const [name, expression] of Object.entries(contract.allowedSecrets)) {
+        if (typeof expression !== "string" || !EXACT_NAMED_SECRET_EXPRESSION.test(expression)) {
+          throw new ConfigurationError(
+            `reusable workflow contract ${reference}.allowedSecrets.${name} must be exactly one whole \${{ secrets.<NAME> }} expression`,
+          );
+        }
+      }
     } else {
       const unknownLabel = contract.fixedRunsOn.find(
         (label) => !knownGitHubHostedRunnerLabels.has(label.toLowerCase()),

@@ -3257,6 +3257,32 @@ test("privileged reusable contracts accept only direct same-name secret mappings
   }
 });
 
+test("every runner-input contract accepts only whole named-secret mapping values", async () => {
+  for (const expression of [
+    `\${{ toJSON(secrets) }}`,
+    `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}-suffix`,
+    `prefix-\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: ["runner"],
+            allowedSecrets: { CLAUDE_CODE_OAUTH_TOKEN: expression },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      () => audit(root),
+      /allowedSecrets\.CLAUDE_CODE_OAUTH_TOKEN must be exactly/,
+      expression,
+    );
+  }
+});
+
 test("privileged reusable contracts use only official permission scope access values", async () => {
   for (const allowedCallerPermissions of [
     { "future-scope": "write" },
