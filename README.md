@@ -52,7 +52,8 @@ orphan catalog component.
 
 `components/runner-policy/` owns the YAML-aware GitHub Actions routing contract:
 public work remains hosted, enrolled private jobs use only an approved selector,
-and every hosted exception is explicit machine-readable inventory.
+and every hosted exception and privileged local-routing grant is explicit
+machine-readable inventory.
 
 `components/go-analysis/` owns the exact golangci-lint v2 analyzer allowlist and
 suppression contract. The root `.golangci.yml` is its canonical exported policy;

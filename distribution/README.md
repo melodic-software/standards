@@ -152,10 +152,12 @@ Repository-specific adoption remains a separate consumer change. Each target
 must add all of the following in the same integration PR:
 
 1. A locally owned `.github/runner-policy.json` with correct visibility,
-   enrollment, and exact job exceptions. A hosted-only consumer uses
-   `selfHostedCi: false` and `exceptions: {}`; because selector routing is
-   disabled, fixed approved hosted targets need no exception and the analyzer
-   rejects every unconsumed entry as `exception-inventory-drift`.
+   enrollment, and exact job exception and local-routing-grant inventory. A
+   hosted-only consumer uses `selfHostedCi: false` and `exceptions: {}`;
+   because selector routing is disabled, fixed approved hosted targets need no
+   exception and the analyzer rejects every unconsumed entry as
+   `exception-inventory-drift` (grants likewise fail as
+   `local-routing-grant-drift`).
 2. A fixed `ubuntu-24.04` hosted CI job that runs
    `npm ci --prefix .github/standards/runner-policy`, then invokes
    `node .github/standards/runner-policy/runner-policy.mjs --root .` with
@@ -167,8 +169,8 @@ must add all of the following in the same integration PR:
    only inventory and a mismatch tripwire.
 3. An npm Dependabot entry with
    `directory: /.github/standards/runner-policy` for the distributed lockfile.
-4. Workflow routing and exception inventory that pass the gate at the reviewed
-   selector/reusable-workflow SHA in the distributed `policy.json`.
+4. Workflow routing, exception, and grant inventory that pass the gate at the
+   reviewed selector/reusable-workflow SHA in the distributed `policy.json`.
 
 Selector-dependent direct jobs and ordinary reusable callers use the recovery
 contract: `if: ${{ !cancelled() }}` (safely conjoined with any existing

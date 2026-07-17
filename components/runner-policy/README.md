@@ -188,6 +188,14 @@ unknown secret names, and alternate expressions:
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
   `id-token`-capable job.
+  A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
+  is secret-capable on its own: a statically read-only caller may forward
+  exactly that named secret mapping while selector-routed, because the
+  immutable contract — not the caller — owns the secret boundary, the same
+  way a hosted-only contract's mapping does. The caller's permissions keep
+  the ordinary explicit read-only requirement unless the contract also names
+  `allowedCallerPermissions`, and every secret-capable runner-input contract
+  is excluded from the Dependabot auto-approval extension below.
   A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
   and the matching `${{ needs.<selector>.result }}` mapping so a required gate
   can report every selector outcome without authorizing general workloads to
@@ -277,21 +285,23 @@ contract is trusted for a fail-closed guarantee — that the called workflow's
 own steps still honor the forwarded `needs.<selector>.result` — which sits
 entirely outside the compared workflow_call/permissions/routing/credential
 surface, so a bump could silently defeat it without moving anything this
-diff inspects. Third, a reviewed contract with `allowedCallerPermissions`
-declines the same way: the privileged caller grant is trusted for what the
-called workflow's steps do with it, and step bodies sit outside the
-compared surface. Fourth, a called workflow containing any commit-relative
-`uses:` reference — a job-level `./.github/workflows/<file>.yml` nested
-reusable workflow or a step-level `./…` local action — declines
-auto-approval on both the candidate and every reviewed basis: GitHub
-resolves the `./` prefix from the same commit as the file that contains it,
-so a SHA bump changes what a byte-identical reference resolves to (the
-nested workflow's runners and secrets, the local action's executable
-content) without moving anything the single fetched workflow file shows. A
-nested workflow could in principle be fetched and recursively diffed, but a
-local action is an arbitrary directory of executable content no single-file
-fetch can prove unchanged. All of these fail closed with a specific
-diagnostic and require a human to add a new contract entry.
+diff inspects. Third, for that same unobservable-trust reason, a reviewed
+contract carrying `allowedCallerPermissions`, and likewise any secret-capable
+runner-input contract (one whose reviewed `allowedSecrets` mapping is
+nonempty), declines unconditionally: each is trusted for what the called
+workflow's steps do with a privileged caller grant or a forwarded caller
+secret, content the compared surface never inspects. Fourth, a called
+workflow containing any commit-relative `uses:` reference — a job-level
+`./.github/workflows/<file>.yml` nested reusable workflow or a step-level
+`./…` local action — declines auto-approval on both the candidate and every
+reviewed basis: GitHub resolves the `./` prefix from the same commit as the
+file that contains it, so a SHA bump changes what a byte-identical reference
+resolves to (the nested workflow's runners and secrets, the local action's
+executable content) without moving anything the single fetched workflow file
+shows. A nested workflow could in principle be fetched and recursively
+diffed, but a local action is an arbitrary directory of executable content
+no single-file fetch can prove unchanged. All of these fail closed with a
+specific diagnostic and require a human to add a new contract entry.
 
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every
@@ -501,6 +511,57 @@ container similarly requires `service-container`. When both are present,
 hosted; it never authorizes selector output or a reusable `inputs.runner` value
 for these structurally excluded jobs.
 
+`localRoutingGrants` is the reviewed inventory for the opposite direction: it
+admits one directly declared, genuinely selector-routed job to the managed
+fleet while that job holds an exactly pinned privilege surface that would
+otherwise require hosted execution. A grant is keyed by
+`<workflow path>#<job id>`, requires a non-empty `justification`, and names:
+
+- `permissions` — the complete effective `GITHUB_TOKEN` mapping the job must
+  declare, compared exactly per scope and access level. Shorthands
+  (`read-all`, `write-all`), omitted declarations, missing scopes, extra
+  scopes, and access drift all fail closed. Pinning the map also admits the
+  exact GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or `${{ github.token }}`
+  expression as a complete job- or step-level `env`/`with` value, which the
+  ordinary boundary reserves for statically read-only jobs.
+- `environment` (optional) — one exact deployment environment name the job
+  must declare in plain string form. A differing name, a mapping-form or
+  expression-valued environment, and an environment the grant does not name
+  all stay privileged-hosted; an expression-valued grant name itself fails
+  configuration, because GitHub evaluates environment expressions (`vars`,
+  `needs`, `matrix`) and the protected environment could then change without
+  a grant-inventory diff.
+- `secrets` (optional) — repository or organization secret names the job may
+  reference, each only as the exact complete `${{ secrets.NAME }}` value of a
+  job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
+  here; transformed expressions, workflow-level env values, `run:`
+  interpolation, and conditions stay privileged-hosted.
+- `credentialActions` (optional) — full `owner/action@<40-hex-SHA>`
+  references the job's steps may invoke, whose action name must be a central
+  `localCredentialActions` entry (for example
+  `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
+  ref because a different ref of the same action is different
+  credential-minting code; a tag, branch, or other SHA stays
+  privileged-hosted, and actions outside the central list cannot be granted.
+
+A grant applies only while the job genuinely consumes the approved selector
+output under the unchanged cancellation-safe condition and literal-fallback
+contract; a fixed hosted target keeps the ordinary privileged exception
+inventory, and job/service containers remain structurally hosted regardless.
+A reusable-call (`uses:`) job never takes the grant path: its caller
+permissions flow into an external workflow whose behavior at the pinned SHA
+only the central contract review sees, so `allowedCallerPermissions` remains
+the sole write-capable waiver for callers and a grant keyed to such a job
+fails as `local-routing-grant-drift`.
+One key cannot carry both an exception and a grant, a grant that admits
+nothing beyond the ordinary read-only boundary fails configuration, and an
+unconsumed grant fails as `local-routing-grant-drift`, exactly like exception
+inventory drift. The same drift rule reports a consumed grant whose named
+secret or credential-action allowances the job does not actually exercise:
+an unexercised allowance is latent pre-approval a later workflow-only change
+could start consuming without any grant-inventory diff, so the admitted
+surface and the reviewed inventory must stay exactly equal.
+
 For an enrolled private repository, effective `GITHUB_TOKEN` permissions follow
 GitHub's workflow-then-job precedence: a job-level declaration replaces the
 workflow declaration, and omitted permissions in a mapping become `none`.
@@ -510,8 +571,10 @@ policy cannot prove it read-only. Every directly selector-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
-`privileged-control-plane` exception. A full-SHA action does not weaken this
-rule because an action can obtain `github.token` implicitly.
+`privileged-control-plane` exception, unless the repository pins that job's
+exact effective mapping in a `localRoutingGrants` entry as described above. A
+full-SHA action does not weaken this rule because an action can obtain
+`github.token` implicitly.
 
 For repository-local reusable calls, GitHub passes the caller's permission
 grant into the called workflow and nested calls can only keep or reduce it. The
@@ -525,7 +588,9 @@ provably narrows it.
 
 Local-routable workload jobs also reject deployment environments, explicit
 credential expressions, and credential-minting actions listed in
-`localCredentialActions`. The only workload credential exception is the exact
+`localCredentialActions`, unless the repository's `localRoutingGrants` entry
+for that exact job names them as described above. Absent a grant, the only
+workload credential exception is the exact
 GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or functionally equivalent
 `${{ github.token }}` as a complete step-level `env`/`with` value under
 statically read-only effective permissions. Workflow/job environment values,
@@ -538,10 +603,12 @@ can access `github.token` implicitly, so full-SHA action policy and least token
 permissions remain the actual boundary; banning only one equivalent spelling
 would add no isolation.
 
-A runner-input contract with `allowedCallerPermissions` may also carry only
-its exact reviewed named `secrets` mapping while using selector routing. After
-that mapping passes the reusable-workflow contract, the generic credential scan
-omits only the caller's `secrets` property. Secret expressions in `with`, `if`,
+Any approved selector-routed runner-input call may carry only its exact
+reviewed named `secrets` mapping, with or without `allowedCallerPermissions`.
+After that mapping passes the reusable-workflow contract, the generic
+credential scan omits only the caller's `secrets` property; the caller's own
+permissions still require the explicit read-only boundary unless the contract
+names `allowedCallerPermissions`. Secret expressions in `with`, `if`,
 workflow or job environment values, or any other caller field remain forbidden,
 as do transformed secret expressions and `secrets: inherit`. Deployment
 environments, credential-minting actions, job containers, and services retain
