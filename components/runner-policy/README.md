@@ -207,7 +207,9 @@ structurally diffs their security-relevant surface — the presence and validity
 of `on.workflow_call`, workflow- and effective job-level `permissions`,
 `on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
 runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
-execution boundaries (`container`, `services`, and `environment`), whether
+execution boundaries (`container`, `services`, `environment`, and workflow-
+and job-level run `defaults`, whose shell and working-directory change how
+every byte-identical `run:` step executes), whether
 any job trips the same privileged-control-plane credential detection already
 enforced against every directly declared or repository-local job (deployment
 environments, unapproved credential expressions, and `localCredentialActions`

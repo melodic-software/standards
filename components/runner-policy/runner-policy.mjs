@@ -1005,8 +1005,14 @@ function jobPermissionsSurface(workflow) {
 // routing contract (runner-input or hosted-only), so the candidate's actual
 // runner boundary is part of its security surface: a bumped SHA that keeps the
 // same workflow_call inputs/secrets and permissions but changes jobs.*.runs-on,
-// a matrix strategy, a nested reusable call, a container/service, or a
-// deployment environment must not be silently auto-approved.
+// a matrix strategy, a nested reusable call, a container/service, a
+// deployment environment, or run defaults must not be silently
+// auto-approved. Workflow- and job-level `defaults` belong here even though
+// they hold no credential and route nothing themselves:
+// `defaults.run.shell` and `defaults.run.working-directory` change the
+// interpreter and working directory GitHub applies to every `run:` step, so
+// a byte-identical step body can execute differently under a bumped SHA
+// that only edits `defaults`.
 function declaredValueSurface(mapping, key) {
   return Object.hasOwn(mapping, key)
     ? { declared: true, value: normalizeStructuralValue(mapping[key]) }
@@ -1035,6 +1041,7 @@ function jobRoutingSurface(workflow) {
             container: declaredValueSurface(job, "container"),
             services: declaredValueSurface(job, "services"),
             environment: declaredValueSurface(job, "environment"),
+            defaults: declaredValueSurface(job, "defaults"),
           },
         },
       ])
@@ -1253,6 +1260,7 @@ function reusableWorkflowSecuritySurface(workflow, policy) {
     permissions: normalizePermissionsSurface(workflow.permissions),
     inputs: normalizeDeclarationSurface(declaration.inputs),
     secrets: normalizeDeclarationSurface(declaration.secrets),
+    defaults: declaredValueSurface(workflow, "defaults"),
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),
     credentials: jobCredentialSurface(workflow, policy),
@@ -1363,6 +1371,7 @@ const DYNAMIC_ROUTING_FIELDS = [
   "container",
   "services",
   "environment",
+  "defaults",
 ];
 
 function dynamicRoutingReferenceJobIds(workflow) {
@@ -1432,6 +1441,7 @@ function securitySurfaceDiffField(basis, candidate) {
     "permissions",
     "inputs",
     "secrets",
+    "defaults",
     "jobPermissions",
     "routing",
     "credentials",

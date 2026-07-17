@@ -596,6 +596,112 @@ jobs:
       - uses: ./.github/actions/scan-setup
 `;
 
+// GitHub applies workflow- and job-level `defaults.run` (shell,
+// working-directory) to every `run:` step, so a bump that edits only
+// `defaults` makes byte-identical credential-bearing step bodies execute
+// under a different interpreter or working directory. Neither field holds a
+// credential expression or routes anything itself, so a surface recording
+// only credential-bearing values and routing fields never sees the change.
+const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE.replace(
+    "    shell: bash",
+    "    shell: bash\n    working-directory: untrusted",
+  );
+
+const REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE.replace(
+    "        shell: bash",
+    "        shell: bash\n        working-directory: untrusted",
+  );
+
+// Job-level defaults.run accepts expressions that can dereference `needs`,
+// so a byte-identical defaults declaration can resolve to a different
+// working directory when the producing job's output changes underneath it --
+// the same indirection the needs catch-all already declines for every other
+// routing-relevant field.
+const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  pick:
+    runs-on: ubuntu-24.04
+    outputs:
+      dir: \${{ steps.pick.outputs.dir }}
+    steps:
+      - id: pick
+        run: echo "dir=safe" >> "$GITHUB_OUTPUT"
+  scan:
+    needs: pick
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: \${{ needs.pick.outputs.dir }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -4233,6 +4339,95 @@ test("Dependabot SHA bump is declined when the previously reviewed basis uses a 
     new RegExp(
       `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job nested uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
     ),
+  );
+});
+
+// Regression test for a gap where workflow-level `defaults` sat outside
+// every compared surface field. GitHub applies `defaults.run.shell` and
+// `defaults.run.working-directory` to every `run:` step, so a bump editing
+// only `defaults` executes a byte-identical credential-bearing step body
+// under a different interpreter or working directory while the whole
+// recorded surface stays unchanged.
+test("Dependabot SHA bump that changes workflow-level run defaults is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: defaults changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+// Job-level defaults are the same execution-semantics surface scoped to one
+// job; they are compared as part of that job's execution boundary.
+test("Dependabot SHA bump that changes job-level run defaults is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+test("Dependabot SHA bump that resolves run defaults through a needs indirection is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
   );
 });
 
