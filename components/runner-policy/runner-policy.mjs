@@ -1005,8 +1005,14 @@ function jobPermissionsSurface(workflow) {
 // routing contract (runner-input or hosted-only), so the candidate's actual
 // runner boundary is part of its security surface: a bumped SHA that keeps the
 // same workflow_call inputs/secrets and permissions but changes jobs.*.runs-on,
-// a matrix strategy, a nested reusable call, a container/service, or a
-// deployment environment must not be silently auto-approved.
+// a matrix strategy, a nested reusable call, a container/service, a
+// deployment environment, or run defaults must not be silently
+// auto-approved. Workflow- and job-level `defaults` belong here even though
+// they hold no credential and route nothing themselves:
+// `defaults.run.shell` and `defaults.run.working-directory` change the
+// interpreter and working directory GitHub applies to every `run:` step, so
+// a byte-identical step body can execute differently under a bumped SHA
+// that only edits `defaults`.
 function declaredValueSurface(mapping, key) {
   return Object.hasOwn(mapping, key)
     ? { declared: true, value: normalizeStructuralValue(mapping[key]) }
@@ -1035,6 +1041,7 @@ function jobRoutingSurface(workflow) {
             container: declaredValueSurface(job, "container"),
             services: declaredValueSurface(job, "services"),
             environment: declaredValueSurface(job, "environment"),
+            defaults: declaredValueSurface(job, "defaults"),
           },
         },
       ])
@@ -1159,8 +1166,31 @@ function credentialBearingEntries(mapping) {
 // credential expression lives directly in `run:` with no env/with block,
 // would drop that step out of the surface entirely instead of narrowing what
 // is recorded for it.
+//
+// Per-step gating is sound only while a credential can reach a step
+// exclusively through that step's own fields. A workflow- or job-scope
+// `env:` entry such as `TOKEN: ${{ secrets.X }}` breaks that assumption:
+// GitHub exports it to the runner process environment for every step in the
+// job, so a step whose body reads `$TOKEN` contains no credential
+// expression of its own and falls outside the filtered surface entirely. A
+// bumped SHA could then rewrite that step's body, or a sibling env value
+// that decides where the credential goes (an upload URL, an API host),
+// while every recorded field stayed byte-identical. When any credential
+// expression appears in workflow-level env or anywhere in the job outside
+// its steps, the whole job therefore switches to full recording: the
+// complete workflow env (sibling values included), the complete job mapping
+// outside steps, the job condition, and every step in full. The
+// inheritedCredentialContext flag is itself part of the recorded surface so
+// a bump that merely moves a job across that boundary can never compare
+// equal. Every recorded step also records its declared `if:` condition even
+// when the condition references no credential: the condition decides
+// whether an already credential-capable step runs at all, and it is the one
+// step field full recording would otherwise drop (it is destructured out of
+// `other`).
 function jobCredentialReferenceSurface(workflow, job, policy) {
   const { steps, if: jobCondition, ...jobWithoutSteps } = job;
+  const inheritedCredentialContext =
+    containsCredentialExpression(workflow.env) || containsCredentialExpression(jobWithoutSteps);
   const stepEntries = Array.isArray(steps)
     ? steps
         .map((step, index) => {
@@ -1169,9 +1199,9 @@ function jobCredentialReferenceSurface(workflow, job, policy) {
           }
           const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
           const credentialActionRef = credentialActionUses(step, policy);
-          const conditionIsCredentialBearing = conditionContainsCredentialReference(stepCondition);
           const isCredentialBearing =
-            conditionIsCredentialBearing ||
+            inheritedCredentialContext ||
+            conditionContainsCredentialReference(stepCondition) ||
             credentialBearingEntries(env) !== undefined ||
             credentialBearingEntries(inputs) !== undefined ||
             credentialBearingEntries(stepWithoutCredentialMappings) !== undefined ||
@@ -1181,9 +1211,8 @@ function jobCredentialReferenceSurface(workflow, job, policy) {
           }
           return {
             index,
-            condition: conditionIsCredentialBearing
-              ? normalizeStructuralValue(stepCondition)
-              : undefined,
+            condition:
+              stepCondition === undefined ? undefined : normalizeStructuralValue(stepCondition),
             other: normalizeStructuralValue(stepWithoutCredentialMappings),
             env: normalizeStructuralValue(env),
             with: normalizeStructuralValue(inputs),
@@ -1196,11 +1225,17 @@ function jobCredentialReferenceSurface(workflow, job, policy) {
         .filter((entry) => entry !== undefined)
     : [];
   return {
-    workflowEnv: credentialBearingEntries(workflow.env),
-    jobCondition: conditionContainsCredentialReference(jobCondition)
-      ? normalizeStructuralValue(jobCondition)
-      : undefined,
-    job: credentialBearingEntries(jobWithoutSteps),
+    inheritedCredentialContext,
+    workflowEnv: inheritedCredentialContext
+      ? normalizeStructuralValue(workflow.env)
+      : credentialBearingEntries(workflow.env),
+    jobCondition:
+      inheritedCredentialContext || conditionContainsCredentialReference(jobCondition)
+        ? normalizeStructuralValue(jobCondition)
+        : undefined,
+    job: inheritedCredentialContext
+      ? normalizeStructuralValue(jobWithoutSteps)
+      : credentialBearingEntries(jobWithoutSteps),
     steps: stepEntries,
   };
 }
@@ -1225,6 +1260,7 @@ function reusableWorkflowSecuritySurface(workflow, policy) {
     permissions: normalizePermissionsSurface(workflow.permissions),
     inputs: normalizeDeclarationSurface(declaration.inputs),
     secrets: normalizeDeclarationSurface(declaration.secrets),
+    defaults: declaredValueSurface(workflow, "defaults"),
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),
     credentials: jobCredentialSurface(workflow, policy),
@@ -1335,6 +1371,7 @@ const DYNAMIC_ROUTING_FIELDS = [
   "container",
   "services",
   "environment",
+  "defaults",
 ];
 
 function dynamicRoutingReferenceJobIds(workflow) {
@@ -1355,12 +1392,56 @@ function dynamicRoutingReferenceJobIds(workflow) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+// GitHub resolves every `uses:` reference that starts with `./` from the
+// same commit as the workflow file that contains it: a job-level
+// `./.github/workflows/<file>.yml` nested reusable workflow and a
+// step-level `./path/to/action` local action both change content when the
+// source repository moves to a new SHA even though the reference string
+// itself stays byte-identical. This diff only ever fetches the one workflow
+// file being compared, so a bumped SHA can change the nested workflow's
+// runners or secrets, or the local action's executable content, while every
+// compared field of the caller stays identical and the candidate silently
+// inherits the reviewed contract. A nested workflow could in principle be
+// fetched and diffed recursively, but a local action cannot: it is an
+// arbitrary directory of executable content (action metadata, scripts,
+// bundled JavaScript) with no single canonical file this fetcher could
+// prove unchanged. Any commit-relative reference, on either the candidate
+// or a reviewed basis, therefore makes the revision ineligible for
+// surface-diff auto-approval and requires a human contract entry instead.
+function localReferenceJobIds(workflow) {
+  const jobs =
+    workflow.jobs !== null && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+      ? workflow.jobs
+      : {};
+  return Object.keys(jobs)
+    .filter((jobId) => {
+      const job = jobs[jobId];
+      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+        return false;
+      }
+      if (typeof job.uses === "string" && job.uses.startsWith("./")) {
+        return true;
+      }
+      const steps = Array.isArray(job.steps) ? job.steps : [];
+      return steps.some(
+        (step) =>
+          step !== null &&
+          typeof step === "object" &&
+          !Array.isArray(step) &&
+          typeof step.uses === "string" &&
+          step.uses.startsWith("./"),
+      );
+    })
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function securitySurfaceDiffField(basis, candidate) {
   for (const key of [
     "workflowCall",
     "permissions",
     "inputs",
     "secrets",
+    "defaults",
     "jobPermissions",
     "routing",
     "credentials",
@@ -1517,6 +1598,14 @@ async function resolveAutoApprovedContracts({
       );
       continue;
     }
+    const localReferenceCandidateJobs = localReferenceJobIds(candidateWorkflow);
+    if (localReferenceCandidateJobs.length > 0) {
+      diagnostics.set(
+        reference,
+        `job ${localReferenceCandidateJobs[0]} uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
+      );
+      continue;
+    }
     const candidateSurface = reusableWorkflowSecuritySurface(candidateWorkflow, policy);
     const malformedField = malformedWorkflowCallMappingField(candidateSurface);
     if (malformedField) {
@@ -1551,6 +1640,12 @@ async function resolveAutoApprovedContracts({
         if (dynamicRoutingBasisJobs.length > 0) {
           throw new ConfigurationError(
             `job ${dynamicRoutingBasisJobs[0]} references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
+          );
+        }
+        const localReferenceBasisJobs = localReferenceJobIds(basisWorkflow);
+        if (localReferenceBasisJobs.length > 0) {
+          throw new ConfigurationError(
+            `job ${localReferenceBasisJobs[0]} uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
           );
         }
         basisSurface = reusableWorkflowSecuritySurface(basisWorkflow, policy);
