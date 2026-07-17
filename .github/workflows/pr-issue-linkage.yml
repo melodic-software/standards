@@ -1,16 +1,16 @@
-name: pr-title
+name: pr-issue-linkage
 
-# Conventional Commits PR-title gate. Consumes the shared semantic-pr reusable
-# workflow from ci-workflows. Repos are squash-only with the squash title set to
-# PR_TITLE, so the PR title becomes the default-branch subject — this gates the
-# Conventional-Commits history. `edited` re-validates on a re-title. The emitted
-# required-check context is `pr-title / pr-title`.
+# Standalone required check that validates the PR body carries a native closing
+# keyword and a non-empty Related section. It runs on pull_request_target so the
+# base-branch definition gates and a head-branch edit cannot bypass it; it reads
+# body metadata from the event payload only and checks out no head code. The
+# emitted required-check context is `pr-issue-linkage / pr-issue-linkage`.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, reopened, synchronize]
+  merge_group:
 
-permissions:
-  pull-requests: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -30,12 +30,11 @@ jobs:
       managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
       observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
 
-  pr-title:
+  pr-issue-linkage:
     needs: select-runner
     if: ${{ always() }}
-    permissions:
-      pull-requests: read
-    uses: melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@51012e2c7b8bf74bc26e08c6446b488254a8770f # 51012e2 2026-07-12
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@f7e94a80254fdca0aa85a600a07d784753b090e3 # f7e94a8 2026-07-16
     with:
       runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
       prerequisite-result: ${{ needs.select-runner.result }}

@@ -191,9 +191,11 @@ jobs:
 
   runner-policy:
     name: Runner policy
+    needs: select-runner
+    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -854,9 +856,10 @@ jobs:
         run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
 
   ci-status:
-    if: always()
+    if: ${{ !cancelled() }}
     permissions: {}
     needs:
+      - select-runner
       - markdown
       - powershell
       - shellcheck
@@ -891,7 +894,7 @@ jobs:
       - actionlint
       - zizmor
       - osv-scanner
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Aggregate lane results

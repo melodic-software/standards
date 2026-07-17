@@ -1,13 +1,14 @@
-name: pr-title
+name: do-not-merge
 
-# Conventional Commits PR-title gate. Consumes the shared semantic-pr reusable
-# workflow from ci-workflows. Repos are squash-only with the squash title set to
-# PR_TITLE, so the PR title becomes the default-branch subject — this gates the
-# Conventional-Commits history. `edited` re-validates on a re-title. The emitted
-# required-check context is `pr-title / pr-title`.
+# Standalone required check that blocks merge while the PR carries the
+# `do-not-merge` label (the reusable's default). It runs on pull_request_target
+# so the base-branch definition gates and a head-branch edit cannot neuter it; it
+# reads PR label metadata only and checks out no head code. The emitted
+# required-check context is `do-not-merge / do-not-merge`.
 on:
-  pull_request:
-    types: [opened, edited, reopened, synchronize]
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  merge_group:
 
 permissions:
   pull-requests: read
@@ -30,12 +31,12 @@ jobs:
       managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
       observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
 
-  pr-title:
+  do-not-merge:
     needs: select-runner
     if: ${{ always() }}
     permissions:
       pull-requests: read
-    uses: melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@51012e2c7b8bf74bc26e08c6446b488254a8770f # 51012e2 2026-07-12
+    uses: melodic-software/ci-workflows/.github/workflows/do-not-merge-gate.yml@885302176345486ca6c2c392d83131f9b5389251 # 8853021 2026-07-16
     with:
       runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
       prerequisite-result: ${{ needs.select-runner.result }}
