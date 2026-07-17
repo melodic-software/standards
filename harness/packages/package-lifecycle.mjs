@@ -235,7 +235,10 @@ async function exportBaseline(root, baseRef, packageDirectory, destination) {
   run("git", ["archive", "--format=tar", `--output=${archive}`, baseRef, "--", packageDirectory], {
     cwd: root,
   });
-  run("tar", ["-xf", archive, "-C", destination]);
+  // Same drive-letter constraint as the pack extraction above: keep tar's
+  // arguments relative so GNU tar never sees a C:\ path it would treat as a
+  // remote host:file archive.
+  run("tar", ["-xf", basename(archive), "-C", "."], { cwd: destination });
   return join(destination, packageDirectory);
 }
 
