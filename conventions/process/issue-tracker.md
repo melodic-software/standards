@@ -37,7 +37,7 @@ Prefer a native mechanism over a status label wherever GitHub offers one, becaus
 
 ## Closing pull requests
 
-A pull request that resolves an issue uses GitHub's native closing keywords — `Closes`, `Fixes`, or `Resolves`, followed by the issue number — as the default house style. The keyword is what wires the automatic link and auto-close on merge; a plain-text reference like "see #123" does neither. The one named exception is `provisioning`, which is stricter, not exempt: its pull requests additionally require a manual `## Related` section alongside the native keyword (decisions log #58/#59).
+A pull request that resolves an issue uses GitHub's native closing keywords — `Closes`, `Fixes`, or `Resolves`, followed by the issue number — as the default house style. The keyword is what wires the automatic link and auto-close on merge; a plain-text reference like "see #123" does neither. Pull requests additionally require a manual `## Related` section alongside the native keyword (or the literal `No linked issue` when nothing closes). This began as `provisioning`'s stricter convention (decisions log #58/#59) and became the org-wide rule when the shared `pr-issue-linkage` gate generalized it to every requires-ci repository.
 
 ## Optional conventions
 
