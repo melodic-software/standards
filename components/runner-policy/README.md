@@ -215,7 +215,9 @@ structurally diffs their security-relevant surface — the presence and validity
 of `on.workflow_call`, workflow- and effective job-level `permissions`,
 `on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
 runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
-execution boundaries (`container`, `services`, and `environment`), whether
+execution boundaries (`container`, `services`, `environment`, and workflow-
+and job-level run `defaults`, whose shell and working-directory change how
+every byte-identical `run:` step executes), whether
 any job trips the same privileged-control-plane credential detection already
 enforced against every directly declared or repository-local job (deployment
 environments, unapproved credential expressions, and `localCredentialActions`
@@ -228,7 +230,16 @@ step's own normalized `uses:` reference: the compared surface records that
 full owner/repo-plus-`@ref` value, not just the bare action name, so a bump
 that repoints an already-reviewed credential-minting action at a different,
 unreviewed ref is a visible diff even though the action name and category
-stay identical. A structural match on that surface auto-approves the
+stay identical. And when a workflow- or job-scope `env:` value (or any
+other job field outside steps) contains a credential expression, that
+credential reaches every step in the job through the runner's process
+environment, so the compared surface switches the whole job to full
+recording — the complete workflow env including sibling values such as an
+upload URL, the complete job mapping outside steps, and every step in
+full — instead of recording only the fields that themselves contain a
+credential expression, which would let a bump rewrite a step body that
+consumes the inherited credential without any visible diff. A structural
+match on that surface auto-approves the
 candidate only after every
 reviewed revision for that workflow path has been fetched, parsed, and
 validated, and every surface-matching revision agrees on the same effective
@@ -247,8 +258,8 @@ repository. Changes outside that bounded runner-contract surface may be
 auto-approved; any change to the surface itself requires a human to add a new
 contract entry.
 
-Several categories are excluded from this diff-based extension entirely,
-because no structural surface comparison can prove them unchanged. First, a job whose
+Several shapes are excluded from this diff-based extension entirely, because
+no structural surface comparison can prove them unchanged. First, a job whose
 routing-relevant fields (`runs-on`, `strategy`, the reusable-call
 `uses`/`with`/`secrets`, or the `container`/`services`/`environment`
 execution boundary) reference the `needs` context in any form declines
@@ -279,8 +290,18 @@ contract carrying `allowedCallerPermissions`, and likewise any secret-capable
 runner-input contract (one whose reviewed `allowedSecrets` mapping is
 nonempty), declines unconditionally: each is trusted for what the called
 workflow's steps do with a privileged caller grant or a forwarded caller
-secret, content the compared surface never inspects. Every case fails closed
-with a specific diagnostic and requires a human to add a new contract entry.
+secret, content the compared surface never inspects. Fourth, a called
+workflow containing any commit-relative `uses:` reference — a job-level
+`./.github/workflows/<file>.yml` nested reusable workflow or a step-level
+`./…` local action — declines auto-approval on both the candidate and every
+reviewed basis: GitHub resolves the `./` prefix from the same commit as the
+file that contains it, so a SHA bump changes what a byte-identical reference
+resolves to (the nested workflow's runners and secrets, the local action's
+executable content) without moving anything the single fetched workflow file
+shows. A nested workflow could in principle be fetched and recursively
+diffed, but a local action is an arbitrary directory of executable content
+no single-file fetch can prove unchanged. All of these fail closed with a
+specific diagnostic and require a human to add a new contract entry.
 
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every

