@@ -6,7 +6,7 @@ version: 2
 components:
   agent-orientation:
     files:
-      AGENTS.md: AGENTS.md
+      components/agent-orientation/orientation.md: AGENTS.md
   architecture-decisions:
     files:
       docs/adr/README.md: docs/adr/README.md
