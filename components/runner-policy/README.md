@@ -353,9 +353,17 @@ capped tier, while the selector control-plane job itself still runs on the
 default fleet label. A review lane must pin this revision: older approved
 revisions do not admit the review-tier label, and a `self-hosted-only` selector
 at an older pin fails closed on it (`unapproved-label`).
-Eight selector revisions remain approved for an ordered consumer rollout.
+The gate-event routing revision at
+`ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5` admits `merge_group` and
+`pull_request_target` to the selector's local event allowlist for
+metadata-only required gates: `merge_group` has no fork variant and only
+write-access users can enqueue one, and `pull_request_target` executes the
+trusted base-ref workflow definition. The fork guard is extended to cover
+both pull-request event names, so every fork-origin pull-request context
+still routes off the managed fleet.
+Nine selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these five strict-scheduling
+owned by a different repository owner, so these six strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
