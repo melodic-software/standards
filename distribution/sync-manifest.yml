@@ -4,6 +4,9 @@
 version: 2
 
 components:
+  agent-orientation:
+    files:
+      components/agent-orientation/orientation.md: AGENTS.md
   architecture-decisions:
     files:
       docs/adr/README.md: docs/adr/README.md
@@ -101,6 +104,9 @@ components:
     files:
       .editorconfig: .editorconfig
       .gitattributes: .gitattributes
+  review-instructions:
+    files:
+      REVIEW.md: REVIEW.md
   ruff:
     files:
       ruff.toml: ruff.toml
@@ -149,21 +155,25 @@ targets:
       - markdownlint
       - psscriptanalyzer
       - repository-text
+      - review-instructions
       - shellcheck
       - typos
   melodic-software/claude-code-plugins:
     managed:
+      - agent-orientation
       - editorconfig-checker
       - gitleaks
       - lychee
       - markdownlint
       - node-runtime
       - repository-text
+      - review-instructions
       - runner-policy
       - shellcheck
       - typos
   melodic-software/dotfiles:
     managed:
+      - agent-orientation
       - editorconfig-checker
       - gitleaks
       - lefthook-base
@@ -176,6 +186,7 @@ targets:
       - psscriptanalyzer
       - pyright
       - repository-text
+      - review-instructions
       - ruff
       - runner-policy
       - typos
@@ -183,6 +194,7 @@ targets:
       - shellcheck
   melodic-software/github-iac:
     managed:
+      - agent-orientation
       - dotnet-analysis
       - editorconfig-checker
       - gitleaks
@@ -192,6 +204,7 @@ targets:
       - markdownlint
       - node-runtime
       - repository-text
+      - review-instructions
       - runner-policy
       - typos
   melodic-software/medley:
@@ -200,9 +213,12 @@ targets:
       - node-runtime
       - runner-policy
     locally-owned:
+      - agent-orientation
       - gitleaks
+      - review-instructions
   melodic-software/provisioning:
     managed:
+      - agent-orientation
       - editorconfig-checker
       - gitleaks
       - lefthook-base
@@ -213,6 +229,7 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
+      - review-instructions
       - runner-policy
       - shellcheck
       - typos

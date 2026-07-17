@@ -74,6 +74,7 @@ committed here.
 | Re-adopt | Move `locally-owned` to `managed`; reconciliation restores the canonical payload. |
 | Retire | Remove upstream ownership first, then delete the obsolete downstream payload in a one-time PR. |
 | Relocate | Change the destination and coordinate deletion of the old path in the downstream migration PR. |
+| Reconcile | For a `locally-owned` target whose file predates and diverges from the canonical shape, a periodic check confirms the canonical minimum content is still present — not a byte diff. Drift opens a review; it is never auto-overwritten. |
 
 Deselection never implies deletion. Without a downstream receipt, deletion and
 ownership transfer are indistinguishable; guessing would eventually erase a
@@ -211,3 +212,22 @@ workspace never enters its shell command. The wrapper rejects missing,
 malformed, unknown-version, unknown-key, out-of-repository, and unsupported
 workspace configurations before spawning `dotnet`. Implicit MSBuild workspace
 discovery is not an accepted default.
+
+## Review-instructions reconciliation (medley)
+
+`agent-orientation` and `review-instructions` are `locally-owned` in
+`melodic-software/medley`, not `managed`: medley's own `REVIEW.md` and
+`AGENTS.md` predate this manifest, are load-bearing for medley's own
+`/quality-gate` automation (a severity vocabulary, a tracker-priority axis,
+and a confidence axis this manifest does not model), and are cited from
+dozens of files — a whole-file managed sync would clobber content the
+`managed`/`locally-owned` split exists to protect.
+
+The `Reconcile` lifecycle row above is what keeps this from silently
+blinding medley to canonical drift: when `standards`' `REVIEW.md` or
+`AGENTS.md` gains a criterion, medley's own copy is checked for the
+equivalent content (not a byte match) and updated by a repository-specific
+PR in medley, same as the initial reconciliation pattern
+(`melodic-software/medley#1541`). This is a periodic self-review obligation, not an
+automated reconciliation PR the synchronizer opens — `locally-owned` means
+exactly that the synchronizer never reads, changes, or deletes the file.

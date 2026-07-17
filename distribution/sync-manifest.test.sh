@@ -531,4 +531,38 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
     '[.targets | to_entries[] | select(.value.managed[]? == "go-analysis") | .key]' \
     "$actual_manifest")"
 
+expected_review_instructions_targets='["melodic-software/ci-workflows","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
+actual_review_instructions_targets="$(
+  yq -o=json -I=0 \
+    '[.targets | to_entries[] | select(.value.managed[]? == "review-instructions") | .key]' \
+    "$actual_manifest"
+)"
+assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
+  "$expected_review_instructions_targets" "$actual_review_instructions_targets"
+
+expected_agent_orientation_targets='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
+actual_agent_orientation_targets="$(
+  yq -o=json -I=0 \
+    '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation") | .key]' \
+    "$actual_manifest"
+)"
+assert_eq 'AGENTS.md reaches exactly the four whole-file-managed private consumers (medley reconciles locally instead; ci-workflows is public and gets REVIEW.md only)' \
+  "$expected_agent_orientation_targets" "$actual_agent_orientation_targets"
+
+assert_eq 'ci-workflows does not whole-file-manage agent-orientation (public repo; AGENTS.md excluded)' '0' \
+  "$(yq -r \
+    '[.targets."melodic-software/ci-workflows".managed[] | select(. == "agent-orientation")] | length' \
+    "$actual_manifest")"
+
+for component in agent-orientation review-instructions; do
+  assert_eq "medley locally-owns $component rather than whole-file-managing it" '1' \
+    "$(COMPONENT="$component" yq -r \
+      '[.targets."melodic-software/medley".locally-owned[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
+  assert_eq "medley's managed list does not also claim $component" '0' \
+    "$(COMPONENT="$component" yq -r \
+      '[.targets."melodic-software/medley".managed[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
