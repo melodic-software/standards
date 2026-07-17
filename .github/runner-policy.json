@@ -4,29 +4,9 @@
   "visibility": "private",
   "selfHostedCi": true,
   "exceptions": {
-    ".github/workflows/ci.yml#runner-policy": {
-      "reason": "hosted-control-plane",
-      "justification": "Policy enforcement stays on independent GitHub-hosted compute so malformed local-routing changes cannot disable their own gate."
-    },
-    ".github/workflows/ci.yml#ci-status": {
-      "reason": "hosted-control-plane",
-      "justification": "The required status gateway remains independent of local capacity while aggregating every workload result."
-    },
-    ".github/workflows/link-check.yml#link-check": {
-      "reason": "privileged-control-plane",
-      "justification": "The scheduled link monitor can write its tracking issue and remains on GitHub-hosted infrastructure."
-    },
-    ".github/workflows/pr-title.yml#pr-title": {
-      "reason": "hosted-control-plane",
-      "justification": "The independently required PR-title gate remains hosted so local fleet availability cannot suppress its check."
-    },
     ".github/workflows/publish-packages.yml#publish": {
       "reason": "privileged-control-plane",
       "justification": "Package publication has packages:write authority and must remain on GitHub-hosted infrastructure."
-    },
-    ".github/workflows/sync.yml#sync": {
-      "reason": "privileged-control-plane",
-      "justification": "Standards synchronization uses GitHub App credentials to open cross-repository pull requests and remains hosted."
     }
   }
 }
