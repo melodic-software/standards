@@ -188,15 +188,6 @@
         "issues": "write"
       }
     },
-    "melodic-software/ci-workflows/.github/workflows/standards-sync.yml@3dfb18452a8c6059a22e62456390d84feb10b42f": {
-      "routing": "runner-input",
-      "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets"],
-      "allowedSecrets": {
-        "app-client-id": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
-        "app-private-key": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
-      }
-    },
     "melodic-software/ci-workflows/.github/workflows/do-not-merge-gate.yml@885302176345486ca6c2c392d83131f9b5389251": {
       "routing": "runner-input",
       "runnerInput": "runner",
