@@ -2548,9 +2548,9 @@ function hasStaticallyReadOnlyPermissions(workflow, job) {
 // stay outside every grant.
 const EXACT_NAMED_SECRET_EXPRESSION = /^\$\{\{ secrets\.([A-Za-z_][A-Za-z0-9_]*) \}\}$/;
 
-function isGrantedSecretExpression(value, secretNames) {
+function grantedSecretName(value, secretNames) {
   const match = EXACT_NAMED_SECRET_EXPRESSION.exec(value);
-  return match !== null && secretNames.has(match[1]);
+  return match !== null && secretNames.has(match[1]) ? match[1] : undefined;
 }
 
 function localCredentialRequirement(workflow, job, grantAllowance) {
@@ -2593,11 +2593,12 @@ function localCredentialRequirement(workflow, job, grantAllowance) {
       ) {
         continue;
       }
-      if (
-        grantAllowance !== undefined &&
-        typeof value === "string" &&
-        isGrantedSecretExpression(value, grantAllowance.secretNames)
-      ) {
+      const grantedName =
+        grantAllowance !== undefined && typeof value === "string"
+          ? grantedSecretName(value, grantAllowance.secretNames)
+          : undefined;
+      if (grantedName !== undefined) {
+        grantAllowance.usedSecretNames.add(grantedName);
         continue;
       }
       return EXACT_GITHUB_TOKEN_EXPRESSIONS.has(value)
@@ -2654,7 +2655,16 @@ function credentialActionUses(step, policy) {
   return policy.localCredentialActions.has(action) ? step.uses : undefined;
 }
 
-function privilegedHostedRequirement(workflow, job, selector, target, policy, localCall, grant) {
+function privilegedHostedRequirement(
+  workflow,
+  job,
+  selector,
+  target,
+  policy,
+  localCall,
+  grant,
+  grantUsage,
+) {
   const reusable = reusableWorkflowStatus(job, policy, workflow);
   const reviewedCallerPermissions =
     target?.kind === "selector-output" &&
@@ -2742,7 +2752,9 @@ function privilegedHostedRequirement(workflow, job, selector, target, policy, lo
   const credentialJob = reviewedSecretBoundary
     ? Object.fromEntries(Object.entries(job).filter(([name]) => name !== "secrets"))
     : job;
-  const grantAllowance = grantApplies ? { secretNames: new Set(grant.secrets ?? []) } : undefined;
+  const grantAllowance = grantApplies
+    ? { secretNames: new Set(grant.secrets ?? []), usedSecretNames: new Set() }
+    : undefined;
   const credentialRequirement = localCredentialRequirement(workflow, credentialJob, grantAllowance);
   if (credentialRequirement) {
     return {
@@ -2752,6 +2764,7 @@ function privilegedHostedRequirement(workflow, job, selector, target, policy, lo
     };
   }
 
+  const usedCredentialActions = new Set();
   if (Array.isArray(job.steps)) {
     for (const step of job.steps) {
       const uses = credentialActionUses(step, policy);
@@ -2766,7 +2779,23 @@ function privilegedHostedRequirement(workflow, job, selector, target, policy, lo
           rule: "privileged-hosted-only",
         };
       }
+      usedCredentialActions.add(action);
     }
+  }
+
+  // A named allowance the job never exercises is latent pre-approval: a later
+  // workflow-only change could start consuming the secret or minting action
+  // without any grant-inventory diff. Report it so the admitted job's surface
+  // and the reviewed inventory stay exactly equal.
+  if (grantApplies && grantUsage !== undefined) {
+    grantUsage.unused = [
+      ...(grant.secrets ?? [])
+        .filter((name) => !grantAllowance.usedSecretNames.has(name))
+        .map((name) => `secret ${name}`),
+      ...(grant.credentialActions ?? [])
+        .filter((action) => !usedCredentialActions.has(action))
+        .map((action) => `credential-minting action ${action}`),
+    ];
   }
 
   return undefined;
@@ -3078,8 +3107,18 @@ export async function auditRepository({
           }),
         );
       }
+      const grantUsage = grant ? { unused: [] } : undefined;
       const privilegedHosted = routingEnabled
-        ? privilegedHostedRequirement(workflow, job, selector, target, policy, localCall, grant)
+        ? privilegedHostedRequirement(
+            workflow,
+            job,
+            selector,
+            target,
+            policy,
+            localCall,
+            grant,
+            grantUsage,
+          )
         : undefined;
       const hostedRequirement = privilegedHosted ?? structuralHostedRequirement(job);
       if (
@@ -3090,6 +3129,16 @@ export async function auditRepository({
         !hostedRequirement
       ) {
         consumedLocalRoutingGrants.add(key);
+        if (grantUsage.unused.length > 0) {
+          findings.push(
+            finding(
+              "local-routing-grant-drift",
+              file,
+              jobId,
+              `local-routing grant ${key} names ${grantUsage.unused.join(", ")} the job does not exercise; remove or narrow it`,
+            ),
+          );
+        }
       }
       let hasForbiddenHostedLabel = false;
       let hasRawManagedLabel = false;

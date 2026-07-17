@@ -549,7 +549,11 @@ fails as `local-routing-grant-drift`.
 One key cannot carry both an exception and a grant, a grant that admits
 nothing beyond the ordinary read-only boundary fails configuration, and an
 unconsumed grant fails as `local-routing-grant-drift`, exactly like exception
-inventory drift.
+inventory drift. The same drift rule reports a consumed grant whose named
+secret or credential-action allowances the job does not actually exercise:
+an unexercised allowance is latent pre-approval a later workflow-only change
+could start consuming without any grant-inventory diff, so the admitted
+surface and the reviewed inventory must stay exactly equal.
 
 For an enrolled private repository, effective `GITHUB_TOKEN` permissions follow
 GitHub's workflow-then-job precedence: a job-level declaration replaces the

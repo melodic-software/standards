@@ -1955,6 +1955,69 @@ ${SELECTOR}  apply:
   assert.deepEqual(await audit(root), []);
 });
 
+test("a local-routing grant naming unexercised allowances is inventory drift", async () => {
+  for (const scenario of [
+    {
+      label: "an unexercised named secret",
+      secrets: ["APP_PRIVATE_KEY", "UNUSED_KEY"],
+      steps: `    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@${SHA}
+        with:
+          client-id: \${{ vars.APP_CLIENT_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: ./apply.sh
+        env:
+          GH_TOKEN: \${{ steps.app-token.outputs.token }}
+`,
+      pattern: /secret UNUSED_KEY/,
+    },
+    {
+      label: "an unexercised credential-minting action",
+      secrets: ["APP_PRIVATE_KEY"],
+      steps: `    steps:
+      - run: ./apply.sh
+        env:
+          KEY: \${{ secrets.APP_PRIVATE_KEY }}
+`,
+      pattern: /credential-minting action actions\/create-github-app-token/,
+    },
+  ]) {
+    const root = await repository({
+      localRoutingGrants: {
+        ".github/workflows/deploy.yml#apply": {
+          permissions: { contents: "read", "id-token": "write" },
+          environment: "github-iac-production",
+          secrets: scenario.secrets,
+          credentialActions: ["actions/create-github-app-token"],
+          justification: "This intentionally exercises per-allowance drift detection.",
+        },
+      },
+      workflows: {
+        "deploy.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  apply:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    environment: github-iac-production
+${scenario.steps}`,
+      },
+    });
+    const findings = await audit(root);
+    assert.deepEqual(
+      findings.map(({ rule }) => rule),
+      ["local-routing-grant-drift"],
+      scenario.label,
+    );
+    assert.match(findings[0].message, scenario.pattern, scenario.label);
+  }
+});
+
 test("a local-routing grant rejects every privilege outside its exact reviewed terms", async () => {
   for (const scenario of [
     {
