@@ -198,6 +198,86 @@ unknown secret names, and alternate expressions:
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
 
+A path@SHA with no `approvedReusableWorkflowContracts` entry is not
+automatically rejected if the same workflow path already has a reviewed
+contract at a different SHA: this is the common Dependabot-bump case. Before
+the per-job checks run, the policy fetches both the previously reviewed
+revision and the candidate revision from the source repository and
+structurally diffs their security-relevant surface — the presence and validity
+of `on.workflow_call`, workflow- and effective job-level `permissions`,
+`on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
+runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
+execution boundaries (`container`, `services`, and `environment`), whether
+any job trips the same privileged-control-plane credential detection already
+enforced against every directly declared or repository-local job (deployment
+environments, unapproved credential expressions, and `localCredentialActions`
+entries such as `actions/create-github-app-token`), and the exact
+credential-bearing values each job references — not just that detection's
+category, so a bump that swaps an already-declared/allowed secret for a
+different secret in the identical position is a visible diff even when both
+trip the same category. The same exactness applies to a `localCredentialActions`
+step's own normalized `uses:` reference: the compared surface records that
+full owner/repo-plus-`@ref` value, not just the bare action name, so a bump
+that repoints an already-reviewed credential-minting action at a different,
+unreviewed ref is a visible diff even though the action name and category
+stay identical. A structural match on that surface auto-approves the
+candidate only after every
+reviewed revision for that workflow path has been fetched, parsed, and
+validated, and every surface-matching revision agrees on the same effective
+contract terms. An unreachable or invalid reviewed basis leaves insufficient
+evidence and fails closed; multiple matching revisions with different input,
+secret, runner-input, or hosted-only contracts are likewise ambiguous and fail
+closed. Policy insertion order never selects the inherited authority. An
+approved candidate inherits that single agreed reviewed contract,
+stamped with `autoApproved: { basisSha, approvedAt }`
+provenance; anything else (incomplete reviewed-basis evidence, no matching
+basis, any change to that surface, or disagreement among matching reviewed
+contracts) fails closed exactly as an unreviewed reference does, with the
+declined reason folded into the diagnostic. This is a deterministic structural
+comparison, not a judgment call, and it grants no blanket trust to a source
+repository. Changes outside that bounded runner-contract surface may be
+auto-approved; any change to the surface itself requires a human to add a new
+contract entry.
+
+Two categories are excluded from this diff-based extension entirely, because
+no structural surface comparison can prove them unchanged. First, a job whose
+routing-relevant fields (`runs-on`, `strategy`, the reusable-call
+`uses`/`with`/`secrets`, or the `container`/`services`/`environment`
+execution boundary) reference the `needs` context in any form declines
+auto-approval for that path: the referencing expression can stay
+byte-identical while another job's own value — an output, a `result`, or
+anything else reachable off `needs` — changes the real routing boundary
+underneath it. This check is deliberately coarse rather than an enumerated
+list of dangerous `needs` spellings. Earlier revisions matched only
+`needs.<job-id>.outputs.<name>`, then that plus GitHub's equivalent index
+syntax on the job-id and `outputs` segments (`needs['<job-id>']`,
+`.outputs['<name>']`); each closed one gap and left the next syntax open,
+most recently an object filter such as `needs.*.outputs.runner` (typically
+wrapped in `join(...)`), which has no named job-id segment for a
+job-id-shaped pattern to match. Rather than continuing to chase individual
+syntaxes, the policy now allowlists only routing fields that provably do not
+mention `needs` at all: any occurrence of the `needs` context followed by a
+property or index accessor, matched case-insensitively because GitHub's
+expression evaluator treats context and property names case-insensitively,
+declines auto-approval regardless of what follows or how it is spelled.
+Second, a reviewed contract with `selectorResultInput` declines
+auto-approval unconditionally, even on an otherwise identical surface: that
+contract is trusted for a fail-closed guarantee — that the called workflow's
+own steps still honor the forwarded `needs.<selector>.result` — which sits
+entirely outside the compared workflow_call/permissions/routing/credential
+surface, so a bump could silently defeat it without moving anything this
+diff inspects. Both cases fail closed with a specific diagnostic and require
+a human to add a new contract entry.
+
+Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
+in CI) to restore today's behavior and require an explicit contract for every
+SHA.
+
+The comparison preserves GitHub's documented distinctions: a reusable workflow
+must declare [`on.workflow_call`][12], and omitted `permissions` inherit the
+configured default while an explicit empty mapping disables all token
+permissions.[13]
+
 Repository-local calls use only the canonical
 `./.github/workflows/<file>.yml` form. The policy resolves the regular checked-in
 file directly: traversal, subdirectories, symlinks, missing files, parse
@@ -467,3 +547,5 @@ default `GITHUB_TOKEN` permissions][7].
 [9]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow
 [10]: https://docs.github.com/en/actions/reference/runners/self-hosted-runners#routing-precedence-for-self-hosted-runners
 [11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
+[12]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow
+[13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions

