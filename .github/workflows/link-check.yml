@@ -14,7 +14,7 @@ permissions:
 jobs:
   select-runner:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@90f1c54cf871a3aed4f1eb14a279a1651975a794 # 90f1c54 2026-07-18
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
+    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@90f1c54cf871a3aed4f1eb14a279a1651975a794 # 90f1c54 2026-07-18
     with:
       runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
       # The called workflow's defaults plus one repo-specific addition: the
