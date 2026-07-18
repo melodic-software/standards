@@ -23,9 +23,11 @@ review cycle.
 
 ## Consumption
 
-Consumers reach this document through the binding-seam resolution ladder's org layer: a
-repo-local or user-global `org_policy_home` pointer names this repository, and the fetch runs
-via the host CLI with the consumer's own authentication. Per-value, a consuming repository's
-own tracked binding overrides these org values (additive merge, later layer refines earlier —
-the ladder semantics are owned by the plugin's `reference/binding-seam.md`, not restated
-here).
+This document is org binding DATA the autonomy setup capability reads at setup/bind time —
+not a prose standard fetched at build or review time, so the `conventions/` copy-or-pointer
+consumption model is preserved. A repo-local or user-global `org_policy_home` pointer names
+this repository; setup fetches the document once per run (host CLI, the consumer's own
+authentication) and PERSISTS the resolved values into the consuming repository's own tracked
+binding, which is what builds, reviews, and later runs read. Per-value, that repo-local
+binding overrides these org values (additive merge, later layer refines earlier — the ladder
+semantics are owned by the plugin's `reference/binding-seam.md`, not restated here).
