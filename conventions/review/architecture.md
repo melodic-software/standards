@@ -1,6 +1,6 @@
 # Architecture review criteria
 
-Diff-time checks for structural integrity, contract evolution, and build-system coupling. Severity labels are defined in [README.md](README.md). The underlying design defaults are owned by `../engineering/architecture-and-design.md`; this file flags violations in a change.
+Diff-time checks for structural integrity, operational swap, contract evolution, and build-system coupling. Severity labels are defined in [README.md](README.md). The underlying design defaults are owned by `../engineering/architecture-and-design.md`; this file flags violations in a change.
 
 ## Structural integrity
 
@@ -10,6 +10,14 @@ Diff-time checks for structural integrity, contract evolution, and build-system 
 - **Operations return results, not raw types or thrown exceptions** for anticipable failures; see `../engineering/architecture-and-design.md`.
 - **Module-to-module coupling** — shared internal types or direct reach into another module's internals instead of going through its published contract.
 - **Incumbency as the only justification** — a boundary or design decision defended purely descriptively, with no normative argument; see [`../engineering/engineering-philosophy.md`](../engineering/engineering-philosophy.md#judgment-and-process).
+
+## Operational swap
+
+These bars flag diff-time violations of the [operational-change posture](../engineering/architecture-and-design.md#operational-change-without-an-outage).
+
+- **Instance-local state accretion that breaks any-instance-can-die** — a change that starts holding session, workflow, or cache-as-truth state in process memory or on the instance's local filesystem, so an instance can no longer be killed and replaced without loss. Important.
+- **Missing graceful shutdown or drain** — a new long-running process, worker, or listener with no termination-signal handling or drain on shutdown. Important.
+- **Restart-only wiring where a reload path exists** — a change that wires a value so only a full process restart applies it, on a platform that offers a reload mechanism for exactly that kind of value. Suggestion; Important where operators change the value routinely (certificates, feature flags — whether a renewal is *triggered* automatically stays with `timebombs.md`; this bar owns only whether applying the new value needs a restart).
 
 ## Contract evolution
 
