@@ -1,6 +1,6 @@
 # Architecture review criteria
 
-Diff-time checks for structural integrity, contract evolution, and build-system coupling. Severity labels are defined in [README.md](README.md). The underlying design defaults are owned by `../engineering/architecture-and-design.md`; this file flags violations in a change.
+Diff-time checks for structural integrity, operational swap, contract evolution, and build-system coupling. Severity labels are defined in [README.md](README.md). The underlying design defaults are owned by `../engineering/architecture-and-design.md`; this file flags violations in a change.
 
 ## Structural integrity
 

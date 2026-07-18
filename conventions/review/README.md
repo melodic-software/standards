@@ -28,7 +28,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 |---|---|
 | [code-quality.md](code-quality.md) | local design, parameter and model shape, style, authoring hygiene |
 | [code-design.md](code-design.md) | cohesion, coupling, responsibility, abstraction fit, substitutability, pattern use |
-| [architecture.md](architecture.md) | structural integrity, contract evolution, build-system coupling |
+| [architecture.md](architecture.md) | structural integrity, operational swap, contract evolution, build-system coupling |
 | [error-handling.md](error-handling.md) | result-modeling, exception boundaries, resilience, idempotency, atomicity of multi-step state changes |
 | [concurrency.md](concurrency.md) | shared state, cancellation, async hazards, deadlocks |
 | [messaging.md](messaging.md) | delivery integrity, ordering, message-contract evolution |
