@@ -2356,6 +2356,18 @@ function permissionHostedRequirement(workflow, job, { requireExplicitReadOnly = 
     }
     return undefined;
   }
+  // packages is registry-publication authority, not repository/organization
+  // state: a job whose only write scope is packages belongs to the durable
+  // publication category, so artifact provenance can stay on hosted
+  // infrastructure after the control-plane reasons retire. Any additional
+  // write scope keeps the job in the privileged category.
+  if (writable.length === 1 && writable[0] === "packages") {
+    return {
+      reason: "publication",
+      description: "write GITHUB_TOKEN permissions (packages)",
+      rule: "privileged-hosted-only",
+    };
+  }
   return {
     reason: "privileged-control-plane",
     description: `write GITHUB_TOKEN permissions (${writable.join(", ")})`,

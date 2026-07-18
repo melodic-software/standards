@@ -1837,7 +1837,29 @@ test("privileged workloads require the privileged-control-plane exception catego
   );
 });
 
-test("privileged hosted workloads pass with the exact exception category", async () => {
+test("packages-only write jobs pass with the publication exception category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job under privileged-control-plane fails the publication category", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
@@ -1850,6 +1872,34 @@ test("privileged hosted workloads pass with the exact exception category", async
       "ci.yml": `jobs:
   publish:
     permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason publication/);
+});
+
+test("a mixed packages-and-repository write job stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "privileged-control-plane",
+        justification:
+          "Publication plus issue reporting writes repository state on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      issues: write
       packages: write
     runs-on: ubuntu-24.04
     steps: []

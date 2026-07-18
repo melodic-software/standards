@@ -510,7 +510,12 @@ allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
 renamed, and deleted exception entries fail as inventory drift. The centrally
 allowlisted reasons deliberately cover Windows, job/service containers, Docker
 socket access, privileged control planes, publication, Dependabot, and narrow
-hosted control-plane work.
+hosted control-plane work. A hosted job whose only write scope is `packages`
+belongs to the `publication` category, not `privileged-control-plane`:
+`packages: write` is registry-publication authority rather than repository or
+organization state, and keeping it in the durable category lets published
+artifacts retain hosted provenance after the control-plane reasons retire.
+Any additional write scope keeps the job privileged.
 
 A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job
