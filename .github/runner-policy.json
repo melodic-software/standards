@@ -3,10 +3,5 @@
   "repositoryOwner": "melodic-software",
   "visibility": "public",
   "selfHostedCi": false,
-  "exceptions": {
-    ".github/workflows/publish-packages.yml#publish": {
-      "reason": "publication",
-      "justification": "Registry publication stays on GitHub-hosted infrastructure so published-artifact provenance never depends on fleet container integrity; packages:write and the registry token therefore never reach a self-hosted worker."
-    }
-  }
+  "exceptions": {}
 }
