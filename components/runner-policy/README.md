@@ -37,8 +37,9 @@ GITHUB_REPOSITORY=owner/repository \
   node .github/standards/runner-policy/runner-policy.mjs --root .
 ```
 
-The policy gate itself stays on an explicit GitHub-hosted image so the
-enforcement path neither depends on nor exercises the fleet it audits:
+In a hosted-only repository the policy gate stays on an explicit
+GitHub-hosted image so the enforcement path neither depends on nor exercises
+any self-hosted fleet:
 
 ```yaml
 runner-policy:
@@ -60,9 +61,15 @@ runner-policy:
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
-In a private repository with `selfHostedCi: true`, its
-`.github/runner-policy.json` entry declares that fixed hosted job with a
-`hosted-control-plane` exception. A hosted-only repository sets
+In a private repository with `selfHostedCi: true`, the gate job instead
+routes through the governed selector like any other eligible read-only job,
+with the approved hosted fallback covering selector failure. No dedicated
+category pins read-only work to hosted infrastructure: the remaining reasons
+describe structural constraints (Windows, containers, Docker socket access),
+and while the analyzer consumes any allowlisted reason for an eligible
+read-only fixed-hosted job without validating that constraint, declaring a
+structural reason the job does not exercise is a review-time inventory
+defect, not an admitted route. A hosted-only repository sets
 `selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
 fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
@@ -535,8 +542,8 @@ An exception is keyed by `<workflow path>#<job id>` and requires both an
 allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
 renamed, and deleted exception entries fail as inventory drift. The centrally
 allowlisted reasons deliberately cover Windows, job/service containers, Docker
-socket access, privileged control planes, publication, Dependabot, and narrow
-hosted control-plane work. A hosted job whose only write scope is `packages`
+socket access, privileged control planes, publication, and Dependabot. A
+hosted job whose only write scope is `packages`
 belongs to the `publication` category, not `privileged-control-plane`:
 `packages: write` is registry-publication authority rather than repository or
 organization state, and keeping it in the durable category lets published

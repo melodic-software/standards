@@ -381,7 +381,6 @@
   "hostedExceptionReasons": [
     "dependabot",
     "docker-socket",
-    "hosted-control-plane",
     "job-container",
     "privileged-control-plane",
     "publication",
