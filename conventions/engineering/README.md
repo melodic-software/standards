@@ -4,8 +4,8 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 
 | Convention | Owns |
 |---|---|
-| [engineering-philosophy.md](engineering-philosophy.md) | the default posture: explicit, fail-fast, resilient, idempotent, simple, cross-platform |
-| [architecture-and-design.md](architecture-and-design.md) | dependency direction, vertical slices, composition, result-modeling, consistency boundaries, extension points |
+| [engineering-philosophy.md](engineering-philosophy.md) | the default posture: explicit, fail-fast, resilient, idempotent, simple, cross-platform, cosmetic findings as real work |
+| [architecture-and-design.md](architecture-and-design.md) | dependency direction, vertical slices, composition, result-modeling, consistency boundaries, extension points, no-outage operational change |
 | [domain-driven-design.md](domain-driven-design.md) | tactical patterns (entities, value objects, aggregates, repositories) and ubiquitous language |
 | [naming.md](naming.md) | verbose behavior-naming, name-by-responsibility, disambiguating overloaded terms |
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |

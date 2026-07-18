@@ -11,6 +11,14 @@ Diff-time checks for structural integrity, contract evolution, and build-system 
 - **Module-to-module coupling** — shared internal types or direct reach into another module's internals instead of going through its published contract.
 - **Incumbency as the only justification** — a boundary or design decision defended purely descriptively, with no normative argument; see [`../engineering/engineering-philosophy.md`](../engineering/engineering-philosophy.md#judgment-and-process).
 
+## Operational swap
+
+The owning posture — operational change requires no outage, via a reload path or disposable processes — lives in `../engineering/architecture-and-design.md`; these bars flag the diff-time violations.
+
+- **In-process state accretion that breaks any-instance-can-die** — a change that starts holding session, workflow, or cache-as-truth state in process memory, so an instance can no longer be killed and replaced without loss. Important.
+- **Missing graceful shutdown or drain** — a new long-running process, worker, or listener with no termination-signal handling: nothing stops intake, finishes or returns in-flight work, or releases held resources on shutdown. Important.
+- **Restart-only wiring where a reload path exists** — a change that wires a value so only a full process restart applies it, on a platform that offers a reload mechanism for exactly that kind of value. Suggestion; Important where operators change the value routinely (certificates, feature flags).
+
 ## Contract evolution
 
 - **API versioning on public contracts** — additive changes (a new optional field, a new endpoint, a new enum member, added paging) are non-breaking and keep the version. Breaking changes (removing or renaming a field, changing its type, tightening validation, adding a required parameter, changing the URL or response shape) require a new version. Flag a breaking edit made in place to an already-shipped version. A versioned API should signal deprecation and carry a removal date ([RFC 8594 Sunset header](https://www.rfc-editor.org/rfc/rfc8594)).
