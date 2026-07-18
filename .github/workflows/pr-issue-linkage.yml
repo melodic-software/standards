@@ -5,7 +5,9 @@ name: pr-issue-linkage
 # base-branch definition gates and a head-branch edit cannot bypass it; it reads
 # body metadata from the event payload only and checks out no head code. The
 # emitted required-check context is `pr-issue-linkage / pr-issue-linkage`.
+# Public repo: runs on the reusable's hosted default runner.
 on:
+  # zizmor: ignore[dangerous-triggers] metadata-only gate; rationale in the header comment
   pull_request_target:
     types: [opened, edited, reopened, synchronize]
   merge_group:
@@ -17,24 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@cdc5917c15aade1995bd810b60d818cadc635b52 # cdc5917 2026-07-16
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   pr-issue-linkage:
-    needs: select-runner
-    if: ${{ always() }}
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@f7e94a80254fdca0aa85a600a07d784753b090e3 # f7e94a8 2026-07-16
+    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: ${{ needs.select-runner.result }}
+      runner: ubuntu-24.04

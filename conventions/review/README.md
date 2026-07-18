@@ -28,8 +28,8 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 |---|---|
 | [code-quality.md](code-quality.md) | local design, parameter and model shape, style, authoring hygiene |
 | [code-design.md](code-design.md) | cohesion, coupling, responsibility, abstraction fit, substitutability, pattern use |
-| [architecture.md](architecture.md) | structural integrity, contract evolution, build-system coupling |
-| [error-handling.md](error-handling.md) | result-modeling, exception boundaries, resilience, idempotency |
+| [architecture.md](architecture.md) | structural integrity, operational swap, contract evolution, build-system coupling |
+| [error-handling.md](error-handling.md) | result-modeling, exception boundaries, resilience, idempotency, atomicity of multi-step state changes |
 | [concurrency.md](concurrency.md) | shared state, cancellation, async hazards, deadlocks |
 | [messaging.md](messaging.md) | delivery integrity, ordering, message-contract evolution |
 | [performance.md](performance.md) | queries, allocation, caching, pagination, streaming |
@@ -37,8 +37,10 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [multi-tenancy.md](multi-tenancy.md) | horizontal (cross-tenant) authorization, isolation, tenant lifecycle |
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |
+| [date-time.md](date-time.md) | zone vs offset, future-local-time storage, tzdata currency, monotonic elapsed time, epoch ranges |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
+| [timebombs.md](timebombs.md) | unbounded growth, quota and hard-constraint exhaustion, expiry and rotation, data lifecycle, crash recovery |
 | [ai-generated-code.md](ai-generated-code.md) | the empirical failure modes of AI-authored changes |
 | [ai-review-bot-composition.md](ai-review-bot-composition.md) | expected automated AI-reviewer composition per repository governance class |
 | [mcp.md](mcp.md) | tools and MCP servers exposed to LLM agents |

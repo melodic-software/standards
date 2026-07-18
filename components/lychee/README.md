@@ -16,10 +16,12 @@ raw-content URLs whose auth boundary makes a calling repository's token receive
 a 404. The current inventory is `melodic-software/claude-code-plugins`,
 `dotfiles`, `github-iac`, `medley`, `provisioning`, and `standards`; public
 siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
-exceptions are path-scoped to the current Medium Dungeon Master article, Miro
-article `31624028247058`, IsDown's Anthropic status page, and the npm package
-pages for `firecrawl-cli` and `@mirohq/miro-api`; every other URL on those hosts
-remains checked. Lychee documents `exclude` values as URL regular expressions
+exceptions are path-scoped to the current Medium Dungeon Master article, the
+Medium Fortmatic postmortem, Miro
+article `31624028247058`, IsDown's Anthropic status page, the npm package
+pages for `firecrawl-cli` and `@mirohq/miro-api`, and the MySQL 8.4 InnoDB
+transaction-isolation manual page; every other URL on those hosts remains
+checked. Lychee documents `exclude` values as URL regular expressions
 in its [configuration guide][1].
 
 [1]: https://lychee.cli.rs/guides/config/#excluding-links

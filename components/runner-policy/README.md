@@ -37,8 +37,9 @@ GITHUB_REPOSITORY=owner/repository \
   node .github/standards/runner-policy/runner-policy.mjs --root .
 ```
 
-The policy gate itself stays on an explicit GitHub-hosted image so the
-enforcement path neither depends on nor exercises the fleet it audits:
+In a hosted-only repository the policy gate stays on an explicit
+GitHub-hosted image so the enforcement path neither depends on nor exercises
+any self-hosted fleet:
 
 ```yaml
 runner-policy:
@@ -60,9 +61,15 @@ runner-policy:
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
-In a private repository with `selfHostedCi: true`, its
-`.github/runner-policy.json` entry declares that fixed hosted job with a
-`hosted-control-plane` exception. A hosted-only repository sets
+In a private repository with `selfHostedCi: true`, the gate job instead
+routes through the governed selector like any other eligible read-only job,
+with the approved hosted fallback covering selector failure. No dedicated
+category pins read-only work to hosted infrastructure: the remaining reasons
+describe structural constraints (Windows, containers, Docker socket access),
+and while the analyzer consumes any allowlisted reason for an eligible
+read-only fixed-hosted job without validating that constraint, declaring a
+structural reason the job does not exercise is a review-time inventory
+defect, not an admitted route. A hosted-only repository sets
 `selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
 fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
@@ -158,6 +165,14 @@ label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to
 `ubuntu-24.04`.
 
+The frozen literal is the governed `default`, and that default must appear in
+`fallbackLabelAllowlist` — a set deliberately narrower than
+`approvedHostedRunnerLabels`. A label may be an approved explicit `runs-on`
+target yet still be barred from becoming the silent recovery fallback, so a
+costlier hosted tier cannot slip in as the default that fires whenever the
+selector fails. Configuration fails closed when the default is absent from the
+allowlist.
+
 The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
 (the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
 dedicated capped review tier). A review-lane caller passes the latter from a
@@ -187,7 +202,17 @@ unknown secret names, and alternate expressions:
   instead pins a fixed hosted runner literal through the same input gets no
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
-  `id-token`-capable job.
+  `id-token`-capable job — or `publication` when the caller's only write
+  scope is `packages` and it carries no other privileged surface, per the
+  packages-only rule below.
+  A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
+  is secret-capable on its own: a statically read-only caller may forward
+  exactly that named secret mapping while selector-routed, because the
+  immutable contract — not the caller — owns the secret boundary, the same
+  way a hosted-only contract's mapping does. The caller's permissions keep
+  the ordinary explicit read-only requirement unless the contract also names
+  `allowedCallerPermissions`, and every secret-capable runner-input contract
+  is excluded from the Dependabot auto-approval extension below.
   A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
   and the matching `${{ needs.<selector>.result }}` mapping so a required gate
   can report every selector outcome without authorizing general workloads to
@@ -277,21 +302,23 @@ contract is trusted for a fail-closed guarantee — that the called workflow's
 own steps still honor the forwarded `needs.<selector>.result` — which sits
 entirely outside the compared workflow_call/permissions/routing/credential
 surface, so a bump could silently defeat it without moving anything this
-diff inspects. Third, a reviewed contract with `allowedCallerPermissions`
-declines the same way: the privileged caller grant is trusted for what the
-called workflow's steps do with it, and step bodies sit outside the
-compared surface. Fourth, a called workflow containing any commit-relative
-`uses:` reference — a job-level `./.github/workflows/<file>.yml` nested
-reusable workflow or a step-level `./…` local action — declines
-auto-approval on both the candidate and every reviewed basis: GitHub
-resolves the `./` prefix from the same commit as the file that contains it,
-so a SHA bump changes what a byte-identical reference resolves to (the
-nested workflow's runners and secrets, the local action's executable
-content) without moving anything the single fetched workflow file shows. A
-nested workflow could in principle be fetched and recursively diffed, but a
-local action is an arbitrary directory of executable content no single-file
-fetch can prove unchanged. All of these fail closed with a specific
-diagnostic and require a human to add a new contract entry.
+diff inspects. Third, for that same unobservable-trust reason, a reviewed
+contract carrying `allowedCallerPermissions`, and likewise any secret-capable
+runner-input contract (one whose reviewed `allowedSecrets` mapping is
+nonempty), declines unconditionally: each is trusted for what the called
+workflow's steps do with a privileged caller grant or a forwarded caller
+secret, content the compared surface never inspects. Fourth, a called
+workflow containing any commit-relative `uses:` reference — a job-level
+`./.github/workflows/<file>.yml` nested reusable workflow or a step-level
+`./…` local action — declines auto-approval on both the candidate and every
+reviewed basis: GitHub resolves the `./` prefix from the same commit as the
+file that contains it, so a SHA bump changes what a byte-identical reference
+resolves to (the nested workflow's runners and secrets, the local action's
+executable content) without moving anything the single fetched workflow file
+shows. A nested workflow could in principle be fetched and recursively
+diffed, but a local action is an arbitrary directory of executable content
+no single-file fetch can prove unchanged. All of these fail closed with a
+specific diagnostic and require a human to add a new contract entry.
 
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every
@@ -343,9 +370,33 @@ capped tier, while the selector control-plane job itself still runs on the
 default fleet label. A review lane must pin this revision: older approved
 revisions do not admit the review-tier label, and a `self-hosted-only` selector
 at an older pin fails closed on it (`unapproved-label`).
-Eight selector revisions remain approved for an ordered consumer rollout.
+The gate-event routing revision at
+`ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5` admits `merge_group` and
+`pull_request_target` to the selector's local event allowlist for
+metadata-only required gates: `merge_group` has no fork variant and only
+write-access users can enqueue one, and `pull_request_target` executes the
+trusted base-ref workflow definition. The fork guard is extended to cover
+both pull-request event names, so every fork-origin pull-request context
+still routes off the managed fleet.
+The gh-free gate revision at
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` carries the do-not-merge-gate
+label refetch rewritten onto github-script's bundled Node runtime
+(ci-workflows#144) and the hosted fallback label moved from the retired
+`ubuntu-slim` to `ubuntu-24.04` (ci-workflows#141), so metadata-only
+required gates no longer shell out to a `gh` binary the fleet image does
+not carry. Its selector diff against `ec91c343` is limited to that
+fallback-label change plus comments, and the six reusable contracts
+registered at this revision were copied from each workflow's newest
+previously approved SHA after byte-level comparison: `claude-review`,
+`link-check`, and `osv-scanner` are byte-identical; `semantic-pr` and
+`pr-issue-linkage` differ only by the same fallback-label change plus
+comments; and `zizmor` adds a version-pin default bump (v1.26.1 to
+v1.27.0) and curl timeout hardening with its input surface unchanged.
+No contract changes its input, secret, routing, or caller-permission
+surface.
+Ten selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these five strict-scheduling
+owned by a different repository owner, so these seven strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -374,6 +425,13 @@ to `09dd32ae40e270614e251fddafa16bab9a487de5`, which only adds a step that
 closes a recovered tracking issue; permissions, inputs, and `runs-on` stay
 byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
 contract, so the existing hosted-only shape carries over unmodified.
+The standards-sync contract was bumped to
+`0b45b9fb1755649455e3bb2b9c56c619a412b06b`, whose diff against the reviewed
+`ec91c343` contract is confined to the generated sync-PR body heredoc — it
+adds the "No linked issue" sentence and a "## Related" section so
+distributed sync PRs pass each target's pr-issue-linkage gate
+(ci-workflows#146); inputs, secrets, permissions, and routing are
+unchanged.
 
 The link-check and Pulumi version-drift monitor contracts were converted to
 `runner-input` at `3dfb18452a8c6059a22e62456390d84feb10b42f`, the reviewed
@@ -491,8 +549,18 @@ An exception is keyed by `<workflow path>#<job id>` and requires both an
 allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
 renamed, and deleted exception entries fail as inventory drift. The centrally
 allowlisted reasons deliberately cover Windows, job/service containers, Docker
-socket access, privileged control planes, publication, Dependabot, and narrow
-hosted control-plane work.
+socket access, privileged control planes, publication, and Dependabot. A
+hosted job whose only write scope is `packages`
+belongs to the `publication` category, not `privileged-control-plane`:
+`packages: write` is registry-publication authority rather than repository or
+organization state, and keeping it in the durable category lets published
+artifacts retain hosted provenance after the control-plane reasons retire.
+Any additional write scope — or any other privileged surface on the job, such
+as a deployment environment, a credential expression, or a credential-minting
+action — keeps the job privileged. The one admission is the exact
+GitHub-provided token expression (the common registry-authentication step
+env), which carries only the packages-only permission map the exception
+already reviews.
 
 A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job
@@ -500,6 +568,57 @@ container similarly requires `service-container`. When both are present,
 `job-container` is the governing category. An exception records why the job is
 hosted; it never authorizes selector output or a reusable `inputs.runner` value
 for these structurally excluded jobs.
+
+`localRoutingGrants` is the reviewed inventory for the opposite direction: it
+admits one directly declared, genuinely selector-routed job to the managed
+fleet while that job holds an exactly pinned privilege surface that would
+otherwise require hosted execution. A grant is keyed by
+`<workflow path>#<job id>`, requires a non-empty `justification`, and names:
+
+- `permissions` — the complete effective `GITHUB_TOKEN` mapping the job must
+  declare, compared exactly per scope and access level. Shorthands
+  (`read-all`, `write-all`), omitted declarations, missing scopes, extra
+  scopes, and access drift all fail closed. Pinning the map also admits the
+  exact GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or `${{ github.token }}`
+  expression as a complete job- or step-level `env`/`with` value, which the
+  ordinary boundary reserves for statically read-only jobs.
+- `environment` (optional) — one exact deployment environment name the job
+  must declare in plain string form. A differing name, a mapping-form or
+  expression-valued environment, and an environment the grant does not name
+  all stay privileged-hosted; an expression-valued grant name itself fails
+  configuration, because GitHub evaluates environment expressions (`vars`,
+  `needs`, `matrix`) and the protected environment could then change without
+  a grant-inventory diff.
+- `secrets` (optional) — repository or organization secret names the job may
+  reference, each only as the exact complete `${{ secrets.NAME }}` value of a
+  job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
+  here; transformed expressions, workflow-level env values, `run:`
+  interpolation, and conditions stay privileged-hosted.
+- `credentialActions` (optional) — full `owner/action@<40-hex-SHA>`
+  references the job's steps may invoke, whose action name must be a central
+  `localCredentialActions` entry (for example
+  `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
+  ref because a different ref of the same action is different
+  credential-minting code; a tag, branch, or other SHA stays
+  privileged-hosted, and actions outside the central list cannot be granted.
+
+A grant applies only while the job genuinely consumes the approved selector
+output under the unchanged cancellation-safe condition and literal-fallback
+contract; a fixed hosted target keeps the ordinary privileged exception
+inventory, and job/service containers remain structurally hosted regardless.
+A reusable-call (`uses:`) job never takes the grant path: its caller
+permissions flow into an external workflow whose behavior at the pinned SHA
+only the central contract review sees, so `allowedCallerPermissions` remains
+the sole write-capable waiver for callers and a grant keyed to such a job
+fails as `local-routing-grant-drift`.
+One key cannot carry both an exception and a grant, a grant that admits
+nothing beyond the ordinary read-only boundary fails configuration, and an
+unconsumed grant fails as `local-routing-grant-drift`, exactly like exception
+inventory drift. The same drift rule reports a consumed grant whose named
+secret or credential-action allowances the job does not actually exercise:
+an unexercised allowance is latent pre-approval a later workflow-only change
+could start consuming without any grant-inventory diff, so the admitted
+surface and the reviewed inventory must stay exactly equal.
 
 For an enrolled private repository, effective `GITHUB_TOKEN` permissions follow
 GitHub's workflow-then-job precedence: a job-level declaration replaces the
@@ -510,8 +629,11 @@ policy cannot prove it read-only. Every directly selector-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
-`privileged-control-plane` exception. A full-SHA action does not weaken this
-rule because an action can obtain `github.token` implicitly.
+`privileged-control-plane` exception — or `publication` when the only write
+scope is `packages`, per the packages-only rule above — unless the repository
+pins that job's exact effective mapping in a `localRoutingGrants` entry as
+described above. A full-SHA action does not weaken this rule because an action
+can obtain `github.token` implicitly.
 
 For repository-local reusable calls, GitHub passes the caller's permission
 grant into the called workflow and nested calls can only keep or reduce it. The
@@ -519,16 +641,22 @@ policy follows that chain recursively. Every dynamic/local called job must
 declare an effective read-only job or workflow mapping when a caller can pass
 write; omission fails because the caller grant would flow through. A fixed
 hosted called job may inherit write only with its own
-`privileged-control-plane` exception. A local reusable caller's write grant is
+`privileged-control-plane` exception — or `publication` when the called job
+declares its own packages-only write map with no other privileged surface,
+per the packages-only rule above. A local reusable caller's write grant is
 therefore not rejected wholesale when every potentially local called job
 provably narrows it.
 
 Local-routable workload jobs also reject deployment environments, explicit
 credential expressions, and credential-minting actions listed in
-`localCredentialActions`. The only workload credential exception is the exact
+`localCredentialActions`, unless the repository's `localRoutingGrants` entry
+for that exact job names them as described above. Absent a grant, the only
+workload credential exception is the exact
 GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or functionally equivalent
 `${{ github.token }}` as a complete step-level `env`/`with` value under
-statically read-only effective permissions. Workflow/job environment values,
+statically read-only effective permissions — or under a packages-only write
+map, where the token carries exactly the `publication`-categorized authority
+per the packages-only rule above. Workflow/job environment values,
 run-script interpolation, bracket aliases, case variants, transformations, and
 user secrets remain privileged-hosted. The selector's one exact observer-secret
 mapping remains allowed because the selector is a reviewed hosted reusable
@@ -538,10 +666,12 @@ can access `github.token` implicitly, so full-SHA action policy and least token
 permissions remain the actual boundary; banning only one equivalent spelling
 would add no isolation.
 
-A runner-input contract with `allowedCallerPermissions` may also carry only
-its exact reviewed named `secrets` mapping while using selector routing. After
-that mapping passes the reusable-workflow contract, the generic credential scan
-omits only the caller's `secrets` property. Secret expressions in `with`, `if`,
+Any approved selector-routed runner-input call may carry only its exact
+reviewed named `secrets` mapping, with or without `allowedCallerPermissions`.
+After that mapping passes the reusable-workflow contract, the generic
+credential scan omits only the caller's `secrets` property; the caller's own
+permissions still require the explicit read-only boundary unless the contract
+names `allowedCallerPermissions`. Secret expressions in `with`, `if`,
 workflow or job environment values, or any other caller field remain forbidden,
 as do transformed secret expressions and `secrets: inherit`. Deployment
 environments, credential-minting actions, job containers, and services retain

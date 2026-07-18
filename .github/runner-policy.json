@@ -1,16 +1,7 @@
 {
   "schemaVersion": 1,
   "repositoryOwner": "melodic-software",
-  "visibility": "private",
-  "selfHostedCi": true,
-  "exceptions": {
-    ".github/workflows/publish-packages.yml#publish": {
-      "reason": "privileged-control-plane",
-      "justification": "Package publication has packages:write authority and must remain on GitHub-hosted infrastructure."
-    },
-    ".github/workflows/sync.yml#sync": {
-      "reason": "privileged-control-plane",
-      "justification": "Standards synchronization uses GitHub App credentials to open cross-repository pull requests and remains hosted."
-    }
-  }
+  "visibility": "public",
+  "selfHostedCi": false,
+  "exceptions": {}
 }

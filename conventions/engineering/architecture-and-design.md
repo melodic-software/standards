@@ -37,6 +37,10 @@ A failure the caller can reasonably anticipate — validation, a broken business
 
 Values that vary by environment, deployment, or operator preference belong in external configuration through the framework's own mechanism, not baked into source. Externalized settings ship with documented, safe defaults; secrets and machine-specific overrides stay out of tracked files. The counterweight is YAGNI: a single implementation with no realistic variance stays inline — a plugin framework or option bag for one value that never varies is over-engineering.
 
+## Operational change without an outage
+
+Configuration, feature flags, certificates, and code reach production without an outage. The outcome is the requirement; the mechanism is deliberately plural. Either the process offers an in-process reload path the platform provides, or — the [twelve-factor default](https://12factor.net/disposability) — processes are disposable behind rolling replacement: fast startup, graceful shutdown on SIGTERM that finishes or returns in-flight work, stateless and share-nothing so any instance can die at any moment ([processes](https://12factor.net/processes)), and robust against sudden non-graceful death. Do not build ad-hoc hot-swap machinery in a stack not designed for it; a platform with native hot-code upgrade follows that platform's own discipline instead (Erlang/OTP [release handling](https://www.erlang.org/doc/system/release_handling.html) and its appup/relup packaging is the reference case). Certificate and key rotation is additionally a lifecycle hazard — the [expiry and rotation bars](../review/timebombs.md#expiry) own it. Dev-time hot reload is developer tooling and out of scope here.
+
 ## Open for extension, closed for modification
 
 When behavior varies along an axis you keep editing — a new provider, a new branch in shared dispatch — prefer adding through registration, strategy, or injection over editing the closed core each time. The tell is the *edit-to-extend* smell: a change that adds a variant by inserting another `if` or `case` into existing code. The counterweight, again, is YAGNI: do not build an extension point for a variation that does not yet exist.
@@ -52,6 +56,8 @@ A pattern earns its place by solving a problem the code actually has. Before int
 ## Sources
 
 - Evans, *Domain-Driven Design*; Vernon, *Implementing Domain-Driven Design* — aggregate and consistency boundaries
+- The Twelve-Factor App — [IX. Disposability](https://12factor.net/disposability), [VI. Processes](https://12factor.net/processes)
+- Erlang/OTP — [Release Handling](https://www.erlang.org/doc/system/release_handling.html)
 - Wlaschin — [Railway-Oriented Programming](https://fsharpforfunandprofit.com/rop/)
 - Feathers, *Working Effectively with Legacy Code* — seams and the humble object
 - Ousterhout, *A Philosophy of Software Design* ([PDF](https://milkov.tech/assets/psd.pdf)) — deep modules, configuration parameters

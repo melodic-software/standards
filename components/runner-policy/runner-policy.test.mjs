@@ -17,6 +17,8 @@ const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
 const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
+const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
+const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
@@ -33,6 +35,20 @@ const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
 const ALTERNATE_REVIEWED_SHA = "1123456789abcdef0123456789abcdef01234567";
 const ALTERNATE_REUSABLE_REFERENCE = `${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`;
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
+// A hypothetical runner-input revision of the standards-sync workflow: the
+// secret-capable contract shape a statically read-only caller uses to route
+// the sync lane through the governed selector.
+const SYNC_RUNNER_INPUT_SHA = "2223456789abcdef0123456789abcdef01234567";
+const SYNC_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${SYNC_RUNNER_INPUT_SHA}`;
+const SYNC_RUNNER_INPUT_CONTRACT = {
+  routing: "runner-input",
+  runnerInput: "runner",
+  allowedInputs: ["runner", "dry-run", "targets"],
+  allowedSecrets: {
+    "app-client-id": `\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}`,
+    "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
+  },
+};
 // The reviewed ci-workflows floor-conversion merge commit that carries these
 // reusables' runner input; shared by both runner-input contracts.
 const WAVE1_FLOOR_CONVERSION_SHA = "3dfb18452a8c6059a22e62456390d84feb10b42f";
@@ -83,6 +99,7 @@ async function repository({
   visibility = "private",
   selfHostedCi = true,
   exceptions = {},
+  localRoutingGrants,
   policyOverrides = {},
   workflows = {},
 } = {}) {
@@ -98,6 +115,7 @@ async function repository({
         visibility,
         selfHostedCi,
         exceptions,
+        ...(localRoutingGrants ? { localRoutingGrants } : {}),
       },
       null,
       2,
@@ -1040,6 +1058,7 @@ test("selector recovery derives its literal fallback from the governed default",
   const alternateDefault = "ubuntu-22.04";
   const policyOverrides = {
     approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
+    fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, alternateDefault],
     governedReusableRunnerInput: {
       ...BASE_POLICY.governedReusableRunnerInput,
       default: alternateDefault,
@@ -1124,7 +1143,7 @@ ${SELECTOR}  test:
 
 test("omitted local permissions require the precise privileged hosted exception", async () => {
   for (const [reason, expectedRules] of [
-    ["hosted-control-plane", ["hosted-exception-category", "privileged-hosted-only"]],
+    ["docker-socket", ["hosted-exception-category", "privileged-hosted-only"]],
     ["privileged-control-plane", ["privileged-hosted-only"]],
   ]) {
     const root = await repository({
@@ -1800,7 +1819,7 @@ test("privileged workloads require the privileged-control-plane exception catego
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -1820,7 +1839,29 @@ test("privileged workloads require the privileged-control-plane exception catego
   );
 });
 
-test("privileged hosted workloads pass with the exact exception category", async () => {
+test("packages-only write jobs pass with the publication exception category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job under privileged-control-plane fails the publication category", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
@@ -1839,7 +1880,950 @@ test("privileged hosted workloads pass with the exact exception category", async
 `,
     },
   });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason publication/);
+});
+
+test("a mixed packages-and-repository write job stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "privileged-control-plane",
+        justification:
+          "Publication plus issue reporting writes repository state on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      issues: write
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
   assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job with a deployment environment stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    environment: production
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job with a credential-minting step stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/create-github-app-token@v2
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job may reference the GitHub-provided token under publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job with a named secret expression stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only publisher factored through a local reusable keeps the publication category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("an undeclared-map called job inheriting write still demands the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("require exception reason privileged-control-plane, not publication"),
+    ),
+    "an inherited write-capable map without a declared packages-only mapping must stay privileged",
+  );
+});
+
+test("a packages-only hosted-reusable caller cannot smuggle a credential input value under publication", async () => {
+  const contract = {
+    routing: "hosted-only",
+    allowedInputs: ["prompt"],
+    allowedSecrets: {},
+    fixedRunsOn: ["ubuntu-24.04"],
+  };
+  const smuggled = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(smuggled);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("requires exception reason privileged-control-plane, not publication"),
+    ),
+    "a credential expression in a with value must keep the caller privileged",
+  );
+
+  const clean = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: release notes
+`,
+    },
+  });
+  assert.deepEqual(await audit(clean), []);
+});
+
+test("a containerized packages-only job keeps the job-container category over publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason job-container, not publication/);
+});
+
+test("a containerized packages-only job in a local reusable keeps job-container in both audits", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "job-container",
+        justification: "The containerized publisher needs hosted Docker for its build image.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
+  const root = await repository({
+    localRoutingGrants: {
+      ".github/workflows/deploy.yml#apply": {
+        permissions: { contents: "read" },
+        environment: "production",
+        justification: "The protected deployment applies reviewed main from the managed fleet.",
+      },
+    },
+    workflows: {
+      "deploy.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  apply:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    environment: production
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a local-routing grant admits an exactly declared write-token workload", async () => {
+  const root = await repository({
+    localRoutingGrants: {
+      ".github/workflows/maintenance.yml#check": {
+        permissions: { contents: "read", issues: "write" },
+        justification:
+          "The scheduled update surfacer writes its rolling tracking issue from the managed fleet.",
+      },
+    },
+    workflows: {
+      "maintenance.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  check:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    env:
+      GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - run: ./check.sh
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a local-routing grant admits exact named secrets and credential-minting actions", async () => {
+  const root = await repository({
+    localRoutingGrants: {
+      ".github/workflows/deploy.yml#apply": {
+        permissions: { contents: "read", "id-token": "write" },
+        environment: "github-iac-production",
+        secrets: ["APP_PRIVATE_KEY"],
+        credentialActions: [`actions/create-github-app-token@${SHA}`],
+        justification: "The protected governance apply mints its App token on the managed fleet.",
+      },
+    },
+    workflows: {
+      "deploy.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  apply:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    environment: github-iac-production
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@${SHA}
+        with:
+          client-id: \${{ vars.APP_CLIENT_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: ./apply.sh
+        env:
+          GH_TOKEN: \${{ steps.app-token.outputs.token }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a local-routing grant naming unexercised allowances is inventory drift", async () => {
+  for (const scenario of [
+    {
+      label: "an unexercised named secret",
+      secrets: ["APP_PRIVATE_KEY", "UNUSED_KEY"],
+      steps: `    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@${SHA}
+        with:
+          client-id: \${{ vars.APP_CLIENT_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: ./apply.sh
+        env:
+          GH_TOKEN: \${{ steps.app-token.outputs.token }}
+`,
+      pattern: /secret UNUSED_KEY/,
+    },
+    {
+      label: "an unexercised credential-minting action",
+      secrets: ["APP_PRIVATE_KEY"],
+      steps: `    steps:
+      - run: ./apply.sh
+        env:
+          KEY: \${{ secrets.APP_PRIVATE_KEY }}
+`,
+      pattern: /credential-minting action actions\/create-github-app-token/,
+    },
+  ]) {
+    const root = await repository({
+      localRoutingGrants: {
+        ".github/workflows/deploy.yml#apply": {
+          permissions: { contents: "read", "id-token": "write" },
+          environment: "github-iac-production",
+          secrets: scenario.secrets,
+          credentialActions: [`actions/create-github-app-token@${SHA}`],
+          justification: "This intentionally exercises per-allowance drift detection.",
+        },
+      },
+      workflows: {
+        "deploy.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  apply:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    environment: github-iac-production
+${scenario.steps}`,
+      },
+    });
+    const findings = await audit(root);
+    assert.deepEqual(
+      findings.map(({ rule }) => rule),
+      ["local-routing-grant-drift"],
+      scenario.label,
+    );
+    assert.match(findings[0].message, scenario.pattern, scenario.label);
+  }
+});
+
+test("a local-routing grant rejects every privilege outside its exact reviewed terms", async () => {
+  for (const scenario of [
+    {
+      label: "permission drift beyond the granted map",
+      grant: { permissions: { contents: "read", issues: "write" } },
+      job: `    permissions:
+      contents: read
+      issues: write
+      packages: write
+    steps: []
+`,
+    },
+    {
+      label: "permission shorthand instead of the granted explicit mapping",
+      grant: { permissions: { contents: "read", issues: "write" } },
+      job: `    permissions: read-all
+    steps: []
+`,
+    },
+    {
+      label: "environment differing from the granted name",
+      grant: { permissions: { contents: "read" }, environment: "production" },
+      job: `    permissions:
+      contents: read
+    environment: staging
+    steps: []
+`,
+    },
+    {
+      label: "environment the grant does not name",
+      grant: { permissions: { contents: "read", issues: "write" } },
+      job: `    permissions:
+      contents: read
+      issues: write
+    environment: production
+    steps: []
+`,
+    },
+    {
+      label: "secret outside the granted allowlist",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - run: ./check.sh
+        env:
+          TOKEN: \${{ secrets.OTHER_TOKEN }}
+`,
+    },
+    {
+      label: "transformed granted secret expression",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - run: ./check.sh
+        env:
+          TOKEN: \${{ secrets.APP_PRIVATE_KEY }}-suffix
+`,
+    },
+    {
+      label: "granted secret outside a narrow step env/with value",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - run: echo \${{ secrets.APP_PRIVATE_KEY }}
+`,
+    },
+    {
+      label: "credential-minting action the grant does not name",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/create-github-app-token@${SHA}
+        with:
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+`,
+    },
+    {
+      label: "credential-minting action at a ref outside the granted pin",
+      grant: {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+        credentialActions: [`actions/create-github-app-token@${SHA}`],
+      },
+      job: `    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/create-github-app-token@main
+        with:
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+`,
+    },
+  ]) {
+    const root = await repository({
+      localRoutingGrants: {
+        ".github/workflows/ci.yml#workload": {
+          ...scenario.grant,
+          justification: "This intentionally exercises grant exactness validation.",
+        },
+      },
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  workload:
+    needs: choose
+    if: \${{ !cancelled() }}
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+${scenario.job}`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "local-routing-grant-drift", "privileged-hosted-only"],
+      scenario.label,
+    );
+  }
+});
+
+test("a local-routing grant keeps workflow-level credential env privileged", async () => {
+  const root = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#workload": {
+        permissions: { contents: "read", issues: "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+        justification: "This intentionally exercises the workflow-env boundary.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+env:
+  TOKEN: \${{ secrets.APP_PRIVATE_KEY }}
+jobs:
+  choose:
+${SELECTOR}  workload:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift", "privileged-hosted-only"],
+  );
+});
+
+test("a local-routing grant never authorizes fixed hosted or structurally excluded targets", async () => {
+  const fixedHosted = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#workload": {
+        permissions: { contents: "read", issues: "write" },
+        justification: "This intentionally exercises the selector-routed-only scope.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  workload:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(fixedHosted)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift"],
+    "a fixed hosted target must keep the ordinary privileged exception inventory",
+  );
+
+  const containerized = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#workload": {
+        permissions: { contents: "read", issues: "write" },
+        justification: "This intentionally exercises the structural exclusion boundary.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  workload:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write
+    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    container: ghcr.io/melodic-software/builder:1
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(containerized)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift", "structural-hosted-only"],
+    "a granted job with a container must remain structurally hosted",
+  );
+});
+
+test("a local-routing grant never applies to a reusable-call job", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner", "skip-actors"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    localRoutingGrants: {
+      ".github/workflows/claude-review.yml#review": {
+        permissions: { contents: "read", "pull-requests": "write", "id-token": "write" },
+        justification: "This intentionally exercises the directly-declared-job scope.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift", "privileged-hosted-only"],
+    "a caller's write permissions must stay behind allowedCallerPermissions, never a repository grant",
+  );
+});
+
+test("an unused local-routing grant is inventory drift", async () => {
+  const missingJob = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#retired": {
+        permissions: { contents: "read", issues: "write" },
+        justification: "This intentionally exercises grant inventory drift.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(missingJob)).map(({ rule }) => rule),
+    ["hosted-exception-required", "local-routing-grant-drift"],
+    "a grant keyed to a missing job must fail as drift",
+  );
+
+  const routingDisabled = await repository({
+    selfHostedCi: false,
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#workload": {
+        permissions: { contents: "read", issues: "write" },
+        justification: "This intentionally exercises grant drift without local routing.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  workload:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(routingDisabled)).map(({ rule }) => rule),
+    ["local-routing-grant-drift"],
+    "a grant in a repository without local routing must fail as drift",
+  );
+});
+
+test("contradictory, empty, or unrecognized local-routing grants fail configuration", async () => {
+  for (const [expectation, options] of [
+    [
+      /cannot declare both a hosted exception and a local-routing grant/,
+      {
+        exceptions: {
+          ".github/workflows/ci.yml#workload": {
+            reason: "privileged-control-plane",
+            justification: "This intentionally contradicts the grant below.",
+          },
+        },
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read", issues: "write" },
+            justification: "This intentionally contradicts the exception above.",
+          },
+        },
+      },
+    ],
+    [
+      /admits nothing beyond the ordinary read-only local boundary/,
+      {
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read" },
+            justification: "This intentionally grants no privilege at all.",
+          },
+        },
+      },
+    ],
+    [
+      /must not name GITHUB_TOKEN as a secret/,
+      {
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read", issues: "write" },
+            secrets: ["GITHUB_TOKEN"],
+            justification: "This intentionally misnames the provided token as a secret.",
+          },
+        },
+      },
+    ],
+    [
+      /is not in policy\.localCredentialActions/,
+      {
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read", issues: "write" },
+            credentialActions: [`actions/unknown-minter@${SHA}`],
+            justification: "This intentionally names an unrecognized credential action.",
+          },
+        },
+      },
+    ],
+    [
+      /must name one literal deployment environment/,
+      {
+        localRoutingGrants: {
+          ".github/workflows/ci.yml#workload": {
+            permissions: { contents: "read", issues: "write" },
+            environment: `\${{ vars.DEPLOY_ENV }}`,
+            justification: "This intentionally names an expression-valued environment.",
+          },
+        },
+      },
+    ],
+  ]) {
+    const root = await repository(options);
+    await assert.rejects(() => audit(root), expectation);
+  }
+});
+
+test("local-routing grant structure rejects malformed permission maps and fields", async () => {
+  for (const grant of [
+    { permissions: { "future-scope": "write" }, justification: "x" },
+    { permissions: { "id-token": "read" }, justification: "x" },
+    { permissions: { contents: "read", issues: "write" } },
+    { justification: "x" },
+    { permissions: { issues: "write" }, secrets: [], justification: "x" },
+    { permissions: { issues: "write" }, routing: "local", justification: "x" },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["actions/create-github-app-token"],
+      justification: "x",
+    },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["actions/create-github-app-token@main"],
+      justification: "x",
+    },
+  ]) {
+    const root = await repository({
+      localRoutingGrants: { ".github/workflows/ci.yml#workload": grant },
+    });
+    await assert.rejects(
+      () => audit(root),
+      (error) =>
+        error instanceof ConfigurationError && error.message.includes("localRoutingGrants"),
+      JSON.stringify(grant),
+    );
+  }
 });
 
 test("obsolete full selector SHA is rejected unless that exact path@SHA is approved", async () => {
@@ -1868,6 +2852,8 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
       `${SELECTOR_PATH}@${DEPENDABOT_ROUTING_SHA}`,
       `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
+      `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -1888,6 +2874,8 @@ test("production selector allowlist contains only independently reviewed commits
     SECURITY_HARDENING_SHA,
     DEPENDABOT_ROUTING_SHA,
     REVIEW_TIER_SELECTOR_SHA,
+    MERGE_GROUP_ROUTING_SHA,
+    GH_FREE_GATE_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
@@ -2456,7 +3444,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     },
     exceptions: {
       ".github/workflows/claude-review.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -2476,7 +3464,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
   assert.deepEqual(
     (await audit(fixedHostedWrongCategory)).map(({ rule }) => rule),
     ["hosted-exception-category"],
-    "a fixed-hosted write/id-token caller must not be satisfied by the weaker hosted-control-plane category",
+    "a fixed-hosted write/id-token caller must not be satisfied by the weaker docker-socket category",
   );
 
   const fixedHostedCorrectCategory = await repository({
@@ -2694,6 +3682,32 @@ test("privileged reusable contracts accept only direct same-name secret mappings
   }
 });
 
+test("every runner-input contract accepts only whole named-secret mapping values", async () => {
+  for (const expression of [
+    `\${{ toJSON(secrets) }}`,
+    `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}-suffix`,
+    `prefix-\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+            routing: "runner-input",
+            runnerInput: "runner",
+            allowedInputs: ["runner"],
+            allowedSecrets: { CLAUDE_CODE_OAUTH_TOKEN: expression },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      () => audit(root),
+      /allowedSecrets\.CLAUDE_CODE_OAUTH_TOKEN must be exactly/,
+      expression,
+    );
+  }
+});
+
 test("privileged reusable contracts use only official permission scope access values", async () => {
   for (const allowedCallerPermissions of [
     { "future-scope": "write" },
@@ -2740,6 +3754,147 @@ test("local permission contract must authorize at least one exact write scope", 
   await assert.rejects(
     () => audit(root),
     /allowedCallerPermissions must include at least one write permission/,
+  );
+});
+
+test("a secret-capable runner-input contract admits a statically read-only selector-routed caller", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+      },
+    },
+    workflows: {
+      "sync.yml": `permissions:
+  contents: read
+jobs:
+  choose:
+${SELECTOR}  sync:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ${SYNC_RUNNER_INPUT_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      dry-run: false
+    secrets:
+      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a secret-capable runner-input caller must pass the exact reviewed secret mapping", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+      },
+    },
+    workflows: {
+      "sync.yml": `permissions:
+  contents: read
+jobs:
+  choose:
+${SELECTOR}  sync:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ${SYNC_RUNNER_INPUT_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    secrets:
+      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.OTHER_PRIVATE_KEY }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-required", "privileged-hosted-only", "runner-target-contract"],
+  );
+  assert.ok(
+    findings.some(({ message }) =>
+      message.includes("reusable workflow secrets.app-private-key must be exactly"),
+    ),
+  );
+});
+
+test("a secret-capable runner-input contract does not waive caller write permissions", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+      },
+    },
+    workflows: {
+      "sync.yml": `permissions:
+  contents: read
+jobs:
+  choose:
+${SELECTOR}  sync:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ${SYNC_RUNNER_INPUT_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    secrets:
+      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["hosted-exception-required", "privileged-hosted-only"],
+  );
+});
+
+test("a secret-capable contract keeps its privileged hosted boundary off the selector", async () => {
+  const workflows = {
+    "sync.yml": `permissions:
+  contents: read
+jobs:
+  sync:
+    uses: ${SYNC_RUNNER_INPUT_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+    secrets:
+      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+`,
+  };
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+    },
+  };
+
+  const withoutException = await repository({ policyOverrides, workflows });
+  assert.deepEqual(
+    (await audit(withoutException)).map(({ rule }) => rule),
+    ["hosted-exception-required"],
+    "a fixed hosted secret-forwarding caller still demands its privileged exception",
+  );
+
+  const withException = await repository({
+    policyOverrides,
+    workflows,
+    exceptions: {
+      ".github/workflows/sync.yml#sync": {
+        reason: "privileged-control-plane",
+        justification: "The fixed hosted sync caller forwards GitHub App credentials.",
+      },
+    },
+  });
+  assert.deepEqual(
+    await audit(withException),
+    [],
+    "the exact privileged-control-plane category must clear the fixed hosted caller",
   );
 });
 
@@ -2853,7 +4008,7 @@ test("repository-local workflows cannot wrap fail-closed selector-result gates",
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a wrapper around a selector-result contract trustworthy.",
       },
@@ -2913,7 +4068,7 @@ test("co-triggered repository-local workflows cannot wrap fail-closed selector-r
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a co-triggered wrapper around a selector-result contract trustworthy.",
       },
@@ -4552,6 +5707,54 @@ test("Dependabot SHA bump of an allowedCallerPermissions contract is declined re
   );
 });
 
+// Regression test: a runner-input contract with a nonempty allowedSecrets
+// mapping lets a statically read-only caller forward those exact reviewed
+// secrets to a workflow executing on a caller-chosen runner. What a bumped
+// SHA's steps do with a forwarded secret sits outside the compared surface,
+// exactly like selectorResultInput and allowedCallerPermissions, so
+// auto-approval must decline every secret-capable runner-input contract even
+// when the structural surface is otherwise unchanged.
+test("Dependabot SHA bump of a secret-capable runner-input contract is declined regardless of surface match", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: { token: `\${{ secrets.SCANNER_TOKEN }}` },
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+    secrets:
+      token: \${{ secrets.SCANNER_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+    }),
+  });
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  assert.match(
+    contractFinding.message,
+    new RegExp(
+      `auto-approval declined: ${REUSABLE_PATH} receives reviewed caller secrets on a caller-chosen runner; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
+    ),
+  );
+});
+
 test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
   const root = await repository({
     visibility: "public",
@@ -4685,7 +5888,7 @@ test("reviewed reusable workflow can remain hosted with an exception", async () 
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#scan": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable scan remains hosted during rollout.",
       },
     },
@@ -4857,7 +6060,7 @@ test("Pulumi drift issues write requires the privileged hosted category", async 
     [
       {
         ".github/workflows/ci.yml#drift": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "This intentionally exercises the wrong hosted category.",
         },
       },
@@ -4962,7 +6165,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable workflow remains fixed to hosted execution.",
       },
     },
@@ -5444,6 +6647,81 @@ test("policy schema fixes the reserved sentinel literal", async () => {
   await assert.rejects(() => audit(root), /governedReusableRunnerInput\.failureSentinel/);
 });
 
+test("fallback label allowlist policy remains required", async () => {
+  const root = await repository({
+    policyOverrides: { fallbackLabelAllowlist: undefined },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message === "policy must have required property 'fallbackLabelAllowlist'",
+  );
+});
+
+test("governed fallback default must be listed in the fallback label allowlist", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be in policy.fallbackLabelAllowlist",
+  );
+});
+
+test("a hosted label removed from the approved set can no longer be the fallback default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "ubuntu-slim",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be an approved hosted runner label",
+  );
+});
+
+test("the shipped fallback default satisfies the fallback label allowlist", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the fallback label allowlist can be extended to admit another approved default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, "windows-2025"],
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'windows-2025' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 test("sentinel is not a general local reusable runner value", async () => {
   const root = await repository({
     workflows: {
@@ -5731,7 +7009,7 @@ jobs:
       },
       exceptions: {
         ".github/workflows/called.yml#test": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "The fixture's called workload remains hosted.",
         },
       },
@@ -5767,7 +7045,7 @@ test("repository-local reusable workflow symlinks are rejected", async (context)
   const root = await repository({
     exceptions: {
       ".github/workflows/real.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The real fixture workflow remains hosted.",
       },
     },
@@ -5866,7 +7144,7 @@ test("hosted exception cannot authorize runner indirection", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This job intentionally remains on a GitHub-hosted runner.",
       },
     },
@@ -6203,7 +7481,7 @@ test("hosted-only repository rejects exception inventory", async () => {
     selfHostedCi: false,
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This fixed hosted job does not route to the local fleet.",
       },
     },
