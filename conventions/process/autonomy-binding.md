@@ -21,7 +21,7 @@ exists because no automation compares the pinned version at setup time yet.
 | CI-orchestration home | [melodic-software/ci-workflows](https://github.com/melodic-software/ci-workflows) |
 | settings-as-code home | [melodic-software/github-iac](https://github.com/melodic-software/github-iac) |
 | org-policy home | This repository (`melodic-software/standards`) |
-| runner-execution home | **Unborn** — no repository holds this role; it is created only when the runner charter's build trigger fires (recorded in the autonomy work-package plans) |
+| runner-execution home | **Unborn** — no repository holds this role; it is created only when the runner charter's build trigger fires. The trigger is tracked in the plugin's [roadmap trigger register](https://github.com/melodic-software/claude-code-plugins/blob/main/plugins/autonomy/README.md); the quarterly vocabulary recheck above reads that register, so the birth is discovered no later than the next recheck |
 
 ## Consumption
 
