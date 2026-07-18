@@ -17,25 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   pr-title:
-    needs: select-runner
-    if: ${{ always() }}
     permissions:
       pull-requests: read
     uses: melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: ${{ needs.select-runner.result }}
+      runner: ubuntu-24.04
