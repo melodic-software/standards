@@ -2029,6 +2029,83 @@ test("a packages-only write job with a named secret expression stays in the priv
   );
 });
 
+test("a packages-only publisher factored through a local reusable keeps the publication category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("an undeclared-map called job inheriting write still demands the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("require exception reason privileged-control-plane, not publication"),
+    ),
+    "an inherited write-capable map without a declared packages-only mapping must stay privileged",
+  );
+});
+
 test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
   const root = await repository({
     localRoutingGrants: {

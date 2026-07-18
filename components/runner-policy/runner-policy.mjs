@@ -767,6 +767,24 @@ function auditLocalPermissionFlow({
       target?.kind === "hosted-reusable" ||
       target?.kind === "hosted-local-reusable";
     if (hostedExecution && capability !== "read-only") {
+      // The direct audit of this same job classifies a declared packages-only
+      // write map (with no other privileged surface) as publication; this flow
+      // pass must demand the same category or the two checks contradict each
+      // other on one exception key. Anything else — a broader declared map, an
+      // additional privileged surface, or an undeclared map that merely
+      // inherits the caller's write capability — stays privileged.
+      const declaredRequirement = privilegedHostedRequirement(
+        record.workflow,
+        job,
+        selector,
+        target,
+        policy,
+        undefined,
+        undefined,
+        undefined,
+      );
+      const requiredReason =
+        declaredRequirement?.reason === "publication" ? "publication" : "privileged-control-plane";
       const key = `${record.file}#${jobId}`;
       const exception = config.exceptions.get(key);
       if (!exception) {
@@ -775,18 +793,18 @@ function auditLocalPermissionFlow({
             "hosted-exception-required",
             record.file,
             jobId,
-            "a fixed-hosted called job inherits write-capable caller permissions and requires a privileged-control-plane exception",
+            `a fixed-hosted called job inherits write-capable caller permissions and requires a ${requiredReason} exception`,
           ),
         );
       } else {
         consumedExceptions.add(key);
-        if (exception.reason !== "privileged-control-plane") {
+        if (exception.reason !== requiredReason) {
           findings.push(
             finding(
               "hosted-exception-category",
               record.file,
               jobId,
-              `inherited write-capable caller permissions require exception reason privileged-control-plane, not ${exception.reason}`,
+              `inherited write-capable caller permissions require exception reason ${requiredReason}, not ${exception.reason}`,
             ),
           );
         }
