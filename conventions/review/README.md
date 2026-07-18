@@ -37,6 +37,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [multi-tenancy.md](multi-tenancy.md) | horizontal (cross-tenant) authorization, isolation, tenant lifecycle |
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |
+| [date-time.md](date-time.md) | zone vs offset, future-local-time storage, tzdata currency, monotonic elapsed time, epoch ranges |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
 | [ai-generated-code.md](ai-generated-code.md) | the empirical failure modes of AI-authored changes |
