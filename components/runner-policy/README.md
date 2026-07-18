@@ -63,9 +63,13 @@ runner-policy:
 
 In a private repository with `selfHostedCi: true`, the gate job instead
 routes through the governed selector like any other eligible read-only job,
-with the approved hosted fallback covering selector failure — no exception
-category exists for pinning read-only work to hosted infrastructure. A
-hosted-only repository sets
+with the approved hosted fallback covering selector failure. No dedicated
+category pins read-only work to hosted infrastructure: the remaining reasons
+describe structural constraints (Windows, containers, Docker socket access),
+and while the analyzer consumes any allowlisted reason for an eligible
+read-only fixed-hosted job without validating that constraint, declaring a
+structural reason the job does not exercise is a review-time inventory
+defect, not an admitted route. A hosted-only repository sets
 `selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
 fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
