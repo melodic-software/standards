@@ -25,9 +25,8 @@ Team-plan rollout. Trigger: this repository or any consumer gains
 Team/Enterprise Code Review access.
 -->
 
-Review-specific guidance belongs in `REVIEW.md`, not here. That file does
-not exist in this repository yet (tracked separately); once it lands, link
-to it here instead of naming it in prose. Managed Code Review reads
+Review-specific guidance belongs in [`REVIEW.md`](REVIEW.md), not here.
+Managed Code Review reads
 `CLAUDE.md` as general project context (nit-level findings only) and
 `REVIEW.md` as review-only, highest-priority instructions — duplicating
 review rules into this file would create two sources of truth for the same
