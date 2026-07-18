@@ -3226,7 +3226,15 @@ export async function auditRepository({
             grantUsage,
           )
         : undefined;
-      const hostedRequirement = privilegedHosted ?? structuralHostedRequirement(job);
+      // A held publication downgrade must not mask the structural container
+      // categories: a containerized packages-only publisher stays in the
+      // job-container/service-container inventory. Privileged requirements
+      // keep their ordinary precedence over structural ones.
+      const structuralHosted = structuralHostedRequirement(job);
+      const hostedRequirement =
+        privilegedHosted?.reason === "publication"
+          ? (structuralHosted ?? privilegedHosted)
+          : (privilegedHosted ?? structuralHosted);
       if (
         grant &&
         routingEnabled &&

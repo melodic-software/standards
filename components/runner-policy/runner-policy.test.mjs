@@ -2176,6 +2176,34 @@ jobs:
   assert.deepEqual(await audit(clean), []);
 });
 
+test("a containerized packages-only job keeps the job-container category over publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason job-container, not publication/);
+});
+
 test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
   const root = await repository({
     localRoutingGrants: {
