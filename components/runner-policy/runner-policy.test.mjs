@@ -1143,7 +1143,7 @@ ${SELECTOR}  test:
 
 test("omitted local permissions require the precise privileged hosted exception", async () => {
   for (const [reason, expectedRules] of [
-    ["hosted-control-plane", ["hosted-exception-category", "privileged-hosted-only"]],
+    ["docker-socket", ["hosted-exception-category", "privileged-hosted-only"]],
     ["privileged-control-plane", ["privileged-hosted-only"]],
   ]) {
     const root = await repository({
@@ -1819,7 +1819,7 @@ test("privileged workloads require the privileged-control-plane exception catego
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -3444,7 +3444,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     },
     exceptions: {
       ".github/workflows/claude-review.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -3464,7 +3464,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
   assert.deepEqual(
     (await audit(fixedHostedWrongCategory)).map(({ rule }) => rule),
     ["hosted-exception-category"],
-    "a fixed-hosted write/id-token caller must not be satisfied by the weaker hosted-control-plane category",
+    "a fixed-hosted write/id-token caller must not be satisfied by the weaker docker-socket category",
   );
 
   const fixedHostedCorrectCategory = await repository({
@@ -4008,7 +4008,7 @@ test("repository-local workflows cannot wrap fail-closed selector-result gates",
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a wrapper around a selector-result contract trustworthy.",
       },
@@ -4068,7 +4068,7 @@ test("co-triggered repository-local workflows cannot wrap fail-closed selector-r
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a co-triggered wrapper around a selector-result contract trustworthy.",
       },
@@ -5888,7 +5888,7 @@ test("reviewed reusable workflow can remain hosted with an exception", async () 
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#scan": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable scan remains hosted during rollout.",
       },
     },
@@ -6060,7 +6060,7 @@ test("Pulumi drift issues write requires the privileged hosted category", async 
     [
       {
         ".github/workflows/ci.yml#drift": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "This intentionally exercises the wrong hosted category.",
         },
       },
@@ -6165,7 +6165,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable workflow remains fixed to hosted execution.",
       },
     },
@@ -7009,7 +7009,7 @@ jobs:
       },
       exceptions: {
         ".github/workflows/called.yml#test": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "The fixture's called workload remains hosted.",
         },
       },
@@ -7045,7 +7045,7 @@ test("repository-local reusable workflow symlinks are rejected", async (context)
   const root = await repository({
     exceptions: {
       ".github/workflows/real.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The real fixture workflow remains hosted.",
       },
     },
@@ -7144,7 +7144,7 @@ test("hosted exception cannot authorize runner indirection", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This job intentionally remains on a GitHub-hosted runner.",
       },
     },
@@ -7481,7 +7481,7 @@ test("hosted-only repository rejects exception inventory", async () => {
     selfHostedCi: false,
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This fixed hosted job does not route to the local fleet.",
       },
     },
