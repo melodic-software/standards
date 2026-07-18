@@ -54,4 +54,19 @@ assert_exit 'win repo: placeholder stays clean' 1 "$?"
 matches "$HPP_ESCAPED_WIN_REPO_BODY" 'D:\\repos\\acme\\project'
 assert_exit 'win repo: JSON-escaped form is flagged' 0 "$?"
 
+# Bare roots (the home/checkout directory itself, no child path) are
+# intentionally not matched: the trailing separator every body requires is its
+# right boundary, so a match needs at least one child segment past the root.
+# These assertions pin that non-match so it cannot silently regress.
+matches "$HPP_WIN_USER_BODY" 'C:\Users\Alice'
+assert_exit 'win user: bare root without child stays clean' 1 "$?"
+matches "$HPP_MACOS_USER_BODY" '/Users/alice'
+assert_exit 'macos user: bare root without child stays clean' 1 "$?"
+matches "$HPP_LINUX_USER_BODY" '/home/alice'
+assert_exit 'linux user: bare root without child stays clean' 1 "$?"
+matches "$HPP_WIN_REPO_BODY" 'D:\repos\acme'
+assert_exit 'win repo: bare root without child stays clean' 1 "$?"
+matches "$HPP_ESCAPED_WIN_REPO_BODY" 'D:\\repos\\acme'
+assert_exit 'win repo: JSON-escaped bare root without child stays clean' 1 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1

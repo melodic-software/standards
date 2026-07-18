@@ -2,9 +2,12 @@
 
 Shared regex bodies for detecting machine-specific absolute paths — Windows,
 macOS, and Linux user-home directories and repo-checkout roots — in tracked
-files and generated content. Portable placeholders such as `C:\Users\<user>\`
-and `<repo-root>/` stay clean by construction (the negative character classes
-exclude `<`, `$`, `{`, and bare `~`).
+files and generated content. Each body matches a root and at least one child
+path segment (`C:\Users\Alice\project`); a bare root with no trailing separator
+(`C:\Users\Alice`, `/home/alice`) is intentionally not matched. Portable
+placeholders such as `C:\Users\<user>\` and `<repo-root>/` stay clean by
+construction (the negative character classes exclude `<`, `$`, `{`, and bare
+`~`).
 
 `machine-path-patterns.sh` is a define-only Bash library: the five `HPP_*`
 pattern bodies and nothing else. Scan drivers own everything around them —
@@ -21,5 +24,6 @@ be propagated by hand to every copy. The bodies now land here once and reach
 every driver through the sync pipeline.
 
 `machine-path-patterns.test.sh` pins the contract: each body matches the path
-shapes it exists to catch (plain, forward-slash, JSON-escaped, 8.3 short-name)
-and stays clean on the placeholder forms.
+shapes it exists to catch (plain, forward-slash, JSON-escaped, 8.3 short-name),
+and stays clean on the placeholder forms and on bare roots that lack a trailing
+separator.
