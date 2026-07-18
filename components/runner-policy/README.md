@@ -517,7 +517,10 @@ organization state, and keeping it in the durable category lets published
 artifacts retain hosted provenance after the control-plane reasons retire.
 Any additional write scope — or any other privileged surface on the job, such
 as a deployment environment, a credential expression, or a credential-minting
-action — keeps the job privileged.
+action — keeps the job privileged. The one admission is the exact
+GitHub-provided token expression (the common registry-authentication step
+env), which carries only the packages-only permission map the exception
+already reviews.
 
 A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job
