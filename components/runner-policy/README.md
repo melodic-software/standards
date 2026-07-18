@@ -515,7 +515,9 @@ belongs to the `publication` category, not `privileged-control-plane`:
 `packages: write` is registry-publication authority rather than repository or
 organization state, and keeping it in the durable category lets published
 artifacts retain hosted provenance after the control-plane reasons retire.
-Any additional write scope keeps the job privileged.
+Any additional write scope — or any other privileged surface on the job, such
+as a deployment environment, a credential expression, or a credential-minting
+action — keeps the job privileged.
 
 A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job

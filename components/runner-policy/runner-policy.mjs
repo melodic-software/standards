@@ -2588,7 +2588,12 @@ function grantedSecretName(value, secretNames) {
   return match !== null && secretNames.has(match[1]) ? match[1] : undefined;
 }
 
-function localCredentialRequirement(workflow, job, grantAllowance) {
+function localCredentialRequirement(
+  workflow,
+  job,
+  grantAllowance,
+  { admitGitHubToken = false } = {},
+) {
   if (containsCredentialExpression(workflow.env)) {
     return "a credential expression in workflow-level env";
   }
@@ -2623,8 +2628,12 @@ function localCredentialRequirement(workflow, job, grantAllowance) {
         EXACT_GITHUB_TOKEN_EXPRESSIONS.has(value) &&
         // A grant pins the job's exact effective permission map, so the
         // GitHub-provided token those permissions describe is admitted even
-        // when the pinned map holds a write scope.
-        (readOnly || grantAllowance !== undefined)
+        // when the pinned map holds a write scope. admitGitHubToken extends
+        // the same reasoning to the publication category: the packages-only
+        // permission map the exception reviews is exactly the capability the
+        // GitHub-provided token carries, so referencing that token adds no
+        // credential surface beyond the already-categorized permissions.
+        (readOnly || grantAllowance !== undefined || admitGitHubToken)
       ) {
         continue;
       }
@@ -2724,6 +2733,14 @@ function privilegedHostedRequirement(
   // and a grant keyed to such a job surfaces as local-routing-grant-drift.
   const grantApplies =
     grant !== undefined && target?.kind === "selector-output" && typeof job.uses !== "string";
+  // The publication downgrade holds only while packages:write is the job's
+  // entire privileged surface: a deployment environment, credential
+  // expression, or credential-minting action found below still demands the
+  // privileged category, so the weaker requirement is held until every later
+  // check passes rather than returned at the permission check. The one
+  // admission is the exact GitHub-provided token expression, which carries
+  // only the already-categorized packages-only permission map.
+  let publicationRequirement;
   if (grantApplies) {
     const permissionError = exactCanonicalMap(
       effectivePermissions(workflow, job),
@@ -2746,7 +2763,9 @@ function privilegedHostedRequirement(
         : permissionHostedRequirement(workflow, job, {
             requireExplicitReadOnly: target?.kind === "selector-output",
           });
-    if (permissionRequirement) {
+    if (permissionRequirement?.reason === "publication") {
+      publicationRequirement = permissionRequirement;
+    } else if (permissionRequirement) {
       return permissionRequirement;
     }
   }
@@ -2756,7 +2775,7 @@ function privilegedHostedRequirement(
   // likewise governed by approvedReusableWorkflowContracts rather than this
   // local-workload boundary.
   if (selector.isSelector || target?.kind === "hosted-reusable") {
-    return undefined;
+    return publicationRequirement;
   }
 
   if (
@@ -2790,7 +2809,14 @@ function privilegedHostedRequirement(
   const grantAllowance = grantApplies
     ? { secretNames: new Set(grant.secrets ?? []), usedSecretNames: new Set() }
     : undefined;
-  const credentialRequirement = localCredentialRequirement(workflow, credentialJob, grantAllowance);
+  const credentialRequirement = localCredentialRequirement(
+    workflow,
+    credentialJob,
+    grantAllowance,
+    {
+      admitGitHubToken: publicationRequirement !== undefined,
+    },
+  );
   if (credentialRequirement) {
     return {
       reason: "privileged-control-plane",
@@ -2836,7 +2862,7 @@ function privilegedHostedRequirement(
     ];
   }
 
-  return undefined;
+  return publicationRequirement;
 }
 
 function structuralHostedRequirement(job) {

@@ -1909,6 +1909,126 @@ test("a mixed packages-and-repository write job stays in the privileged category
   assert.deepEqual(await audit(root), []);
 });
 
+test("a packages-only write job with a deployment environment stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    environment: production
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job with a credential-minting step stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/create-github-app-token@v2
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job may reference the GitHub-provided token under publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job with a named secret expression stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
 test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
   const root = await repository({
     localRoutingGrants: {
