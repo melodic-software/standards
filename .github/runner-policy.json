@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repositoryOwner": "melodic-software",
-  "visibility": "private",
-  "selfHostedCi": true,
+  "visibility": "public",
+  "selfHostedCi": false,
   "exceptions": {
     ".github/workflows/publish-packages.yml#publish": {
       "reason": "publication",
