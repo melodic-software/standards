@@ -1837,7 +1837,29 @@ test("privileged workloads require the privileged-control-plane exception catego
   );
 });
 
-test("privileged hosted workloads pass with the exact exception category", async () => {
+test("packages-only write jobs pass with the publication exception category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job under privileged-control-plane fails the publication category", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
@@ -1852,6 +1874,364 @@ test("privileged hosted workloads pass with the exact exception category", async
     permissions:
       packages: write
     runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason publication/);
+});
+
+test("a mixed packages-and-repository write job stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "privileged-control-plane",
+        justification:
+          "Publication plus issue reporting writes repository state on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      issues: write
+      packages: write
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job with a deployment environment stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    environment: production
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job with a credential-minting step stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/create-github-app-token@v2
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only write job may reference the GitHub-provided token under publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a packages-only write job with a named secret expression stays in the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not publication/,
+  );
+});
+
+test("a packages-only publisher factored through a local reusable keeps the publication category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("an undeclared-map called job inheriting write still demands the privileged category", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("require exception reason privileged-control-plane, not publication"),
+    ),
+    "an inherited write-capable map without a declared packages-only mapping must stay privileged",
+  );
+});
+
+test("a packages-only hosted-reusable caller cannot smuggle a credential input value under publication", async () => {
+  const contract = {
+    routing: "hosted-only",
+    allowedInputs: ["prompt"],
+    allowedSecrets: {},
+    fixedRunsOn: ["ubuntu-24.04"],
+  };
+  const smuggled = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(smuggled);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("requires exception reason privileged-control-plane, not publication"),
+    ),
+    "a credential expression in a with value must keep the caller privileged",
+  );
+
+  const clean = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: release notes
+`,
+    },
+  });
+  assert.deepEqual(await audit(clean), []);
+});
+
+test("a containerized packages-only job keeps the job-container category over publication", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
+    steps: []
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(findings[0].message, /requires exception reason job-container, not publication/);
+});
+
+test("a containerized packages-only job in a local reusable keeps job-container in both audits", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "job-container",
+        justification: "The containerized publisher needs hosted Docker for its build image.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
     steps: []
 `,
     },

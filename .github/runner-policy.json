@@ -5,8 +5,8 @@
   "selfHostedCi": true,
   "exceptions": {
     ".github/workflows/publish-packages.yml#publish": {
-      "reason": "privileged-control-plane",
-      "justification": "Package publication has packages:write authority and must remain on GitHub-hosted infrastructure."
+      "reason": "publication",
+      "justification": "Registry publication stays on GitHub-hosted infrastructure so published-artifact provenance never depends on fleet container integrity; packages:write and the registry token therefore never reach a self-hosted worker."
     },
     ".github/workflows/sync.yml#sync": {
       "reason": "privileged-control-plane",

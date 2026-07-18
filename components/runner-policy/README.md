@@ -187,7 +187,9 @@ unknown secret names, and alternate expressions:
   instead pins a fixed hosted runner literal through the same input gets no
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
-  `id-token`-capable job.
+  `id-token`-capable job — or `publication` when the caller's only write
+  scope is `packages` and it carries no other privileged surface, per the
+  packages-only rule below.
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
   exactly that named secret mapping while selector-routed, because the
@@ -510,7 +512,17 @@ allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
 renamed, and deleted exception entries fail as inventory drift. The centrally
 allowlisted reasons deliberately cover Windows, job/service containers, Docker
 socket access, privileged control planes, publication, Dependabot, and narrow
-hosted control-plane work.
+hosted control-plane work. A hosted job whose only write scope is `packages`
+belongs to the `publication` category, not `privileged-control-plane`:
+`packages: write` is registry-publication authority rather than repository or
+organization state, and keeping it in the durable category lets published
+artifacts retain hosted provenance after the control-plane reasons retire.
+Any additional write scope — or any other privileged surface on the job, such
+as a deployment environment, a credential expression, or a credential-minting
+action — keeps the job privileged. The one admission is the exact
+GitHub-provided token expression (the common registry-authentication step
+env), which carries only the packages-only permission map the exception
+already reviews.
 
 A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job
@@ -579,10 +591,11 @@ policy cannot prove it read-only. Every directly selector-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
-`privileged-control-plane` exception, unless the repository pins that job's
-exact effective mapping in a `localRoutingGrants` entry as described above. A
-full-SHA action does not weaken this rule because an action can obtain
-`github.token` implicitly.
+`privileged-control-plane` exception — or `publication` when the only write
+scope is `packages`, per the packages-only rule above — unless the repository
+pins that job's exact effective mapping in a `localRoutingGrants` entry as
+described above. A full-SHA action does not weaken this rule because an action
+can obtain `github.token` implicitly.
 
 For repository-local reusable calls, GitHub passes the caller's permission
 grant into the called workflow and nested calls can only keep or reduce it. The
@@ -590,7 +603,9 @@ policy follows that chain recursively. Every dynamic/local called job must
 declare an effective read-only job or workflow mapping when a caller can pass
 write; omission fails because the caller grant would flow through. A fixed
 hosted called job may inherit write only with its own
-`privileged-control-plane` exception. A local reusable caller's write grant is
+`privileged-control-plane` exception — or `publication` when the called job
+declares its own packages-only write map with no other privileged surface,
+per the packages-only rule above. A local reusable caller's write grant is
 therefore not rejected wholesale when every potentially local called job
 provably narrows it.
 
@@ -601,7 +616,9 @@ for that exact job names them as described above. Absent a grant, the only
 workload credential exception is the exact
 GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or functionally equivalent
 `${{ github.token }}` as a complete step-level `env`/`with` value under
-statically read-only effective permissions. Workflow/job environment values,
+statically read-only effective permissions — or under a packages-only write
+map, where the token carries exactly the `publication`-categorized authority
+per the packages-only rule above. Workflow/job environment values,
 run-script interpolation, bracket aliases, case variants, transformations, and
 user secrets remain privileged-hosted. The selector's one exact observer-secret
 mapping remains allowed because the selector is a reviewed hosted reusable
