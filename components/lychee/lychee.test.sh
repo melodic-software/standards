@@ -41,6 +41,8 @@ assert_not_contains 'private raw-content URL is excluded' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/'
 assert_not_contains 'current Medium article is excluded' "$dump_out" \
   'https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f'
+assert_not_contains 'Fortmatic postmortem is excluded' "$dump_out" \
+  'https://medium.com/fortmatic/postmortem-service-disruption-from-expired-ssl-certificate-a993a59272a0'
 assert_not_contains 'current Miro article is excluded' "$dump_out" \
   'https://help.miro.com/hc/en-us/articles/31624028247058'
 assert_not_contains 'current IsDown page is excluded' "$dump_out" \

@@ -40,6 +40,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [date-time.md](date-time.md) | zone vs offset, future-local-time storage, tzdata currency, monotonic elapsed time, epoch ranges |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
+| [timebombs.md](timebombs.md) | unbounded growth, quota and hard-constraint exhaustion, expiry and rotation, data lifecycle, crash recovery |
 | [ai-generated-code.md](ai-generated-code.md) | the empirical failure modes of AI-authored changes |
 | [ai-review-bot-composition.md](ai-review-bot-composition.md) | expected automated AI-reviewer composition per repository governance class |
 | [mcp.md](mcp.md) | tools and MCP servers exposed to LLM agents |

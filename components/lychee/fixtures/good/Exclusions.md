@@ -14,6 +14,7 @@ lane:
 The exact current public URLs that reject automated link checkers are excluded:
 
 - <https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f>
+- <https://medium.com/fortmatic/postmortem-service-disruption-from-expired-ssl-certificate-a993a59272a0>
 - <https://help.miro.com/hc/en-us/articles/31624028247058>
 - <https://isdown.app/status/anthropic>
 - <https://www.npmjs.com/package/firecrawl-cli>
