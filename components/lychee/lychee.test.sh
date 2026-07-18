@@ -19,12 +19,12 @@ require_min_version lychee "$(lychee --version | awk '{ print $2 }')" 0.24.2
 private_org_rule="$(grep -F \
   "  '^https?://github\\.com/melodic-software/" "$config" || true)"
 assert_eq 'private GitHub exclusion is one exact transferred-org inventory' \
-  "  '^https?://github\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)(\\.git)?([/#?]|$)'," \
+  "  '^https?://github\\.com/melodic-software/(dotfiles|github-iac|medley|provisioning)(\\.git)?([/#?]|$)'," \
   "$private_org_rule"
 private_raw_rule="$(grep -F \
   "  '^https?://raw\\.githubusercontent\\.com/melodic-software/" "$config" || true)"
 assert_eq 'private raw-content exclusion uses the same exact inventory' \
-  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/(claude-code-plugins|dotfiles|github-iac|medley|provisioning|standards)/'," \
+  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/(dotfiles|github-iac|medley|provisioning)/'," \
   "$private_raw_rule"
 assert_eq 'obsolete personal-owner private exclusion is absent' '0' \
   "$(grep -cF 'github\.com/kyle-sexton/' "$config" || true)"
@@ -33,11 +33,17 @@ dump_out="$(lychee --dump --config "$config" \
   components/lychee/fixtures/good/Exclusions.md 2>&1)"
 rc=$?
 assert_exit 'URL exclusion boundary dump needs no network and exits 0' 0 "$rc"
-for repo in claude-code-plugins dotfiles github-iac medley provisioning standards; do
+for repo in dotfiles github-iac medley provisioning; do
   assert_not_contains "private inventory excludes melodic-software/$repo" \
     "$dump_out" "https://github.com/melodic-software/$repo"
 done
+for repo in claude-code-plugins standards; do
+  assert_contains "public melodic-software/$repo stays checked" \
+    "$dump_out" "https://github.com/melodic-software/$repo"
+done
 assert_not_contains 'private raw-content URL is excluded' \
+  "$dump_out" 'https://raw.githubusercontent.com/melodic-software/dotfiles/'
+assert_contains 'public raw-content URL stays checked' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/'
 assert_not_contains 'current Medium article is excluded' "$dump_out" \
   'https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f'
