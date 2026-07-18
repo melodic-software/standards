@@ -187,7 +187,9 @@ unknown secret names, and alternate expressions:
   instead pins a fixed hosted runner literal through the same input gets no
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
-  `id-token`-capable job.
+  `id-token`-capable job — or `publication` when the caller's only write
+  scope is `packages` and it carries no other privileged surface, per the
+  packages-only rule below.
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
   exactly that named secret mapping while selector-routed, because the
