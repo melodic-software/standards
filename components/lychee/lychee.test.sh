@@ -49,11 +49,15 @@ assert_not_contains 'current firecrawl-cli package page is excluded' "$dump_out"
   'https://www.npmjs.com/package/firecrawl-cli'
 assert_not_contains 'current Miro API package page is excluded' "$dump_out" \
   'https://www.npmjs.com/package/@mirohq/miro-api'
+assert_not_contains 'current MySQL isolation manual page is excluded' "$dump_out" \
+  'https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html'
 assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
 assert_contains 'another Miro help path remains checked' "$dump_out" \
   'https://help.miro.com/hc/en-us/articles/example'
 assert_contains 'another IsDown path remains checked' "$dump_out" 'https://isdown.app/status/example'
 assert_contains 'another npm package remains checked' "$dump_out" 'https://www.npmjs.com/package/example'
+assert_contains 'another MySQL manual path remains checked' "$dump_out" \
+  'https://dev.mysql.com/doc/refman/8.4/en/example.html'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \
