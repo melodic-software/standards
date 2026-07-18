@@ -2,7 +2,8 @@ name: standards-sync
 
 # Exact-file distribution: standards owns desired bytes and ci-workflows owns
 # GitHub orchestration. Every real run opens or refreshes one reviewed PR per
-# target; it never writes directly to a target's default branch.
+# target; it never writes directly to a target's default branch. Public repo:
+# runs on the reusable's hosted default runner.
 on:
   push:
     branches: [main]
@@ -26,27 +27,12 @@ permissions:
   contents: read
 
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   sync:
     # Real runs attest App access for the complete unfiltered manifest before
     # mutation; `targets` limits reconciliation only, never attestation.
-    needs: select-runner
-    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
     uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+      runner: ubuntu-24.04
       # Schedule and push run for real (inputs is empty on those events, so
       # `|| false` makes them real runs); manual dispatch keeps its dry-run
       # preview default. Do NOT flip to `== 'schedule'` — that inverts it and
