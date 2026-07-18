@@ -9,7 +9,9 @@ names appear among the contract's artifacts.
 
 Role-vocabulary version bound: **v0.1.0** (the `autonomy` plugin version that shipped the
 topology contract). A role-vocabulary change upstream updates this document in the same
-review cycle.
+review cycle. Recheck the pin against the plugin's current `reference/role-topology.md` by
+**2026-10-18** and quarterly thereafter (bump the date on each recheck); this dated trigger
+exists because no automation compares the pinned version at setup time yet.
 
 ## Role bindings
 
