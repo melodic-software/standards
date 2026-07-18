@@ -13,11 +13,11 @@ Diff-time checks for structural integrity, contract evolution, and build-system 
 
 ## Operational swap
 
-The owning posture — operational change requires no outage, via a reload path or disposable processes — lives in `../engineering/architecture-and-design.md`; these bars flag the diff-time violations.
+These bars flag diff-time violations of the [operational-change posture](../engineering/architecture-and-design.md#operational-change-without-an-outage).
 
 - **In-process state accretion that breaks any-instance-can-die** — a change that starts holding session, workflow, or cache-as-truth state in process memory, so an instance can no longer be killed and replaced without loss. Important.
-- **Missing graceful shutdown or drain** — a new long-running process, worker, or listener with no termination-signal handling: nothing stops intake, finishes or returns in-flight work, or releases held resources on shutdown. Important.
-- **Restart-only wiring where a reload path exists** — a change that wires a value so only a full process restart applies it, on a platform that offers a reload mechanism for exactly that kind of value. Suggestion; Important where operators change the value routinely (certificates, feature flags).
+- **Missing graceful shutdown or drain** — a new long-running process, worker, or listener with no termination-signal handling or drain on shutdown. Important.
+- **Restart-only wiring where a reload path exists** — a change that wires a value so only a full process restart applies it, on a platform that offers a reload mechanism for exactly that kind of value. Suggestion; Important where operators change the value routinely (certificates, feature flags — whether a renewal is *triggered* automatically stays with `timebombs.md`; this bar owns only whether applying the new value needs a restart).
 
 ## Contract evolution
 
