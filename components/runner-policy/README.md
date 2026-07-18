@@ -37,8 +37,9 @@ GITHUB_REPOSITORY=owner/repository \
   node .github/standards/runner-policy/runner-policy.mjs --root .
 ```
 
-The policy gate itself stays on an explicit GitHub-hosted image so the
-enforcement path neither depends on nor exercises the fleet it audits:
+In a hosted-only repository the policy gate stays on an explicit
+GitHub-hosted image so the enforcement path neither depends on nor exercises
+any self-hosted fleet:
 
 ```yaml
 runner-policy:
@@ -60,9 +61,15 @@ runner-policy:
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
-In a private repository with `selfHostedCi: true`, its
-`.github/runner-policy.json` entry declares that fixed hosted job with a
-`hosted-control-plane` exception. A hosted-only repository sets
+In a private repository with `selfHostedCi: true`, the gate job instead
+routes through the governed selector like any other eligible read-only job,
+with the approved hosted fallback covering selector failure. No dedicated
+category pins read-only work to hosted infrastructure: the remaining reasons
+describe structural constraints (Windows, containers, Docker socket access),
+and while the analyzer consumes any allowlisted reason for an eligible
+read-only fixed-hosted job without validating that constraint, declaring a
+structural reason the job does not exercise is a review-time inventory
+defect, not an admitted route. A hosted-only repository sets
 `selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
 fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
@@ -157,6 +164,14 @@ failure, that operational value has not passed the selector's approved-hosted-
 label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to
 `ubuntu-24.04`.
+
+The frozen literal is the governed `default`, and that default must appear in
+`fallbackLabelAllowlist` — a set deliberately narrower than
+`approvedHostedRunnerLabels`. A label may be an approved explicit `runs-on`
+target yet still be barred from becoming the silent recovery fallback, so a
+costlier hosted tier cannot slip in as the default that fires whenever the
+selector fails. Configuration fails closed when the default is absent from the
+allowlist.
 
 The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
 (the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
@@ -363,9 +378,25 @@ write-access users can enqueue one, and `pull_request_target` executes the
 trusted base-ref workflow definition. The fork guard is extended to cover
 both pull-request event names, so every fork-origin pull-request context
 still routes off the managed fleet.
-Nine selector revisions remain approved for an ordered consumer rollout.
+The gh-free gate revision at
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` carries the do-not-merge-gate
+label refetch rewritten onto github-script's bundled Node runtime
+(ci-workflows#144) and the hosted fallback label moved from the retired
+`ubuntu-slim` to `ubuntu-24.04` (ci-workflows#141), so metadata-only
+required gates no longer shell out to a `gh` binary the fleet image does
+not carry. Its selector diff against `ec91c343` is limited to that
+fallback-label change plus comments, and the six reusable contracts
+registered at this revision were copied from each workflow's newest
+previously approved SHA after byte-level comparison: `claude-review`,
+`link-check`, and `osv-scanner` are byte-identical; `semantic-pr` and
+`pr-issue-linkage` differ only by the same fallback-label change plus
+comments; and `zizmor` adds a version-pin default bump (v1.26.1 to
+v1.27.0) and curl timeout hardening with its input surface unchanged.
+No contract changes its input, secret, routing, or caller-permission
+surface.
+Ten selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these six strict-scheduling
+owned by a different repository owner, so these seven strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -511,8 +542,8 @@ An exception is keyed by `<workflow path>#<job id>` and requires both an
 allowlisted machine-readable `reason` and a non-empty `justification`. Extra,
 renamed, and deleted exception entries fail as inventory drift. The centrally
 allowlisted reasons deliberately cover Windows, job/service containers, Docker
-socket access, privileged control planes, publication, Dependabot, and narrow
-hosted control-plane work. A hosted job whose only write scope is `packages`
+socket access, privileged control planes, publication, and Dependabot. A
+hosted job whose only write scope is `packages`
 belongs to the `publication` category, not `privileged-control-plane`:
 `packages: write` is registry-publication authority rather than repository or
 organization state, and keeping it in the durable category lets published

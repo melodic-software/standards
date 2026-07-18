@@ -18,6 +18,7 @@ const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
 const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
 const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
+const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
@@ -1057,6 +1058,7 @@ test("selector recovery derives its literal fallback from the governed default",
   const alternateDefault = "ubuntu-22.04";
   const policyOverrides = {
     approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
+    fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, alternateDefault],
     governedReusableRunnerInput: {
       ...BASE_POLICY.governedReusableRunnerInput,
       default: alternateDefault,
@@ -1141,7 +1143,7 @@ ${SELECTOR}  test:
 
 test("omitted local permissions require the precise privileged hosted exception", async () => {
   for (const [reason, expectedRules] of [
-    ["hosted-control-plane", ["hosted-exception-category", "privileged-hosted-only"]],
+    ["docker-socket", ["hosted-exception-category", "privileged-hosted-only"]],
     ["privileged-control-plane", ["privileged-hosted-only"]],
   ]) {
     const root = await repository({
@@ -1817,7 +1819,7 @@ test("privileged workloads require the privileged-control-plane exception catego
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#publish": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -2851,6 +2853,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${DEPENDABOT_ROUTING_SHA}`,
       `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
+      `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -2872,6 +2875,7 @@ test("production selector allowlist contains only independently reviewed commits
     DEPENDABOT_ROUTING_SHA,
     REVIEW_TIER_SELECTOR_SHA,
     MERGE_GROUP_ROUTING_SHA,
+    GH_FREE_GATE_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
@@ -3440,7 +3444,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     },
     exceptions: {
       ".github/workflows/claude-review.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This intentionally exercises privilege-category validation.",
       },
     },
@@ -3460,7 +3464,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
   assert.deepEqual(
     (await audit(fixedHostedWrongCategory)).map(({ rule }) => rule),
     ["hosted-exception-category"],
-    "a fixed-hosted write/id-token caller must not be satisfied by the weaker hosted-control-plane category",
+    "a fixed-hosted write/id-token caller must not be satisfied by the weaker docker-socket category",
   );
 
   const fixedHostedCorrectCategory = await repository({
@@ -4004,7 +4008,7 @@ test("repository-local workflows cannot wrap fail-closed selector-result gates",
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a wrapper around a selector-result contract trustworthy.",
       },
@@ -4064,7 +4068,7 @@ test("co-triggered repository-local workflows cannot wrap fail-closed selector-r
   const root = await repository({
     exceptions: {
       ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification:
           "An exception cannot make a co-triggered wrapper around a selector-result contract trustworthy.",
       },
@@ -5884,7 +5888,7 @@ test("reviewed reusable workflow can remain hosted with an exception", async () 
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#scan": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable scan remains hosted during rollout.",
       },
     },
@@ -6056,7 +6060,7 @@ test("Pulumi drift issues write requires the privileged hosted category", async 
     [
       {
         ".github/workflows/ci.yml#drift": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "This intentionally exercises the wrong hosted category.",
         },
       },
@@ -6161,7 +6165,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#review": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The reviewed reusable workflow remains fixed to hosted execution.",
       },
     },
@@ -6643,6 +6647,81 @@ test("policy schema fixes the reserved sentinel literal", async () => {
   await assert.rejects(() => audit(root), /governedReusableRunnerInput\.failureSentinel/);
 });
 
+test("fallback label allowlist policy remains required", async () => {
+  const root = await repository({
+    policyOverrides: { fallbackLabelAllowlist: undefined },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message === "policy must have required property 'fallbackLabelAllowlist'",
+  );
+});
+
+test("governed fallback default must be listed in the fallback label allowlist", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be in policy.fallbackLabelAllowlist",
+  );
+});
+
+test("a hosted label removed from the approved set can no longer be the fallback default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "ubuntu-slim",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be an approved hosted runner label",
+  );
+});
+
+test("the shipped fallback default satisfies the fallback label allowlist", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the fallback label allowlist can be extended to admit another approved default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, "windows-2025"],
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'windows-2025' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 test("sentinel is not a general local reusable runner value", async () => {
   const root = await repository({
     workflows: {
@@ -6930,7 +7009,7 @@ jobs:
       },
       exceptions: {
         ".github/workflows/called.yml#test": {
-          reason: "hosted-control-plane",
+          reason: "docker-socket",
           justification: "The fixture's called workload remains hosted.",
         },
       },
@@ -6966,7 +7045,7 @@ test("repository-local reusable workflow symlinks are rejected", async (context)
   const root = await repository({
     exceptions: {
       ".github/workflows/real.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "The real fixture workflow remains hosted.",
       },
     },
@@ -7065,7 +7144,7 @@ test("hosted exception cannot authorize runner indirection", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This job intentionally remains on a GitHub-hosted runner.",
       },
     },
@@ -7402,7 +7481,7 @@ test("hosted-only repository rejects exception inventory", async () => {
     selfHostedCi: false,
     exceptions: {
       ".github/workflows/ci.yml#test": {
-        reason: "hosted-control-plane",
+        reason: "docker-socket",
         justification: "This fixed hosted job does not route to the local fleet.",
       },
     },

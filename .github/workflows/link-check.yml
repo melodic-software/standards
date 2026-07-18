@@ -2,7 +2,8 @@ name: link-check
 
 # Advisory online external-link check (not part of ci-status). Runs weekly and
 # on demand; files a rolling tracking issue on failure rather than gating merges.
-# Deterministic on-disk link integrity is the lychee lane in ci.yml.
+# Deterministic on-disk link integrity is the lychee lane in ci.yml. Public
+# repo: runs on the reusable's hosted default runner.
 on:
   schedule:
     - cron: '17 6 * * 1'
@@ -12,30 +13,15 @@ permissions:
   contents: read
 
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   link-check:
-    needs: select-runner
-    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
     # issues: write is scoped to this job (least privilege) — only the called
     # workflow files the rolling tracking issue.
     permissions:
       contents: read
       issues: write
-    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
+    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+      runner: ubuntu-24.04
       # The called workflow's defaults plus one repo-specific addition: the
       # online lane also verifies local file links, so the intentionally-broken
       # lychee fixture must be excluded here (the offline lane in ci.yml already
