@@ -589,10 +589,11 @@ policy cannot prove it read-only. Every directly selector-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
-`privileged-control-plane` exception, unless the repository pins that job's
-exact effective mapping in a `localRoutingGrants` entry as described above. A
-full-SHA action does not weaken this rule because an action can obtain
-`github.token` implicitly.
+`privileged-control-plane` exception — or `publication` when the only write
+scope is `packages`, per the packages-only rule above — unless the repository
+pins that job's exact effective mapping in a `localRoutingGrants` entry as
+described above. A full-SHA action does not weaken this rule because an action
+can obtain `github.token` implicitly.
 
 For repository-local reusable calls, GitHub passes the caller's permission
 grant into the called workflow and nested calls can only keep or reduce it. The
@@ -611,7 +612,9 @@ for that exact job names them as described above. Absent a grant, the only
 workload credential exception is the exact
 GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or functionally equivalent
 `${{ github.token }}` as a complete step-level `env`/`with` value under
-statically read-only effective permissions. Workflow/job environment values,
+statically read-only effective permissions — or under a packages-only write
+map, where the token carries exactly the `publication`-categorized authority
+per the packages-only rule above. Workflow/job environment values,
 run-script interpolation, bracket aliases, case variants, transformations, and
 user secrets remain privileged-hosted. The selector's one exact observer-secret
 mapping remains allowed because the selector is a reviewed hosted reusable
