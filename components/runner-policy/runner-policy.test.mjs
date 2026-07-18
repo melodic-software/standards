@@ -1057,6 +1057,7 @@ test("selector recovery derives its literal fallback from the governed default",
   const alternateDefault = "ubuntu-22.04";
   const policyOverrides = {
     approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
+    fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, alternateDefault],
     governedReusableRunnerInput: {
       ...BASE_POLICY.governedReusableRunnerInput,
       default: alternateDefault,
@@ -6641,6 +6642,81 @@ test("policy schema fixes the reserved sentinel literal", async () => {
     workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
   });
   await assert.rejects(() => audit(root), /governedReusableRunnerInput\.failureSentinel/);
+});
+
+test("fallback label allowlist policy remains required", async () => {
+  const root = await repository({
+    policyOverrides: { fallbackLabelAllowlist: undefined },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message === "policy must have required property 'fallbackLabelAllowlist'",
+  );
+});
+
+test("governed fallback default must be listed in the fallback label allowlist", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be in policy.fallbackLabelAllowlist",
+  );
+});
+
+test("a hosted label removed from the approved set can no longer be the fallback default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "ubuntu-slim",
+      },
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        "policy.governedReusableRunnerInput.default must be an approved hosted runner label",
+  );
+});
+
+test("the shipped fallback default satisfies the fallback label allowlist", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the fallback label allowlist can be extended to admit another approved default", async () => {
+  const root = await repository({
+    policyOverrides: {
+      fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, "windows-2025"],
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'windows-2025' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
 });
 
 test("sentinel is not a general local reusable runner value", async () => {
