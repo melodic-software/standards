@@ -378,13 +378,14 @@ label refetch rewritten onto github-script's bundled Node runtime
 `ubuntu-slim` to `ubuntu-24.04` (ci-workflows#141), so metadata-only
 required gates no longer shell out to a `gh` binary the fleet image does
 not carry. Its selector diff against `ec91c343` is limited to that
-fallback-label change plus comments, and the six reusable contracts
+fallback-label change plus comments, and the eight reusable contracts
 registered at this revision were copied from each workflow's newest
 previously approved SHA after byte-level comparison: `claude-review`,
-`link-check`, and `osv-scanner` are byte-identical; `semantic-pr` and
-`pr-issue-linkage` differ only by the same fallback-label change plus
-comments; and `zizmor` adds a version-pin default bump (v1.26.1 to
-v1.27.0) and curl timeout hardening with its input surface unchanged.
+`link-check`, `osv-scanner`, `pester`, and `pulumi-version-drift-check`
+are byte-identical; `semantic-pr` and `pr-issue-linkage` differ only by
+the same fallback-label change plus comments; and `zizmor` adds a
+version-pin default bump (v1.26.1 to v1.27.0) and curl timeout hardening
+with its input surface unchanged.
 No contract changes its input, secret, routing, or caller-permission
 surface.
 Ten selector revisions remain approved for an ordered consumer rollout.
