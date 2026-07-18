@@ -7,10 +7,6 @@
     ".github/workflows/publish-packages.yml#publish": {
       "reason": "publication",
       "justification": "Registry publication stays on GitHub-hosted infrastructure so published-artifact provenance never depends on fleet container integrity; packages:write and the registry token therefore never reach a self-hosted worker."
-    },
-    ".github/workflows/sync.yml#sync": {
-      "reason": "privileged-control-plane",
-      "justification": "Standards synchronization uses GitHub App credentials to open cross-repository pull requests and remains hosted."
     }
   }
 }
