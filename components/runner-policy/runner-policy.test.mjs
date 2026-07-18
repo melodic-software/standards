@@ -2106,6 +2106,76 @@ jobs:
   );
 });
 
+test("a packages-only hosted-reusable caller cannot smuggle a credential input value under publication", async () => {
+  const contract = {
+    routing: "hosted-only",
+    allowedInputs: ["prompt"],
+    allowedSecrets: {},
+    fixedRunsOn: ["ubuntu-24.04"],
+  };
+  const smuggled = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: \${{ secrets.NPM_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(smuggled);
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "hosted-exception-category" &&
+        message.includes("requires exception reason privileged-control-plane, not publication"),
+    ),
+    "a credential expression in a with value must keep the caller privileged",
+  );
+
+  const clean = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    exceptions: {
+      ".github/workflows/publish.yml#publish": {
+        reason: "publication",
+        justification:
+          "Package publication requires a write-scoped token on hosted infrastructure.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    permissions:
+      packages: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      prompt: release notes
+`,
+    },
+  });
+  assert.deepEqual(await audit(clean), []);
+});
+
 test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
   const root = await repository({
     localRoutingGrants: {

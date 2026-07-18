@@ -2791,8 +2791,32 @@ function privilegedHostedRequirement(
   // The selector's one exact observer secret is part of its reviewed hosted
   // reusable-workflow contract. Exact hosted-only reusable secret mappings are
   // likewise governed by approvedReusableWorkflowContracts rather than this
-  // local-workload boundary.
+  // local-workload boundary. A pending publication downgrade still scans the
+  // caller outside that reviewed secrets mapping first: a contract allowlists
+  // input names, not values, so a credential expression smuggled through a
+  // `with:` value would otherwise ride the weaker category.
   if (selector.isSelector || target?.kind === "hosted-reusable") {
+    if (publicationRequirement === undefined) {
+      return undefined;
+    }
+    const boundaryJob = Object.fromEntries(
+      Object.entries(job).filter(([name]) => name !== "secrets"),
+    );
+    const callerCredentialRequirement = localCredentialRequirement(
+      workflow,
+      boundaryJob,
+      undefined,
+      {
+        admitGitHubToken: true,
+      },
+    );
+    if (callerCredentialRequirement) {
+      return {
+        reason: "privileged-control-plane",
+        description: callerCredentialRequirement,
+        rule: "privileged-hosted-only",
+      };
+    }
     return publicationRequirement;
   }
 

@@ -601,7 +601,9 @@ policy follows that chain recursively. Every dynamic/local called job must
 declare an effective read-only job or workflow mapping when a caller can pass
 write; omission fails because the caller grant would flow through. A fixed
 hosted called job may inherit write only with its own
-`privileged-control-plane` exception. A local reusable caller's write grant is
+`privileged-control-plane` exception — or `publication` when the called job
+declares its own packages-only write map with no other privileged surface,
+per the packages-only rule above. A local reusable caller's write grant is
 therefore not rejected wholesale when every potentially local called job
 provably narrows it.
 
