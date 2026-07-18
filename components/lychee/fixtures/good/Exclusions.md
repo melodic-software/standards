@@ -18,6 +18,7 @@ The exact current public URLs that reject automated link checkers are excluded:
 - <https://isdown.app/status/anthropic>
 - <https://www.npmjs.com/package/firecrawl-cli>
 - <https://www.npmjs.com/package/@mirohq/miro-api>
+- <https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html>
 
 Other paths on those public hosts remain subject to checking:
 
@@ -25,6 +26,7 @@ Other paths on those public hosts remain subject to checking:
 - <https://help.miro.com/hc/en-us/articles/example>
 - <https://isdown.app/status/example>
 - <https://www.npmjs.com/package/example>
+- <https://dev.mysql.com/doc/refman/8.4/en/example.html>
 
 Public siblings and stale pre-transfer owner links remain subject to checking:
 
