@@ -371,9 +371,25 @@ write-access users can enqueue one, and `pull_request_target` executes the
 trusted base-ref workflow definition. The fork guard is extended to cover
 both pull-request event names, so every fork-origin pull-request context
 still routes off the managed fleet.
-Nine selector revisions remain approved for an ordered consumer rollout.
+The gh-free gate revision at
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` carries the do-not-merge-gate
+label refetch rewritten onto github-script's bundled Node runtime
+(ci-workflows#144) and the hosted fallback label moved from the retired
+`ubuntu-slim` to `ubuntu-24.04` (ci-workflows#141), so metadata-only
+required gates no longer shell out to a `gh` binary the fleet image does
+not carry. Its selector diff against `ec91c343` is limited to that
+fallback-label change plus comments, and the six reusable contracts
+registered at this revision were copied from each workflow's newest
+previously approved SHA after byte-level comparison: `claude-review`,
+`link-check`, and `osv-scanner` are byte-identical; `semantic-pr` and
+`pr-issue-linkage` differ only by the same fallback-label change plus
+comments; and `zizmor` adds a version-pin default bump (v1.26.1 to
+v1.27.0) and curl timeout hardening with its input surface unchanged.
+No contract changes its input, secret, routing, or caller-permission
+surface.
+Ten selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these six strict-scheduling
+owned by a different repository owner, so these seven strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
