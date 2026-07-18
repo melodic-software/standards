@@ -158,6 +158,14 @@ label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to
 `ubuntu-24.04`.
 
+The frozen literal is the governed `default`, and that default must appear in
+`fallbackLabelAllowlist` — a set deliberately narrower than
+`approvedHostedRunnerLabels`. A label may be an approved explicit `runs-on`
+target yet still be barred from becoming the silent recovery fallback, so a
+costlier hosted tier cannot slip in as the default that fires whenever the
+selector fails. Configuration fails closed when the default is absent from the
+allowlist.
+
 The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
 (the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
 dedicated capped review tier). A review-lane caller passes the latter from a
