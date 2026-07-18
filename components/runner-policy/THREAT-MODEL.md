@@ -179,7 +179,10 @@ not duplicate those changing inventories.
   platform behavior, not all future control-plane interpretation.
 - The literal hosted fallback preserves scheduling availability but spends
   hosted capacity and does not make a failed selector healthy. Operational
-  monitoring must still surface selector failures.
+  monitoring must still surface selector failures. Its label is bounded to
+  `fallbackLabelAllowlist`, narrower than `approvedHostedRunnerLabels`, so the
+  fallback cannot silently escalate to a costlier hosted tier; the residual
+  spend is that of the single allowlisted default.
 - The zero-cost rejection sentinel intentionally delays terminal failure until
   GitHub's 24-hour unmatched self-hosted queue limit. Its safety also depends on
   the external runner inventory never assigning `ci-runner-selection-failed`;

@@ -15,33 +15,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Every eligible lane shares one same-contract central selector decision. A
-# selector failure cannot skip required work: every workload directly uses a
-# cancellation-safe condition and an explicit ubuntu-24.04 fallback. The
-# ci-status gateway stays hosted and aggregates only the original lane IDs, so
-# required check names do not change. Workload steps are route-independent:
-# pinned setup/composite actions install every tool, and existing setup-action
-# caches remain GitHub-managed rather than host-mounted.
+# Public repository: every lane runs on GitHub-hosted ubuntu-24.04 (free for
+# public repositories); the local-runner selector is not permitted here. The
+# ci-status gateway aggregates the same lane IDs, so required check names do
+# not change. Workload steps are route-independent: pinned setup/composite
+# actions install every tool, and setup-action caches are GitHub-managed.
 jobs:
-  select-runner:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   markdown:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -55,11 +38,9 @@ jobs:
           globs: '**/*.md !components/**/fixtures/bad/**'
 
   powershell:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -73,11 +54,9 @@ jobs:
           exclude: components/psscriptanalyzer/fixtures/bad
 
   shellcheck:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -91,11 +70,9 @@ jobs:
           exclude: components/shellcheck/fixtures/bad
 
   lychee:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -109,11 +86,9 @@ jobs:
           exclude: 'components/[^/]+/fixtures/bad'
 
   editorconfig:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -129,11 +104,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
 
   gitleaks:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -148,11 +121,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
 
   typos:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -168,11 +139,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
   markdown-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -191,11 +160,9 @@ jobs:
 
   runner-policy:
     name: Runner policy
-    needs: select-runner
-    if: ${{ !cancelled() && needs.select-runner.result == 'success' }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -231,11 +198,9 @@ jobs:
           CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 
   concurrency-policy:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -256,11 +221,9 @@ jobs:
         run: npm run lint:concurrency-policy
 
   dependabot-policy:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -281,11 +244,9 @@ jobs:
         run: npm run lint:dependabot-policy
 
   powershell-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -314,11 +275,9 @@ jobs:
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
   shellcheck-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -341,11 +300,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
   lychee-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -369,11 +326,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
 
   ruff:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -387,11 +342,9 @@ jobs:
           exclude: components/ruff/fixtures/bad
 
   pyright:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -408,11 +361,9 @@ jobs:
           paths: components/pyright/fixtures/good
 
   biome:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -430,11 +381,9 @@ jobs:
 
   tsc:
     name: TypeScript ${{ matrix.typescript }}
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -461,11 +410,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-build:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # The rootless fleet has no write access to setup-dotnet's Linux default.
@@ -485,11 +432,9 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   dotnet-format:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       DOTNET_INSTALL_DIR: ~/.dotnet
@@ -504,11 +449,9 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   actionlint:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -519,34 +462,28 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/actionlint@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   zizmor:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
     # Advisory Actions security lint; findings annotate without blocking.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+      runner: ubuntu-24.04
       paths: .
 
   osv-scanner:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5 # ec91c34 2026-07-17
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+      runner: ubuntu-24.04
 
   go-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       GO_VERSION: 1.26.5
@@ -589,11 +526,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
   python-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — component contract tests assert specific rule codes on
@@ -627,11 +562,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   typescript-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — component tests assert specific rule/error codes on
@@ -661,11 +594,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-fixtures:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Inline install — the fixtures suite asserts specific rule codes fire on
@@ -701,11 +632,9 @@ jobs:
           DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
 
   harness:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -716,11 +645,9 @@ jobs:
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
   distribution:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -752,11 +679,9 @@ jobs:
         run: bash distribution/sync-manifest.sh validate
 
   exec-bit:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -767,11 +692,9 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/exec-bit@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   machine-specific-paths:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -782,11 +705,9 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   eol-renormalize:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -797,11 +718,9 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   comment-hygiene:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -816,11 +735,9 @@ jobs:
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
   lefthook:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     permissions:
       contents: read
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out
@@ -859,7 +776,6 @@ jobs:
     if: ${{ !cancelled() }}
     permissions: {}
     needs:
-      - select-runner
       - markdown
       - powershell
       - shellcheck
@@ -894,7 +810,7 @@ jobs:
       - actionlint
       - zizmor
       - osv-scanner
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Aggregate lane results
