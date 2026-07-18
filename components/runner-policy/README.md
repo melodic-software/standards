@@ -425,6 +425,13 @@ to `09dd32ae40e270614e251fddafa16bab9a487de5`, which only adds a step that
 closes a recovered tracking issue; permissions, inputs, and `runs-on` stay
 byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
 contract, so the existing hosted-only shape carries over unmodified.
+The standards-sync contract was bumped to
+`0b45b9fb1755649455e3bb2b9c56c619a412b06b`, whose diff against the reviewed
+`ec91c343` contract is confined to the generated sync-PR body heredoc — it
+adds the "No linked issue" sentence and a "## Related" section so
+distributed sync PRs pass each target's pr-issue-linkage gate
+(ci-workflows#146); inputs, secrets, permissions, and routing are
+unchanged.
 
 The link-check and Pulumi version-drift monitor contracts were converted to
 `runner-input` at `3dfb18452a8c6059a22e62456390d84feb10b42f`, the reviewed
