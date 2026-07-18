@@ -13,6 +13,7 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
+| [deterministic-artifact-scaffolding.md](deterministic-artifact-scaffolding.md) | stable artifact structure in deterministic mechanisms; judgment-bearing slots stay human- or agent-owned |
 | [progressive-disclosure.md](progressive-disclosure.md) | layering information so a reader pays only for the depth they reach |
 | [container-supply-chain.md](container-supply-chain.md) | Dockerfile, build-context, image-scanning, artifact-identity, and runtime assurance boundaries |
 | [legacy-and-migration-debt.md](legacy-and-migration-debt.md) | describing the current form; the exposure classifier for old paths |
