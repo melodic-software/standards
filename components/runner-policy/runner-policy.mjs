@@ -768,11 +768,12 @@ function auditLocalPermissionFlow({
       target?.kind === "hosted-local-reusable";
     if (hostedExecution && capability !== "read-only") {
       // The direct audit of this same job classifies a declared packages-only
-      // write map (with no other privileged surface) as publication; this flow
-      // pass must demand the same category or the two checks contradict each
-      // other on one exception key. Anything else — a broader declared map, an
-      // additional privileged surface, or an undeclared map that merely
-      // inherits the caller's write capability — stays privileged.
+      // write map (with no other privileged surface) as publication — with the
+      // structural container categories taking precedence over that downgrade;
+      // this flow pass must demand the same category or the two checks
+      // contradict each other on one exception key. Anything else — a broader
+      // declared map, an additional privileged surface, or an undeclared map
+      // that merely inherits the caller's write capability — stays privileged.
       const declaredRequirement = privilegedHostedRequirement(
         record.workflow,
         job,
@@ -783,8 +784,11 @@ function auditLocalPermissionFlow({
         undefined,
         undefined,
       );
-      const requiredReason =
-        declaredRequirement?.reason === "publication" ? "publication" : "privileged-control-plane";
+      let requiredReason = "privileged-control-plane";
+      if (declaredRequirement?.reason === "publication") {
+        const structuralRequirement = structuralHostedRequirement(job);
+        requiredReason = structuralRequirement ? structuralRequirement.reason : "publication";
+      }
       const key = `${record.file}#${jobId}`;
       const exception = config.exceptions.get(key);
       if (!exception) {

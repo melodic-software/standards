@@ -2204,6 +2204,41 @@ test("a containerized packages-only job keeps the job-container category over pu
   assert.match(findings[0].message, /requires exception reason job-container, not publication/);
 });
 
+test("a containerized packages-only job in a local reusable keeps job-container in both audits", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/publish-inner.yml#publish": {
+        reason: "job-container",
+        justification: "The containerized publisher needs hosted Docker for its build image.",
+      },
+    },
+    workflows: {
+      "publish.yml": `on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-inner.yml
+`,
+      "publish-inner.yml": `on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      packages: write
+    runs-on: ubuntu-24.04
+    container: ghcr.io/example/builder:1
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
   const root = await repository({
     localRoutingGrants: {
