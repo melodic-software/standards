@@ -91,10 +91,13 @@ async function pack(directory, destination) {
   if (!Array.isArray(result) || result.length !== 1 || !result[0].filename) {
     throw new Error(`npm pack returned an unexpected result for ${directory}`);
   }
-  const tarball = join(destination, result[0].filename);
   const extracted = join(destination, "extracted");
   await mkdir(extracted);
-  run("tar", ["-xzf", tarball, "-C", extracted]);
+  // Relative paths from `destination`, not absolute ones: GNU tar parses a
+  // drive-letter path (C:\...) as a remote host:file archive, so an absolute
+  // Windows path breaks under Git Bash's tar while bsdtar rejects the
+  // --force-local flag that would disable that parsing.
+  run("tar", ["-xzf", result[0].filename, "-C", "extracted"], { cwd: destination });
   return extracted;
 }
 
@@ -232,7 +235,10 @@ async function exportBaseline(root, baseRef, packageDirectory, destination) {
   run("git", ["archive", "--format=tar", `--output=${archive}`, baseRef, "--", packageDirectory], {
     cwd: root,
   });
-  run("tar", ["-xf", archive, "-C", destination]);
+  // Same drive-letter constraint as the pack extraction above: keep tar's
+  // arguments relative so GNU tar never sees a C:\ path it would treat as a
+  // remote host:file archive.
+  run("tar", ["-xf", basename(archive), "-C", "."], { cwd: destination });
   return join(destination, packageDirectory);
 }
 
