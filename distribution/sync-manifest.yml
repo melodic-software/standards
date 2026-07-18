@@ -94,6 +94,15 @@ components:
   node-runtime:
     files:
       .node-version: .node-version
+  path-detection-action:
+    files:
+      components/path-detection/machine-path-patterns.sh: .github/actions/machine-specific-paths/machine-path-patterns.sh
+  path-detection-guardrails:
+    files:
+      components/path-detection/machine-path-patterns.sh: plugins/guardrails/lib/path-detection/machine-path-patterns.sh
+  path-detection-tools:
+    files:
+      components/path-detection/machine-path-patterns.sh: tools/shared/path-detection/machine-path-patterns.sh
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
@@ -153,6 +162,7 @@ targets:
       - gitleaks
       - lychee
       - markdownlint
+      - path-detection-action
       - psscriptanalyzer
       - repository-text
       - review-instructions
@@ -166,6 +176,7 @@ targets:
       - lychee
       - markdownlint
       - node-runtime
+      - path-detection-guardrails
       - repository-text
       - review-instructions
       - runner-policy
@@ -211,6 +222,7 @@ targets:
     managed:
       - architecture-decisions
       - node-runtime
+      - path-detection-tools
       - runner-policy
     locally-owned:
       - agent-orientation
