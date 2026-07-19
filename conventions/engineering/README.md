@@ -11,6 +11,7 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |
 | [concise-prose.md](concise-prose.md) | removing prose overhead without losing meaning, force, or clarity |
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
+| [documentation-existence.md](documentation-existence.md) | whether a tracked page may exist at all — the admission test upstream of the documentation family |
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
 | [deterministic-artifact-scaffolding.md](deterministic-artifact-scaffolding.md) | stable artifact structure in deterministic mechanisms; judgment-bearing slots stay human- or agent-owned |

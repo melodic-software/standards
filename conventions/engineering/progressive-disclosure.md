@@ -2,7 +2,7 @@
 
 Layer information so the reader — human or agent — gets the cheapest useful glance first and drills to detail only on demand. An always-loaded surface pays its whole size on every read, even when a one-line index would have settled the question; layering moves that cost to the point of demand. This is a reasoning-only discipline: where to draw the glance-versus-detail line is a judgment, not something a tool decides.
 
-It composes with `reference-dont-duplicate.md` (keep one copy of a fact) and `documentation-and-citations.md` (defer to the upstream owner): those decide *whether* to hold a fact and *where* it lives; this decides how to *layer* the copy you keep so a reader pays only for the depth they reach.
+It composes with `documentation-existence.md` (admit the page at all), `reference-dont-duplicate.md` (keep one copy of a fact), and `documentation-and-citations.md` (defer to the upstream owner): those decide *whether* the page exists, *whether* to hold a fact, and *where* it lives; this decides how to *layer* the copy you keep so a reader pays only for the depth they reach.
 
 ## Lead with a glance a reader can stop at
 
