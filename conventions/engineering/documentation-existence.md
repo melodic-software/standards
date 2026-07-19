@@ -27,7 +27,7 @@ Hand-written restatement of anything the code expresses: how-it-works narration,
 
 ## Failed admission is deleted, not updated
 
-Drift inside an admitted page is a defect: fix the page. A page that fails the admission test is drift by construction, and updating it only re-arms the trap — the remediation is deletion, after relocating anything admissible to its owning category. Apply the test opportunistically: when work touches a page, judge its existence before its accuracy.
+Drift inside an admitted page is a defect: fix the page. A page that fails the admission test is drift by construction, and updating it only re-arms the trap — the remediation is deletion, after relocating anything admissible to its owning category. This is the specific-case override of the general stale-descriptor rule ([../review/code-quality.md](../review/code-quality.md)): a behavior change that invalidates an admitted page's descriptors is completed by updating them; one that invalidates a page which fails admission is completed by deleting it. Apply the test opportunistically: when work touches a page, judge its existence before its accuracy.
 
 ## Sources
 

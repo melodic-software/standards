@@ -34,10 +34,10 @@
 
 **Deferred questions:**
 
-- Matt Pocock video URL for the sources footer — USER-RESERVED (footer ships without it if not supplied; no fabricated citation).
+- Matt Pocock citation for the sources footer — RESOLVED: user-supplied X post shipped in the footer and verified live (author `@mattpocockuk`, quoted text matches).
 - Whether `sync-manifest.yml` should distribute any part of this convention as a managed component — `/architect`.
 - Tooling follow-up design (plugins repo): whether the admission test ships as the portable-baseline default in `doc-drift-detector` / `docs-hygiene:declutter` — consuming org's declared conventions always win via the `follow-our-standards` resolution ladder; plugins never hard-code `melodic-software/standards` (verified: zero runtime references) — decided in that follow-up, not here.
 
 ## Plan
 
-(unfilled — `/architect` owns this section)
+Intentionally deferred — no `/architect` pass was run; this single-concern documentation change shipped directly from the Brief above. The one open architecture decision it surfaced (managed-component distribution) is tracked in #207.
