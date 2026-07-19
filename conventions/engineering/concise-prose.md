@@ -6,6 +6,8 @@ is a reasoning-only judgment: word or sentence counts can flag a passage for
 review, but they cannot prove that a shorter version is equivalent.
 
 This rule owns wording, not whether content belongs or where it lives.
+[`documentation-existence.md`](documentation-existence.md) owns whether a
+page may exist at all;
 [`simpler-code.md`](simpler-code.md) owns reductions to executable code;
 [`progressive-disclosure.md`](progressive-disclosure.md) owns information
 layering; and [`reference-dont-duplicate.md`](reference-dont-duplicate.md) and
