@@ -21,9 +21,12 @@
 # OR one-or-two backslashes — and accept an 8.3 short-name segment that ends
 # ~<digit> (e.g. ALICE~1) via the optional (~[0-9]+). These are the two shapes
 # a script-written temp path evaded with. The negative class still excludes a
-# bare ~ so a tilde-shorthand segment stays clean. macOS/Linux bodies are NOT
-# widened: no 8.3 / escaped-JSON analogue exists there, so widening is pure
-# false-positive risk.
+# bare ~ so a tilde-shorthand segment stays clean. Only the FIRST body char
+# excludes %, so a %VAR%-style env interpolation (which always opens with %)
+# stays clean while a literal % later in a real segment (e.g. build%2026) is
+# still matched — banning % throughout would drop real machine paths.
+# macOS/Linux bodies are NOT widened: no 8.3 / escaped-JSON analogue exists
+# there, so widening is pure false-positive risk.
 #
 # The Windows bodies are self-anchored by [A-Za-z]:. The slash-rooted
 # macOS/Linux bodies need a driver-side boundary prefix so a substring like
@@ -37,11 +40,11 @@
 # would match), and where a bare root ends at a value boundary is
 # format-specific — a driver-owned concern like the left prefix. A consumer
 # that needs bare-root detection adds that right boundary in its own driver.
-HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^/\\$%<{~]+(~[0-9]+)?(/|\\\\?)'
+HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^/\\$%<{~][^/\\$<{~]*(~[0-9]+)?(/|\\\\?)'
 HPP_MACOS_USER_BODY='/Users/[^/$<{~]+/'
 HPP_LINUX_USER_BODY='/home/[^/$<{~]+/'
-HPP_WIN_REPO_BODY='[A-Za-z]:(/|\\\\?)repos(/|\\\\?)[^/\\$%<{~]+(~[0-9]+)?(/|\\\\?)'
+HPP_WIN_REPO_BODY='[A-Za-z]:(/|\\\\?)repos(/|\\\\?)[^/\\$%<{~][^/\\$<{~]*(~[0-9]+)?(/|\\\\?)'
 # SC1003 false positive: the trailing \\\\ is a deliberate literal-backslash ERE
 # body (a JSON-escaped path separator), not a botched single-quote escape.
 # shellcheck disable=SC1003
-HPP_ESCAPED_WIN_REPO_BODY='[A-Za-z]:\\\\repos\\\\[^\\$%<{~]+(~[0-9]+)?\\\\'
+HPP_ESCAPED_WIN_REPO_BODY='[A-Za-z]:\\\\repos\\\\[^\\$%<{~][^\\$<{~]*(~[0-9]+)?\\\\'

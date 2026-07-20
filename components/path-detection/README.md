@@ -7,8 +7,11 @@ path segment (`C:\Users\Alice\project`); a bare root with no trailing separator
 (`C:\Users\Alice`, `/home/alice`) is intentionally not matched. Portable
 placeholders such as `C:\Users\<user>\` and `<repo-root>/` stay clean by
 construction (the negative character classes exclude `<`, `$`, `{`, and bare
-`~`); the Windows bodies additionally exclude `%`, so percent-env
-interpolations like `C:\Users\%USERNAME%\` are not flagged.
+`~`); the Windows bodies additionally exclude a segment beginning with
+`%`, so percent-env
+interpolations like `C:\Users\%USERNAME%\` are not flagged; a literal
+`%` inside a real segment (a directory named `build%2026`) is still
+detected.
 
 `machine-path-patterns.sh` is a define-only Bash library: the five `HPP_*`
 pattern bodies and nothing else. Scan drivers own everything around them —
