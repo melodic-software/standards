@@ -11,6 +11,9 @@ components:
     files:
       docs/adr/README.md: docs/adr/README.md
       docs/adr/adr-template.md: docs/adr/adr-template.md
+  claude-permissions:
+    files:
+      components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
   comment-hygiene-action:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
@@ -185,6 +188,7 @@ targets:
   melodic-software/dotfiles:
     managed:
       - agent-orientation
+      - claude-permissions
       - editorconfig-checker
       - gitleaks
       - lefthook-base
