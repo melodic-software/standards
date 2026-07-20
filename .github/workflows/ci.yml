@@ -818,8 +818,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Aggregate lane results
-        uses: melodic-software/ci-workflows/.github/actions/ci-status@058f5e42e81f9966e7f788bc4a0fe9849cea7c9d # 058f5e4 2026-07-20
+        uses: melodic-software/ci-workflows/.github/actions/ci-status@87fb95c3b05fa318b9dd8c2c164cc550071a1ccb # v0.7.0
         with:
+          treat-skipped-as: fail
           results: >-
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}
