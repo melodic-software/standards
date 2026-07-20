@@ -1979,15 +1979,15 @@ function unroutableFailureStatus(jobId, target, job, jobs, policy) {
 function routeStatus(jobId, target, job, jobs, policy, reusableContract, localRunnerInputMode) {
   const fallbackMatch = RUNNER_OUTPUT.exec(target);
   const requiredMatch = REQUIRED_RUNNER_OUTPUT.exec(target);
-  const configuredDefault = policy.governedReusableRunnerInput.default;
+  const allowedFallbacks = new Set(policy.fallbackLabelAllowlist);
   const usesOptionalDefault =
-    fallbackMatch !== null && fallbackMatch.groups.fallback === configuredDefault;
+    fallbackMatch !== null && allowedFallbacks.has(fallbackMatch.groups.fallback);
   const usesRequiredInput = requiredMatch !== null && localRunnerInputMode === "required";
   if (!usesOptionalDefault && !usesRequiredInput) {
     return {
       attempted: target.includes("outputs.runner"),
       approved: false,
-      reason: `runner routing must use exactly needs.<selector-job>.outputs.runner || '${configuredDefault}', or a raw selector output passed to a required no-default repository-local runner input`,
+      reason: `runner routing must use exactly needs.<selector-job>.outputs.runner || '<fallback>' with a fallback from policy.fallbackLabelAllowlist (${[...policy.fallbackLabelAllowlist].map((label) => `'${label}'`).join(", ")}), or a raw selector output passed to a required no-default repository-local runner input`,
     };
   }
 
@@ -3284,6 +3284,16 @@ export async function auditRepository({
       }
 
       for (const runner of runnerStrings) {
+        // A governed selector-output expression may carry an allowlisted
+        // managed fallback; the literal inside it is the reviewed recovery
+        // label, not a raw self-hosted pin.
+        const governedRoute = RUNNER_OUTPUT.exec(runner);
+        if (
+          governedRoute !== null &&
+          new Set(policy.fallbackLabelAllowlist).has(governedRoute.groups.fallback)
+        ) {
+          continue;
+        }
         if (rawManagedLabel(runner, policy)) {
           hasRawManagedLabel = true;
           findings.push(

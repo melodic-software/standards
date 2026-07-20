@@ -1054,7 +1054,7 @@ test("same-contract workloads can share one selector decision", async () => {
   assert.deepEqual(await audit(root), []);
 });
 
-test("selector recovery derives its literal fallback from the governed default", async () => {
+test("selector recovery accepts any allowlisted literal fallback", async () => {
   const alternateDefault = "ubuntu-22.04";
   const policyOverrides = {
     approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
@@ -1074,26 +1074,48 @@ ${SELECTOR}  test:
     steps: []
 `;
 
-  const acceptedRoot = await repository({
-    policyOverrides,
-    workflows: { "ci.yml": workflow(alternateDefault) },
-  });
-  assert.deepEqual(await audit(acceptedRoot), []);
+  for (const allowlisted of [alternateDefault, ...BASE_POLICY.fallbackLabelAllowlist]) {
+    const acceptedRoot = await repository({
+      policyOverrides,
+      workflows: { "ci.yml": workflow(allowlisted) },
+    });
+    assert.deepEqual(await audit(acceptedRoot), []);
+  }
 
-  const mismatchedRoot = await repository({
+  const unlistedRoot = await repository({
     policyOverrides,
-    workflows: { "ci.yml": workflow(BASE_POLICY.governedReusableRunnerInput.default) },
+    workflows: { "ci.yml": workflow("ubuntu-20.04") },
   });
-  const findings = await audit(mismatchedRoot);
+  const findings = await audit(unlistedRoot);
   assert.deepEqual(
     findings.map(({ rule, job }) => ({ rule, job })),
     [{ rule: "selector-contract", job: "test" }],
   );
   const selectorFinding = findings.find(({ rule }) => rule === "selector-contract");
-  assert.equal(
+  assert.match(
     selectorFinding.message,
-    "runner routing must use exactly needs.<selector-job>.outputs.runner || 'ubuntu-22.04', or a raw selector output passed to a required no-default repository-local runner input",
+    /a fallback from policy\.fallbackLabelAllowlist \('ubuntu-24\.04', 'melodic-ubuntu-24\.04-x64', 'ubuntu-22\.04'\)/,
   );
+});
+
+test("an allowlisted managed fallback routes without a raw-self-hosted-label finding", async () => {
+  const managedFallback = "melodic-ubuntu-24.04-x64";
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || '${managedFallback}' }}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a managed fallback outside the allowlist stays a raw self-hosted pin", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'kyle-ubuntu-24.04-x64' }}\n    steps: []\n`,
+    },
+  });
+  const rules = (await audit(root)).map(({ rule }) => rule).sort();
+  assert.deepEqual(rules, ["raw-self-hosted-label", "selector-contract"]);
 });
 
 test("omitted permissions keep a full-SHA untrusted action off the local fleet", async () => {

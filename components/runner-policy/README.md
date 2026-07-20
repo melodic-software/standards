@@ -63,7 +63,7 @@ runner-policy:
 
 In a private repository with `selfHostedCi: true`, the gate job instead
 routes through the governed selector like any other eligible read-only job,
-with the approved hosted fallback covering selector failure. No dedicated
+with the approved allowlisted fallback covering selector failure. No dedicated
 category pins read-only work to hosted infrastructure: the remaining reasons
 describe structural constraints (Windows, containers, Docker socket access),
 and while the analyzer consumes any allowlisted reason for an eligible
@@ -162,16 +162,21 @@ This explicit literal is the recovery path if the selector itself fails before
 producing an output. It must not use `vars.CI_HOSTED_RUNNER`: on selector
 failure, that operational value has not passed the selector's approved-hosted-
 label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
-validated input; only the caller's failure fallback is frozen to
-`ubuntu-24.04`.
+validated input; only the caller's failure fallback is frozen to a literal from
+`fallbackLabelAllowlist`.
 
-The frozen literal is the governed `default`, and that default must appear in
-`fallbackLabelAllowlist` — a set deliberately narrower than
-`approvedHostedRunnerLabels`. A label may be an approved explicit `runs-on`
-target yet still be barred from becoming the silent recovery fallback, so a
-costlier hosted tier cannot slip in as the default that fires whenever the
-selector fails. Configuration fails closed when the default is absent from the
-allowlist.
+The frozen literal must appear in `fallbackLabelAllowlist` — a set deliberately
+narrower than `approvedHostedRunnerLabels`. A label may be an approved explicit
+`runs-on` target yet still be barred from becoming the silent recovery
+fallback, so a costlier hosted tier cannot slip in as the recovery label that
+fires whenever the selector fails. The governed `default` must itself be in the
+allowlist; configuration fails closed when it is absent. The allowlist also
+admits the managed fleet label: a repository whose CI is a hard dependency on
+the self-hosted fleet (routing policy `self-hosted-only`) may freeze its
+recovery fallback to that managed label instead of a hosted one, trading the
+hosted scheduling-availability hedge for zero hosted spend — when the fleet is
+down, that repository's workloads are queued either way, so the reporter
+stalling in the queue adds no marginal harm.
 
 The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
 (the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
@@ -515,7 +520,7 @@ exactly one approved unroutable failure sentinel for that selector; one sentinel
 may
 cover multiple required calls sharing the selector, but a sentinel in another
 workflow or for another selector does not satisfy the contract. Optional calls
-with the governed hosted fallback do not require this guard. A
+with a governed allowlisted fallback do not require this guard. A
 `workflow_dispatch`, schedule, push, or other co-trigger invalidates either
 routing contract because those entry points share the workflow's `inputs`
 context. GitHub documents required reusable-workflow inputs; separately, an
