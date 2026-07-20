@@ -5,9 +5,15 @@ lane:
 
 - <https://github.com/melodic-software/dotfiles>
 - <https://github.com/melodic-software/github-iac>
+- <https://github.com/melodic-software/itinerary-planner>
+- <https://github.com/melodic-software/knowledge-corpus>
 - <https://github.com/melodic-software/medley>
+- <https://github.com/melodic-software/medley-archive>
+- <https://github.com/melodic-software/melodic-main-archive>
 - <https://github.com/melodic-software/provisioning>
+- <https://github.com/melodic-software/songwriting>
 - <https://raw.githubusercontent.com/melodic-software/dotfiles/main/README.md>
+- <https://raw.githubusercontent.com/melodic-software/medley-archive/main/README.md>
 
 The exact current public URLs that reject automated link checkers are excluded:
 
