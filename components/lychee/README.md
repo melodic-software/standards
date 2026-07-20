@@ -13,9 +13,10 @@ prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 
 The online lane excludes explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes a calling repository's token receive
-a 404. The current inventory is `melodic-software/dotfiles`, `github-iac`,
-`medley`, and `provisioning`; public siblings and stale pre-transfer owner
-URLs remain checked. Public bot-blocking
+a 404. The inventory itself lives in the two `melodic-software/` alternations in
+[`lychee.toml`](../../lychee.toml)'s `exclude` list — read it there rather than
+from a copy here, and keep it in sync with actual repository visibility. Public
+siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
 exceptions are path-scoped to the current Medium Dungeon Master article, the
 Medium Fortmatic postmortem, Miro
 article `31624028247058`, IsDown's Anthropic status page, the npm package
