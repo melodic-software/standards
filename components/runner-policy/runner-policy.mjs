@@ -263,6 +263,18 @@ function validatePolicy(value) {
       "policy.governedReusableRunnerInput.default must be in policy.fallbackLabelAllowlist",
     );
   }
+  // Every allowlist member is an executable selector-failure route, so each
+  // must be a label this policy already recognizes as routable.
+  for (const label of value.fallbackLabelAllowlist) {
+    if (
+      !approvedHostedRunnerLabels.has(label) &&
+      !managedLabelRegexes.some((pattern) => pattern.test(label))
+    ) {
+      throw new ConfigurationError(
+        `policy.fallbackLabelAllowlist entry ${JSON.stringify(label)} must be an approved hosted runner label or match a managed label pattern`,
+      );
+    }
+  }
   if (
     approvedHostedRunnerLabels.has(value.governedReusableRunnerInput.failureSentinel) ||
     forbiddenHostedRunnerLabels.has(

@@ -6719,6 +6719,22 @@ test("a hosted label removed from the approved set can no longer be the fallback
   );
 });
 
+test("an allowlist entry that is neither hosted-approved nor managed fails configuration", async () => {
+  const root = await repository({
+    policyOverrides: {
+      fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, "self-hosted"],
+    },
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message ===
+        'policy.fallbackLabelAllowlist entry "self-hosted" must be an approved hosted runner label or match a managed label pattern',
+  );
+});
+
 test("the shipped fallback default satisfies the fallback label allowlist", async () => {
   const root = await repository({
     workflows: {
