@@ -390,6 +390,13 @@
         "pull-requests": "write",
         "id-token": "write"
       }
+    },
+    "melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@d7734df8c557084edc2df7cf578cf62ad2f261e4": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "selectorResultInput": "prerequisite-result",
+      "allowedInputs": ["runner", "prerequisite-result", "exempt-authors"],
+      "allowedSecrets": {}
     }
   },
   "canonicalSelectorInputs": {
