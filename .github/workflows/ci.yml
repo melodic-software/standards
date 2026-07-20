@@ -818,8 +818,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Aggregate lane results
-        env:
-          RESULTS: >-
+        uses: melodic-software/ci-workflows/.github/actions/ci-status@87fb95c3b05fa318b9dd8c2c164cc550071a1ccb # v0.7.0
+        with:
+          treat-skipped-as: fail
+          results: >-
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}
             ${{ needs.shellcheck.result }}
@@ -854,11 +856,3 @@ jobs:
             ${{ needs.actionlint.result }}
             ${{ needs.zizmor.result }}
             ${{ needs.osv-scanner.result }}
-        run: |
-          for r in $RESULTS; do
-            case "$r" in
-              success) ;;
-              *) echo "A lane did not pass (result: $r)."; exit 1 ;;
-            esac
-          done
-          echo "All lanes passed."
