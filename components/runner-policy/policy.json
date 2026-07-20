@@ -417,7 +417,7 @@
     "default": "ubuntu-24.04",
     "failureSentinel": "ci-runner-selection-failed"
   },
-  "fallbackLabelAllowlist": ["ubuntu-24.04"],
+  "fallbackLabelAllowlist": ["ubuntu-24.04", "melodic-ubuntu-24.04-x64"],
   "forbiddenHostedRunnerLabels": ["macos-latest", "ubuntu-latest", "windows-latest"],
   "managedLabelPatterns": [
     "(?:^|[^a-z0-9-])(?:melodic|kyle)-(?:[a-z0-9]+-)*ubuntu-24\\.04-x64(?:-[a-z0-9-]+)?(?:$|[^a-z0-9-])"
