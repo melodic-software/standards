@@ -46,6 +46,19 @@ file; the consumer owns the runtime composition that reads it.
 - A repository needing a stricter or looser posture layers its own project settings; the
   deny floor is not relaxable below this component wherever it is composed in.
 
+## Threat model — what the deny floor is and is not
+
+The deny list pins the COMMON destructive and secret-reaching spellings. The rule grammar is
+positional glob matching, so it cannot enumerate every flag permutation a shell command
+admits (combined short flags, arbitrary flag positions, values smuggled inside arguments);
+treating it as a sandbox is a category error. The floor is one defense-in-depth layer:
+below it sit the permission classifier's own category safety checks, and around it sit the
+remote-side protections (branch rulesets, force-push denial at the platform, lease-based
+worktree isolation). The structural fix for spelling-permutation gaps is classifier-side
+command decomposition — a recorded product-surface gap, not something more glob rules can
+close. New spellings observed in real sessions land here on sight; adversarial enumeration
+beyond the common forms is explicitly out of scope.
+
 ## Change discipline
 
 Additions to `allow` require observed-usage evidence (recurring prompt patterns from real
