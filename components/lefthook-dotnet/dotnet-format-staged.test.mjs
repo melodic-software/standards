@@ -27,6 +27,14 @@ async function writeConfig(root, value) {
   await writeFile(configPath(root), source);
 }
 
+function assertSpawnSucceeded(result) {
+  assert.equal(
+    result.status,
+    0,
+    [result.error?.message, result.stdout, result.stderr].filter(Boolean).join("\n"),
+  );
+}
+
 function runLefthook(root, args, environment = {}) {
   const result = spawnSync(process.execPath, [LEFTHOOK_CLI, ...args], {
     cwd: root,
@@ -39,11 +47,7 @@ function runLefthook(root, args, environment = {}) {
     },
     shell: false,
   });
-  assert.equal(
-    result.status,
-    0,
-    [result.error?.message, result.stdout, result.stderr].filter(Boolean).join("\n"),
-  );
+  assertSpawnSucceeded(result);
   return result.stdout.trim();
 }
 
@@ -75,11 +79,7 @@ test("pinned Lefthook validates, dumps, and runs the production config contract"
     encoding: "utf8",
     shell: false,
   });
-  assert.equal(
-    gitInit.status,
-    0,
-    [gitInit.error?.message, gitInit.stdout, gitInit.stderr].filter(Boolean).join("\n"),
-  );
+  assertSpawnSucceeded(gitInit);
   await writeFile(
     path.join(root, ".lefthook", "base.yml"),
     await readFile(new URL("../lefthook-base/lefthook.yml", import.meta.url), "utf8"),
