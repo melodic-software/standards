@@ -28,20 +28,20 @@ assert_file_exists 'installed package contains tsconfig.json' \
 
 cp "components/tsconfig/fixtures/good/example.ts" "$consumer/good/example.ts"
 cp "components/tsconfig/fixtures/bad/violations.ts" "$consumer/bad/violations.ts"
-node -e '
-  const fs = require("node:fs");
-  const [source, destination] = process.argv.slice(1);
-  const config = JSON.parse(fs.readFileSync(source, "utf8"));
-  config.extends = "@melodic-software/tsconfig/tsconfig.json";
-  fs.writeFileSync(destination, JSON.stringify(config, null, 2) + "\n");
-' "$good" "$consumer/good/tsconfig.json"
-node -e '
-  const fs = require("node:fs");
-  const [source, destination] = process.argv.slice(1);
-  const config = JSON.parse(fs.readFileSync(source, "utf8"));
-  config.extends = "@melodic-software/tsconfig/tsconfig.json";
-  fs.writeFileSync(destination, JSON.stringify(config, null, 2) + "\n");
-' "$bad" "$consumer/bad/tsconfig.json"
+
+# write_extending_tsconfig <source> <destination> — copy <source>'s tsconfig,
+# pointed at the packaged base via `extends`, to <destination>.
+write_extending_tsconfig() {
+  node -e '
+    const fs = require("node:fs");
+    const [source, destination] = process.argv.slice(1);
+    const config = JSON.parse(fs.readFileSync(source, "utf8"));
+    config.extends = "@melodic-software/tsconfig/tsconfig.json";
+    fs.writeFileSync(destination, JSON.stringify(config, null, 2) + "\n");
+  ' "$1" "$2"
+}
+write_extending_tsconfig "$good" "$consumer/good/tsconfig.json"
+write_extending_tsconfig "$bad" "$consumer/bad/tsconfig.json"
 
 good="$consumer/good/tsconfig.json"
 bad="$consumer/bad/tsconfig.json"

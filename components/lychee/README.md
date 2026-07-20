@@ -17,12 +17,10 @@ a 404. The inventory itself lives in the two `melodic-software/` alternations in
 [`lychee.toml`](../../lychee.toml)'s `exclude` list — read it there rather than
 from a copy here, and keep it in sync with actual repository visibility. Public
 siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
-exceptions are path-scoped to the current Medium Dungeon Master article, the
-Medium Fortmatic postmortem, Miro
-article `31624028247058`, IsDown's Anthropic status page, the npm package
-pages for `firecrawl-cli` and `@mirohq/miro-api`, and the MySQL 8.4 InnoDB
-transaction-isolation manual page; every other URL on those hosts remains
-checked. Lychee documents `exclude` values as URL regular expressions
-in its [configuration guide][1].
+exceptions are scoped to the exact URL, not the host — every other URL on
+those hosts remains checked. The specific exceptions are inventoried alongside
+the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`
+list. Lychee documents `exclude` values as URL regular expressions in its
+[configuration guide][1].
 
 [1]: https://lychee.cli.rs/guides/config/#excluding-links

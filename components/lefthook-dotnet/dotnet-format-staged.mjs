@@ -47,7 +47,7 @@ function hasControlCharacter(value) {
   });
 }
 
-function resolveRepositoryPath(root, candidate, label) {
+function assertNonEmptyRepositoryRelative(candidate, label) {
   if (typeof candidate !== "string" || candidate.trim() === "") {
     throw new Error(`${label} must be a non-empty repository-relative path`);
   }
@@ -58,6 +58,10 @@ function resolveRepositoryPath(root, candidate, label) {
   ) {
     throw new Error(`${label} must be repository-relative, not absolute: ${candidate}`);
   }
+}
+
+function resolveRepositoryPath(root, candidate, label) {
+  assertNonEmptyRepositoryRelative(candidate, label);
   const resolved = path.resolve(root, candidate);
   if (!isInside(root, resolved)) {
     throw new Error(`${label} escapes the repository: ${candidate}`);
@@ -66,16 +70,7 @@ function resolveRepositoryPath(root, candidate, label) {
 }
 
 function validateWorkspaceValue(candidate) {
-  if (typeof candidate !== "string" || candidate.trim() === "") {
-    throw new Error("workspace must be a non-empty repository-relative path");
-  }
-  if (
-    path.isAbsolute(candidate) ||
-    path.win32.isAbsolute(candidate) ||
-    /^[A-Za-z]:/.test(candidate)
-  ) {
-    throw new Error(`workspace must be repository-relative, not absolute: ${candidate}`);
-  }
+  assertNonEmptyRepositoryRelative(candidate, "workspace");
   if (
     candidate !== candidate.trim() ||
     hasControlCharacter(candidate) ||

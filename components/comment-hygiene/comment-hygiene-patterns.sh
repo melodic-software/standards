@@ -18,6 +18,15 @@
 # reusable change upstream; a repository with genuinely different policy opts
 # out and owns the complete component. Execution remains in ci-workflows.
 
+# chp::_record_violation <lineno> <kind> <detail>
+#
+# Emit one "lineno:kind:detail" line and increment the caller's `violations`
+# local via bash dynamic scoping; private to chp::scan_text.
+chp::_record_violation() {
+  printf '%s:%s:%s\n' "$1" "$2" "$3"
+  violations=$((violations + 1))
+}
+
 # chp::scan_text <content>
 #
 # Scan the comment lines of <content> (those starting with //, #, /*, *, or
@@ -47,8 +56,7 @@ chp::scan_text() {
     # marker matched; TODO has its own rule so its reported detail is always the
     # canonical "TODO" spelling regardless of the case matched.
     if [[ "$line" =~ (^|[^[:alnum:]_])(FIXME|HACK)([^[:alnum:]_]|$) ]]; then
-      printf '%s:warning-marker:%s\n' "$lineno" "${BASH_REMATCH[2]}"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" warning-marker "${BASH_REMATCH[2]}"
       continue
     fi
     # XXX is uppercase-only: lowercase xxx collides with the CSS keyword
@@ -56,21 +64,18 @@ chp::scan_text() {
     shopt -u nocasematch
     if [[ "$line" =~ (^|[^[:alnum:]_])XXX([^[:alnum:]_]|$) ]]; then
       shopt -s nocasematch
-      printf '%s:warning-marker:XXX\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" warning-marker XXX
       continue
     fi
     shopt -s nocasematch
     if [[ "$line" =~ (^|[^[:alnum:]_])TODO([^[:alnum:]_]|$) ]]; then
-      printf '%s:warning-marker:TODO\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" warning-marker TODO
       continue
     fi
 
     # Internal continuous-collaboration issue marker.
     if [[ "$line" =~ cc-issue ]]; then
-      printf '%s:tracker-ref:cc-issue\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref cc-issue
       continue
     fi
 
@@ -78,15 +83,13 @@ chp::scan_text() {
     # require the # — that keeps prose like "fix 3 bugs" or "close the handle"
     # clean while catching "fixes #12" / "resolves #42" / "closed #7".
     if [[ "$line" =~ (^|[^[:alnum:]_])(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:space:]]+#[0-9]+ ]]; then
-      printf '%s:tracker-ref:closing-keyword\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref closing-keyword
       continue
     fi
 
     # issue / issues / tracked references (the # is optional here).
     if [[ "$line" =~ (^|[^[:alnum:]_])(issues?|tracked)[[:space:]]*:?[[:space:]]*#?[0-9]+ ]]; then
-      printf '%s:tracker-ref:issue-reference\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref issue-reference
       continue
     fi
 
@@ -100,21 +103,18 @@ chp::scan_text() {
     # allow them; the leading boundary still excludes '.'/'-' so a host embedded
     # mid-token is not a match start either.
     if [[ "$line" =~ (^|[^[:alnum:]_/.-])[A-Za-z0-9_-]+/[A-Za-z0-9._-]+#[0-9]+ ]]; then
-      printf '%s:tracker-ref:repo-issue\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref repo-issue
       continue
     fi
 
     # GH-N shorthand.
     if [[ "$line" =~ (^|[^[:alnum:]_])GH-[0-9]+ ]]; then
-      printf '%s:tracker-ref:gh-reference\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref gh-reference
       continue
     fi
 
     if [[ "$line" =~ (^|[^[:alnum:]_])PR[[:space:]]*#[0-9]+ ]]; then
-      printf '%s:tracker-ref:pr-reference\n' "$lineno"
-      violations=$((violations + 1))
+      chp::_record_violation "$lineno" tracker-ref pr-reference
       continue
     fi
     # Jira-style keys (PROJ-123) are intentionally NOT matched: the bare
