@@ -23,15 +23,15 @@ jobs:
     with:
       runner: ubuntu-24.04
       # The called workflow's defaults plus one repo-specific addition: the
-      # online lane also verifies local file links, so the intentionally-broken
-      # lychee fixture must be excluded here (the offline lane in ci.yml already
-      # excludes it). `args` is a single input, so overriding it restates the
-      # defaults.
+      # online lane also verifies local file links, so component fixtures stay
+      # in their dedicated offline contract lane rather than becoming external
+      # link-check inputs. `args` is a single input, so overriding it restates
+      # the defaults.
       args: >-
         --cache
         --max-cache-age 7d
         --no-progress
         --accept-timeouts
-        --exclude-path 'components/[^/]+/fixtures/bad'
+        --exclude-path '^(\./)?components[\\/][^\\/]+[\\/]fixtures([\\/]|$)'
         --config lychee.toml
         './**/*.md'

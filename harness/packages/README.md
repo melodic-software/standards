@@ -36,7 +36,7 @@ The behavior follows npm's definitions of [package identity][1], [`npm
 pack`][2], and [semantic versioning][3]. Version comparison uses npm's maintained
 [`semver` implementation][4], pinned exactly in the root lockfile.
 
-[1]: https://docs.npmjs.com/files/package.json/#name
+[1]: https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#name
 [2]: https://docs.npmjs.com/cli/v11/commands/npm-pack/
 [3]: https://docs.npmjs.com/about-semantic-versioning/
 [4]: https://github.com/npm/node-semver

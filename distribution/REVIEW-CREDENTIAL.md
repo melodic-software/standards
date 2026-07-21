@@ -120,7 +120,7 @@ way.
 
 ## Sources
 
-- [GitHub Apps — installation permissions and access](https://docs.github.com/en/apps/creating-github-apps/setting-up-a-github-app/choosing-permissions-for-github-apps)
-- [`actions/checkout` — checking out a different repository](https://github.com/actions/checkout#checkout-a-different-repository)
+- [GitHub Apps — installation permissions and access](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+- [`actions/checkout` — checking out multiple repositories (private)](https://github.com/actions/checkout#checkout-multiple-repos-private)
 - [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)
 - [Encrypted secrets — restricting a secret to selected repositories](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)
