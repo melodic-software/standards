@@ -87,7 +87,7 @@ contract. This overlay owns only what a shell script should do itself.
 - **Keep portable output explicit and UTC** — for a portable current timestamp,
   use a fixed locale and POSIX `date`, for example
   `LC_ALL=C date -u '+%Y-%m-%dT%H:%M:%SZ'`. GNU `date -d`, `--iso-8601`,
-  `--rfc-3339`, `%s`, `%N`, and `%:z` are extensions; each use needs a declared,
+  `--rfc-3339`, `%N`, and `%:z` are extensions; each use needs a declared,
   tested compatible runtime rather than being treated as POSIX-portable. See
   POSIX [`date`][10] and GNU's [option][11] and [format guidance][12].
 - **Do not make `date` a business-calendar engine** — reject natural-language
