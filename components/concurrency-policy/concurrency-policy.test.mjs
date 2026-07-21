@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { auditRepository, ConfigurationError, parseUniqueJson } from "./concurrency-policy.mjs";
+import {
+  auditRepository,
+  ConfigurationError,
+  parseArguments,
+  parseUniqueJson,
+} from "./concurrency-policy.mjs";
 
 const CANONICAL = `concurrency:
   group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
@@ -39,6 +44,31 @@ function rules(findings) {
 
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
+});
+
+test("command-line parsing preserves defaults and follows strict Node syntax", () => {
+  assert.deepEqual(parseArguments(["--"]), {
+    root: process.cwd(),
+    configPath: ".github/concurrency-policy.json",
+    json: false,
+  });
+  assert.deepEqual(parseArguments(["--json", "--root=repo", "--config=config.json"]), {
+    root: "repo",
+    configPath: "config.json",
+    json: true,
+  });
+  assert.equal(parseArguments(["--root=-repo"]).root, "-repo");
+
+  for (const [argv, pattern] of [
+    [["--unknown"], /Unknown option/u],
+    [["--root", "-repo"], /ambiguous/u],
+    [["repo"], /Unexpected argument/u],
+  ]) {
+    assert.throws(
+      () => parseArguments(argv),
+      (error) => error instanceof ConfigurationError && pattern.test(error.message),
+    );
+  }
 });
 
 test("canonical block on a pull_request workflow passes", async () => {

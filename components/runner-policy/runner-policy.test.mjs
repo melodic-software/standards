@@ -3,8 +3,14 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { auditRepository, ConfigurationError, parseUniqueJson } from "./runner-policy.mjs";
+import {
+  auditRepository,
+  ConfigurationError,
+  parseArguments,
+  parseUniqueJson,
+} from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
@@ -968,6 +974,53 @@ jobs:
 
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
+});
+
+test("command-line parsing preserves defaults and follows strict Node syntax", () => {
+  const environment = {
+    CI_REPOSITORY_VISIBILITY: "private",
+    GITHUB_REPOSITORY: "owner/repository",
+  };
+  assert.deepEqual(parseArguments(["--"], environment), {
+    root: process.cwd(),
+    configPath: ".github/runner-policy.json",
+    policyPath: fileURLToPath(new URL("./policy.json", import.meta.url)),
+    repositoryVisibility: "private",
+    githubRepository: "owner/repository",
+    json: false,
+  });
+  assert.deepEqual(
+    parseArguments(
+      [
+        "--json",
+        "--root=repo",
+        "--config=config.json",
+        "--policy=policy.json",
+        "--repository-visibility=public",
+      ],
+      environment,
+    ),
+    {
+      root: "repo",
+      configPath: "config.json",
+      policyPath: "policy.json",
+      repositoryVisibility: "public",
+      githubRepository: "owner/repository",
+      json: true,
+    },
+  );
+  assert.equal(parseArguments(["--root=-repo"], environment).root, "-repo");
+
+  for (const [argv, pattern] of [
+    [["--unknown"], /Unknown option/u],
+    [["--root", "-repo"], /ambiguous/u],
+    [["repo"], /Unexpected argument/u],
+  ]) {
+    assert.throws(
+      () => parseArguments(argv, environment),
+      (error) => error instanceof ConfigurationError && pattern.test(error.message),
+    );
+  }
 });
 
 test("public repository with explicit hosted image passes", async () => {
