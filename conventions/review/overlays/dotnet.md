@@ -22,6 +22,37 @@ Stack-specific review bars for .NET that the agnostic review criteria leave to a
 - **Async-void** — `async void` is the fire-and-forget-shaped signature the base criterion restricts to the platform's event-handler case; everything else returns a `Task`.
 - **Library await configuration** — the analyzer already forces every await to be configured (the `dotnet-analysis` component posture); review owns what it cannot decide: the configuration fits the context (library code avoids capturing the synchronization context), and the bar still holds in repos that deliberately relaxed the rule.
 
+## Date and time
+
+The shared [date-time criteria](../date-time.md) own the semantic and storage
+contract. This overlay owns only the .NET and SQL Server representation.
+
+- **Types match the contract** — represent an instant with `DateTimeOffset`,
+  normalizing it to UTC when the shared storage contract requires that; use a
+  UTC `DateTime` only behind an enforced `Kind.Utc` invariant. On targets that
+  provide them, use `DateOnly` and `TimeOnly` for date-only and time-of-day
+  values (`DateOnly` and `TimeOnly` are not available in .NET Framework). Use
+  `TimeZoneInfo`, not the obsolete `TimeZone`, for zone conversion, and retain
+  the IANA zone ID separately for future local intent: a `DateTimeOffset`
+  carries an offset, not a time zone. Prove ID resolution on every target;
+  Windows IANA lookup starts with .NET 6 and requires ICU rather than NLS or
+  invariant globalization. See Microsoft's [type-selection guidance][1] and
+  [`TimeZoneInfo` compatibility notes][6].
+- **Inject the clock** — time-dependent services receive a `TimeProvider` and
+  use its timestamp APIs for elapsed time so tests can control wall time and
+  timers. It is built into .NET 8 and later; .NET 5–7, .NET Framework 4.6.2 and
+  later, and .NET Standard 2.0 use the official compatibility package. See the
+  [`TimeProvider` overview][2].
+- **Modern SQL Server columns** — for SQL Server and Azure SQL, select `date`,
+  `time`, `datetime2`, or `datetimeoffset` by contract; a new legacy `datetime`
+  column is an Important finding because Microsoft says to avoid it for new
+  work. Use `datetime2` when an offset need not round-trip and `datetimeoffset`
+  only when the numeric offset is part of the contract; neither type stores a
+  named time zone. Confirm the target before prescribing `datetimeoffset`:
+  Microsoft Fabric Warehouse currently does not support that column type. See
+  the [`datetime`][3], [`datetime2`][4], and [`datetimeoffset`][5]
+  documentation.
+
 ## Performance
 
 - **Two-tier cache coherence** — a hybrid in-process-over-distributed cache treats tag invalidation as logical (entries expire as misses, not evicted) and must not wrap its built-in stampede protection in a redundant lock.
@@ -38,3 +69,10 @@ Stack-specific review bars for .NET that the agnostic review criteria leave to a
 - **Test-project placement** — integration tests as a child of a web-SDK project compile test files into the app; place them in a dedicated test project. Unit tests co-locate by responsibility; cross-cutting tests centralize.
 - **Real instances for managed dependencies** — an in-memory provider or a mocked database for an application-owned store hides integration bugs; use a real instance (a container) for managed dependencies, and substitute only unmanaged, externally-visible ones.
 - **Foundational library changes** — shared platform code requires thorough coverage; a bug there cascades. Critical when independently testable behavior is added without tests.
+
+[1]: https://learn.microsoft.com/en-us/dotnet/standard/datetime/choosing-between-datetime
+[2]: https://learn.microsoft.com/en-us/dotnet/standard/datetime/timeprovider-overview
+[3]: https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetime-transact-sql
+[4]: https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetime2-transact-sql
+[5]: https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetimeoffset-transact-sql
+[6]: https://learn.microsoft.com/en-us/dotnet/api/system.timezoneinfo.findsystemtimezonebyid

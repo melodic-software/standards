@@ -79,6 +79,32 @@ brings it under ShellCheck.
   `code-quality.md` owns the god-file and embedded-script bars. See the
   [Google shell style guide][6] on when to use shell.
 
+## Date and time
+
+The shared [date-time criteria](../date-time.md) own the semantic and storage
+contract. This overlay owns only what a shell script should do itself.
+
+- **Keep portable output explicit and UTC** — for a portable current timestamp,
+  use a fixed locale and POSIX `date`, for example
+  `LC_ALL=C date -u '+%Y-%m-%dT%H:%M:%SZ'`. GNU `date -d`, `--iso-8601`,
+  `--rfc-3339`, `%s`, `%N`, and `%z` are extensions; each use needs a declared,
+  tested compatible runtime rather than being treated as POSIX-portable. See
+  POSIX [`date`][10] and GNU's [option][11] and [format guidance][12].
+- **Do not make `date` a business-calendar engine** — reject natural-language
+  input and ambiguous abbreviations on correctness-critical paths. Parsing,
+  named-zone conversion, recurrence, or civil-time arithmetic belongs in a
+  structured runtime with a documented time-zone library once it passes the
+  shell threshold.
+- **Do not inherit the machine's local zone** — when local reporting is truly
+  required on a known platform, set `TZ` for the individual command and verify
+  that the deployed system contains the requested IANA data. `TZ` chooses the
+  conversion context; it does not make a missing database appear. Otherwise use
+  `-u`.
+- **Delegate elapsed-time correctness** — portable shell has no standard
+  monotonic-clock interface. A timeout, retry budget, or deadline whose
+  correctness must survive wall-clock adjustment belongs in a runtime with a
+  documented monotonic API, not arithmetic over `date` output.
+
 ## Testing
 
 - **Tests for non-trivial scripts** — a script with real branching, parsing, or a
@@ -96,3 +122,6 @@ brings it under ShellCheck.
 [7]: https://mywiki.wooledge.org/BashPitfalls
 [8]: https://github.com/koalaman/shellcheck/wiki/SC2115
 [9]: https://github.com/bats-core/bats-core
+[10]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/date.html
+[11]: https://www.gnu.org/software/coreutils/manual/html_node/Options-for-date.html
+[12]: https://www.gnu.org/software/coreutils/manual/html_node/General-date-syntax.html

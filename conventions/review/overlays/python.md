@@ -17,6 +17,34 @@ Stack-specific review bars for Python. The mechanically enforced posture is owne
 - **Immutability by default** — internal value objects and API models are frozen rather than mutable bags.
 - **Explicit results for domain-heavy flows** — a domain-heavy service may model success and failure explicitly (an explicit result type) rather than control-flow exceptions, mirroring the result-modeling default; infrastructure failures stay exceptions.
 
+## Date and time
+
+The shared [date-time criteria](../date-time.md) own the semantic and storage
+contract. This overlay owns the Python representation.
+
+- **Aware `datetime` values represent instants** — use `date` for a date-only
+  value, `time` for a time of day, `timedelta` for a duration, and an aware
+  `datetime` for an instant. Create UTC with `datetime.now(timezone.utc)` (or
+  `datetime.now(UTC)` on Python 3.11 and later), not `datetime.utcnow()`:
+  `utcnow()` returns a naive value and is deprecated in Python 3.12. Never
+  silently attach UTC to an unvalidated naive value. See the [`datetime`
+  documentation][1].
+- **Use `zoneinfo` with a declared data source** — on Python 3.9 and later,
+  resolve IANA IDs with `ZoneInfo` and make the `fold` policy explicit for an
+  ambiguous local input. The module is unavailable on WASI and does not bundle
+  zone data; cross-platform projects that require named zones declare the
+  first-party `tzdata` dependency instead of assuming the host supplies it.
+  See the [`zoneinfo` documentation][2].
+- **Measure with a monotonic clock** — use `time.monotonic()` or
+  `time.monotonic_ns()` for elapsed time and in-process deadlines, not
+  `datetime.now()` or `time.time()`. The reference point is deliberately
+  undefined, so only differences within the process are meaningful. See the
+  [`time` documentation][3].
+
 ## Testing
 
 - **Tests for non-trivial package logic** — a package carrying real logic, a CLI boundary, or regression-prone parsing has tests for it; "covered by a consumer" is not a default. Framework and placement remain repository-specific.
+
+[1]: https://docs.python.org/3/library/datetime.html
+[2]: https://docs.python.org/3/library/zoneinfo.html
+[3]: https://docs.python.org/3/library/time.html#time.monotonic

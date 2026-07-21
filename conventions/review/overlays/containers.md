@@ -30,6 +30,32 @@ Apply this overlay to Dockerfiles, Compose definitions, deployment manifests, im
 - **Credential-bearing agent images are security-sensitive** — an image that can receive source-control, model-provider, browser-session, or automation credentials is reviewed as a production security boundary even when the surrounding workflow is internal or experimental.
 - **Logs preserve the boundary** — runtime and audit logs are available outside the container, exclude sensitive values, and identify the immutable image revision. A container's writable filesystem is not the only copy of operational evidence.
 
+## Date and time
+
+The shared [date-time criteria](../date-time.md) own application semantics. This
+overlay owns the runtime data and clock boundary that makes those semantics
+work in a container.
+
+- **Ship the zone database the application expects** — when code loads named
+  zones, the final image contains a maintained OS `tzdata` package or the
+  runtime's reviewed embedded equivalent. `TZ` selects a zone; it does not add
+  the zoneinfo files. Test at least one required zone and offset transition in
+  the final image, especially for slim, distroless, and `scratch` images. The
+  [IANA database][1] and glibc [`TZ` documentation][2] define the data and lookup
+  model.
+- **Give tzdb an update path** — record whether rules come from the base image,
+  a package, or a language runtime, then rebuild and test when that source ships
+  an update. IANA releases have no fixed schedule and normally reach clients
+  through OS or runtime updates; Docker likewise recommends [regular rebuilds
+  with updated dependencies][3]. An immutable image with no rebuild trigger can
+  carry politically obsolete rules indefinitely.
+- **Leave Linux clock synchronization to the node** — Linux time namespaces do
+  not virtualize `CLOCK_REALTIME`; keep `SYS_TIME` dropped and do not run an NTP
+  daemon in an application container. Make host or node synchronization and
+  skew monitoring an operational dependency instead. See the Linux [time
+  namespace documentation][4] and Docker's [`SYS_TIME` capability
+  description][5].
+
 ## Verification evidence
 
 - **Scan the artifact that will run** — source dependency results and a base-image scan do not establish the contents of the final image. Review expects results for the built artifact identified by immutable digest, with findings triaged under the repository's vulnerability policy.
@@ -43,3 +69,9 @@ Apply this overlay to Dockerfiles, Compose definitions, deployment manifests, im
 - [Docker seccomp profiles](https://docs.docker.com/engine/security/seccomp/)
 - [Docker rootless mode](https://docs.docker.com/engine/security/rootless/)
 - [OWASP Docker Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html)
+
+[1]: https://www.iana.org/time-zones
+[2]: https://sourceware.org/glibc/manual/latest/html_node/TZ-Variable.html
+[3]: https://docs.docker.com/build/building/best-practices/#rebuild-your-images-often
+[4]: https://man7.org/linux/man-pages/man7/time_namespaces.7.html
+[5]: https://docs.docker.com/engine/containers/run/#runtime-privilege-and-linux-capabilities
