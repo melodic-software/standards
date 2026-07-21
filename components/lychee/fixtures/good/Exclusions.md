@@ -24,6 +24,7 @@ The exact current public URLs that reject automated link checkers are excluded:
 - <https://www.npmjs.com/package/firecrawl-cli>
 - <https://www.npmjs.com/package/@mirohq/miro-api>
 - <https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html>
+- <https://www.w3.org/International/wiki/WorkingWithTimeZones>
 
 Other paths on those public hosts remain subject to checking:
 
@@ -32,6 +33,7 @@ Other paths on those public hosts remain subject to checking:
 - <https://isdown.app/status/example>
 - <https://www.npmjs.com/package/example>
 - <https://dev.mysql.com/doc/refman/8.4/en/example.html>
+- <https://www.w3.org/International/>
 
 Public siblings and stale pre-transfer owner links remain subject to checking:
 

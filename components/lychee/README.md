@@ -21,6 +21,6 @@ exceptions are scoped to the exact URL, not the host — every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside
 the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`
 list. Lychee documents `exclude` values as URL regular expressions in its
-[configuration guide][1].
+[link-exclusion recipe][1].
 
-[1]: https://lychee.cli.rs/guides/config/#excluding-links
+[1]: https://lychee.cli.rs/recipes/excluding-links/

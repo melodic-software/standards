@@ -32,7 +32,7 @@ recommend removing words that add no substance.
 Do not vary terminology merely to avoid repetition. Use one term for one
 concept. Repeat a word deliberately when the repetition prevents ambiguity or
 keeps parallel conditions explicit, as Google's
-[global-audience guidance](https://developers.google.com/style/translation#use_helper_words_and_optional_words)
+[global-audience guidance](https://developers.google.com/style/translation#use-helper-words-and-optional-words)
 recommends.
 
 ## Preserve the whole contract

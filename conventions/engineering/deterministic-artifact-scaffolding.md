@@ -4,9 +4,9 @@ When an artifact repeats a stable structure, emit that structure with the
 narrowest deterministic mechanism that fits: a platform-native form or
 template, a schema-aware serializer, or a producer-owned template. A human or
 model supplies only the values that require judgment. OpenAI's
-[Structured Outputs guidance](https://openai.com/index/introducing-structured-outputs-in-the-api/)
-distinguishes deterministic schema conformance from the correctness of values
-inside that schema; a scaffold owns the former, not the latter.
+[Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs)
+separates schema adherence from generation quality and recommends evals for
+the latter; a scaffold owns the former, not the latter.
 
 Choosing whether a shape is stable and reusable remains a reasoning-only
 decision. [`enforceability-tiers.md`](enforceability-tiers.md)
@@ -93,7 +93,7 @@ workload and treats preflight counts as estimates.
 
 - [GitHub, "Creating a default community health file"](https://docs.github.com/en/enterprise-cloud@latest/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file)
 - [GitHub, "About issue and pull request templates"](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/about-issue-and-pull-request-templates)
-- [OpenAI, "Introducing Structured Outputs in the API"](https://openai.com/index/introducing-structured-outputs-in-the-api/)
+- [OpenAI, "Structured model outputs"](https://developers.openai.com/api/docs/guides/structured-outputs)
 - [Anthropic, "Writing effective tools for AI agents"](https://www.anthropic.com/engineering/writing-tools-for-agents)
 - [Anthropic, "Agent Skills"](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
 - [Anthropic, "Token counting"](https://platform.claude.com/docs/en/build-with-claude/token-counting)
