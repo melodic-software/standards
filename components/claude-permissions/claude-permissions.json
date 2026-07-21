@@ -16,6 +16,7 @@
       "Bash(gh pr diff *)",
       "Bash(gh pr list *)",
       "Bash(gh pr ready *)",
+      "Bash(gh pr review *)",
       "Bash(gh pr view *)",
       "Bash(gh repo clone *)",
       "Bash(gh run list *)",
