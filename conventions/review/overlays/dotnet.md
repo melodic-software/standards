@@ -49,9 +49,9 @@ contract. This overlay owns only the .NET and SQL Server representation.
   work. Use `datetime2` when an offset need not round-trip and `datetimeoffset`
   only when the numeric offset is part of the contract; neither type stores a
   named time zone. Confirm the target before prescribing `datetimeoffset`:
-  Microsoft Fabric Warehouse currently does not support that column type. See
-  the [`datetime`][3], [`datetime2`][4], and [`datetimeoffset`][5]
-  documentation.
+  Microsoft Fabric Warehouse does not support that column type for persisted
+  table storage [7]. See the [`datetime`][3], [`datetime2`][4], and
+  [`datetimeoffset`][5] documentation.
 
 ## Performance
 
@@ -76,3 +76,4 @@ contract. This overlay owns only the .NET and SQL Server representation.
 [4]: https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetime2-transact-sql
 [5]: https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetimeoffset-transact-sql
 [6]: https://learn.microsoft.com/en-us/dotnet/api/system.timezoneinfo.findsystemtimezonebyid
+[7]: https://learn.microsoft.com/en-us/fabric/data-warehouse/data-types#unsupported-data-types-for-tables

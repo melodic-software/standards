@@ -21,7 +21,7 @@ contract. This overlay owns the JavaScript runtime representation.
 - **Gate `Temporal` on the supported runtimes** — use `Temporal.Instant`,
   `Temporal.ZonedDateTime`, and the appropriate `Temporal.Plain*` type when
   their semantics match the contract, but do not assume the global exists:
-  MDN still marks `Temporal` as [limited availability and not Baseline][1]. If
+  MDN marks `Temporal` as [limited availability and not Baseline][1]. If
   a target needs a polyfill, make it an explicit, pinned, tested dependency;
   the proposal champions' [`@js-temporal/polyfill` README][2] says the package
   is not affiliated with TC39 and can still make breaking changes before Stage
