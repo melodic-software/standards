@@ -20,12 +20,14 @@ contract. This overlay owns the JavaScript runtime representation.
 
 - **Gate `Temporal` on the supported runtimes** — use `Temporal.Instant`,
   `Temporal.ZonedDateTime`, and the appropriate `Temporal.Plain*` type when
-  their semantics match the contract, but do not assume the global exists:
-  MDN marks `Temporal` as [limited availability and not Baseline][1]. If
-  a target needs a polyfill, make it an explicit, pinned, tested dependency;
-  the proposal champions' [`@js-temporal/polyfill` README][2] says the package
-  is not affiliated with TC39 and can still make breaking changes before Stage
-  4. Do not use legacy `Date` for named-zone or civil-time arithmetic.
+  their semantics match the contract. `Temporal` is a [Stage 4
+  specification][6], but do not assume the global exists: MDN marks it as
+  [limited availability and not Baseline][1]. When a target lacks it, add and
+  import a project-reviewed polyfill explicitly. The proposal champions'
+  [`@js-temporal/polyfill` README][2] says that package is not affiliated with
+  TC39, does not install a global `Temporal`, supports Node.js 14 and later, and
+  ships ES2020; test the target's runtime and bundle compatibility. Do not use
+  legacy `Date` for named-zone or civil-time arithmetic.
 - **Parse a declared wire format** — `Date` stores only an epoch-millisecond
   instant, not a time zone. Validate a standards-conforming string with an
   explicit offset before constructing it; reject non-standard or offset-less
@@ -46,3 +48,4 @@ contract. This overlay owns the JavaScript runtime representation.
 [3]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
 [4]: https://developer.mozilla.org/en-US/docs/Web/API/Performance/now
 [5]: https://nodejs.org/api/process.html#processhrtimebigint
+[6]: https://tc39.es/proposal-temporal/

@@ -44,11 +44,11 @@ contract. This overlay owns the Go representation.
 
 - **Use `time.Time` and `time.Duration` by contract** — use `time.Time` for a
   resolved timestamp and `time.Duration` for a fixed elapsed interval. A
-  date-only or future local value needs an explicit domain type plus its IANA
-  zone ID; do not disguise it as a UTC instant. Normalize resolved instants to
-  UTC at the persistence boundary, and compare them with `Time.Equal`, not
-  `==`; `==` also compares location and monotonic-clock state. See the [`time`
-  package][8].
+  floating date-only value uses an explicit domain type with no zone attachment;
+  a future local schedule uses explicit local fields plus its IANA zone ID.
+  Do not disguise either as a UTC instant. Normalize resolved instants to UTC at
+  the persistence boundary, and compare them with `Time.Equal`, not `==`; `==`
+  also compares location and monotonic-clock state. See the [`time` package][8].
 - **Parse in an explicit location** — `time.Parse` interprets input without zone
   information as UTC; use `time.ParseInLocation` when the contract supplies a
   named location. Do not rely on `time.Local` or an abbreviation. Resolve an
