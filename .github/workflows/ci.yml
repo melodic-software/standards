@@ -401,7 +401,7 @@ jobs:
       - name: Install exact TypeScript release
         env:
           TYPESCRIPT_VERSION: ${{ matrix.typescript }}
-        run: npm install --global "typescript@$TYPESCRIPT_VERSION"
+        run: npm install --global "typescript@$TYPESCRIPT_VERSION" # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
       - name: Verify exact TypeScript release
         env:
           TYPESCRIPT_VERSION: ${{ matrix.typescript }}
@@ -586,7 +586,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Install biome and tsc
-        run: npm install -g "@biomejs/biome@${BIOME_VERSION}" "typescript@${TYPESCRIPT_VERSION}"
+        run: npm install -g "@biomejs/biome@${BIOME_VERSION}" "typescript@${TYPESCRIPT_VERSION}" # zizmor: ignore[adhoc-packages] exact-pinned tools installed on PATH so the biome/tsconfig contract tests can assert rule codes directly
       - name: Verify toolchain
         run: |
           biome --version
