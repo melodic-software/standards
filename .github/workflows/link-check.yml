@@ -32,6 +32,6 @@ jobs:
         --max-cache-age 7d
         --no-progress
         --accept-timeouts
-        --exclude-path 'components/[^/]+/fixtures'
+        --exclude-path '^(\./)?components[\\/][^\\/]+[\\/]fixtures([\\/]|$)'
         --config lychee.toml
         './**/*.md'
