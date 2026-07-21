@@ -464,11 +464,14 @@ jobs:
   zizmor:
     permissions:
       contents: read
-    # Advisory Actions security lint; findings annotate without blocking.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
+    # Actions security lint. High-severity findings block the lane; lower
+    # severities annotate. Gating runs in-lane via the SARIF guard, so it
+    # rides the existing ci-status gate — no code-scanning, no elevated grant.
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
     with:
       runner: ubuntu-24.04
       paths: .
+      fail-on-severity: high
 
   osv-scanner:
     permissions:
