@@ -152,15 +152,24 @@ assert_sorted_unique() {
 }
 
 validate_record_keys() {
-  local label="$1" required="$2" optional="$3"
+  local label="$1" required="$2" optional_csv="$3"
   shift 3
-  local key found=false
+  local -a optional_keys=()
+  [[ -z "$optional_csv" ]] || IFS=',' read -r -a optional_keys <<<"$optional_csv"
+  local key opt found=false is_optional
   for key in "$@"; do
     if [[ "$key" == "$required" ]]; then
       found=true
-    elif [[ -z "$optional" || "$key" != "$optional" ]]; then
-      die "$label contains unknown key '$key'"
+      continue
     fi
+    is_optional=false
+    for opt in "${optional_keys[@]+"${optional_keys[@]}"}"; do
+      [[ "$key" != "$opt" ]] || {
+        is_optional=true
+        break
+      }
+    done
+    [[ "$is_optional" == true ]] || die "$label contains unknown key '$key'"
   done
   [[ "$found" == true ]] || die "$label is missing required key '$required'"
 }
@@ -169,6 +178,7 @@ declare -a COMPONENT_NAMES=() TARGET_NAMES=()
 declare -A COMPONENT_EXISTS=() TARGET_EXISTS=()
 declare -A FILES_BY_COMPONENT=() SOURCE_MODES=() REQUIRES_BY_COMPONENT=()
 declare -A MANAGED_BY_TARGET=() LOCAL_BY_TARGET=() VISIT_STATE=()
+declare -A AUTOMERGE_BY_TARGET=()
 declare -a VISIT_PATH=()
 
 visit_component() {
@@ -196,7 +206,7 @@ visit_component() {
 
 validate_manifest() {
   local root_key component key source destination existing_destination mode dependency target selected_component
-  local has_requires has_local
+  local has_requires has_local has_automerge automerge_value
   local -a root_keys component_keys file_sources dependencies target_keys managed locally_owned
   local -A destination_owner=() selected=()
 
@@ -364,10 +374,12 @@ validate_manifest() {
       TARGET="$target" yq eval -r \
         '.targets[strenv(TARGET)] | keys[]' "$MANIFEST_ABS"
     )
-    validate_record_keys "target '$target'" managed locally-owned "${target_keys[@]}"
+    validate_record_keys "target '$target'" managed "locally-owned,automerge" "${target_keys[@]}"
     has_local=false
+    has_automerge=false
     for key in "${target_keys[@]}"; do
       [[ "$key" == locally-owned ]] && has_local=true
+      [[ "$key" == automerge ]] && has_automerge=true
     done
 
     TARGET="$target" yq eval --exit-status \
@@ -412,6 +424,20 @@ validate_manifest() {
       )
       assert_sorted_unique "target '$target' locally-owned components" "${locally_owned[@]}"
     fi
+
+    # Absent means true: automerge is opt-out policy-as-data, so a target that
+    # never mentions the key keeps the fleet-default armed behavior.
+    automerge_value=true
+    if [[ "$has_automerge" == true ]]; then
+      TARGET="$target" yq eval --exit-status \
+        '.targets[strenv(TARGET)].automerge | tag == "!!bool"' \
+        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+        die "target '$target' automerge must be a boolean"
+      automerge_value="$(
+        TARGET="$target" yq eval -r '.targets[strenv(TARGET)].automerge' "$MANIFEST_ABS"
+      )"
+    fi
+    AUTOMERGE_BY_TARGET["$target"]="$automerge_value"
 
     selected=()
     MANAGED_BY_TARGET["$target"]=''
@@ -480,8 +506,8 @@ emit_matrix() {
   for target in "${SELECTED_TARGETS[@]}"; do
     owner="${target%%/*}"
     repo="${target:${#owner}+1}"
-    printf '%s{"repo":"%s","repo_owner":"%s","repo_name":"%s"}' \
-      "$separator" "$target" "$owner" "$repo"
+    printf '%s{"repo":"%s","repo_owner":"%s","repo_name":"%s","automerge":%s}' \
+      "$separator" "$target" "$owner" "$repo" "${AUTOMERGE_BY_TARGET[$target]}"
     separator=','
   done
   printf ']}\n'
@@ -505,6 +531,7 @@ emit_plan() {
   printf 'Distribution plan:\n'
   for target in "${SELECTED_TARGETS[@]}"; do
     printf '## %s\n' "$target"
+    printf '  automerge: %s\n' "${AUTOMERGE_BY_TARGET[$target]}"
     while IFS= read -r component; do
       [[ -n "$component" ]] || continue
       printf '  managed %s:\n' "$component"
