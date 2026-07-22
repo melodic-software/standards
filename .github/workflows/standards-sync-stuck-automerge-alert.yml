@@ -4,12 +4,6 @@ name: standards-sync-stuck-automerge-alert
 # (read from the manifest, never hardcoded) for App-authored sync PRs armed
 # for auto-merge but BLOCKED past a threshold, and files/refreshes a rolling
 # tracking issue in this repo — the calling repo, not any scanned target.
-#
-# BLOCKED ON melodic-software/ci-workflows#<PR1>: the pinned SHA below
-# predates that PR, which moves the reusable's issue writes onto a
-# self-minted App token instead of this caller's ambient GITHUB_TOKEN. Flip
-# the pin to PR1's merge SHA once it lands (this workflow needs no other
-# change — no allowedCallerPermissions waiver, no caller-side issues:write).
 on:
   workflow_dispatch:
   schedule:
@@ -22,7 +16,7 @@ permissions:
 
 jobs:
   alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@dd45dacd7b74dd05f3334b78769e57225f7356d8 # dd45dac 2026-07-22 — pre-PR1, see BLOCKED ON note above
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@43bc8d0f4b328cba9c579039955b93259b6cc6bf # 43bc8d0 2026-07-22
     with:
       runner: ubuntu-24.04
     secrets:
