@@ -37,6 +37,38 @@ golangci-lint analyzer set cannot fully decide. Severity labels are defined in
   semantics; a value receiver must represent an intentionally copyable value.
   The Go team's [review guidance][5] supplies the decision factors.
 
+## Date and time
+
+The shared [date-time criteria](../date-time.md) own the semantic and storage
+contract. This overlay owns the Go representation.
+
+- **Use `time.Time` and `time.Duration` by contract** — use `time.Time` for a
+  resolved timestamp and `time.Duration` for a fixed elapsed interval. A
+  floating date-only value uses an explicit domain type with no zone attachment;
+  a future local schedule uses explicit local fields plus its IANA zone ID.
+  Do not disguise either as a UTC instant. Normalize resolved instants to UTC at
+  the persistence boundary, and compare them with `Time.Equal`, not `==`; `==`
+  also compares location and monotonic-clock state. See the [`time` package][8].
+- **Parse in an explicit location** — `time.Parse` interprets input without zone
+  information as UTC; use `time.ParseInLocation` when the contract supplies a
+  named location. Do not rely on `time.Local` or an abbreviation. Resolve an
+  ambiguous or nonexistent local time before `time.Date`: its documented choice
+  around an offset transition is not guaranteed. See [`ParseInLocation`][9] and
+  [`time.Date`][10].
+- **Make zone data a deployment dependency** — `time.LoadLocation` searches the
+  configured path, the operating system, the Go installation, then embedded
+  data. A final artifact that cannot rely on those sources imports
+  `time/tzdata` or builds with `-tags timetzdata` (available since Go 1.15), and
+  is rebuilt when that data changes. Test a required named zone in the final
+  artifact; embedding adds binary size and belongs to the main program, not a
+  library. See [`time.LoadLocation`][11] and [`time/tzdata`][12].
+- **Keep monotonic measurements in process** — values from `time.Now` carry a
+  monotonic reading, so use `Sub`, `Since`, or `Until` while both endpoints
+  retain it. Serialization and parsing strip that reading and fall back to wall
+  time; sleep behavior also varies by system, so persisted or suspend-inclusive
+  deadlines need a different, explicit contract. See the package's [monotonic
+  clock guidance][13].
+
 ## Resources and tests
 
 - **Cleanup on every path** — close bodies, files, timers, tickers, and other
@@ -65,3 +97,9 @@ golangci-lint analyzer set cannot fully decide. Severity labels are defined in
 [5]: https://go.dev/wiki/CodeReviewComments#receiver-type
 [6]: https://go.dev/doc/articles/race_detector
 [7]: https://go.dev/doc/security/fuzz/
+[8]: https://pkg.go.dev/time#Time
+[9]: https://pkg.go.dev/time#ParseInLocation
+[10]: https://pkg.go.dev/time#Date
+[11]: https://pkg.go.dev/time#LoadLocation
+[12]: https://pkg.go.dev/time/tzdata
+[13]: https://pkg.go.dev/time#hdr-Monotonic_Clocks
