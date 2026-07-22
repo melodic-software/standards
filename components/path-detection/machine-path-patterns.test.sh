@@ -62,6 +62,18 @@ assert_exit 'win repo: percent-env segment stays clean' 1 "$?"
 matches "$HPP_ESCAPED_WIN_REPO_BODY" 'D:\\repos\\%BUILD_ID%\\project'
 assert_exit 'win repo: JSON-escaped percent-env segment stays clean' 1 "$?"
 
+# Broadened checkout-root names beyond `repos` (both spellings each).
+matches "$HPP_WIN_REPO_BODY" 'C:\Projects\acme\project'
+assert_exit 'win repo: Projects root is flagged' 0 "$?"
+matches "$HPP_WIN_REPO_BODY" 'D:\dev\acme\project'
+assert_exit 'win repo: dev root is flagged' 0 "$?"
+matches "$HPP_WIN_REPO_BODY" 'D:/Dev/acme/project'
+assert_exit 'win repo: Dev root forward-slash form is flagged' 0 "$?"
+matches "$HPP_ESCAPED_WIN_REPO_BODY" 'C:\\Projects\\acme\\project'
+assert_exit 'win repo: JSON-escaped Projects root is flagged' 0 "$?"
+matches "$HPP_WIN_REPO_BODY" 'C:\Projects\<repo-root>\x'
+assert_exit 'win repo: Projects placeholder stays clean' 1 "$?"
+
 # Bare roots (the home/checkout directory itself, no child path) are
 # intentionally not matched: the trailing separator every body requires is its
 # right boundary, so a match needs at least one child segment past the root.
