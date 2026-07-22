@@ -55,4 +55,9 @@ assert_exit 'double-quoted ref with a valid comment is clean' 0 "$?"
 pcc::scan_text 'uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f"' >/dev/null
 assert_exit 'double-quoted ref with no comment is flagged' 1 "$?"
 
+# The fallback short-SHA is lowercase hex only; an uppercase short-SHA does
+# not read as the documented fallback shape and is flagged as invalid-form.
+pcc::scan_text 'uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90F1C54 2026-07-18' >/dev/null
+assert_exit 'uppercase short-sha in fallback is invalid-form' 1 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1
