@@ -53,6 +53,30 @@ pcc::scan_text 'jobs:
     uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18 pre-tag pin' >/dev/null
 assert_exit 'short-sha + date + note fallback form is clean' 0 "$?"
 
+# The fallback form's <short-sha> is provenance-checked against the same
+# line's pinned SHA, not just shape-checked: it must be a (case-insensitive)
+# prefix of the actual pin. A short-sha that does not prefix the pin is
+# flagged even though the comment otherwise has the right shape.
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 1234567 2026-07-18' >/dev/null
+assert_exit 'a fallback short-sha that does not prefix the pin is flagged' 1 "$?"
+
+# An all-digit short-sha is a real, if less common, git prefix and is
+# accepted the same as a mixed digit/letter one — only the prefix
+# relationship to the pin matters, not the token's own composition.
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@1234567abcdef1234567890abcdef1234567890 # 1234567 2026-07-18' >/dev/null
+assert_exit 'an all-digit short-sha that genuinely prefixes the pin is clean' 0 "$?"
+
+# A short-sha under 7 characters never reaches the prefix check: it fails
+# the documented shape first, the same way it always has.
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c 2026-07-18' >/dev/null
+assert_exit 'a short-sha under 7 characters is invalid-form' 1 "$?"
+
 # Non-ci-workflows references are out of policy scope regardless of comment.
 pcc::scan_text 'jobs:
   a:

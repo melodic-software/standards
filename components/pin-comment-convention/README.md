@@ -20,19 +20,27 @@ research that locked this dual-form shape, including the fleet pin-comment
 census (six variants found pre-convention) in
 `melodic-software/medley#1624`.
 
-## Scope: form, not provenance
+## Scope: the tag form is format-only; the fallback form is provenance-checked
 
-This policy checks **form** only — a comment is present and matches one of
-the two shapes above. It does not check whether a fallback comment's
-`<short-sha>` actually prefixes the pinned 40-character commit; that
-provenance question is the runner-policy component's `pin-provenance-drift`
-check (`components/runner-policy/README.md`). The two checks are
-complementary: a comment can pass this form check and still fail
-runner-policy's prefix match (a genuine, mismatched short SHA); the reverse
-cannot happen — a comment that fails this form check never resembles a
-short-SHA-plus-date claim in the first place. Neither check subsumes the
-other, and this component does not re-implement runner-policy's prefix
-comparison.
+The tag form (`# vX.Y.Z`) checks **format** only — whether the named release
+actually corresponds to the pinned SHA is GitHub tag data a static scan
+cannot verify without a network call, so it is out of scope here.
+
+The fallback form (`# <short-sha> <date>[ <note>]`) is **provenance-checked**,
+not just format-checked: `<short-sha>` must case-insensitively prefix the
+pinned 40-character SHA on the *same line*. At this position the token is an
+unambiguous SHA claim about that exact pin, so there is no ambiguity to defer
+to a heuristic for — unlike the runner-policy component's
+`pin-provenance-drift` check (`components/runner-policy/README.md`), which
+scans free-form comments across the whole repository and needs an `isShaClaim`
+heuristic (mixed digits/letters, or exactly 40 characters) to decide whether a
+token is a SHA claim at all before checking it. That heuristic would reject a
+legitimate all-digit or all-`a`-`f` abbreviated SHA outright — a real, if less
+common, git prefix — so this component does not align its accepted subset to
+it; it checks the actual pin directly instead. The two checks now overlap for
+a ci-workflows fallback comment specifically: this check is authoritative
+there, and `pin-provenance-drift` remains the sole check for every other
+SHA-pin comment shape this convention does not govern.
 
 ## Renovate: rejected as a pin-alignment mechanism
 
@@ -94,12 +102,15 @@ repository does.
 
 `fixtures/` and `pin-comment-convention.test.sh` cover both forms (with and
 without a fallback note), every documented drift shape (missing comment,
-prose, partial SemVer, reversed fallback field order), the exclusion boundary
-(a pin to any action or workflow outside `melodic-software/ci-workflows` is
-out of scope regardless of its comment), quoted refs, anchored/aliased pins
-(both the whole-step and bare-scalar-alias shapes), the two run:-block /
-YAML-comment false-positive guards, the two data-field-named-"uses" false-positive
-guards (matrix and `with:`), an uppercase pinned SHA (clean and flagged), and
-a document with no `jobs:` key at all (clean, not a parse failure). The test
-file skips (rather than fails) when yq v4 is not installed, matching
-`distribution/sync-manifest.test.sh`'s existing tool-availability guard.
+prose, partial SemVer, reversed fallback field order, a fallback short-sha
+that does not prefix its pin, a short-sha under 7 characters), an all-digit
+short-sha that genuinely prefixes its pin, the exclusion boundary (a pin to
+any action or workflow outside `melodic-software/ci-workflows` is out of
+scope regardless of its comment), quoted refs, anchored/aliased pins (both
+the whole-step and bare-scalar-alias shapes), the two run:-block /
+YAML-comment false-positive guards, the two data-field-named-"uses"
+false-positive guards (matrix and `with:`), an uppercase pinned SHA (clean
+and flagged), and a document with no `jobs:` key at all (clean, not a parse
+failure). The test file skips (rather than fails) when yq v4 is not
+installed, matching `distribution/sync-manifest.test.sh`'s existing
+tool-availability guard.

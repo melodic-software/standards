@@ -19,20 +19,29 @@
 #   2. `# <short-sha> <date>[ <note>]` — fallback form for pinning a commit
 #                                        with no corresponding tag;
 #                                        <short-sha> is 7-40 lowercase hex
-#                                        digits, <date> is ISO 8601
+#                                        digits that must case-insensitively
+#                                        PREFIX the same line's pinned
+#                                        40-character SHA, <date> is ISO 8601
 #                                        (YYYY-MM-DD), <note> is optional
 #                                        free text.
 # No comment, or any other shape (a stray version fragment, prose, the
-# fields in the wrong order), is flagged.
+# fields in the wrong order, a short-sha that does not prefix the pin it
+# annotates), is flagged.
 #
-# This policy checks FORM only. Whether a fallback comment's short SHA
-# actually prefixes the pinned 40-character commit is a correctness question
-# the runner-policy component's `pin-provenance-drift` check already owns —
-# see components/runner-policy/README.md ("pin-provenance-drift"). The two
-# checks are complementary: a comment can pass this form check and still fail
-# runner-policy's prefix match; a comment that fails this form check never
-# reaches runner-policy's prefix match because it does not read as a
-# short-SHA-plus-date claim in the first place.
+# The tag form checks FORM only — GitHub's tag data is not something a
+# static scan can verify without a network call, so whether a `# vX.Y.Z`
+# comment names the release the pinned SHA actually corresponds to is out of
+# scope here. The fallback form is provenance-checked, not just
+# format-checked: at this position, the token is an unambiguous SHA claim
+# about the exact SHA on the same line, so there is no heuristic classifier
+# to defer to the way runner-policy's `pin-provenance-drift` check needs one
+# (its `isShaClaim` heuristic scans free-form comments across the whole
+# repository, where a bare 7-character token could be almost anything). The
+# two checks now overlap for a ci-workflows fallback comment specifically —
+# this check is the authoritative one there, verified directly against the
+# pin it annotates — and `pin-provenance-drift` remains the sole check for
+# every other SHA-pin comment shape this convention does not govern. See
+# components/runner-policy/README.md ("pin-provenance-drift").
 #
 # Extraction goes through yq's YAML tree, not a per-line text regex: `explode`
 # resolves anchors and aliases to their referenced scalar value before the
@@ -68,7 +77,7 @@ pcc::_record_violation() {
   violations=$((violations + 1))
 }
 
-# pcc::_check_comment <raw_comment>
+# pcc::_check_comment <raw_comment> <pinned_sha>
 #
 # <raw_comment> is yq's `line_comment` value for a `uses:` scalar node. yq
 # strips exactly one leading "# " (hash + one space) when present, but
@@ -80,14 +89,25 @@ pcc::_record_violation() {
 # only one), which the patterns below tolerate rather than reject — the exact
 # leading space count was never a deliberate policy dimension.
 #
-# Exit: 0 = one of the two documented forms, 1 = anything else, including an
-# empty <raw_comment> (no comment at all).
+# <pinned_sha> is the same node's 40-character pinned SHA (any case — see
+# the case-insensitivity note above). For the fallback form, <short-sha>
+# must case-insensitively PREFIX <pinned_sha>: an all-digit or
+# all-a-through-f abbreviated SHA is a real, if less common, git prefix (one
+# in roughly 25 real 7-character hex prefixes has no mixed-case letters) and
+# is accepted the same as a mixed one — only the prefix relationship to the
+# actual pin is checked, never the token's own letter/digit composition.
+#
+# Exit: 0 = one of the two documented forms (fallback additionally requires
+# the prefix match), 1 = anything else, including an empty <raw_comment>.
 pcc::_check_comment() {
-  local raw="$1"
+  local raw="$1" pinned_sha="$2"
   [[ -n "$raw" ]] || return 1
   [[ "$raw" == \#* ]] && return 1
   [[ "$raw" =~ ^[[:space:]]*v[0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$ ]] && return 0
-  [[ "$raw" =~ ^[[:space:]]*[0-9a-f]{7,40}[[:space:]][0-9]{4}-[0-9]{2}-[0-9]{2}([[:space:]]+.+)?[[:space:]]*$ ]] && return 0
+  if [[ "$raw" =~ ^[[:space:]]*([0-9a-f]{7,40})[[:space:]][0-9]{4}-[0-9]{2}-[0-9]{2}([[:space:]]+.+)?[[:space:]]*$ ]]; then
+    local short="${BASH_REMATCH[1]}" pinned_lc="${pinned_sha,,}"
+    [[ "$pinned_lc" == "$short"* ]] && return 0
+  fi
   return 1
 }
 
@@ -126,7 +146,7 @@ pcc::scan_text() {
   # set to, so it coalesces the two adjacent tabs an empty comment field
   # produces and silently shifts every later field left — parameter
   # expansion has no such collapsing behavior.
-  local rec rest
+  local rec rest pinned_sha
   while IFS= read -r rec; do
     [[ -n "$rec" ]] || continue
     lineno="${rec%%$'\t'*}"
@@ -136,7 +156,10 @@ pcc::scan_text() {
 
     [[ -n "$value" ]] || continue
     [[ "$value" =~ $value_re ]] || continue
-    pcc::_check_comment "$comment" && continue
+    # The path segment excludes '@' (value_re), so the last '@' unambiguously
+    # separates the workflow/action path from the pinned SHA.
+    pinned_sha="${value##*@}"
+    pcc::_check_comment "$comment" "$pinned_sha" && continue
 
     if [[ -z "$comment" ]]; then
       pcc::_record_violation "$lineno" missing-comment "$value"
