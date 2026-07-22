@@ -492,7 +492,16 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 prefix of the pinned commit. An automated or manual repin that leaves the old
 short SHA behind turns the comment into misinformation for the next reviewer;
 version tags, prose, dates, and hex-only English words are not treated as SHA
-claims. Update the provenance comment in the same change as the pin.
+claims. Update the provenance comment in the same change as the pin. The
+dual-form pin-comment shape itself (`# vX.Y.Z` or
+`# <short-sha> <date>[ <note>]`) is documented and detected by the
+`pin-comment-convention` component
+(`components/pin-comment-convention/README.md`), which is authoritative for a
+ci-workflows fallback comment's prefix correctness (it verifies the short-sha
+against the exact pin it annotates, rather than this heuristic's
+whole-repository `isShaClaim` classification) and remains complementary,
+format-only for the tag form and for the exclusion boundary this analyzer
+does not have (any non-ci-workflows pin stays this heuristic's alone).
 
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:

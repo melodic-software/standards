@@ -1,0 +1,25 @@
+name: example
+on: push
+jobs:
+  tagged:
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # v0.7.0
+  untagged:
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
+  untagged-with-note:
+    uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14 pre-tag pin, see #244
+  unrelated-action-no-comment:
+    uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+  anchor-source:
+    steps:
+      - &pin-step
+        name: typos
+        uses: melodic-software/ci-workflows/.github/actions/typos@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
+  anchor-consumer:
+    steps:
+      - *pin-step
+  decoys:
+    steps:
+      - name: 'not a real pin: uses:-shaped text inside a run block body'
+        run: |
+          echo "uses: melodic-software/ci-workflows/.github/workflows/fake.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46"
+      # uses: melodic-software/ci-workflows/.github/workflows/fake2.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46
