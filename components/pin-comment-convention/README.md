@@ -50,20 +50,40 @@ alignment across consumers stays routed to the deferred mechanism in
 `pin-comment-patterns.sh` exposes `pcc::scan_text`, which requires Mike
 Farah's yq v4 on PATH (this repo's established YAML tool — see
 `distribution/sync-manifest.sh`). Extraction walks the parsed YAML tree —
-`explode(.) | .. | select(has("uses")) | .uses` — rather than matching text
-line by line, so a plain, single-quoted, double-quoted, anchored, or aliased
-`uses:` value is all scanned the same way, at any depth, and `uses:`-shaped
-text inside a `run:` block body or a YAML `#` comment is never a candidate in
-the first place because it is never a `uses:` node in the tree. A bare
-scalar-value alias (`uses: *v`) shares only the referenced string, not the
-anchor line's trailing comment, so the alias's own line still needs its own
-comment — see the test cases in `pin-comment-convention.test.sh` for the
-distinction from a whole aliased step, which does carry its comment along.
-`scan-workflow-files.sh` in this directory is a minimal driver (file
-enumeration, path handling, exit-code mapping) that this repository's own CI
-runs against `.github/workflows/*.yml` and `*.yaml` as its live consumer,
-after installing the same checksum-pinned yq release the `distribution` job
-uses.
+`explode(.)` first to resolve anchors and aliases, then only
+`jobs.<id>.uses` and `jobs.<id>.steps[*].uses`, the two positions GitHub
+Actions actually executes a `uses:` value from — rather than matching text
+line by line or walking every node in the document. A plain, single-quoted,
+double-quoted, anchored, or aliased `uses:` value is all scanned the same
+way; `uses:`-shaped text inside a `run:` block body or a YAML `#` comment is
+never a candidate because it is never a `uses:` node in the tree; and a
+same-named "uses" key that is only data — a `strategy.matrix.include` entry,
+a step's own `with:` input — is never a candidate either, because it is
+never at one of the two scanned positions. A bare scalar-value alias
+(`uses: *v`) shares only the referenced string, not the anchor line's
+trailing comment, so the alias's own line still needs its own comment — see
+the test cases in `pin-comment-convention.test.sh` for the distinction from
+a whole aliased step, which does carry its comment along. `scan-workflow-files.sh`
+in this directory is a minimal driver (file enumeration, path handling,
+exit-code mapping) that this repository's own CI runs against
+`.github/workflows/*.yml` and `*.yaml` as its live consumer, after
+installing the same checksum-pinned yq release the `distribution` job uses.
+
+The pinned 40-character SHA in the `uses:...@<sha>` value is matched
+case-insensitively — it names the same git object regardless of hex letter
+case, matching how the runner-policy provenance scanner already treats it.
+The fallback comment's own short-SHA and the release-tag form's leading `v`
+both stay case-sensitive by deliberate design, not oversight: a fallback
+short-SHA is an authored documentation string the two-form policy fixes a
+canonical spelling for, and a tag's case is part of its identity as a git
+ref (this repo has never cut an uppercase-`V` tag, so an uppercase comment
+would name a tag that does not exist). The org/repo segment
+(`melodic-software/ci-workflows`) also stays case-sensitive: GitHub's own
+routing is case-insensitive there, but nothing in this fleet has ever
+spelled it any other way, and matching it case-insensitively would require
+widening the `.github/(workflows|actions)/` directory segment along with
+it — those *are* case-sensitive git tree paths — for a shape with no known
+real occurrence; considered and deliberately left as-is.
 
 Full-tree execution for other repositories — the way the `comment-hygiene`
 composite action in `ci-workflows` drives `comment-hygiene-patterns.sh` today
@@ -77,7 +97,9 @@ without a fallback note), every documented drift shape (missing comment,
 prose, partial SemVer, reversed fallback field order), the exclusion boundary
 (a pin to any action or workflow outside `melodic-software/ci-workflows` is
 out of scope regardless of its comment), quoted refs, anchored/aliased pins
-(both the whole-step and bare-scalar-alias shapes), and the two run:-block /
-YAML-comment false-positive guards. The test file skips (rather than fails)
-when yq v4 is not installed, matching `distribution/sync-manifest.test.sh`'s
-existing tool-availability guard.
+(both the whole-step and bare-scalar-alias shapes), the two run:-block /
+YAML-comment false-positive guards, the two data-field-named-"uses" false-positive
+guards (matrix and `with:`), an uppercase pinned SHA (clean and flagged), and
+a document with no `jobs:` key at all (clean, not a parse failure). The test
+file skips (rather than fails) when yq v4 is not installed, matching
+`distribution/sync-manifest.test.sh`'s existing tool-availability guard.

@@ -31,40 +31,119 @@ assert_contains 'flags a partial-semver comment' "$out" 'invalid-form:# v1.2'
 assert_contains 'flags a reversed fallback (date before short-sha)' "$out" 'invalid-form:# 2026-07-18 90f1c54'
 assert_row_count 'an anchored pin and its alias are each flagged' "$out" 2 'invalid-form:# not-a-form'
 
+# Every `pcc::scan_text` case below wraps its `uses:` line in the position
+# GitHub Actions actually executes it from — `jobs.<id>.uses` — rather than a
+# bare root-level `uses:` scalar, which is not a real workflow shape and
+# (since the scan is scoped to jobs.*.uses / jobs.*.steps[*].uses, not an
+# untargeted document walk) would never be scanned in the first place.
+
 # Primary form: full SemVer tag.
-pcc::scan_text 'uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # v0.7.0' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # v0.7.0' >/dev/null
 assert_exit 'full semver tag form is clean' 0 "$?"
 
 # Fallback form: short SHA + ISO date, with and without a trailing note.
-pcc::scan_text 'uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18' >/dev/null
 assert_exit 'short-sha + date fallback form is clean' 0 "$?"
-pcc::scan_text 'uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18 pre-tag pin' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18 pre-tag pin' >/dev/null
 assert_exit 'short-sha + date + note fallback form is clean' 0 "$?"
 
 # Non-ci-workflows references are out of policy scope regardless of comment.
-pcc::scan_text 'uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' >/dev/null
 assert_exit 'a pin to an unrelated action is not scanned' 0 "$?"
 
 # A composite-action reference (no .yml suffix) is scanned the same as a
 # reusable workflow reference.
-pcc::scan_text 'uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@f2d5e06757201f2fce187096a2c6fa805836c3d2' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@f2d5e06757201f2fce187096a2c6fa805836c3d2' >/dev/null
 assert_exit 'a composite-action pin with no comment is flagged' 1 "$?"
 
 # A quoted YAML scalar `uses:` value is scanned the same as a plain one — a
 # single- or double-quoted ref must not silently escape the check.
-pcc::scan_text "uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # v0.7.0" >/dev/null
+pcc::scan_text "jobs:
+  a:
+    uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # v0.7.0" >/dev/null
 assert_exit 'single-quoted ref with a valid comment is clean' 0 "$?"
-pcc::scan_text "uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # latest stable" >/dev/null
+pcc::scan_text "jobs:
+  a:
+    uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # latest stable" >/dev/null
 assert_exit 'single-quoted ref with an invalid comment is flagged' 1 "$?"
-pcc::scan_text 'uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f" # 90f1c54 2026-07-18' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f" # 90f1c54 2026-07-18' >/dev/null
 assert_exit 'double-quoted ref with a valid comment is clean' 0 "$?"
-pcc::scan_text 'uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f"' >/dev/null
+pcc::scan_text 'jobs:
+  a:
+    uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f"' >/dev/null
 assert_exit 'double-quoted ref with no comment is flagged' 1 "$?"
+
+# A YAML document without a jobs: key at all (the driver's file glob can
+# plausibly reach a non-workflow file) is clean, not a parse failure — an
+# absent or malformed jobs: value yields no candidates rather than erroring.
+pcc::scan_text 'name: not-a-workflow
+foo: bar' >/dev/null
+assert_exit 'a document with no jobs: key is clean, not an error' 0 "$?"
 
 # The fallback short-SHA is lowercase hex only; an uppercase short-SHA does
 # not read as the documented fallback shape and is flagged as invalid-form.
-pcc::scan_text 'uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90F1C54 2026-07-18' >/dev/null
+# This is the fallback comment's OWN short-SHA (an authored documentation
+# string, fixed lowercase by policy) — contrast with the PINNED SHA case
+# below, a resolved git object ID that is genuinely case-insensitive.
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90F1C54 2026-07-18' >/dev/null
 assert_exit 'uppercase short-sha in fallback is invalid-form' 1 "$?"
+
+# The PINNED 40-character SHA (the git object ID after @) is matched
+# case-insensitively: it is the same commit regardless of hex letter case,
+# matching how the runner-policy provenance scanner already treats it. An
+# uppercase-hex pin is scanned the same as a lowercase one — clean with a
+# valid comment, flagged with an invalid one — not silently skipped.
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@31A5B76C4A0B663023DC1C944E2BCFC01D6F6C46 # v0.7.0' >/dev/null
+assert_exit 'uppercase pinned SHA with a valid comment is clean' 0 "$?"
+pcc::scan_text 'jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@31A5B76C4A0B663023DC1C944E2BCFC01D6F6C46 # latest stable' >/dev/null
+assert_exit 'uppercase pinned SHA with an invalid comment is flagged' 1 "$?"
+
+# A `strategy.matrix.include` entry (or any other data field) that happens to
+# be named "uses" is not an executable position and must never be flagged —
+# the scan is scoped to jobs.*.uses and jobs.*.steps[*].uses, not every
+# same-named key anywhere in the document. `${{ matrix.uses }}` below is
+# literal GitHub Actions expression text, not a bash expansion, so the
+# single-quoted string is intentional.
+# shellcheck disable=SC2016
+matrix_decoy='jobs:
+  a:
+    strategy:
+      matrix:
+        include:
+          - uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46
+    steps:
+      - run: echo "${{ matrix.uses }}"'
+pcc::scan_text "$matrix_decoy" >/dev/null
+assert_exit 'a strategy.matrix.include entry named uses is not scanned' 0 "$?"
+
+# A step's `with:` input that happens to be named "uses" is not the step's
+# own uses: key either, regardless of what the caller's own uses: is.
+with_input_decoy='jobs:
+  a:
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46'
+pcc::scan_text "$with_input_decoy" >/dev/null
+assert_exit 'a with: input named uses is not scanned' 0 "$?"
 
 # A whole aliased step — the anchor covers the entire step object including
 # its trailing comment — resolves to the same content at both occurrences,

@@ -37,10 +37,27 @@
 # Extraction goes through yq's YAML tree, not a per-line text regex: `explode`
 # resolves anchors and aliases to their referenced scalar value before the
 # walk, so a plain, quoted, anchored, or aliased `uses:` value is scanned the
-# same way, at any depth (job- and step-level). Text that merely looks like a
-# `uses:` pin inside a `run:` block body or a YAML `#` comment is never a
-# `uses:` node in the parsed tree, so it is never a candidate in the first
-# place — a line-oriented regex cannot make that distinction reliably.
+# same way. The walk is scoped to the two positions GitHub Actions actually
+# executes a `uses:` value from — `jobs.<id>.uses` (a reusable-workflow call)
+# and `jobs.<id>.steps[*].uses` (an action call) — not an untargeted `..`
+# walk of the whole document, so a same-named "uses" key that is only data
+# (a `strategy.matrix.include` entry, a step's `with:` input) is never a
+# candidate. Text that merely looks like a `uses:` pin inside a `run:` block
+# body or a YAML `#` comment is never a `uses:` node in the parsed tree
+# either, so it is never a candidate — a line-oriented regex cannot make
+# either distinction reliably.
+#
+# The pinned 40-character SHA in the `uses:...@<sha>` value is matched
+# case-insensitively: it is a git object ID, the same object regardless of
+# hex letter case, and the runner-policy provenance scanner already treats
+# it that way. The fallback comment's *own* short-SHA stays lowercase-only —
+# that is an authored documentation string, not a resolved git object, and
+# the two-form policy fixes its canonical spelling deliberately (see
+# `pcc::_check_comment`). A release tag (`# vX.Y.Z`) likewise stays
+# lowercase-`v`-only: unlike a SHA, a tag's case is part of its identity as
+# a git ref, and every tag this repo has ever cut is lowercase `v` — an
+# uppercase `V` comment would name a tag that does not exist, not a
+# differently-spelled version of one that does.
 
 # pcc::_record_violation <lineno> <kind> <detail>
 #
@@ -89,11 +106,15 @@ pcc::_check_comment() {
 pcc::scan_text() {
   local content="$1"
   local lineno comment value violations=0
-  local value_re='^melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-f]{40}$'
+  local value_re='^melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-fA-F]{40}$'
   local records
 
   if ! records="$(yq eval --yaml-fix-merge-anchor-to-spec=true -r '
-      explode(.) | .. | select(has("uses")) | .uses
+      explode(.) | .jobs[]
+      | (
+          (select(has("uses")) | .uses),
+          (select(has("steps")) | .steps[] | select(has("uses")) | .uses)
+        )
       | (line | tostring) + "\t" + line_comment + "\t" + .
     ' - <<<"$content" 2>&1)"; then
     pcc::_record_violation 0 yaml-parse-error "$records"
