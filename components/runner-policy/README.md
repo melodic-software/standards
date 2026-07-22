@@ -492,7 +492,12 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 prefix of the pinned commit. An automated or manual repin that leaves the old
 short SHA behind turns the comment into misinformation for the next reviewer;
 version tags, prose, dates, and hex-only English words are not treated as SHA
-claims. Update the provenance comment in the same change as the pin.
+claims. Update the provenance comment in the same change as the pin. This is
+a provenance check, not a format check: the dual-form pin-comment shape itself
+(`# vX.Y.Z` or `# <short-sha> <date>[ <note>]`) is documented and detected by
+the `pin-comment-convention` component
+(`components/pin-comment-convention/README.md`), which is the complementary,
+form-only counterpart to this check.
 
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:

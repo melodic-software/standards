@@ -106,6 +106,10 @@ components:
   path-detection-tools:
     files:
       components/path-detection/machine-path-patterns.sh: tools/shared/path-detection/machine-path-patterns.sh
+  pin-comment-convention:
+    files:
+      components/pin-comment-convention/pin-comment-patterns.sh: .github/standards/pin-comment-convention/pin-comment-patterns.sh
+      components/pin-comment-convention/scan-workflow-files.sh: .github/standards/pin-comment-convention/scan-workflow-files.sh
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
