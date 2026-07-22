@@ -751,6 +751,17 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - name: Install yq 4.53.3
+        run: |
+          set -euo pipefail
+          version=4.53.3
+          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
+          curl -fsSL "$url" -o yq
+          echo "${sha}  yq" | sha256sum -c -
+          sudo install yq /usr/local/bin/yq
+          rm yq
+          yq --version
       - name: Check ci-workflows pin-comment convention (this repo's own workflow files)
         # GitHub accepts both .yml and .yaml for workflow files (this repo's own
         # index has only .yml today, but a future .yaml workflow must not silently

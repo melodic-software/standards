@@ -47,21 +47,37 @@ alignment across consumers stays routed to the deferred mechanism in
 
 ## Library, driver, and what is deferred
 
-`pin-comment-patterns.sh` is a source-only Bash library exposing
-`pcc::scan_text`: no env reads, no file I/O, no exit calls — the same shape as
-`comment-hygiene-patterns.sh`. `scan-workflow-files.sh` in this directory is a
-minimal driver (file enumeration, path handling, exit-code mapping) that this
-repository's own CI runs against `.github/workflows/*.yml` as its live
-consumer.
+`pin-comment-patterns.sh` exposes `pcc::scan_text`, which requires Mike
+Farah's yq v4 on PATH (this repo's established YAML tool — see
+`distribution/sync-manifest.sh`). Extraction walks the parsed YAML tree —
+`explode(.) | .. | select(has("uses")) | .uses` — rather than matching text
+line by line, so a plain, single-quoted, double-quoted, anchored, or aliased
+`uses:` value is all scanned the same way, at any depth, and `uses:`-shaped
+text inside a `run:` block body or a YAML `#` comment is never a candidate in
+the first place because it is never a `uses:` node in the tree. A bare
+scalar-value alias (`uses: *v`) shares only the referenced string, not the
+anchor line's trailing comment, so the alias's own line still needs its own
+comment — see the test cases in `pin-comment-convention.test.sh` for the
+distinction from a whole aliased step, which does carry its comment along.
+`scan-workflow-files.sh` in this directory is a minimal driver (file
+enumeration, path handling, exit-code mapping) that this repository's own CI
+runs against `.github/workflows/*.yml` and `*.yaml` as its live consumer,
+after installing the same checksum-pinned yq release the `distribution` job
+uses.
 
 Full-tree execution for other repositories — the way the `comment-hygiene`
 composite action in `ci-workflows` drives `comment-hygiene-patterns.sh` today
 — is deferred: no `ci-workflows` composite action wraps this library yet. A
 consumer that wants this check before that driver exists can invoke
-`scan-workflow-files.sh` directly, the same way this repository does.
+`scan-workflow-files.sh` directly (with yq on PATH), the same way this
+repository does.
 
 `fixtures/` and `pin-comment-convention.test.sh` cover both forms (with and
 without a fallback note), every documented drift shape (missing comment,
-prose, partial SemVer, reversed fallback field order), and the exclusion
-boundary (a pin to any action or workflow outside `melodic-software/ci-workflows`
-is out of scope regardless of its comment).
+prose, partial SemVer, reversed fallback field order), the exclusion boundary
+(a pin to any action or workflow outside `melodic-software/ci-workflows` is
+out of scope regardless of its comment), quoted refs, anchored/aliased pins
+(both the whole-step and bare-scalar-alias shapes), and the two run:-block /
+YAML-comment false-positive guards. The test file skips (rather than fails)
+when yq v4 is not installed, matching `distribution/sync-manifest.test.sh`'s
+existing tool-availability guard.

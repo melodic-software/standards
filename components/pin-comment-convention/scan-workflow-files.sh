@@ -3,8 +3,8 @@
 # `uses: melodic-software/ci-workflows/...@<40-hex-sha>` references whose
 # trailing comment does not match one of the two documented pin-comment forms
 # (README.md in this directory). File enumeration, path handling, and
-# exit-code mapping live here; the policy itself is the pure
-# pin-comment-patterns.sh library.
+# exit-code mapping live here; the YAML-node extraction and comment-form
+# check live in pin-comment-patterns.sh, which requires yq v4 on PATH.
 set -euo pipefail
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
