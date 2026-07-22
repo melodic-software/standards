@@ -88,7 +88,7 @@ out="$(run_engine "$source_repo" matrix --targets ' beta/two , alpha/one ' 2>&1)
 rc=$?
 assert_exit 'matrix accepts an exact whitespace-trimmed filter' 0 "$rc"
 assert_eq 'matrix stays in manifest order' \
-  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"},{"repo":"beta/two","repo_owner":"beta","repo_name":"two"}]}' \
+  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one","automerge":true},{"repo":"beta/two","repo_owner":"beta","repo_name":"two","automerge":true}]}' \
   "$out"
 
 out="$(run_engine "$source_repo" plan --targets beta/two 2>&1)"
@@ -104,7 +104,7 @@ out="$(run_engine "$source_repo" matrix --targets alpha/one 2>&1)"
 rc=$?
 assert_exit 'filtered matrix succeeds when the last manifest target is omitted' 0 "$rc"
 assert_eq 'filtered matrix contains only the requested earlier target' \
-  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"}]}' \
+  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one","automerge":true}]}' \
   "$out"
 
 out="$(run_engine "$source_repo" plan --targets alpha/one 2>&1)"
@@ -237,7 +237,7 @@ apply_rc=$?
 assert_exit 'yq-only production validate succeeds' 0 "$validate_rc"
 assert_exit 'yq-only production matrix succeeds' 0 "$matrix_rc"
 assert_eq 'yq-only matrix remains exact' \
-  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one"}]}' "$matrix_out"
+  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one","automerge":true}]}' "$matrix_out"
 assert_exit 'yq-only production apply succeeds' 0 "$apply_rc"
 assert_file_exists 'yq-only production apply writes the managed destination' \
   "$runtime_target/.policy"
@@ -572,5 +572,37 @@ for component in agent-orientation review-instructions; do
       '[.targets."melodic-software/medley".managed[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"
 done
+
+# automerge is optional policy-as-data: absent means true (exercised by every
+# prior matrix assertion above), an explicit value is emitted verbatim, and a
+# non-boolean value is rejected by both the Bash validator and the authoring
+# JSON Schema. A target-level unknown key is also re-verified here as a
+# regression check on the generalized validate_record_keys optional-key set.
+automerge_manifest="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: false'$'\n''    managed:'}"
+automerge_dir="$tmp_root/automerge-source"
+make_source "$automerge_dir" "$automerge_manifest"
+out="$(run_engine "$automerge_dir" matrix 2>&1)"
+rc=$?
+assert_exit 'manifest with an explicit automerge value validates' 0 "$rc"
+assert_eq 'matrix emits the explicit false and the default-true for the other target' \
+  '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one","automerge":false},{"repo":"beta/two","repo_owner":"beta","repo_name":"two","automerge":true}]}' \
+  "$out"
+
+bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: yes-please'$'\n''    managed:'}"
+invalid_case 'non-boolean automerge value' "$bad" "target 'alpha/one' automerge must be a boolean"
+
+bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    unknown: true'$'\n''    managed:'}"
+invalid_case 'unknown target key' "$bad" "target 'alpha/one' contains unknown key 'unknown'"
+
+if [[ -f "$root/distribution/node_modules/ajv/package.json" ]]; then
+  bad_automerge="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: not-a-bool'$'\n''    managed:'}"
+  automerge_schema_error="$tmp_root/automerge-schema.err"
+  { printf '%s\n' "$bad_automerge" | yq eval -o=json -I=0 '.' -; } |
+    node "$root/distribution/validate-sync-manifest.mjs" 2>"$automerge_schema_error"
+  rc=$?
+  assert_nonzero 'non-boolean automerge fails authoring schema validation' "$rc"
+  assert_contains 'authoring schema reports the boolean type mismatch' \
+    "$(cat "$automerge_schema_error")" 'automerge'
+fi
 
 [[ $FAILED -eq 0 ]] || exit 1

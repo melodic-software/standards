@@ -38,6 +38,11 @@ in a component move together.
 - Omission means the component is irrelevant or has not been classified for
   that target.
 
+A target may also set `automerge: false` — policy-as-data read by the
+`ci-workflows` reusable that opens sync PRs — to opt that repository out of
+auto-merge arming. Omitting the key defaults to `true` (armed), so the fleet
+default stays terse; only a deliberate opt-out needs an explicit entry.
+
 This repository's own root files — currently just `README.md` — are neither
 `managed` nor `locally-owned` here — those labels describe a *downstream*
 copy's relationship to an upstream source. In `standards` itself a root file

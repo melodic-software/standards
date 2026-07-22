@@ -59,7 +59,8 @@
       "required": ["managed"],
       "properties": {
         "managed": { "$ref": "#/$defs/componentList" },
-        "locally-owned": { "$ref": "#/$defs/componentList" }
+        "locally-owned": { "$ref": "#/$defs/componentList" },
+        "automerge": { "type": "boolean" }
       }
     }
   }
