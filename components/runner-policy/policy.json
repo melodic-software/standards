@@ -412,6 +412,15 @@
       "allowedCallerPermissions": {
         "issues": "write"
       }
+    },
+    "melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@43bc8d0f4b328cba9c579039955b93259b6cc6bf": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner", "manifest", "standards-ref", "threshold-hours"],
+      "allowedSecrets": {
+        "app-client-id": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
+        "app-private-key": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
+      }
     }
   },
   "canonicalSelectorInputs": {

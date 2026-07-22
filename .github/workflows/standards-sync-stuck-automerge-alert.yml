@@ -1,0 +1,24 @@
+name: standards-sync-stuck-automerge-alert
+
+# Watchdog for sync.yml's auto-merge arming: scans standards-sync target repos
+# (read from the manifest, never hardcoded) for App-authored sync PRs armed
+# for auto-merge but BLOCKED past a threshold, and files/refreshes a rolling
+# tracking issue in this repo — the calling repo, not any scanned target.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute hourly poll: catches an armed PR stuck behind an unrelated
+    # gate failure well within a single working day.
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  alert:
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@43bc8d0f4b328cba9c579039955b93259b6cc6bf # 43bc8d0 2026-07-22
+    with:
+      runner: ubuntu-24.04
+    secrets:
+      app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
