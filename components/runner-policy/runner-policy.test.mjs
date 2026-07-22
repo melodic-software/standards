@@ -26,6 +26,7 @@ const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
 const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
+const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
 const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
@@ -3250,6 +3251,24 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     allowedSecrets: {},
     allowedCallerPermissions: { contents: "read", issues: "write" },
   });
+  for (const [workflow, allowedInputs] of [
+    ["semantic-pr.yml", ["runner", "prerequisite-result"]],
+    ["do-not-merge-gate.yml", ["runner", "prerequisite-result", "label"]],
+    ["pr-issue-linkage.yml", ["runner", "prerequisite-result", "exempt-authors"]],
+  ]) {
+    assert.deepEqual(
+      contracts[
+        `melodic-software/ci-workflows/.github/workflows/${workflow}@${PREREQUISITE_GATE_RUNNER_SHA}`
+      ],
+      {
+        routing: "runner-input",
+        runnerInput: "runner",
+        selectorResultInput: "prerequisite-result",
+        allowedInputs,
+        allowedSecrets: {},
+      },
+    );
+  }
 });
 
 test("policy rejects invalid selector-result contract shapes", async () => {
