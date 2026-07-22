@@ -44,4 +44,15 @@ assert_exit 'a pin to an unrelated action is not scanned' 0 "$?"
 pcc::scan_text 'uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@f2d5e06757201f2fce187096a2c6fa805836c3d2' >/dev/null
 assert_exit 'a composite-action pin with no comment is flagged' 1 "$?"
 
+# A quoted YAML scalar `uses:` value is scanned the same as a plain one — a
+# single- or double-quoted ref must not silently escape the check.
+pcc::scan_text "uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # v0.7.0" >/dev/null
+assert_exit 'single-quoted ref with a valid comment is clean' 0 "$?"
+pcc::scan_text "uses: 'melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46' # latest stable" >/dev/null
+assert_exit 'single-quoted ref with an invalid comment is flagged' 1 "$?"
+pcc::scan_text 'uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f" # 90f1c54 2026-07-18' >/dev/null
+assert_exit 'double-quoted ref with a valid comment is clean' 0 "$?"
+pcc::scan_text 'uses: "melodic-software/ci-workflows/.github/workflows/x.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f"' >/dev/null
+assert_exit 'double-quoted ref with no comment is flagged' 1 "$?"
+
 [[ $FAILED -eq 0 ]] || exit 1

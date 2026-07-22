@@ -59,7 +59,12 @@ pcc::_record_violation() {
 pcc::scan_text() {
   local content="$1"
   local lineno line violations=0
-  local uses_re='uses:[[:space:]]*melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-f]{40}[[:space:]]*(#(.*))?$'
+  # The optional leading/trailing bracket expression accepts a plain,
+  # single-, or double-quoted YAML scalar (`uses: 'owner/repo@sha'` and
+  # `uses: "owner/repo@sha"` are both legal YAML for the same ref) — the two
+  # quote characters need not match each other, since this scans for the
+  # pin-comment shape, not YAML validity.
+  local uses_re='uses:[[:space:]]*['\''"]?melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-f]{40}['\''"]?[[:space:]]*(#(.*))?$'
   local tag_re='^#[[:space:]]v[0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$'
   local fallback_re='^#[[:space:]][0-9a-f]{7,40}[[:space:]][0-9]{4}-[0-9]{2}-[0-9]{2}([[:space:]]+.+)?[[:space:]]*$'
 

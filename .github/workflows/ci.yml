@@ -752,7 +752,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Check ci-workflows pin-comment convention (this repo's own workflow files)
-        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml
+        # GitHub accepts both .yml and .yaml for workflow files (this repo's own
+        # index has only .yml today, but a future .yaml workflow must not silently
+        # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
+        # already tolerates a glob with no current matches).
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml
       - name: Pin-comment-convention contract test
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 
