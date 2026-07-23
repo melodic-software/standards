@@ -1,0 +1,18 @@
+name: example
+on: push
+jobs:
+  no-comment:
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46
+  prose-comment:
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # latest stable
+  partial-semver:
+    uses: melodic-software/ci-workflows/.github/workflows/link-check.yml@09dd32ae40e270614e251fddafa16bab9a487de5 # v1.2
+  reversed-fallback:
+    uses: melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@51012e2c7b8bf74bc26e08c6446b488254a8770f # 2026-07-18 90f1c54
+  anchor-source:
+    steps:
+      - &bad-pin-step
+        uses: melodic-software/ci-workflows/.github/actions/lychee@1234567890abcdef1234567890abcdef12345678 # not-a-form
+  anchor-consumer:
+    steps:
+      - *bad-pin-step

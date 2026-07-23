@@ -184,8 +184,17 @@ dedicated capped review tier). A review-lane caller passes the latter from a
 separate selector job so its review workload routes to that tier while the
 repository's other self-hosted jobs keep the default. Personal-repository
 callers may additionally pass
-`self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`. No other
-selector input or expression is allowed by the policy.
+`self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`.
+
+A caller whose ancillary-event jobs — `issue_comment`, `pull_request_review`,
+`pull_request_review_comment`, and `issues` — perform no checkout of PR or
+issue content may pass `admits-ancillary-events: true` (or the deprecated alias
+`admits-comment-events: true`) to opt those events into fleet routing. Only the
+literal `true` is accepted; the default is not written. The policy permits the
+input but does not verify the no-checkout premise the caller declares — that
+declaration is trusted under the same job-step review that backs a local-routing
+grant (see [`THREAT-MODEL.md`](THREAT-MODEL.md)). No other selector input or
+expression is allowed by the policy.
 
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
@@ -400,9 +409,18 @@ version-pin default bump (v1.26.1 to v1.27.0) and curl timeout hardening
 with its input surface unchanged.
 No contract changes its input, secret, routing, or caller-permission
 surface.
-Ten selector revisions remain approved for an ordered consumer rollout.
+The ancillary-events opt-in revision at
+`e77f0126b474144708719f99795e44d0ffe2541d` (select-runner v0.8.0) adds the
+`admits-ancillary-events` selector input, with the deprecated
+`admits-comment-events` alias, which a caller sets `true` to route its
+no-checkout `issue_comment`, `pull_request_review`,
+`pull_request_review_comment`, and `issues` jobs onto the managed fleet;
+without it the selector routes those events to the hosted fallback. It carries
+no other routing-surface change and, like the other fleet-routing revisions, is
+owner-scoped to `melodic-software`.
+Eleven selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these seven strict-scheduling
+owned by a different repository owner, so these eight strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -504,7 +522,16 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 prefix of the pinned commit. An automated or manual repin that leaves the old
 short SHA behind turns the comment into misinformation for the next reviewer;
 version tags, prose, dates, and hex-only English words are not treated as SHA
-claims. Update the provenance comment in the same change as the pin.
+claims. Update the provenance comment in the same change as the pin. The
+dual-form pin-comment shape itself (`# vX.Y.Z` or
+`# <short-sha> <date>[ <note>]`) is documented and detected by the
+`pin-comment-convention` component
+(`components/pin-comment-convention/README.md`), which is authoritative for a
+ci-workflows fallback comment's prefix correctness (it verifies the short-sha
+against the exact pin it annotates, rather than this heuristic's
+whole-repository `isShaClaim` classification) and remains complementary,
+format-only for the tag form and for the exclusion boundary this analyzer
+does not have (any non-ci-workflows pin stays this heuristic's alone).
 
 For an approved reusable workflow call, pass the same cancellation-safe,
 literal-fallback expression through its canonical `runner` input:

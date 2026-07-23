@@ -741,6 +741,36 @@ jobs:
       - name: Comment-hygiene contract test
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
+  pin-comment-convention:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install yq 4.53.3
+        run: |
+          set -euo pipefail
+          version=4.53.3
+          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
+          curl -fsSL "$url" -o yq
+          echo "${sha}  yq" | sha256sum -c -
+          sudo install yq /usr/local/bin/yq
+          rm yq
+          yq --version
+      - name: Check ci-workflows pin-comment convention (this repo's own workflow files)
+        # GitHub accepts both .yml and .yaml for workflow files (this repo's own
+        # index has only .yml today, but a future .yaml workflow must not silently
+        # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
+        # already tolerates a glob with no current matches).
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml
+      - name: Pin-comment-convention contract test
+        run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
+
   lefthook:
     permissions:
       contents: read
@@ -814,6 +844,7 @@ jobs:
       - machine-specific-paths
       - eol-renormalize
       - comment-hygiene
+      - pin-comment-convention
       - actionlint
       - zizmor
       - osv-scanner
@@ -856,6 +887,7 @@ jobs:
             ${{ needs.machine-specific-paths.result }}
             ${{ needs.eol-renormalize.result }}
             ${{ needs.comment-hygiene.result }}
+            ${{ needs.pin-comment-convention.result }}
             ${{ needs.actionlint.result }}
             ${{ needs.zizmor.result }}
             ${{ needs.osv-scanner.result }}

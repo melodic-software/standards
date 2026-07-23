@@ -25,6 +25,7 @@ const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
 const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
 const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
+const ANCILLARY_OPT_IN_SELECTOR_SHA = "e77f0126b474144708719f99795e44d0ffe2541d";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -2930,6 +2931,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
       `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
       `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
+      `${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -2952,6 +2954,7 @@ test("production selector allowlist contains only independently reviewed commits
     REVIEW_TIER_SELECTOR_SHA,
     MERGE_GROUP_ROUTING_SHA,
     GH_FREE_GATE_SHA,
+    ANCILLARY_OPT_IN_SELECTOR_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
@@ -3358,6 +3361,114 @@ test("selector self-hosted-label rejects an ungoverned variable expression", asy
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, "selector-pin");
   assert.match(findings[0].message, /selector inputs\.self-hosted-label must be one of/);
+});
+
+test("selector accepts the admits-ancillary-events boolean opt-in", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: true\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("selector accepts the deprecated admits-comment-events alias", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-comment-events: true\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("selector rejects a boolean opt-in set to a non-reviewed value", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: false\n`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(
+    findings[0].message,
+    /selector inputs\.admits-ancillary-events must be exactly true/,
+  );
+});
+
+test("selector rejects a boolean opt-in passed as a quoted string", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: "true"\n`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(
+    findings[0].message,
+    /selector inputs\.admits-ancillary-events must be exactly true/,
+  );
+});
+
+test("selector rejects an unregistered boolean opt-in input", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-unknown-events: true\n`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(findings[0].message, /has unapproved properties: admits-unknown-events/);
+});
+
+test("selector accepts admits-ancillary-events on the owner-scoped v0.8.0 revision", async () => {
+  const root = await repository({
+    repositoryOwner: "melodic-software",
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        SHA,
+        ANCILLARY_OPT_IN_SELECTOR_SHA,
+      )}      admits-ancillary-events: true\n`,
+    },
+  });
+  assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
+});
+
+test("admits-ancillary-events on an unapproved selector revision fails closed", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        SHA,
+        "abcabcabcabcabcabcabcabcabcabcabcabcabca",
+      )}      admits-ancillary-events: true\n`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(findings[0].message, /not in the reviewed approval allowlist/);
+});
+
+test("policy schema rejects a boolean opt-in value other than true", async () => {
+  const root = await repository({
+    policyOverrides: { optionalBooleanSelectorInputs: { "admits-ancillary-events": false } },
+  });
+  await assert.rejects(() => audit(root), ConfigurationError);
+});
+
+test("policy rejects a boolean opt-in input that duplicates an optional string input", async () => {
+  const root = await repository({
+    policyOverrides: { optionalBooleanSelectorInputs: { "self-hosted-labels-json": true } },
+  });
+  await assert.rejects(() => audit(root), ConfigurationError);
+});
+
+test("policy rejects a boolean opt-in input that duplicates a canonical input", async () => {
+  const root = await repository({
+    policyOverrides: { optionalBooleanSelectorInputs: { "self-hosted-label": true } },
+  });
+  await assert.rejects(() => audit(root), ConfigurationError);
 });
 
 test("a claude-review caller routes to the review tier through the governed selector without findings", async () => {
