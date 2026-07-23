@@ -120,7 +120,12 @@ affected dependency in the owning component, and `standards-sync` distributes
 the fix to every consumer's managed materialization the same way it
 distributes any other component change. A maintainer who sees a failing
 security-update job against a managed manifest should expect it to resolve
-through the next sync pull request and can otherwise ignore it.
+once the next sync pull request merges — opening one does not update the
+consumer's default branch, so a sync that stays open, is blocked, or is never
+raised leaves the managed manifest on the vulnerable version until it lands.
+The failing job is noise only while that sync is progressing; if no upstream
+bump or sync merge is forthcoming, escalate the alert rather than continuing
+to ignore it.
 
 Whether Dependabot's own scoping can suppress these doomed jobs while keeping
 the underlying alert visible is an open decision, tracked on
