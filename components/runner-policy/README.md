@@ -468,6 +468,18 @@ rolling tracking-issue lane needs — which the policy honors only while the cal
 genuinely selector-routed; the reusables' own permissions are unchanged. Their
 earlier hosted-only contracts stay registered until every consumer migrates.
 
+The prerequisite-gate contracts at
+`380612ae1d4e0cc9741efbac7b6ffb3d3da63a04`, the reviewed ci-workflows#177
+merge, move `semantic-pr`, `do-not-merge-gate`, and `pr-issue-linkage` to the
+caller-selected `runner` for every prerequisite outcome. Each retains the
+reviewed `prerequisite-result` selector-result input so an exact `always()`
+caller can report selector failure without losing its required check;
+`do-not-merge-gate` additionally permits `label`, and `pr-issue-linkage`
+additionally permits `exempt-authors`. All three secret maps remain empty.
+Private self-hosted-only callers must result-gate their fallback so the
+selector's non-empty `ci-runner-selection-failed` sentinel cannot become the
+requested runner label.
+
 The policy records each complete path@SHA, fixed runner label, caller-input
 allowlist, and exact secret map; changing any field requires another review.
 
