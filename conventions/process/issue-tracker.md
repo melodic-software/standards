@@ -34,7 +34,7 @@ Personal accounts have no native Issue Types, so their repositories retain a lab
 Prefer a native mechanism over a status label wherever GitHub offers one, because the native mechanism carries behavior the label can only imitate:
 
 - **Blocking is a dependency edge, not a label.** Model "this cannot proceed until that is done" as a native blocked-by relationship between issues. The edge resolves itself when the blocker closes; a label has to be cleared by hand and silently goes stale.
-- **Claiming is an assignee plus a lease, not a label — but this mechanism is deferred.** The intended model is a worker taking an issue setting themselves as its assignee under a time-boxed lease, so ownership and its freshness live in the native field where a second worker can trust them, rather than in a label anyone can leave behind. It stays undeployed today because a single-maintainer org has nothing for it to arbitrate: activate it if the org adopts required reviewers or otherwise grows enough maintainers that assignment contention becomes real. Until then, the optional 🔒 marker below is the lightweight interim signal.
+- **Claiming is an assignee plus a lease, not a label — active.** A worker taking an issue sets themselves as its assignee under a time-boxed lease, so ownership and its freshness live in the native field where a second worker can trust them, rather than in a label anyone can leave behind. The activation trigger this convention named — assignment contention becoming real — was met when autonomous multi-worker loop lanes began claiming from the same backlog; the mechanism is the work-items plugin's tracker-seam lease protocol (claude-code-plugins, `plugins/work-items/tools/work-item-tracker/CONTRACT.md`, "Lease protocol"), whose concurrent-claim arbitration is race-tested (exactly one claimant wins; the loser backs off on the live foreign lease). The former interim 🔒 marker is retired.
 - **The remaining status labels are the human-gate signals.** What stays a label is the small set of states that mean *a human must act before work can continue* — an issue waiting on information, waiting on a decision, or cleared and ready to start. These have no native equivalent, so they remain labels under the naming grammar; their exact spelling is defined in infrastructure-as-code.
 
 ## Closing pull requests
@@ -47,7 +47,7 @@ The following are documented patterns, not requirements — use them where they 
 
 - **🤖 marks a bot-authored comment.** A trailing 🤖 on a comment tells a human reader at a glance that an agent, not a person, wrote it.
 - **Cite the evidence when closing on it.** A pull request or comment that closes an issue because of external evidence (a log, a run, an upstream release) links or quotes that evidence rather than asserting the conclusion bare.
-- **🔒 marks a claimed issue.** Until the assignee-plus-lease mechanism above is activated, a worker who wants to signal "I'm on this" adds a 🔒 to the title or opens with it in a comment. It is advisory, not enforced — nothing clears it automatically, so treat a stale 🔒 with the same skepticism as any other unmaintained signal.
+- **🔒 is retired.** The interim "I'm on this" marker served while the assignee-plus-lease mechanism above was deferred; with that mechanism active, the lease is the claim signal. Treat any 🔒 still encountered as a stale artifact of the interim period.
 
 ## Governance: infrastructure-as-code is the sole writer
 
