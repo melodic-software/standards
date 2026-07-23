@@ -105,6 +105,32 @@ or rot. The `open-pull-requests-limit` cap is not waivable.
 The file is optional: a repository whose entries all conform needs no
 configuration, and its absence declares no exceptions.
 
+## Security updates on sync-managed materializations
+
+Dependabot's security-update jobs cannot fix a dependency inside a
+sync-managed materialization (for example
+`.github/standards/<component>/package-lock.json`): the managed path is
+governed by the standards sync, not by the consumer repository, and the
+generated fix is rejected. The observed failure mode is a security-update job
+that retries and fails repeatedly against the managed manifest — expected
+noise, not a hazard requiring an in-repo response.
+
+The absorb path is upstream-bump-then-sync: this repository bumps the
+affected dependency in the owning component, and `standards-sync` distributes
+the fix to every consumer's managed materialization the same way it
+distributes any other component change. A maintainer who sees a failing
+security-update job against a managed manifest should expect it to resolve
+once the next sync pull request merges — opening one does not update the
+consumer's default branch, so a sync that stays open, is blocked, or is never
+raised leaves the managed manifest on the vulnerable version until it lands.
+The failing job is noise only while that sync is progressing; if no upstream
+bump or sync merge is forthcoming, escalate the alert rather than continuing
+to ignore it.
+
+Whether Dependabot's own scoping can suppress these doomed jobs while keeping
+the underlying alert visible is an open decision, tracked on
+[standards#256](https://github.com/melodic-software/standards/issues/256).
+
 ## Enforcement gate
 
 The gate installs the component's locked runtime and runs the analyzer against
