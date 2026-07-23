@@ -74,19 +74,36 @@ assert_exit 'win repo: JSON-escaped Projects root is flagged' 0 "$?"
 matches "$HPP_WIN_REPO_BODY" 'C:\Projects\<repo-root>\x'
 assert_exit 'win repo: Projects placeholder stays clean' 1 "$?"
 
-# Bare roots (the home/checkout directory itself, no child path) are
-# intentionally not matched: the trailing separator every body requires is its
-# right boundary, so a match needs at least one child segment past the root.
-# These assertions pin that non-match so it cannot silently regress.
+# Right boundary is the segment class, not a trailing separator. Bare VALUES —
+# the home or checkout directory itself as a config value, no path below it —
+# now match: the earlier trailing-separator design inverted detection (a real
+# `root = C:/Dev/GitHub` value at end of line was missed, while the old
+# space-permitting class let prose match greedily through a later slash on the
+# same line). These assertions pin the value-shape matches so they cannot
+# silently regress back to separator-bounded semantics.
 matches "$HPP_WIN_USER_BODY" 'C:\Users\Alice'
-assert_exit 'win user: bare root without child stays clean' 1 "$?"
+assert_exit 'win user: bare home value is flagged' 0 "$?"
 matches "$HPP_MACOS_USER_BODY" '/Users/alice'
-assert_exit 'macos user: bare root without child stays clean' 1 "$?"
+assert_exit 'macos user: bare home value is flagged' 0 "$?"
 matches "$HPP_LINUX_USER_BODY" '/home/alice'
-assert_exit 'linux user: bare root without child stays clean' 1 "$?"
-matches "$HPP_WIN_REPO_BODY" 'D:\repos\acme'
-assert_exit 'win repo: bare root without child stays clean' 1 "$?"
+assert_exit 'linux user: bare home value is flagged' 0 "$?"
+matches "$HPP_WIN_REPO_BODY" 'root = C:/Dev/GitHub'
+assert_exit 'win repo: bare checkout value at EOL is flagged' 0 "$?"
 matches "$HPP_ESCAPED_WIN_REPO_BODY" 'D:\\repos\\acme'
-assert_exit 'win repo: JSON-escaped bare root without child stays clean' 1 "$?"
+assert_exit 'win repo: JSON-escaped bare checkout value is flagged' 0 "$?"
+
+# A root with NO child segment still never matches: the child segment stays
+# mandatory, only its trailing separator is gone.
+matches "$HPP_WIN_USER_BODY" 'C:\Users'
+assert_exit 'win user: parent root alone stays clean' 1 "$?"
+matches "$HPP_WIN_REPO_BODY" 'D:/repos/'
+assert_exit 'win repo: parent root alone stays clean' 1 "$?"
+
+# Prose safety now comes from the whitespace-excluding segment class, not the
+# separator requirement — both directions of the old inversion pinned here.
+matches "$HPP_MACOS_USER_BODY" '/Users/ for details see the guide'
+assert_exit 'macos user: root then whitespace prose stays clean' 1 "$?"
+span=$(printf '%s' 'C:/Projects/melodic - personal repos (reference/reading only)' | grep -oE "$HPP_WIN_REPO_BODY")
+assert_eq 'win repo: prose match is the path token, never a greedy span' 'C:/Projects/melodic' "$span"
 
 [[ $FAILED -eq 0 ]] || exit 1
