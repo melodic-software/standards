@@ -184,8 +184,17 @@ dedicated capped review tier). A review-lane caller passes the latter from a
 separate selector job so its review workload routes to that tier while the
 repository's other self-hosted jobs keep the default. Personal-repository
 callers may additionally pass
-`self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`. No other
-selector input or expression is allowed by the policy.
+`self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`.
+
+A caller whose ancillary-event jobs — `issue_comment`, `pull_request_review`,
+`pull_request_review_comment`, and `issues` — perform no checkout of PR or
+issue content may pass `admits-ancillary-events: true` (or the deprecated alias
+`admits-comment-events: true`) to opt those events into fleet routing. Only the
+literal `true` is accepted; the default is not written. The policy permits the
+input but does not verify the no-checkout premise the caller declares — that
+declaration is trusted under the same job-step review that backs a local-routing
+grant (see [`THREAT-MODEL.md`](THREAT-MODEL.md)). No other selector input or
+expression is allowed by the policy.
 
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
