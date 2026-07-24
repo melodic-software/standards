@@ -21,21 +21,37 @@ the primary consumer merges the file into a shared template-data namespace) carr
   prefixes; network-share mounts; and secret-material `Read()` patterns (key files, env
   files, credential stores) in both bare and `**/`-prefixed forms. The union is deliberately
   the STRICTEST observed form of each rule.
-- **`allow`** — deterministic grants an unattended agent loop needs that auto mode's
-  built-ins do not carry: the routine non-destructive working verbs (add, commit, non-force
-  push, pull, checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow
-  code via `gh run rerun`), test invocations (`pytest` forms), and
-  the babysit lane's gate tooling. Read-only git/gh inspection and read-only lint tooling
-  are deliberately absent: auto mode covers them without prompting through its built-in
-  read-only handling (source of truth: `claude auto-mode defaults` and
-  <https://code.claude.com/docs/en/auto-mode-config>), so floor entries for that set were
-  dead weight. Force/destructive spellings stay covered by `deny`, which always wins.
+- **`allow`** — grants an unattended agent loop needs that auto mode's built-ins do not
+  carry: the routine non-destructive working verbs (add, commit, non-force push, pull,
+  checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow code via
+  `gh run rerun`), test invocations (`pytest` forms), and the babysit lane's gate tooling.
+  Read-only git/gh inspection and read-only lint tooling are deliberately absent: auto mode
+  covers them without prompting through its built-in read-only handling (source of truth:
+  `claude auto-mode defaults` and <https://code.claude.com/docs/en/auto-mode-config>), so
+  floor entries for that set were dead weight. Force/destructive spellings stay covered by
+  `deny`, which always wins.
+
+  **Scope limit — these grants are deterministic only outside auto mode.** Every allow
+  entry on this floor is a shell rule (`Bash()` / `PowerShell()`), and a consumer setting
+  `autoMode.classifyAllShell: true` suspends *all* shell allow rules
+  (<https://code.claude.com/docs/en/auto-mode-config>). In such a session the classifier
+  adjudicates each of these actions on its merits and the built-in "External System Writes"
+  soft_deny consent-gates the gh write verbs; clearing that for an unattended lane needs a
+  prose `autoMode.allow` entry in user or managed settings, which this component does not
+  carry. Consumers that route all shell through the classifier must treat this floor as the
+  non-auto fallback posture and provide lane grants in prose.
+
+  `deny` is unaffected — `classifyAllShell` suspends allow rules only, so every deny entry
+  stays pre-classifier and non-overridable in every mode.
 
 The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are interim shapes: the
 end state is each script exposed as a bare wrapper on the plugin `bin/` PATH so the rule
 names the command rather than the interpreter (trigger:
 melodic-software/claude-code-plugins#843, the PATH gap fix). Until that lands, both quoted
 and unquoted spellings stay pinned here alongside the bare wrappers that already exist.
+That end state does not restore pre-classifier handling under `classifyAllShell: true` —
+a bare wrapper is still a shell rule. It buys rule clarity and the non-auto posture, not a
+classifier bypass.
 
 ## Composition model — data component, consumer-owned merge
 
@@ -76,3 +92,8 @@ Additions to `allow` require observed-usage evidence (recurring prompt patterns 
 sessions — the auto-mode tuning loop) or a reviewed unattended-lane need; additions to
 `deny` ship on sight. Either lands as a reviewed change here and reaches consumers through
 the ordinary sync PR.
+
+Before proposing an `allow` addition from an observed prompt, check whether the prompting
+session routes shell through the classifier. If it does, a rule here will not stop that
+prompt — the fix is a prose `autoMode.allow` entry in the consumer's user or managed
+settings. Reserve floor additions for grants that must hold in a non-auto session.
