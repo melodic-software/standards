@@ -33,8 +33,11 @@ this purpose.
 - New or changed review criteria are authored fresh from primary sources and
   cite them; criteria are never ported from a downstream consumer's own
   copy, which would run the source-of-truth arrow backward.
-- `.claude/` is untracked local session tooling. Never `git add -A` or
-  `git add .` here — stage explicit paths only.
+- `.claude/` is untracked local session tooling, with one exception:
+  tracked repo-owned plugin configuration (`.claude/source-control.md`,
+  whose loop-lane keys are ratified through reviewed PRs per the
+  [loop-lane convention](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/conventions/loop-lane/README.md)).
+  Never `git add -A` or `git add .` here — stage explicit paths only.
 
 ## Validating a change
 
