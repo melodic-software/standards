@@ -23,7 +23,8 @@ the primary consumer merges the file into a shared template-data namespace) carr
   the STRICTEST observed form of each rule.
 - **`allow`** — deterministic grants an unattended agent loop needs that auto mode's
   built-ins do not carry: the routine non-destructive working verbs (add, commit, non-force
-  push, pull, checkout/switch, PR and issue CRUD), test invocations (`pytest` forms), and
+  push, pull, checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow
+  code via `gh run rerun`), test invocations (`pytest` forms), and
   the babysit lane's gate tooling. Read-only git/gh inspection and read-only lint tooling
   are deliberately absent: auto mode covers them without prompting through its built-in
   read-only handling (source of truth: `claude auto-mode defaults` and
