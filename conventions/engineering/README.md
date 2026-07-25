@@ -15,8 +15,10 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 | [documentation-existence.md](documentation-existence.md) | whether a tracked page may exist at all — the admission test upstream of the documentation family |
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
+| [source-authority-tiers.md](source-authority-tiers.md) | how much authority a source carries; how many independent corroborators a claim needs |
 | [deterministic-artifact-scaffolding.md](deterministic-artifact-scaffolding.md) | stable artifact structure in deterministic mechanisms; judgment-bearing slots stay human- or agent-owned |
 | [deterministic-work-execution.md](deterministic-work-execution.md) | session-time tool execution for deterministic sub-work; judgment remains human- or agent-owned |
+| [session-time-agent-output-trust.md](session-time-agent-output-trust.md) | what an undiffed mid-session agent claim owes its reader, and what the reader owes before acting |
 | [progressive-disclosure.md](progressive-disclosure.md) | layering information so a reader pays only for the depth they reach |
 | [container-supply-chain.md](container-supply-chain.md) | Dockerfile, build-context, image-scanning, artifact-identity, and runtime assurance boundaries |
 | [legacy-and-migration-debt.md](legacy-and-migration-debt.md) | describing the current form; the exposure classifier for old paths |
