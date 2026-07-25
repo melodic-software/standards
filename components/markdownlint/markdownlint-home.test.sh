@@ -32,8 +32,27 @@ component='markdownlint-home'
 
 # --- The manifest mapping is what the rest of this test depends on ------------
 
-source_path="$(yq -r ".components.\"$component\".files | keys | .[0]" "$manifest")"
-dest_path="$(yq -r ".components.\"$component\".files.\"$source_path\"" "$manifest")"
+# Read the manifest with the `yaml` package `npm ci` already installs, NOT `yq`:
+# this job installs only Node dependencies, and the pinned `yq` lives in other,
+# isolated jobs — a `yq` call here would exit 127 on a clean runner and fail the
+# required gate before any discovery behavior ran.
+manifest_files() {
+  # SC2016: the single quotes are required — this is JavaScript, and its
+  # `${...}` template literal must reach node unexpanded by the shell.
+  # shellcheck disable=SC2016
+  node -e '
+    const YAML = require("yaml");
+    const fs = require("fs");
+    const doc = YAML.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const files = doc.components?.[process.argv[2]]?.files ?? {};
+    const [source] = Object.keys(files);
+    process.stdout.write(`${source ?? ""}\n${files[source] ?? ""}\n`);
+  ' "$1" "$2"
+}
+
+mapfile -t mapping < <(manifest_files "$manifest" "$component")
+source_path="${mapping[0]:-}"
+dest_path="${mapping[1]:-}"
 
 assert_eq 'component maps the home config' \
   'components/markdownlint/home/.markdownlint-cli2.jsonc' "$source_path"
