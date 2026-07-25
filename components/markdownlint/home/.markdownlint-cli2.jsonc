@@ -1,0 +1,45 @@
+{
+  // Home-directory variant of the root GFM ruleset, deployed to ~/.markdownlint-cli2.jsonc
+  // so a session whose working directory IS the home directory lints under the org's
+  // rules instead of markdownlint's stock defaults. markdownlint-cli2 does not read a
+  // config from an ancestor of the working directory, so this only governs $HOME-rooted
+  // runs; a repository linted from its own root keeps its own materialized config.
+  //
+  // The `config` block below is byte-identical to the root .markdownlint-cli2.jsonc and
+  // MUST stay that way — markdownlint-home.test.sh asserts the equality and fails the
+  // build on drift. `config.extends` would express the sharing directly, but the target
+  // it names has to exist beside the deployed file, and only this one file deploys.
+  //
+  // `ignores` deliberately DIVERGES: the root config excludes build and cache trees on
+  // the premise that the tree is a repository checkout. Under $HOME that premise fails —
+  // ~/bin holds authored markdown, not build output — so the repository-only traversal
+  // exclusions are dropped and only the genuinely-never-authored trees remain.
+  // Schema pinned to markdownlint-cli2 v0.23.1 — bump together with the root config.
+  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.23.1/schema/markdownlint-cli2-config-schema.json",
+  "ignores": [
+    // Dependency and virtualenv trees — vendored, never authored, at any depth.
+    "**/node_modules/**",
+    "**/.venv/**"
+  ],
+  "config": {
+    // --- GFM-aligned style ---
+    "MD003": { "style": "atx" }, // ATX headings (# Heading)
+    "MD004": { "style": "dash" }, // Dash unordered-list bullets
+    "MD049": { "style": "asterisk" }, // *emphasis*
+    "MD050": { "style": "asterisk" }, // **strong**
+    "MD046": { "style": "fenced" }, // Fenced (not indented) code blocks
+    "MD048": { "style": "backtick" }, // Backtick (not tilde) code fences
+    "MD024": { "siblings_only": true }, // Allow duplicate headings under different parents
+    "MD060": false, // Table column style — disabled; allows any pipe spacing (its default flags tables matching no supported style)
+
+    // --- Relaxed for GFM / prose ---
+    "MD013": false, // No hard line-length limit (tables and code exceed 80)
+    "MD025": false, // Allow multiple top-level (H1) sections
+    "MD028": false, // Allow blank lines between adjacent blockquotes
+    "MD033": false, // Allow inline HTML (<details>, <summary>, <br>, ...)
+    "MD034": false, // Allow bare URLs (GFM autolinks them)
+    "MD036": false, // Allow bold text used as a pseudo-heading
+    "MD040": false, // Fenced code need not declare a language
+    "MD041": false // First line need not be a top-level heading (frontmatter)
+  }
+}
