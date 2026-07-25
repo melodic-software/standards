@@ -94,6 +94,9 @@ components:
   markdownlint:
     files:
       .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
+  markdownlint-home:
+    files:
+      .markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
   node-runtime:
     files:
       .node-version: .node-version
@@ -201,6 +204,7 @@ targets:
       - lefthook-shellcheck
       - lychee
       - markdownlint
+      - markdownlint-home
       - node-runtime
       - psscriptanalyzer
       - pyright
