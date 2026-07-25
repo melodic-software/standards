@@ -24,7 +24,25 @@ the primary consumer merges the file into a shared template-data namespace) carr
 - **`allow`** — safe-everywhere commands an unattended agent loop needs without prompting:
   read-only git/gh inspection and the routine non-destructive working verbs (add, commit,
   non-force push, checkout/switch, PR and issue CRUD), plus fleet-standard lint/test
-  tooling. Force/destructive spellings stay covered by `deny`, which always wins.
+  tooling. Force/destructive spellings stay covered by `deny`, which always wins — with one
+  deliberate carve-out, below.
+
+### `--force-with-lease` is enforced by a hook, not by `deny`
+
+`deny` covers the force spellings it can express, but not this one. Claude Code's Bash rules are
+whole-string globs with `*` as the only metacharacter, and precedence is fixed at deny → ask →
+allow, so a `deny` entry cannot carry an allowlist exception
+([permissions](https://code.claude.com/docs/en/permissions)). That makes the distinction this
+option needs inexpressible here: git treats `--force-with-lease` and
+`--force-with-lease=<refname>` as unsafe — they lease against the remote-tracking ref, which
+[git-push(1)](https://git-scm.com/docs/git-push) says is "trivially defeated if some background
+process is updating refs in the background" — while `--force-with-lease=<refname>:<expect>` states
+the expectation and is safe. One glob cannot deny the first two and permit the third.
+
+A blanket `deny` here would therefore have to reject the safe form too. The precise check lives in
+the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which parses the argv and
+also honors `--force-if-includes` and the last-wins negations. The docs name a PreToolUse hook as
+the mechanism for exactly what globs cannot express.
 
 ## Composition model — data component, consumer-owned merge
 
