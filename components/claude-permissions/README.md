@@ -41,8 +41,9 @@ the primary consumer merges the file into a shared template-data namespace) carr
   (<https://code.claude.com/docs/en/permissions>, "Read-only commands"). Floor entries for
   that set are dead weight in every mode, not just under auto. Verified 2026-07-24 on
   Claude Code 2.1.219 in `default` mode with zero settings loaded: `git status`,
-  `git diff`, `git log`, `git show`, `git branch`, `git ls-files`, `git merge-base`, and
-  `git rev-parse` all ran promptless through both the `Bash` and `PowerShell` tools.
+  `git diff`, `git log`, `git show`, `git branch`, `git branch --list`, `git ls-files`,
+  `git merge-base`, and `git rev-parse` — nine spellings — all ran promptless through both
+  the `Bash` and `PowerShell` tools.
 
   Membership is not unconditional, so this is cheap rather than free: the same doc section
   lists carve-outs that void the built-in handling even for a member — unquoted globs on
@@ -80,17 +81,19 @@ the primary consumer merges the file into a shared template-data namespace) carr
   `classifyAllShell: true` in auto mode, an allow-ruled `bash --version` took a 1536 ms
   classifier round-trip while `git status`, `git log`, and `ls` resolved in 4–5 ms —
   bimodal, with nothing in between. This is why trimming read-only git costs nothing under
-  the fleet default while trimming anything outside that set would reintroduce prompts.
+  the fleet default (`permissions.defaultMode: "auto"`) while trimming anything outside
+  that set would reintroduce prompts.
 
 The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are interim shapes: the
 end state is each script exposed as a bare wrapper on the plugin `bin/` PATH so the rule
 names the command rather than the interpreter (trigger:
 melodic-software/claude-code-plugins#843, the PATH gap fix). Until that lands, both quoted
-and unquoted spellings stay pinned here — and bare-wrapper rules stay OUT: the plugin
-`bin/` directory is not on the shell's PATH today, and the skill invokes each wrapper as
-`bash "${CLAUDE_PLUGIN_ROOT}/bin/<wrapper>"` (claude-code-plugins `3fc72d351c`), so a rule
-naming the bare command matches nothing and is dead weight until #843 makes the bare name
-resolve. The end state also does not restore pre-classifier handling under
+and unquoted spellings stay pinned here — for the plugin scripts and equally for the two
+guarded `bin/` wrappers, whose real invocation shape is
+`bash "${CLAUDE_PLUGIN_ROOT}/bin/<wrapper>"` (claude-code-plugins `3fc72d351c`) — and
+bare-wrapper rules stay OUT: the plugin `bin/` directory is not on the shell's PATH today,
+so a rule naming the bare command matches nothing and is dead weight until #843 makes the
+bare name resolve. The end state also does not restore pre-classifier handling under
 `classifyAllShell: true` — a bare wrapper is still a shell rule. It buys rule clarity and
 the non-auto posture, not a classifier bypass.
 

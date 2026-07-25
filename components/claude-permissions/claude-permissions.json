@@ -4,8 +4,12 @@
     "allow": [
       "Bash(actionlint *)",
       "Bash(actionlint)",
+      "Bash(bash \"${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-merge\"*)",
+      "Bash(bash \"${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-resolve-thread\"*)",
       "Bash(bash \"${CLAUDE_PLUGIN_ROOT}/scripts/babysit-readiness-gate.sh\"*)",
       "Bash(bash \"${CLAUDE_PLUGIN_ROOT}/scripts/fetch-all-pr-comments.sh\"*)",
+      "Bash(bash ${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-merge*)",
+      "Bash(bash ${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-resolve-thread*)",
       "Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/babysit-readiness-gate.sh*)",
       "Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/fetch-all-pr-comments.sh*)",
       "Bash(check-jsonschema *)",
