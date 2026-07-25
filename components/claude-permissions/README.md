@@ -21,15 +21,37 @@ the primary consumer merges the file into a shared template-data namespace) carr
   prefixes; network-share mounts; and secret-material `Read()` patterns (key files, env
   files, credential stores) in both bare and `**/`-prefixed forms. The union is deliberately
   the STRICTEST observed form of each rule.
-- **`allow`** — grants an unattended agent loop needs that auto mode's built-ins do not
-  carry: the routine non-destructive working verbs (add, commit, non-force push, pull,
+- **`allow`** — grants an unattended agent loop needs that no built-in mechanism carries:
+  the routine non-destructive working verbs (add, commit, non-force push, pull,
   checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow code via
-  `gh run rerun`), test invocations (`pytest` forms), and the babysit lane's gate tooling.
-  Read-only git/gh inspection and read-only lint tooling are deliberately absent: auto mode
-  covers them without prompting through its built-in read-only handling (source of truth:
-  `claude auto-mode defaults` and <https://code.claude.com/docs/en/auto-mode-config>), so
-  floor entries for that set were dead weight. Force/destructive spellings stay covered by
-  `deny`, which always wins.
+  `gh run rerun`), test invocations (`pytest` forms), the babysit lane's gate tooling, and
+  the read-only inspection commands Claude Code does *not* pre-approve — every `gh` verb
+  (read-only ones included) and every third-party linter. Force/destructive spellings stay
+  covered by `deny`, which always wins.
+
+  **Read-only *git* inspection is deliberately absent.** Claude Code recognizes a built-in
+  set of Bash commands as read-only and runs them without a permission prompt in every
+  mode; the set is not configurable and covers "read-only forms of `git`"
+  (<https://code.claude.com/docs/en/permissions>, "Read-only commands"). Floor entries for
+  that set are dead weight in every mode, not just under auto. Verified 2026-07-24 on
+  Claude Code 2.1.219 in `default` mode with zero settings loaded: `git status`,
+  `git diff`, `git log`, `git show`, `git branch`, `git ls-files`, `git merge-base`, and
+  `git rev-parse` all ran promptless through both the `Bash` and `PowerShell` tools.
+
+  Membership is not unconditional, so this is cheap rather than free: the same doc section
+  lists carve-outs that void the built-in handling even for a member — unquoted globs on
+  commands carrying write-capable flags (`git` among them), Windows UNC paths, `cd` into a
+  different directory before a `git` call, output redirection, and compound commands. An
+  observed instance: `git status; echo "exit status: $?"` was denied while bare
+  `git status` ran. Expect occasional prompts on exotic spellings of these verbs.
+
+  **Membership is narrow, and it is command identity — not "looks read-only."** The same
+  run denied every `gh` verb (`gh pr view`, `gh issue list`, `gh label list`, `gh pr list`,
+  `gh repo view`, `gh run list`, `gh run view`, `gh search`), every linter (`actionlint`,
+  `check-jsonschema`, `gitleaks`, `lychee`, `ruff check`, `shellcheck`, `typos`) — even
+  bare `--version` and `--help` forms — and `claude plugin list`. Those rules are
+  load-bearing. The documented list is explicitly non-exhaustive ("These include…"), so
+  **membership must be tested, never inferred from a command being read-only in spirit.**
 
   **Scope limit — these grants are deterministic only outside auto mode.** Every allow
   entry on this floor is a shell rule (`Bash()` / `PowerShell()`), and a consumer setting
@@ -43,6 +65,16 @@ the primary consumer merges the file into a shared template-data namespace) carr
 
   `deny` is unaffected — `classifyAllShell` suspends allow rules only, so every deny entry
   stays pre-classifier and non-overridable in every mode.
+
+  **The two scope limits above do not collide.** `classifyAllShell` suspends *allow rules*;
+  the built-in read-only set is not an allow rule but a separate pre-permission-check step
+  (<https://code.claude.com/docs/en/permission-modes> enumerates `permissions.allow` rules,
+  read-only Bash commands, and `PreToolUse` hook approvals as three distinct categories),
+  so it survives. Verified 2026-07-24 by timing the permission decision: with
+  `classifyAllShell: true` in auto mode, an allow-ruled `bash --version` took a 1536 ms
+  classifier round-trip while `git status`, `git log`, and `ls` resolved in 4–5 ms —
+  bimodal, with nothing in between. This is why trimming read-only git costs nothing under
+  the fleet default while trimming anything outside that set would reintroduce prompts.
 
 The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are interim shapes: the
 end state is each script exposed as a bare wrapper on the plugin `bin/` PATH so the rule
@@ -97,3 +129,25 @@ Before proposing an `allow` addition from an observed prompt, check whether the 
 session routes shell through the classifier. If it does, a rule here will not stop that
 prompt — the fix is a prose `autoMode.allow` entry in the consumer's user or managed
 settings. Reserve floor additions for grants that must hold in a non-auto session.
+
+**Removals carry the heavier burden, and only one argument retires an entry: that Claude
+Code's built-in read-only set covers the command in every mode.** That claim must be tested
+before it is acted on, never inferred — from the command being read-only in spirit, from a
+sibling command being covered, or from auto mode's classifier approving it. Auto-mode
+coverage is specifically *not* an argument: it does not reach the lanes that never enter
+auto mode (workflow subagents, which always run `acceptEdits`; headless `-p`/SDK runs,
+where an unapproved call fails with nobody to answer the prompt; and explicitly non-auto
+sessions), and under `classifyAllShell: true` it does not confer a pre-classifier
+short-circuit on anything. The test:
+
+```sh
+claude -p 'Run this exact shell command and report nothing else: <command>' \
+  --setting-sources "" --permission-mode default --output-format json
+```
+
+`--setting-sources ""` loads no ambient settings, so nothing but the built-in handling can
+approve the call. A `permission_denials` entry means the rule is load-bearing and stays; an
+empty array means the built-in set covers it and the entry is dead weight. Verify the
+binary is on `PATH` first — a denial fires before execution, so an uninstalled tool and a
+denied one look alike in the exit status but differ in `permission_denials`. Record the
+result in the PR; a removal without one is not reviewable.
