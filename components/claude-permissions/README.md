@@ -24,10 +24,16 @@ the primary consumer merges the file into a shared template-data namespace) carr
 - **`allow`** — grants an unattended agent loop needs that no built-in mechanism carries:
   the routine non-destructive working verbs (add, commit, non-force push, pull,
   checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow code via
-  `gh run rerun`), test invocations (`pytest` forms), the babysit lane's gate tooling, and
-  the read-only inspection commands Claude Code does *not* pre-approve — every `gh` verb
-  (read-only ones included) and every third-party linter. Force/destructive spellings stay
-  covered by `deny`, which always wins.
+  `gh run rerun`), the babysit lane's gate tooling, and the read-only inspection commands
+  Claude Code does *not* pre-approve — every `gh` verb (read-only ones included) and every
+  third-party linter. Force/destructive spellings stay covered by `deny`, which always
+  wins.
+
+  **Test-suite invocations are deliberately absent.** A test runner executes whatever test
+  files are on disk, and an agent session that can write files plus a blanket `pytest`
+  grant compose into a general code-execution grant wearing a narrow name — no rule
+  grammar can tell a test file the agent wrote this session from one the repository
+  already had. Test runs are judged per session instead.
 
   **Read-only *git* inspection is deliberately absent.** Claude Code recognizes a built-in
   set of Bash commands as read-only and runs them without a permission prompt in every
@@ -80,10 +86,13 @@ The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are interim sh
 end state is each script exposed as a bare wrapper on the plugin `bin/` PATH so the rule
 names the command rather than the interpreter (trigger:
 melodic-software/claude-code-plugins#843, the PATH gap fix). Until that lands, both quoted
-and unquoted spellings stay pinned here alongside the bare wrappers that already exist.
-That end state does not restore pre-classifier handling under `classifyAllShell: true` —
-a bare wrapper is still a shell rule. It buys rule clarity and the non-auto posture, not a
-classifier bypass.
+and unquoted spellings stay pinned here — and bare-wrapper rules stay OUT: the plugin
+`bin/` directory is not on the shell's PATH today, and the skill invokes each wrapper as
+`bash "${CLAUDE_PLUGIN_ROOT}/bin/<wrapper>"` (claude-code-plugins `3fc72d351c`), so a rule
+naming the bare command matches nothing and is dead weight until #843 makes the bare name
+resolve. The end state also does not restore pre-classifier handling under
+`classifyAllShell: true` — a bare wrapper is still a shell rule. It buys rule clarity and
+the non-auto posture, not a classifier bypass.
 
 ## Composition model — data component, consumer-owned merge
 
