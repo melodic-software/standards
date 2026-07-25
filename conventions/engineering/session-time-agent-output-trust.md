@@ -61,19 +61,19 @@ carries no information about whether a check was available.
   information the reader needed most.
 - **A conclusion whose provenance is gone** — a summary of a summary, a
   subagent's return, or a recollection of earlier session work, presented as
-  findings. The conclusion survived; the evidence did not. Treat it as
-  [`source-authority-tiers.md`](source-authority-tiers.md) treats a **Recalled**
-  source: promote it by re-retrieving the underlying source, or drop it.
+  findings. The conclusion survived; the evidence did not. The rung it now holds
+  is set by
+  [`source-authority-tiers.md#the-four-rungs`](source-authority-tiers.md#the-four-rungs).
 - **Agreement mistaken for corroboration** — several agents, or several passes
-  of one agent, converging on an answer. Shared priors produce agreement without
-  producing evidence; the independence rule in
+  of one agent, converging on an answer. The tell is a count of agreeing reports
+  offered where independent sources were needed;
   [`source-authority-tiers.md#independence-is-what-corroboration-counts`](source-authority-tiers.md#independence-is-what-corroboration-counts)
-  applies unchanged.
+  decides what such a count is worth.
 - **A constraint that quietly stopped being mentioned** — a late claim that
   contravenes a limit set early: a directory that was out of bounds, a step that
   required approval, a tool that was excluded. The tell is a stated constraint
-  that no recent output references. Long sessions lose constraints before they
-  lose goals.
+  that no recent output references — a goal is restated on every turn, a
+  constraint set once is not.
 - **An answer more confident than its retrieval** — an authority-shaped
   assertion about an external fact with no source named. Route it through
   [`source-authority-tiers.md#the-four-rungs`](source-authority-tiers.md#the-four-rungs)
@@ -86,7 +86,7 @@ instead of re-verifiable:
 
 - The scope actually covered, stated against the scope requested, including what
   was deliberately left out and why.
-- For anything executed, the invocation and its material result, per
+- For anything executed, the record required by
   [`deterministic-work-execution.md#make-the-execution-honest`](deterministic-work-execution.md#make-the-execution-honest).
 - For any external fact, the source and its rung.
 - An explicit statement of what was *not* verified. This is the load-bearing
@@ -99,13 +99,16 @@ a reader discovering the downgrade later has already acted on it.
 ## Boundaries
 
 - **vs [`deterministic-work-execution.md`](deterministic-work-execution.md)** —
-  that file owns the producer's duty to run a mechanical operation rather than
-  predict its result. This file owns the consumer's duty before acting on the
-  report, whether or not anything was executed.
+  that file owns the producer's side: run the mechanical operation rather than
+  predict its result, and record the invocation and input scope that make the run
+  repeatable. This file owns the consumer's side — what is owed before acting on
+  the report, whether or not anything was executed.
 - **vs [`../review/ai-generated-code.md`](../review/ai-generated-code.md)** —
   that file owns the committed artifact at diff time: generation smells,
-  hallucinated APIs and packages, injection surface. This file owns the claim
-  about the artifact, which is never diffed.
+  hallucinated APIs and packages, injection surface, and confidently-wrong code.
+  This file owns the confidently-wrong *claim about* the code, which no review
+  sees. The confidence failure is split along that line, not stated twice
+  across it.
 - **vs [`source-authority-tiers.md`](source-authority-tiers.md)** — that file
   ranks an external source. This file governs an agent's assertion about its own
   work, which carries no rung until a source is named.
