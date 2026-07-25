@@ -96,7 +96,7 @@ components:
       .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
   markdownlint-home:
     files:
-      .markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
+      components/markdownlint/home/.markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
   node-runtime:
     files:
       .node-version: .node-version
