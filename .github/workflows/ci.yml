@@ -157,6 +157,8 @@ jobs:
         run: npm ci
       - name: Markdownlint contract test
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
+      - name: Markdownlint home contract test
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-home.test.sh
 
   runner-policy:
     name: Runner policy

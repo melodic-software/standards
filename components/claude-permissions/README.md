@@ -27,7 +27,7 @@ the primary consumer merges the file into a shared template-data namespace) carr
   `gh run rerun`), the babysit lane's gate tooling, and the read-only inspection commands
   Claude Code does *not* pre-approve — every `gh` verb (read-only ones included) and every
   third-party linter. Force/destructive spellings stay covered by `deny`, which always
-  wins.
+  wins — with one deliberate carve-out, below.
 
   **Test-suite invocations are deliberately absent.** A test runner executes whatever test
   files are on disk, and an agent session that can write files plus a blanket `pytest`
@@ -96,6 +96,27 @@ so a rule naming the bare command matches nothing and is dead weight until #843 
 bare name resolve. The end state also does not restore pre-classifier handling under
 `classifyAllShell: true` — a bare wrapper is still a shell rule. It buys rule clarity and
 the non-auto posture, not a classifier bypass.
+
+### `--force-with-lease` is enforced by a hook, not by `deny`
+
+`deny` covers the force spellings it can express, but not this one. Claude Code's Bash rules are
+whole-string globs with `*` as the only metacharacter, and precedence is fixed at deny → ask →
+allow, so a `deny` entry cannot carry an allowlist exception
+([permissions](https://code.claude.com/docs/en/permissions)). That makes the distinction this
+option needs inexpressible here. git leases against the remote-tracking ref for
+`--force-with-lease` and `--force-with-lease=<refname>`, which
+[git-push(1)](https://git-scm.com/docs/git-push) says is "trivially defeated if some background
+process is updating refs in the background". A `--force-with-lease=<refname>:<expect>` is safe only
+when `<expect>` is something git cannot resolve to a newer value — an object id, or the empty string
+asserting the ref must not already exist. A movable name in that slot
+(`--force-with-lease=refs/heads/main:origin/main`, `:HEAD`, `:@{u}`) is resolved when the push runs,
+so a background fetch advances it first and the lease passes while clobbering unseen work: the same
+hole the bare form has. One glob cannot separate an object id from a ref name in that position.
+
+A blanket `deny` here would therefore have to reject the safe form too. The precise check lives in
+the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which parses the argv,
+requires an immutable `<expect>`, and also honors `--force-if-includes` and the last-wins
+negations. The docs name a PreToolUse hook as the mechanism for exactly what globs cannot express.
 
 ## Composition model — data component, consumer-owned merge
 
