@@ -23,16 +23,31 @@ as an open item, not attempted here.
 > **This section's premise no longer holds. Do not provision from it.**
 >
 > It was written against a repository classification that has since changed.
-> Re-verified 2026-07-26 against **two independent primary-rung sources** —
-> this is a security-bearing durable claim, and
-> [`source-authority-tiers.md`](../conventions/engineering/source-authority-tiers.md)
-> requires more primary sources for those, not more corroborators:
+> Re-verified 2026-07-26 by observing the fact through three authorization
+> planes:
 >
 > 1. the authenticated REST API (`gh api repos/melodic-software/<repo> --jq .visibility`);
 > 2. **anonymous git transport** — `git -c credential.helper= ls-remote` with
 >    `GIT_TERMINAL_PROMPT=0`, which reaches a public repository and fails on a
->    private one. A different plane from the REST API and a different
->    authorization decision, so it is not the same source twice.
+>    private one;
+> 3. for `claude-code-plugins`, the `CI_REPOSITORY_VISIBILITY` value Actions
+>    supplies to its own runner-policy job — the value the gate itself reads.
+>
+> **These are one source, not three, and the claim does not meet this
+> repository's corroboration floor.** Under
+> [`source-authority-tiers.md`](../conventions/engineering/source-authority-tiers.md)
+> sources that "share an upstream pool" count once, and all three read GitHub's
+> repository state. Repository visibility is a fact GitHub *owns*; no
+> independent pool exists to corroborate it from, so the floor of one primary
+> plus two independent corroborators is unmeetable for this class of claim, not
+> merely unmet here.
+>
+> What the three planes do buy is protection against **observation** error —
+> a stale credential context, a cached value, a mistyped repository — which is
+> the realistic failure mode. They buy nothing against GitHub being wrong about
+> its own repositories, which is not a meaningful failure mode: that state *is*
+> the fact. Recorded this way so a reader weighs the evidence for what it is
+> rather than for a corroboration count it cannot have.
 >
 > | Repository | Classified here as | Authenticated API | Anonymous transport |
 > | --- | --- | --- | --- |
@@ -46,9 +61,7 @@ as an open item, not attempted here.
 >
 > The four private rows are the control: the probe discriminates rather than
 > succeeding for everything, so the two public rows are a finding and not an
-> artifact of the method. A third plane agrees for `claude-code-plugins` —
-> GitHub Actions supplies `CI_REPOSITORY_VISIBILITY: public` to that repo's own
-> runner-policy job, which is the value the gate itself reads.
+> artifact of the method.
 >
 > Two consequences, in order of severity:
 >
@@ -146,9 +159,16 @@ criterion to ground a finding. It may **not**:
 
 ## Open questions — pilot before relying
 
-None of these are testable without the App this document classifies but
-does not provision; each is a real open question about the wiring's
-behavior once it is, not an assumption to build further design on.
+These were written when the mount required the App this document classifies
+but does not provision. **With `standards` public, most no longer depend on
+it** — an anonymous checkout mounts the same tree, so `--add-dir` visibility,
+SDK rule loading, default tool grants, and OAuth quota can all be piloted now.
+Only private-marketplace authentication is genuinely credential-dependent.
+
+Gating them on an App that the caution above says not to provision would
+deadlock the re-derivation it asks for, so they are not gated: pilot what an
+anonymous checkout can reach, and let the results inform whether any
+credential is needed at all rather than assuming one is.
 
 - **Private-marketplace authentication.** Whether a `plugins`/
   `plugin_marketplaces` install authenticates using this same credential is
@@ -198,9 +218,9 @@ for r in ci-workflows standards dotfiles provisioning github-iac \
 done
 ```
 
-Both planes, because one is not enough for a security-bearing claim. They must
-agree; if they diverge, the claim is uncorroborated at any count and belongs
-recorded as open rather than resolved by preferring one.
+Both planes, because the realistic failure is a misread rather than GitHub
+being wrong. They must agree; if they diverge, the claim is uncorroborated at
+any count and belongs recorded as open rather than resolved by preferring one.
 
 ## Sources
 
