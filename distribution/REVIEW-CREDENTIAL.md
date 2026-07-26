@@ -22,15 +22,33 @@ as an open item, not attempted here.
 > [!CAUTION]
 > **This section's premise no longer holds. Do not provision from it.**
 >
-> It was written against a repository classification that has since changed,
-> and re-verified against the live GitHub API on 2026-07-26:
+> It was written against a repository classification that has since changed.
+> Re-verified 2026-07-26 against **two independent primary-rung sources** —
+> this is a security-bearing durable claim, and
+> [`source-authority-tiers.md`](../conventions/engineering/source-authority-tiers.md)
+> requires more primary sources for those, not more corroborators:
 >
-> | Repository | Classified here as | Actual |
-> | --- | --- | --- |
-> | `standards` | private | **public** |
-> | `claude-code-plugins` | private | **public** |
-> | `ci-workflows` | public | public |
-> | `dotfiles`, `provisioning`, `github-iac`, `medley` | private | private |
+> 1. the authenticated REST API (`gh api repos/melodic-software/<repo> --jq .visibility`);
+> 2. **anonymous git transport** — `git -c credential.helper= ls-remote` with
+>    `GIT_TERMINAL_PROMPT=0`, which reaches a public repository and fails on a
+>    private one. A different plane from the REST API and a different
+>    authorization decision, so it is not the same source twice.
+>
+> | Repository | Classified here as | Authenticated API | Anonymous transport |
+> | --- | --- | --- | --- |
+> | `standards` | private | **public** | reachable — public |
+> | `claude-code-plugins` | private | **public** | reachable — public |
+> | `ci-workflows` | public | public | reachable — public |
+> | `dotfiles` | private | private | unreachable — private |
+> | `provisioning` | private | private | unreachable — private |
+> | `github-iac` | private | private | unreachable — private |
+> | `medley` | private | private | unreachable — private |
+>
+> The four private rows are the control: the probe discriminates rather than
+> succeeding for everything, so the two public rows are a finding and not an
+> artifact of the method. A third plane agrees for `claude-code-plugins` —
+> GitHub Actions supplies `CI_REPOSITORY_VISIBILITY: public` to that repo's own
+> runner-policy job, which is the value the gate itself reads.
 >
 > Two consequences, in order of severity:
 >
@@ -172,10 +190,17 @@ authority. Recheck cheaply with:
 ```bash
 for r in ci-workflows standards dotfiles provisioning github-iac \
          claude-code-plugins medley; do
-  printf '%-22s %s\n' "$r" \
-    "$(gh api "repos/melodic-software/$r" --jq .visibility)"
+  api="$(gh api "repos/melodic-software/$r" --jq .visibility)"
+  if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git -c credential.helper= \
+       ls-remote "https://github.com/melodic-software/$r" HEAD >/dev/null 2>&1
+  then anon=public; else anon=private; fi
+  printf '%-22s api=%-8s anon=%s\n' "$r" "$api" "$anon"
 done
 ```
+
+Both planes, because one is not enough for a security-bearing claim. They must
+agree; if they diverge, the claim is uncorroborated at any count and belongs
+recorded as open rather than resolved by preferring one.
 
 ## Sources
 
