@@ -7,11 +7,16 @@ below (see "Depth"). A self-hosted or local review running the `review`
 plugin reads this file too, and additionally follows its citations into the
 `standards` repository for the full reasoned criterion behind each line.
 
-Two review lanes consume this file: the **code-review lane**
-(`claude-review`) and the **security lane** (`claude-security-review`).
-Each lane applies only its own scope section below; the two scopes are
-mutually exclusive, so a finding belongs to exactly one lane and is never
-reported twice.
+Review in this organization is split into two mutually exclusive scopes,
+so a finding belongs to exactly one scope and is never reported twice.
+The **code-review lane** (`claude-review`, and Managed Code Review)
+reads this file and applies the code-review scope below. The **security
+lane** (`claude-security-review`) runs from its own security-only prompt
+rather than reading this file; its scope section below records the same
+split for every surface that does read it — so the code-review lane
+knows what to leave to the security lane, and so a self-hosted or local
+review (for example a `review`-plugin security agent) applies the right
+section.
 
 ## Severity
 
@@ -58,10 +63,14 @@ criterion; a citation here never substitutes prose that isn't needed, per
 
 This lane owns every review dimension except security: correctness,
 design, conventions, error handling, observability, tests, and
-documentation. It does **not** report security findings — vulnerabilities,
-authorization or tenancy gaps, credential exposure, injection — those
-belong exclusively to the security lane and are omitted here even when a
-hunk plainly contains one.
+documentation. On a repository whose CI runs the security lane (a
+`.github/workflows/claude-security-review.yml` workflow exists), it does
+**not** report security findings — vulnerabilities, authorization or
+tenancy gaps, credential exposure, injection — those belong exclusively
+to that lane and are omitted here even when a hunk plainly contains one.
+On a repository without that workflow no security lane exists yet, and
+suppressed findings would have no other reader: report security findings
+under this lane too, applying the security-scope checks below.
 
 Always check:
 
