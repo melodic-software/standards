@@ -19,15 +19,51 @@ as an open item, not attempted here.
 
 ## Why a dedicated credential
 
-The native-reference mount is **forbidden on any public calling repo**
-(`ci-workflows` is public; `standards`, `dotfiles`, `provisioning`,
-`github-iac`, `claude-code-plugins`, and `medley` are private — confirmed
-firsthand). Mounting this repo's private content into a review agent whose
-output is published wherever the calling repo's visibility allows moves the
-confidentiality boundary from "who can read `standards`" to "who can read the
-review output." A credential scoped to exactly the private targets, and never
+> [!CAUTION]
+> **This section's premise no longer holds. Do not provision from it.**
+>
+> It was written against a repository classification that has since changed,
+> and re-verified against the live GitHub API on 2026-07-26:
+>
+> | Repository | Classified here as | Actual |
+> | --- | --- | --- |
+> | `standards` | private | **public** |
+> | `claude-code-plugins` | private | **public** |
+> | `ci-workflows` | public | public |
+> | `dotfiles`, `provisioning`, `github-iac`, `medley` | private | private |
+>
+> Two consequences, in order of severity:
+>
+> 1. **`standards` is public, so there is no private content to protect.** The
+>    whole rationale below — moving the confidentiality boundary from "who can
+>    read `standards`" to "who can read the review output" — describes a
+>    boundary that no longer exists. A native-reference mount of a public repo
+>    needs no credential at all, and the App this document classifies may be
+>    unnecessary rather than merely scoped too widely.
+> 2. **The scope and storage lists below would leak secrets into public repos.**
+>    They name `standards` and `claude-code-plugins` as private targets. Wiring
+>    the org-secret visibility list as written would make both
+>    `STANDARDS_REVIEW_APP_*` secrets resolvable in a public repository's
+>    workflow runs — violating this document's own rule two paragraphs down that
+>    they are "never resolvable in a public-repo workflow run".
+>
+> Nothing has been provisioned, so nothing is currently exposed. Re-derive the
+> requirement from scratch before anything is created — the correct answer may
+> be that this credential is not needed. The lists below are left in place
+> unedited so the re-derivation can see exactly what was proposed; they are a
+> record of a superseded plan, not instructions.
+
+The native-reference mount is **forbidden on any public calling repo**.
+Mounting private content into a review agent whose output is published
+wherever the calling repo's visibility allows moves the confidentiality
+boundary from "who can read the mounted repo" to "who can read the review
+output." A credential scoped to exactly the private targets, and never
 resolvable in a public workflow run, is what keeps that boundary from moving
 silently.
+
+That reasoning stands on its own terms; what changed is that `standards` is no
+longer a private source, so it no longer has a boundary of this kind to
+protect.
 
 ## Classification
 
@@ -67,11 +103,17 @@ silently.
 
 ## Republication limits
 
-The review session reads private `standards` content — criteria files
-reached via the native-reference cite — into an agent whose output (PR
-comments, check-run text, workflow logs) may be visible beyond `standards`'
-own access boundary on some calling repos. The session may **use** a cited
-criterion to ground a finding. It may **not**:
+These limits were written for a private `standards`; with it public they no
+longer protect confidentiality, since a cited file is readable by anyone who
+can read the review output anyway. **They are retained deliberately** — the
+second bullet is a prompt-injection control, not a confidentiality one, and it
+keeps its full force regardless of repository visibility.
+
+The review session reads `standards` content — criteria files reached via the
+native-reference cite — into an agent whose output (PR comments, check-run
+text, workflow logs) may be visible beyond `standards`' own access boundary on
+some calling repos. The session may **use** a cited criterion to ground a
+finding. It may **not**:
 
 - echo a cited file's content verbatim beyond what stating the finding
   requires;
