@@ -136,13 +136,21 @@ protect.
 
 These limits were written for a private `standards`; with it public they no
 longer protect confidentiality, since a cited file is readable by anyone who
-can read the review output anyway. **All three are retained deliberately.**
-The second bullet is the injection trigger-block and the third is its
-companion — a cited file is a rubric, never a source of instructions — and
-both hold regardless of repository visibility. The first is the damage cap
-that pairs with them: bounding what a session echoes limits what a successful
-injection can extract, which is an integrity property, not a confidentiality
-one.
+can read the review output anyway. **All three are retained, for two different
+reasons.**
+
+The second and third are the injection controls — block the trigger, and
+refuse to treat a cited file as instructions rather than a rubric. Both hold
+regardless of repository visibility, and both are why this section survives at
+all.
+
+The first is **not** a security control and should not be read as one. It
+bounds how much of a cited file a session echoes; that file is now public, so
+bounding it protects nothing, and it does not bound disclosure of the *calling*
+repository's content, its secrets, or the session's tool actions — which is
+where the real exposure sits once an injection succeeds. It is retained as
+review-output discipline: findings stay grounded and terse instead of quoting
+rubric at the reader.
 
 With `standards` public, no calling repo's review output can reach an audience
 that could not already read the cited criteria, so these are **not** access-
