@@ -12,10 +12,12 @@ authentication and belongs instead to the reusable workflow in
 engine: it authenticates a *review* job's checkout, never a materialization
 apply.
 
-**Status: classified, not provisioned.** Nothing below has been created.
-Provisioning — registering the GitHub App, generating its key, and wiring the
-org-secret visibility list — is `github-iac` governance work and is recorded
-as an open item, not attempted here.
+**Status: classified, not provisioned — re-derived 2026-07-26 as not
+currently needed (see "Re-derivation" below).** Nothing below has been
+created. Provisioning — registering the GitHub App, generating its key, and
+wiring the org-secret visibility list — is `github-iac` governance work and
+stays deferred behind it; under the current visibility state there is
+nothing to provision.
 
 ## Why a dedicated credential
 
@@ -95,6 +97,29 @@ silently.
 That reasoning stands on its own terms; what changed is that `standards` is no
 longer a private source, so it no longer has a boundary of this kind to
 protect.
+
+## Re-derivation (2026-07-26)
+
+The re-derivation [standards#264](https://github.com/melodic-software/standards/issues/264)
+asked for, performed against the corrected visibility table above:
+
+- **No consumer needs this credential today.** With `standards` public, a
+  native-reference mount is an anonymous checkout — every calling repo,
+  public or private, can reach the same tree without authenticating. The
+  eligible-consumer question under the public-caller prohibition is moot:
+  that prohibition exists to keep *private* mounted content out of
+  published review output, and there is currently no private content to
+  protect. `claude-code-plugins` being public is therefore not a per-repo
+  ineligibility; the credential is simply unnecessary for the mount.
+- **Provisioning stays deferred behind `github-iac` governance**, and under
+  the current state there is nothing to provision. The classification below
+  is retained as the record of what would be provisioned if the need
+  returns.
+- **The need returns in exactly two cases**, both already covered by the
+  review triggers: `standards` (or another mounted source) becoming
+  private again, or private-marketplace authentication becoming a
+  documented, credential-dependent path (the one genuinely
+  credential-dependent open question below).
 
 ## Classification
 
@@ -188,11 +213,13 @@ credential is needed at all rather than assuming one is.
   `claude-code-action` setup guide do not currently document private-
   marketplace authentication. Treat as unsupported until confirmed
   empirically.
-- **`--add-dir` visibility to a plugin subagent's `Read` tool.** Whether a
-  mounted path is visible to `code-reviewer`/`security-reviewer`/
-  `architecture-guardian` the same way it is to the main session (the B4
-  plugin change assumes so; see `claude-code-plugins`' review-plugin PR's
-  own "Explicitly unverified" note).
+- **`--add-dir` visibility to a plugin subagent's `Read` tool.**
+  **Resolved 2026-07-26** — empirically verified
+  ([standards#264](https://github.com/melodic-software/standards/issues/264)):
+  in a live session, a subagent performed Read, Glob, and Grep against an
+  additional working directory outside the primary working directory — the
+  same mechanism `--add-dir` uses. Mounted paths are visible to plugin
+  subagents the same way they are to the main session.
 - **Self-hosted Agent-SDK `.claude/rules/` auto-load** in a non-interactive
   CI invocation — not confirmed to behave like an interactive session's
   auto-load.
