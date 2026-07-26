@@ -19,15 +19,82 @@ as an open item, not attempted here.
 
 ## Why a dedicated credential
 
-The native-reference mount is **forbidden on any public calling repo**
-(`ci-workflows` is public; `standards`, `dotfiles`, `provisioning`,
-`github-iac`, `claude-code-plugins`, and `medley` are private — confirmed
-firsthand). Mounting this repo's private content into a review agent whose
-output is published wherever the calling repo's visibility allows moves the
-confidentiality boundary from "who can read `standards`" to "who can read the
-review output." A credential scoped to exactly the private targets, and never
+> [!CAUTION]
+> **This section's premise no longer holds. Do not provision from it.**
+>
+> It was written against a repository classification that has since changed.
+> Re-verified 2026-07-26 by observing the fact through three authorization
+> planes:
+>
+> 1. the authenticated REST API (`gh api repos/melodic-software/<repo> --jq .visibility`);
+> 2. **anonymous git transport** — `git -c credential.helper= ls-remote` with
+>    `GIT_TERMINAL_PROMPT=0`, which reaches a public repository and fails on a
+>    private one;
+> 3. for `claude-code-plugins`, the `CI_REPOSITORY_VISIBILITY` value Actions
+>    supplies to its own runner-policy job — the value the gate itself reads.
+>
+> **These are one source, not three, and the claim does not meet this
+> repository's corroboration floor.** Under
+> [`source-authority-tiers.md`](../conventions/engineering/source-authority-tiers.md)
+> sources that "share an upstream pool" count once, and all three read GitHub's
+> repository state. Repository visibility is a fact GitHub *owns*; no
+> independent pool exists to corroborate it from, so the floor of one primary
+> plus two independent corroborators is unmeetable for this class of claim, not
+> merely unmet here.
+>
+> What the three planes do buy is protection against **observation** error —
+> a stale credential context, a cached value, a mistyped repository — which is
+> the realistic failure mode. They buy nothing against GitHub being wrong about
+> its own repositories, which is not a meaningful failure mode: that state *is*
+> the fact. Recorded this way so a reader weighs the evidence for what it is
+> rather than for a corroboration count it cannot have.
+>
+> | Repository | Classified here as | Authenticated API | Anonymous transport |
+> | --- | --- | --- | --- |
+> | `standards` | private | **public** | reachable — public |
+> | `claude-code-plugins` | private | **public** | reachable — public |
+> | `ci-workflows` | public | public | reachable — public |
+> | `dotfiles` | private | private | unreachable — private |
+> | `provisioning` | private | private | unreachable — private |
+> | `github-iac` | private | private | unreachable — private |
+> | `medley` | private | private | unreachable — private |
+>
+> The four private rows are the control: the probe discriminates rather than
+> succeeding for everything, so the two public rows are a finding and not an
+> artifact of the method.
+>
+> Two consequences, in order of severity:
+>
+> 1. **`standards` is public, so there is no private content to protect.** The
+>    whole rationale below — moving the confidentiality boundary from "who can
+>    read `standards`" to "who can read the review output" — describes a
+>    boundary that no longer exists. A native-reference mount of a public repo
+>    needs no credential at all, and the App this document classifies may be
+>    unnecessary rather than merely scoped too widely.
+> 2. **The scope and storage lists below would leak secrets into public repos.**
+>    They name `standards` and `claude-code-plugins` as private targets. Wiring
+>    the org-secret visibility list as written would make both
+>    `STANDARDS_REVIEW_APP_*` secrets resolvable in a public repository's
+>    workflow runs — violating this document's own rule two paragraphs down that
+>    they are "never resolvable in a public-repo workflow run".
+>
+> Nothing has been provisioned, so nothing is currently exposed. Re-derive the
+> requirement from scratch before anything is created — the correct answer may
+> be that this credential is not needed. The lists below are left in place
+> unedited so the re-derivation can see exactly what was proposed; they are a
+> record of a superseded plan, not instructions.
+
+The native-reference mount is **forbidden on any public calling repo**.
+Mounting private content into a review agent whose output is published
+wherever the calling repo's visibility allows moves the confidentiality
+boundary from "who can read the mounted repo" to "who can read the review
+output." A credential scoped to exactly the private targets, and never
 resolvable in a public workflow run, is what keeps that boundary from moving
 silently.
+
+That reasoning stands on its own terms; what changed is that `standards` is no
+longer a private source, so it no longer has a boundary of this kind to
+protect.
 
 ## Classification
 
@@ -67,10 +134,29 @@ silently.
 
 ## Republication limits
 
-The review session reads private `standards` content — criteria files
-reached via the native-reference cite — into an agent whose output (PR
-comments, check-run text, workflow logs) may be visible beyond `standards`'
-own access boundary on some calling repos. The session may **use** a cited
+These limits were written for a private `standards`; with it public they no
+longer protect confidentiality, since a cited file is readable by anyone who
+can read the review output anyway. **All three are retained, for two different
+reasons.**
+
+The second and third are the injection controls — block the trigger, and
+refuse to treat a cited file as instructions rather than a rubric. Both hold
+regardless of repository visibility, and both are why this section survives at
+all.
+
+The first is **not** a security control and should not be read as one. It
+bounds how much of a cited file a session echoes; that file is now public, so
+bounding it protects nothing, and it does not bound disclosure of the *calling*
+repository's content, its secrets, or the session's tool actions — which is
+where the real exposure sits once an injection succeeds. It is retained as
+review-output discipline: findings stay grounded and terse instead of quoting
+rubric at the reader.
+
+With `standards` public, no calling repo's review output can reach an audience
+that could not already read the cited criteria, so these are **not** access-
+boundary controls. What remains is output integrity: a review session must
+report findings grounded in the criteria, and must not be steerable by the
+content it reviews into doing something else. The session may **use** a cited
 criterion to ground a finding. It may **not**:
 
 - echo a cited file's content verbatim beyond what stating the finding
@@ -85,9 +171,16 @@ criterion to ground a finding. It may **not**:
 
 ## Open questions — pilot before relying
 
-None of these are testable without the App this document classifies but
-does not provision; each is a real open question about the wiring's
-behavior once it is, not an assumption to build further design on.
+These were written when the mount required the App this document classifies
+but does not provision. **With `standards` public, most no longer depend on
+it** — an anonymous checkout mounts the same tree, so `--add-dir` visibility,
+SDK rule loading, default tool grants, and OAuth quota can all be piloted now.
+Only private-marketplace authentication is genuinely credential-dependent.
+
+Gating them on an App that the caution above says not to provision would
+deadlock the re-derivation it asks for, so they are not gated: pilot what an
+anonymous checkout can reach, and let the results inform whether any
+credential is needed at all rather than assuming one is.
 
 - **Private-marketplace authentication.** Whether a `plugins`/
   `plugin_marketplaces` install authenticates using this same credential is
@@ -117,6 +210,29 @@ Re-run this classification when the App's granted permissions, installed
 repository set, or storage visibility changes; when a new consumer of this
 credential is added; or when any open question above is resolved either
 way.
+
+**Also when any source or caller repository's visibility changes** — and
+verify it against the API rather than restating this document, because
+repository visibility is mutable and a stale firsthand claim is exactly what
+invalidated the classification once already. The claim is time-bound in the
+sense of `conventions/engineering/documentation-and-citations.md`, so it
+carries a verification date (2026-07-26) and does not survive on its own
+authority. Recheck cheaply with:
+
+```bash
+for r in ci-workflows standards dotfiles provisioning github-iac \
+         claude-code-plugins medley; do
+  api="$(gh api "repos/melodic-software/$r" --jq .visibility)"
+  if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git -c credential.helper= \
+       ls-remote "https://github.com/melodic-software/$r" HEAD >/dev/null 2>&1
+  then anon=public; else anon=private; fi
+  printf '%-22s api=%-8s anon=%s\n' "$r" "$api" "$anon"
+done
+```
+
+Both planes, because the realistic failure is a misread rather than GitHub
+being wrong. They must agree; if they diverge, the claim is uncorroborated at
+any count and belongs recorded as open rather than resolved by preferring one.
 
 ## Sources
 

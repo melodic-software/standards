@@ -139,7 +139,9 @@ they are never hand-copied around a failed access check.
 ## Runner-policy consumer handoff
 
 The `runner-policy` component materializes one atomic runtime at
-`.github/standards/runner-policy/` in exactly these enrolled private targets:
+`.github/standards/runner-policy/` in exactly these enrolled targets — the set
+is an adoption list, not a visibility class, and `claude-code-plugins` is
+public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 
 - `melodic-software/claude-code-plugins`
 - `melodic-software/dotfiles`
