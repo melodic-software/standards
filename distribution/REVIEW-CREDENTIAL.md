@@ -136,9 +136,13 @@ protect.
 
 These limits were written for a private `standards`; with it public they no
 longer protect confidentiality, since a cited file is readable by anyone who
-can read the review output anyway. **They are retained deliberately** — the
-second bullet is a prompt-injection control, not a confidentiality one, and it
-keeps its full force regardless of repository visibility.
+can read the review output anyway. **All three are retained deliberately.**
+The second bullet is the injection trigger-block and the third is its
+companion — a cited file is a rubric, never a source of instructions — and
+both hold regardless of repository visibility. The first is the damage cap
+that pairs with them: bounding what a session echoes limits what a successful
+injection can extract, which is an integrity property, not a confidentiality
+one.
 
 With `standards` public, no calling repo's review output can reach an audience
 that could not already read the cited criteria, so these are **not** access-

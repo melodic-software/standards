@@ -381,7 +381,7 @@ else
 fi
 
 # Production coverage contract: the runner policy is one atomic runtime
-# component in each enrolled private consumer. Its dependency lockfile travels
+# component in each enrolled consumer. Its dependency lockfile travels
 # with the executable, and node-runtime makes the engine pin explicit.
 actual_manifest="$root/distribution/sync-manifest.yml"
 assert_eq 'runner-policy requires the shared Node runtime pin' 'node-runtime' \
@@ -554,7 +554,7 @@ actual_agent_orientation_targets="$(
     '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'AGENTS.md reaches exactly the four whole-file-managed private consumers (medley reconciles locally instead; ci-workflows is public and gets REVIEW.md only)' \
+assert_eq 'AGENTS.md reaches exactly the four whole-file-managed consumers (medley reconciles locally instead; ci-workflows gets REVIEW.md only)' \
   "$expected_agent_orientation_targets" "$actual_agent_orientation_targets"
 
 assert_eq 'ci-workflows does not whole-file-manage agent-orientation (public repo; AGENTS.md excluded)' '0' \
