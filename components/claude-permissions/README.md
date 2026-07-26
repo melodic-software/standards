@@ -23,8 +23,8 @@ the primary consumer merges the file into a shared template-data namespace) carr
   the STRICTEST observed form of each rule.
 - **`allow`** — grants an unattended agent loop needs that no built-in mechanism carries:
   the routine non-destructive working verbs (add, commit, non-force push, pull,
-  checkout/switch, PR and issue CRUD, CI re-runs of already-merged workflow code via
-  `gh run rerun`), the babysit lane's gate tooling, and the read-only inspection commands
+  checkout/switch, PR and issue CRUD), the babysit lane's gate tooling, and the read-only
+  inspection commands
   Claude Code does *not* pre-approve — every `gh` verb (read-only ones included) and every
   third-party linter. Force/destructive spellings stay covered by `deny`, which always
   wins — with one deliberate carve-out, below.
@@ -34,6 +34,18 @@ the primary consumer merges the file into a shared template-data namespace) carr
   grant compose into a general code-execution grant wearing a narrow name — no rule
   grammar can tell a test file the agent wrote this session from one the repository
   already had. Test runs are judged per session instead.
+
+  **`gh run rerun` is deliberately absent for the same shape of reason.** The verb takes a
+  bare run id, and the CLI reruns whatever that id names — a run on an unmerged branch, a
+  deployment, a release workflow — so a floor glob cannot restrict it to flaky CI on merged
+  workflow code. Reruns are judged per session until a guarded wrapper validates the
+  repository, workflow, event, and ref.
+
+  **`git pull` is covered, with its hostile spellings denied.** The wildcard would
+  otherwise pre-approve `git pull --no-verify` (git documents it as bypassing the pre-merge
+  and commit-msg hooks) and `git pull --force`/`-f`/`+<refspec>` (a forced overwrite of the
+  local ref, same as the fetch forms already denied), so `deny` carries the pull spellings
+  of both families, args-before-flag forms included.
 
   **Read-only *git* inspection is deliberately absent.** Claude Code recognizes a built-in
   set of Bash commands as read-only and runs them without a permission prompt in every
