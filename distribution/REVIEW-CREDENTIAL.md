@@ -109,11 +109,12 @@ can read the review output anyway. **They are retained deliberately** — the
 second bullet is a prompt-injection control, not a confidentiality one, and it
 keeps its full force regardless of repository visibility.
 
-The review session reads `standards` content — criteria files reached via the
-native-reference cite — into an agent whose output (PR comments, check-run
-text, workflow logs) may be visible beyond `standards`' own access boundary on
-some calling repos. The session may **use** a cited criterion to ground a
-finding. It may **not**:
+With `standards` public, no calling repo's review output can reach an audience
+that could not already read the cited criteria, so these are **not** access-
+boundary controls. What remains is output integrity: a review session must
+report findings grounded in the criteria, and must not be steerable by the
+content it reviews into doing something else. The session may **use** a cited
+criterion to ground a finding. It may **not**:
 
 - echo a cited file's content verbatim beyond what stating the finding
   requires;
@@ -159,6 +160,22 @@ Re-run this classification when the App's granted permissions, installed
 repository set, or storage visibility changes; when a new consumer of this
 credential is added; or when any open question above is resolved either
 way.
+
+**Also when any source or caller repository's visibility changes** — and
+verify it against the API rather than restating this document, because
+repository visibility is mutable and a stale firsthand claim is exactly what
+invalidated the classification once already. The claim is time-bound in the
+sense of `conventions/engineering/documentation-and-citations.md`, so it
+carries a verification date (2026-07-26) and does not survive on its own
+authority. Recheck cheaply with:
+
+```bash
+for r in ci-workflows standards dotfiles provisioning github-iac \
+         claude-code-plugins medley; do
+  printf '%-22s %s\n' "$r" \
+    "$(gh api "repos/melodic-software/$r" --jq .visibility)"
+done
+```
 
 ## Sources
 
