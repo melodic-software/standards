@@ -462,6 +462,8 @@ jobs:
           persist-credentials: false
       - name: Lint workflows
         uses: melodic-software/ci-workflows/.github/actions/actionlint@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+      - name: Test actionlint component
+        run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
 
   zizmor:
     permissions:

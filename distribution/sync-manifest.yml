@@ -4,6 +4,22 @@
 version: 2
 
 components:
+  # actionlint queue-suppression config (ci-workflows claude-review-lanes plan,
+  # Phase 3c0). Targets ONLY repos with no pre-existing actionlint config; the
+  # source doubles as this repository's own live config. Deliberate exclusions:
+  # - medley: keeps its locally-owned config — repo-specific `self-hosted-runner`
+  #   labels, including the deliberate `ci-runner-selection-failed` sentinel
+  #   load-bearing in 12 workflows; a whole-file sync would overwrite them
+  #   (12 label errors observed in the fleet probe).
+  # - ci-runner: keeps its locally-owned config with repo-specific waivers a
+  #   whole-file sync would clobber.
+  # - github-iac: extends its own enumerated config in-repo; its
+  #   GovernanceTopologyTests pin the config content.
+  # - standards: manifest source, not a target — carries the canonical file.
+  # - .github: no workflows needing it.
+  actionlint:
+    files:
+      .github/actionlint.yaml: .github/actionlint.yaml
   agent-orientation:
     files:
       components/agent-orientation/orientation.md: AGENTS.md
@@ -165,6 +181,8 @@ targets:
       - repository-text
       - shellcheck
       - typos
+    locally-owned:
+      - actionlint
   melodic-software/ci-workflows:
     managed:
       - comment-hygiene-action
@@ -178,8 +196,13 @@ targets:
       - review-instructions
       - shellcheck
       - typos
+    # Pre-existing locally-owned copy the component's content was derived from;
+    # the removal trigger fires there too.
+    locally-owned:
+      - actionlint
   melodic-software/claude-code-plugins:
     managed:
+      - actionlint
       - agent-orientation
       - editorconfig-checker
       - gitleaks
@@ -194,6 +217,7 @@ targets:
       - typos
   melodic-software/dotfiles:
     managed:
+      - actionlint
       - agent-orientation
       - claude-permissions
       - editorconfig-checker
@@ -230,6 +254,8 @@ targets:
       - review-instructions
       - runner-policy
       - typos
+    locally-owned:
+      - actionlint
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -237,11 +263,13 @@ targets:
       - path-detection-tools
       - runner-policy
     locally-owned:
+      - actionlint
       - agent-orientation
       - gitleaks
       - review-instructions
   melodic-software/provisioning:
     managed:
+      - actionlint
       - agent-orientation
       - editorconfig-checker
       - gitleaks
