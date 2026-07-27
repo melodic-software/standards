@@ -14,6 +14,31 @@ components:
   claude-permissions:
     files:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
+  # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
+  # 3a): thin sync-managed callers for the ci-workflows reusable review lanes,
+  # pinned at the v0.9.0 release SHA. Managed — a recorded exception to the
+  # workflow-caller exclusion in README.md — because hand-written lane callers
+  # empirically drifted: medley's missing `reopened` trigger, divergent
+  # skip-actors lists, and pin skew (v0.6.1 ↔ e295107). Each component
+  # targets the repos that run that lane TODAY. Deliberate exclusions:
+  # - .github, ci-runner: exempt from lane components (near-zero PR traffic;
+  #   ci-runner is runner infra where a wedged lane job could block its own
+  #   substrate).
+  # - standards: manifest source, not a target — keeps its repo-local caller.
+  # - knowledge-corpus, songwriting: planned NEW targets, blocked on the org
+  #   owner extending the sync App's selected access first — add them only
+  #   with that grant recorded.
+  # The security caller reads the repo-owned `.github/claude-security-paths`
+  # pattern file (absent = fail-open: every PR reviewed). That file is
+  # deliberately NOT sync-managed, and the manifest has no seed-once
+  # mechanism, so a new adopter commits its starter list via a repo-local PR
+  # at adoption time.
+  claude-review-caller:
+    files:
+      components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
+  claude-security-review-caller:
+    files:
+      components/claude-lanes/claude-security-review.yml: .github/workflows/claude-security-review.yml
   comment-hygiene-action:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
@@ -181,6 +206,8 @@ targets:
   melodic-software/claude-code-plugins:
     managed:
       - agent-orientation
+      - claude-review-caller
+      - claude-security-review-caller
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -196,6 +223,7 @@ targets:
     managed:
       - agent-orientation
       - claude-permissions
+      - claude-review-caller
       - editorconfig-checker
       - gitleaks
       - lefthook-base
@@ -218,6 +246,7 @@ targets:
   melodic-software/github-iac:
     managed:
       - agent-orientation
+      - claude-review-caller
       - dotnet-analysis
       - editorconfig-checker
       - gitleaks
@@ -233,6 +262,12 @@ targets:
   melodic-software/medley:
     managed:
       - architecture-decisions
+      # claude-review-caller replaces medley's hand-written caller: its
+      # missing `reopened` trigger and skip-actors divergence normalize away;
+      # its `paths-ignore` tuning is an ACCEPTED LOSS (the component carries
+      # no workflow-level path filtering), so medley's review volume rises
+      # slightly.
+      - claude-review-caller
       - node-runtime
       - path-detection-tools
       - runner-policy
@@ -243,6 +278,7 @@ targets:
   melodic-software/provisioning:
     managed:
       - agent-orientation
+      - claude-review-caller
       - editorconfig-checker
       - gitleaks
       - lefthook-base
