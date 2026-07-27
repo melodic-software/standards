@@ -181,6 +181,8 @@ targets:
       - repository-text
       - shellcheck
       - typos
+    locally-owned:
+      - actionlint
   melodic-software/ci-workflows:
     managed:
       - comment-hygiene-action
@@ -248,6 +250,8 @@ targets:
       - review-instructions
       - runner-policy
       - typos
+    locally-owned:
+      - actionlint
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -255,6 +259,7 @@ targets:
       - path-detection-tools
       - runner-policy
     locally-owned:
+      - actionlint
       - agent-orientation
       - gitleaks
       - review-instructions
