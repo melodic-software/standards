@@ -196,7 +196,8 @@ targets:
       - review-instructions
       - shellcheck
       - typos
-    # Canonical origin of the actionlint config; keeps its own copy — the removal trigger fires there too.
+    # Pre-existing locally-owned copy the component's content was derived from;
+    # the removal trigger fires there too.
     locally-owned:
       - actionlint
   melodic-software/claude-code-plugins:
