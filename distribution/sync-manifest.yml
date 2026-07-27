@@ -10,7 +10,7 @@ components:
   # - medley: keeps its locally-owned config — repo-specific `self-hosted-runner`
   #   labels, including the deliberate `ci-runner-selection-failed` sentinel
   #   load-bearing in 12 workflows; a whole-file sync would overwrite them
-  #   (24 label errors observed in the fleet probe).
+  #   (12 label errors observed in the fleet probe).
   # - ci-runner: keeps its locally-owned config with repo-specific waivers a
   #   whole-file sync would clobber.
   # - github-iac: extends its own enumerated config in-repo; its
