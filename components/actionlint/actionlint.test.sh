@@ -40,7 +40,7 @@ assert_contains 'unrelated violation is reported' "$out" 'unexpected key "unknow
 assert_not_contains 'suppression stays scoped to its exact message' "$out" "$queue_message"
 
 # Control: without the config the queue key must be rejected. When this case
-# fails, rhysd/actionlint#654 shipped in the pinned engine — fire the removal
+# fails, the upstream fix shipped in the pinned engine — fire the removal
 # trigger recorded in the config instead of patching this test.
 rm "$project/.github/actionlint.yaml" "$project/.github/workflows/unknown-key.yml"
 out="$(cd "$project" && actionlint -no-color 2>&1)"
