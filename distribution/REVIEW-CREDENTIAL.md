@@ -86,13 +86,15 @@ nothing to provision.
 > unedited so the re-derivation can see exactly what was proposed; they are a
 > record of a superseded plan, not instructions.
 
-The native-reference mount is **forbidden on any public calling repo**.
-Mounting private content into a review agent whose output is published
-wherever the calling repo's visibility allows moves the confidentiality
-boundary from "who can read the mounted repo" to "who can read the review
-output." A credential scoped to exactly the private targets, and never
-resolvable in a public workflow run, is what keeps that boundary from moving
-silently.
+A native-reference mount of **private** content is forbidden on any public
+calling repo. Mounting private content into a review agent whose output is
+published wherever the calling repo's visibility allows moves the
+confidentiality boundary from "who can read the mounted repo" to "who can
+read the review output." A credential scoped to exactly the private targets,
+and never resolvable in a public workflow run, is what keeps that boundary
+from moving silently. Mounting **public** content raises no such boundary:
+while `standards` is public, the anonymous mount is allowed from any calling
+repo, public or private.
 
 That reasoning stands on its own terms; what changed is that `standards` is no
 longer a private source, so it no longer has a boundary of this kind to
@@ -113,8 +115,11 @@ asked for, performed against the corrected visibility table above:
   ineligibility; the credential is simply unnecessary for the mount.
 - **Provisioning stays deferred behind `github-iac` governance**, and under
   the current state there is nothing to provision. The classification below
-  is retained as the record of what would be provisioned if the need
-  returns.
+  is retained strictly as the historical record of the superseded proposal —
+  per the caution above, its scope and storage lists must not be provisioned
+  as written. If the need returns, re-derive the classification from the
+  then-current visibility table first; the marketplace-authentication case
+  may require a different credential shape altogether.
 - **The need returns in exactly two cases**, both already covered by the
   review triggers: `standards` (or another mounted source) becoming
   private again, or private-marketplace authentication becoming a
