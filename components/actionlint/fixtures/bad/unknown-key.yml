@@ -1,0 +1,11 @@
+# An unrelated syntax-check violation in the same rule class as the suppressed
+# message, proving the ignore is scoped to its exact text.
+name: unknown-key fixture
+on: push
+jobs:
+  noop:
+    runs-on: ubuntu-24.04
+    unknown-key: true
+    steps:
+      - name: No-op
+        run: exit 0
