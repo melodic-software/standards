@@ -229,8 +229,6 @@ targets:
     managed:
       - actionlint
       - agent-orientation
-      - claude-review-caller
-      - claude-security-review-caller
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -242,6 +240,18 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+    # The lane callers resolve the runner through the governed select-runner
+    # indirection, which runner-policy forbids a PUBLIC repository from
+    # referencing at all (`routingEnabled` is private-and-self-hosted only, and
+    # the ban consults neither `exceptions` nor `localRoutingGrants`). This is
+    # the org's one public caller target, so it owns hosted-only callers that
+    # pass `runner: ubuntu-24.04` directly. Removal trigger: a caller shape that
+    # resolves the runner without a caller-side selector reference (e.g. the
+    # indirection moving inside the ci-workflows reusable) makes one managed
+    # component serve both visibilities again.
+    locally-owned:
+      - claude-review-caller
+      - claude-security-review-caller
   melodic-software/dotfiles:
     managed:
       - actionlint

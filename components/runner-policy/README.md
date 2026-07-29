@@ -422,7 +422,14 @@ The Claude lane revision at `c136b27f404dd32ce3873f39a6f3443891d1c16e`
 (v0.9.1) carries the selector byte-identical to `e77f0126`; it is approved so
 the review and security lane callers pinning that revision keep a reviewed
 selector reference. Like the other fleet-routing revisions it is owner-scoped
-to `melodic-software`.
+to `melodic-software`. Its two lane contracts are additive against each
+workflow's newest previously approved SHA: `claude-review` (`e2951077`) gains
+the `max-reviews-per-pr` and `retry-delay-seconds` inputs, and
+`claude-security-review` (`66073e58`) gains `paths-file`,
+`exclude-comments-by-actor`, and `retry-delay-seconds`. Neither changes its
+secret or routing surface, and each `allowedInputs` set stays narrower than the
+declared surface — the review caller may pass only `runner`, the security
+caller only `runner` and `paths-file`.
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
