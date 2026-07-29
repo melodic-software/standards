@@ -1,9 +1,13 @@
 name: standards-sync-stuck-automerge-alert
 
 # Watchdog for sync.yml's auto-merge arming: scans standards-sync target repos
-# (read from the manifest, never hardcoded) for App-authored sync PRs armed
-# for auto-merge but BLOCKED past a threshold, and files/refreshes a rolling
+# (read from the manifest, never hardcoded) for App-authored sync PRs in either
+# failure state — armed but BLOCKED past a threshold, or never armed at all on
+# a target the manifest marks `automerge: true` — and files/refreshes a rolling
 # tracking issue in this repo — the calling repo, not any scanned target.
+#
+# The never-armed half only considers `automerge: true` targets, so it is inert
+# for the duration of a rollout window that opts every target out.
 on:
   workflow_dispatch:
   schedule:
@@ -16,7 +20,7 @@ permissions:
 
 jobs:
   alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@43bc8d0f4b328cba9c579039955b93259b6cc6bf # 43bc8d0 2026-07-22
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@8202e03f30dd0c0189c862052d5f242b9a496798 # 8202e03 2026-07-29
     with:
       runner: ubuntu-24.04
     secrets:

@@ -536,11 +536,24 @@ long as that PR stayed open: `peter-evans/create-pull-request` attempts
 because an open pull request already exists, so a PR the window holds open is
 never re-reported as `created`.
 
-This bump moves one of the two pins ci-workflows#291 touches. Its other half —
-the `standards-sync-stuck-automerge-alert.yml` never-armed detection — is
-reached through this repository's separate watchdog caller, still pinned at
-`43bc8d0f4b328cba9c579039955b93259b6cc6bf`, and stays dormant until that pin
-moves.
+The watchdog contract was bumped to the same
+`8202e03f30dd0c0189c862052d5f242b9a496798`, which is where ci-workflows#291's
+other half lives: `standards-sync-stuck-automerge-alert.yml` is a separate
+reusable behind this repository's own separate caller, so the engine bump above
+reached only the arming step. The predecessor `43bc8d0f` also predated
+ci-workflows#234, which split the stuck-PR scan into a cheap page fetch and a
+per-candidate merge-state probe with retry, so this bump carries a reliability
+fix to the armed-but-BLOCKED path as well as the new never-armed detection.
+Inputs, secrets, and routing are unchanged across both SHAs — `runner`,
+`manifest`, `standards-ref`, `threshold-hours`, the same two App secrets — so
+the reviewed `runner-input` shape carries over; the caller passes only `runner`.
+
+The two halves reach different target sets, and the difference is what makes
+the bump's timing matter. Never-armed detection considers only targets the
+manifest marks `automerge: true`, so it reports nothing while a rollout window
+holds every target opted out, and starts reporting the moment the window's
+`automerge: true` restore lands. The armed-but-BLOCKED scan is not gated that
+way — it sweeps every manifest target on the hourly cron regardless.
 
 Read the two together before adding that first workflow mapping: a token that
 may write `.github/workflows/` plus auto-merge armed on every never-armed sync
