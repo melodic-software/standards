@@ -418,9 +418,14 @@ no-checkout `issue_comment`, `pull_request_review`,
 without it the selector routes those events to the hosted fallback. It carries
 no other routing-surface change and, like the other fleet-routing revisions, is
 owner-scoped to `melodic-software`.
-Eleven selector revisions remain approved for an ordered consumer rollout.
+The Claude lane revision at `c136b27f404dd32ce3873f39a6f3443891d1c16e`
+(v0.9.1) carries the selector byte-identical to `e77f0126`; it is approved so
+the review and security lane callers pinning that revision keep a reviewed
+selector reference. Like the other fleet-routing revisions it is owner-scoped
+to `melodic-software`.
+Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these eight strict-scheduling
+owned by a different repository owner, so these nine strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.

@@ -26,6 +26,7 @@ const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
 const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
 const ANCILLARY_OPT_IN_SELECTOR_SHA = "e77f0126b474144708719f99795e44d0ffe2541d";
+const PATHS_FILE_SELECTOR_SHA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -2932,6 +2933,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
       `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
       `${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${PATHS_FILE_SELECTOR_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -2955,6 +2957,7 @@ test("production selector allowlist contains only independently reviewed commits
     MERGE_GROUP_ROUTING_SHA,
     GH_FREE_GATE_SHA,
     ANCILLARY_OPT_IN_SELECTOR_SHA,
+    PATHS_FILE_SELECTOR_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
