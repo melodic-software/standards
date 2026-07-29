@@ -32,11 +32,21 @@ components:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
   # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
   # 3a): thin sync-managed callers for the ci-workflows reusable review lanes,
-  # pinned at the v0.9.0 release SHA. Managed — a recorded exception to the
-  # workflow-caller exclusion in README.md — because hand-written lane callers
-  # empirically drifted: medley's missing `reopened` trigger, divergent
-  # skip-actors lists, and pin skew (v0.6.1 ↔ e295107). Each component
-  # targets the repos that run that lane TODAY. Deliberate exclusions:
+  # pinned at the v0.9.1 release SHA (c136b27; v0.9.0 predates the
+  # `paths-file` input the security caller passes). Managed — a recorded
+  # exception to the workflow-caller exclusion in README.md — because
+  # hand-written lane callers empirically drifted: medley's missing `reopened`
+  # trigger, divergent skip-actors lists, and pin skew (v0.6.1 ↔ e295107).
+  #
+  # ACCEPTED LOSS, all targets: the code-review caller drops `synchronize`,
+  # which every target's hand-written caller carries today. That is the plan's
+  # deliberate cadence cut (review on open/ready/reopen; re-run the job for a
+  # fresh review) — not drift — and it is the single largest behavior change
+  # this component makes. The security lane KEEPS `synchronize`: its check
+  # certifies execution against the latest head.
+  #
+  # Each component targets the repos that run that lane TODAY. Deliberate
+  # exclusions:
   # - .github, ci-runner: exempt from lane components (near-zero PR traffic;
   #   ci-runner is runner infra where a wedged lane job could block its own
   #   substrate).
@@ -49,6 +59,20 @@ components:
   # deliberately NOT sync-managed, and the manifest has no seed-once
   # mechanism, so a new adopter commits its starter list via a repo-local PR
   # at adoption time.
+  #
+  # PARKED: `claude-security-review-caller` has NO managed target and cannot
+  # gain one as written. Both repos running a security lane today
+  # (claude-code-plugins, ci-workflows) are PUBLIC, and a caller that resolves
+  # its runner through the governed selector is rejected outright on a public
+  # repository — runner-policy admits the selector only for a private
+  # self-hosted consumer, consulting neither `exceptions` nor
+  # `localRoutingGrants`. The component is kept, not deleted: its bytes are
+  # the reviewed shape, and the security lane is the one whose check can be a
+  # required context, so it must not be re-derived by hand later. Unparks when
+  # EITHER a private repo adopts the security lane, OR the runner indirection
+  # moves inside the ci-workflows reusable so one component serves both
+  # visibilities (the same trigger the claude-code-plugins `locally-owned`
+  # note records).
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml

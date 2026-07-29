@@ -771,7 +771,13 @@ jobs:
         # index has only .yml today, but a future .yaml workflow must not silently
         # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
         # already tolerates a glob with no current matches).
-        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml
+        #
+        # components/claude-lanes/ holds workflow BYTES that ship to consumers'
+        # .github/workflows/. Every workflow-shaped lane in this repo discovers
+        # files by that location, so the caller components are invisible to all
+        # of them; scanning them here keeps their pins under the same convention
+        # the files they become are held to.
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml
       - name: Pin-comment-convention contract test
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 

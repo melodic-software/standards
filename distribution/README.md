@@ -263,21 +263,41 @@ no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
 inline — do not normalize the two.
 
-Both components are `managed` for PRIVATE targets only. They resolve the
-runner through the governed `select-runner` indirection, and `runner-policy`
-admits that selector only for a private self-hosted consumer — the ban
-consults neither `exceptions` nor `localRoutingGrants`, so a public target has
-no configuration escape and would fail its own `runner-policy` lane (and with
-it `ci-status`) the moment the caller synced in. `melodic-software/claude-code-plugins`,
-the org's one public caller target, is therefore `locally-owned` for both and
-keeps hosted-only callers that pass `runner: ubuntu-24.04` directly. Three
-tests in `components/runner-policy/runner-policy.test.mjs` hold this: a
-selector-routed caller component may not be `managed` for a public target, every
-caller component must audit clean for a private self-hosted consumer, and a
-selector-routed caller is expected to be rejected outright on a public one.
+Both components resolve the runner through the governed `select-runner`
+indirection, and `runner-policy` admits that selector only for a private
+self-hosted consumer — the ban consults neither `exceptions` nor
+`localRoutingGrants`, so a PUBLIC target has no configuration escape and would
+fail its own `runner-policy` lane (and with it `ci-status`) the moment the
+caller synced in. These components are therefore private-only, which resolves
+differently for each lane:
+
+- `claude-review-caller` is `managed` for the four private targets that run
+  the code-review lane (dotfiles, github-iac, medley, provisioning).
+- `claude-security-review-caller` is **parked: it has no managed target.** Both
+  repos running a security lane today — `claude-code-plugins` and
+  `ci-workflows` — are public, so there is no eligible consumer for the
+  selector-routed shape. The component is retained rather than deleted because
+  its bytes are the reviewed shape for the one lane whose check can be a
+  required context. It unparks when either a private repo adopts the security
+  lane or the removal trigger below fires.
+
+`melodic-software/claude-code-plugins`, the org's one public caller target and
+the only repo whose ruleset requires `security-review / security-review`, is
+`locally-owned` for both components and keeps its hand-written hosted-only
+callers that pass `runner: ubuntu-24.04` directly. Consequence to accept
+knowingly: that repo stays outside this normalization and re-pins by hand at
+each `ci-workflows` release.
+
+Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
+constraint: a selector-routed caller component may not be `managed` for a
+public target, every caller component must audit clean for a private
+self-hosted consumer, and a selector-routed caller is expected to be rejected
+outright on a public one.
+
 Removal trigger: a caller shape that resolves the runner without a caller-side
-selector reference — the indirection moving inside the `ci-workflows` reusable —
-lets one managed component serve both visibilities again.
+selector reference — the indirection moving inside the `ci-workflows` reusable
+— lets one managed component serve both visibilities again, unparks the
+security caller, and re-absorbs `claude-code-plugins`.
 
 ## Review-instructions reconciliation (medley)
 
