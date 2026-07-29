@@ -7942,12 +7942,40 @@ test("anchored uses scalars retain provenance enforcement", async () => {
   );
 });
 
-// The sync targets that are PUBLIC repositories. `routingEnabled` admits the
-// governed selector only for private self-hosted consumers, and that ban
-// consults neither `exceptions` nor `localRoutingGrants` — so a public target
-// has no configuration escape. Add a repository here when it becomes a sync
-// target; the assertions below then hold the manifest to it.
-const PUBLIC_SYNC_TARGETS = ["melodic-software/claude-code-plugins"];
+// Repository visibility, keyed by sync-manifest target name. `routingEnabled`
+// admits the governed selector only for private self-hosted consumers, and
+// that ban consults neither `exceptions` nor `localRoutingGrants` — so a
+// PUBLIC target has no configuration escape.
+//
+// Checked in rather than read from the GitHub API: these tests must run
+// offline and hermetically like the rest of this suite. The cost is that a
+// visibility flip lands here by hand, so the lookup FAILS CLOSED — a target
+// absent from this map is treated as public and rejected, rather than
+// silently assumed private. Add a repository here when it becomes a sync
+// target; a wrong entry surfaces as a failing test, a missing one as a
+// failing test naming the gap.
+const TARGET_VISIBILITY = new Map([
+  ["melodic-software/.github", "public"],
+  ["melodic-software/ci-runner", "public"],
+  ["melodic-software/ci-workflows", "public"],
+  ["melodic-software/claude-code-plugins", "public"],
+  ["melodic-software/standards", "public"],
+  ["melodic-software/dotfiles", "private"],
+  ["melodic-software/github-iac", "private"],
+  ["melodic-software/knowledge-corpus", "private"],
+  ["melodic-software/medley", "private"],
+  ["melodic-software/provisioning", "private"],
+  ["melodic-software/songwriting", "private"],
+]);
+
+function isPublicTarget(target) {
+  const visibility = TARGET_VISIBILITY.get(target);
+  assert.ok(
+    visibility,
+    `${target} is a sync target with no recorded visibility; add it to TARGET_VISIBILITY (public until proven private)`,
+  );
+  return visibility === "public";
+}
 
 async function claudeLaneCallerComponents() {
   const manifest = parse(
@@ -7990,7 +8018,7 @@ test("every managed target of a claude lane caller admits that caller", async ()
     for (const [target, definition] of Object.entries(manifest.targets)) {
       if (!(definition.managed ?? []).includes(component)) continue;
       assert.ok(
-        !PUBLIC_SYNC_TARGETS.includes(target),
+        !isPublicTarget(target),
         `${source} is managed for ${target}, which is public — runner-policy rejects a selector-routed caller there`,
       );
       const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
@@ -8006,7 +8034,8 @@ test("every managed target of a claude lane caller admits that caller", async ()
 test("selector-routed claude lane callers are not managed for a public sync target", async () => {
   for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
     if (!body.includes("/select-runner.yml@")) continue;
-    for (const target of PUBLIC_SYNC_TARGETS) {
+    for (const target of Object.keys(manifest.targets)) {
+      if (!isPublicTarget(target)) continue;
       assert.ok(
         !(manifest.targets[target]?.managed ?? []).includes(component),
         `${source} routes through the governed selector, which a public repository may not reference; ` +
@@ -8046,7 +8075,7 @@ test("a selector-routed claude lane caller is rejected outright on a public cons
     );
     assert.ok(
       rules.has("public-self-hosted-routing"),
-      `${source} is expected to be private-only; if it became public-safe, update PUBLIC_SYNC_TARGETS handling deliberately`,
+      `${source} is expected to be private-only; if it became public-safe, revisit TARGET_VISIBILITY handling deliberately`,
     );
   }
 });
