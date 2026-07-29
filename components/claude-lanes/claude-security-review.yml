@@ -52,6 +52,14 @@ permissions:
 # These are per-LANE values, deliberately different from the code-review
 # caller's (which cancels superseded runs and queues repo-wide) — do not
 # normalize the two.
+#
+# KNOWN CONFLICT with the standards `concurrency-policy` component, which
+# requires a `${{ github.workflow }}`-prefixed group and a literal
+# `cancel-in-progress: true`. Both of this lane's values are deliberate and
+# load-bearing (above), and the lane-scoped group name is what keeps the
+# caller's group distinct from the reusable's inner per-(PR,head) group. No
+# target repo runs `concurrency-policy` today, so nothing fails now; a repo
+# adopting BOTH must exempt these two lane callers rather than normalize them.
 concurrency:
   group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false

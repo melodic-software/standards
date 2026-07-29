@@ -38,6 +38,13 @@ permissions:
 # human-driven. This value is per-LANE and deliberate — the security caller
 # must NOT copy it (cancelling a REQUIRED check is not a skip and does not
 # read success).
+#
+# KNOWN CONFLICT with the standards `concurrency-policy` component, which
+# requires a `${{ github.workflow }}`-prefixed group name. The lane-scoped
+# name is what keeps this caller group distinct from the reusable's inner
+# per-(PR,head) group. No target repo runs `concurrency-policy` today, so
+# nothing fails now; a repo adopting BOTH must exempt this caller rather than
+# normalize it.
 concurrency:
   group: claude-review-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
