@@ -516,10 +516,33 @@ capability — it is what will let the sync materialize a target's workflow file
 once such a mapping lands. A mint whose installation lacks the permission fails
 loudly before any target is touched.
 
+The standards-sync contract was bumped to
+`8202e03f30dd0c0189c862052d5f242b9a496798`. Its entire diff against the reviewed
+`ac223bbe` contract is the arming step (ci-workflows#291): the gate moves from
+`steps.cpr.outputs.pull-request-operation == 'created'` to
+`steps.cpr.outputs.pull-request-number != ''`, and the step reads the pull
+request through one GraphQL query — replacing a REST `pulls.get` — that returns
+early when an auto-merge, auto-squash, or auto-rebase enabled event already
+exists. Inputs, secrets, job-level `permissions`, and routing are unchanged, so
+the reviewed `runner-input` shape carries over. What the bump changes is reach,
+not authority: the same mutation under the same token now applies to every sync
+PR the manifest marks `automerge: true` and that was never armed, rather than
+only one the current run opened. A PR opened while its target carried
+`automerge: false` — how a staged rollout window is held — is armed by the next
+sync after the opt-out lifts, where the created-only gate left it unarmed
+permanently, because `peter-evans/create-pull-request` reports `created` exactly
+once per branch.
+
+This bump moves one of the two pins ci-workflows#291 touches. Its other half —
+the `standards-sync-stuck-automerge-alert.yml` never-armed detection — is
+reached through this repository's separate watchdog caller, still pinned at
+`43bc8d0f4b328cba9c579039955b93259b6cc6bf`, and stays dormant until that pin
+moves.
+
 Read the two together before adding that first workflow mapping: a token that
-may write `.github/workflows/` plus arm-at-creation auto-merge plus targets
-whose `base` ruleset requires zero approving reviews means one merge on a
-standards PR can write workflow content into every target and have it
+may write `.github/workflows/` plus auto-merge armed on every never-armed sync
+PR plus targets whose `base` ruleset requires zero approving reviews means one
+merge on a standards PR can write workflow content into every target and have it
 self-merge. `ci-workflows`, which hosts the engine, is itself a target.
 
 The policy records each complete path@SHA, fixed runner label, caller-input
