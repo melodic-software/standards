@@ -464,6 +464,26 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/actionlint@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
       - name: Test actionlint component
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
+      # The lane caller test materializes each target through the distribution
+      # engine before linting, so this job needs the engine's yq the same way
+      # the distribution and pin-comment-convention jobs do.
+      - name: Install yq 4.53.3
+        run: |
+          set -euo pipefail
+          version=4.53.3
+          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
+          curl -fsSL "$url" -o yq
+          echo "${sha}  yq" | sha256sum -c -
+          sudo install yq /usr/local/bin/yq
+          rm yq
+          yq --version
+      # The lint above covers .github/workflows only, so the lane caller
+      # components — workflow bytes that live outside it until a sync
+      # materializes them — need the consumer entrypoint run over them here,
+      # in the one job that has the pinned engine installed.
+      - name: Test claude lane caller components
+        run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
 
   zizmor:
     permissions:
