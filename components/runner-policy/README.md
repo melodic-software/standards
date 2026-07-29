@@ -529,9 +529,11 @@ not authority: the same mutation under the same token now applies to every sync
 PR the manifest marks `automerge: true` and that was never armed, rather than
 only one the current run opened. A PR opened while its target carried
 `automerge: false` — how a staged rollout window is held — is armed by the next
-sync after the opt-out lifts, where the created-only gate left it unarmed
-permanently, because `peter-evans/create-pull-request` reports `created` exactly
-once per branch.
+sync after the opt-out lifts, where the created-only gate left it unarmed for as
+long as that PR stayed open: `peter-evans/create-pull-request` attempts
+`pulls.create` first and reports `updated` only when that call is rejected
+because an open pull request already exists, so a PR the window holds open is
+never re-reported as `created`.
 
 This bump moves one of the two pins ci-workflows#291 touches. Its other half —
 the `standards-sync-stuck-automerge-alert.yml` never-armed detection — is
