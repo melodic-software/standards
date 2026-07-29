@@ -8,18 +8,25 @@ name: claude-review
 # Repo-local rather than the sync-managed `claude-review-caller` component
 # (melodic-software/standards, components/claude-lanes/claude-review.yml): this
 # repository is the manifest SOURCE, not a sync target. It tracks that component
-# except where a documented constraint forces a deviation — see the runner and
-# concurrency notes below.
+# except where a documented constraint forces a deviation — see the trigger,
+# concurrency, and runner notes below.
 #
 # Fork PRs receive no secrets and a read-only token, so they are simply not
 # reviewed by design (no token-exfiltration surface).
 
 on:
   pull_request:
-    # No `synchronize`: this lane reviews on open/ready/reopen only. Pushes do
-    # not re-trigger it — re-run the job for a fresh review (the security
-    # lane, whose check certifies execution, keeps `synchronize`). Cuts
-    # per-PR spend on active branches.
+    # No `synchronize`: this lane reviews on open/ready/reopen only, which
+    # cuts per-PR spend on active branches. The security lane, whose check
+    # certifies execution against the head, keeps `synchronize`.
+    #
+    # DEVIATION from the component, which tells the reader to "re-run the job
+    # for a fresh review". A re-run replays the ORIGINAL event payload, so the
+    # reusable's freshness guard — it compares the payload's
+    # `pull_request.head.sha` against the live head — retires the run as
+    # superseded and every review step skips. Re-running only helps when the
+    # head has not moved. To review a newer head, reopen the PR, or mark it
+    # draft and ready again: either emits a fresh event at the current head.
     types: [opened, ready_for_review, reopened]
 
 permissions:
