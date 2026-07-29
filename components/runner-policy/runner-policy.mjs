@@ -72,9 +72,12 @@ const EXACT_GITHUB_TOKEN_EXPRESSIONS = new Set([
   `\${{ github.token }}`,
 ]);
 
-// The one object-shape check the whole analyzer depends on: a YAML mapping
-// decodes to a non-null, non-array object, and every other decoded shape
-// (null, scalar, sequence) must fail closed at the same boundary.
+// The shared object-shape check behind every "must be a mapping" decision in
+// this analyzer. It admits any non-null, non-array object, which under the
+// core schema means a decoded YAML mapping — but an explicit `!!set`/`!!omap`/
+// `!!timestamp`/`!!binary` tag or a `%YAML 1.1` directive also decodes to an
+// object this admits. Tag-shape rejection is deliberately not performed here;
+// it belongs at the parse boundary, not at 48 individual gates.
 function isMapping(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -430,7 +433,7 @@ function stringsIn(value) {
   if (Array.isArray(value)) {
     return value.flatMap(stringsIn);
   }
-  if (value !== null && typeof value === "object") {
+  if (isMapping(value)) {
     return Object.values(value).flatMap(stringsIn);
   }
   return [];
@@ -479,11 +482,7 @@ function workflowCallDeclaration(workflow) {
   if (Array.isArray(workflow.on)) {
     return workflow.on.includes("workflow_call") ? {} : undefined;
   }
-  if (
-    workflow.on === null ||
-    typeof workflow.on !== "object" ||
-    !Object.hasOwn(workflow.on, "workflow_call")
-  ) {
+  if (!isMapping(workflow.on) || !Object.hasOwn(workflow.on, "workflow_call")) {
     return undefined;
   }
   const declaration = workflow.on.workflow_call;
@@ -1028,7 +1027,7 @@ function normalizeStructuralValue(value) {
   if (Array.isArray(value)) {
     return value.map(normalizeStructuralValue);
   }
-  if (value !== null && typeof value === "object") {
+  if (isMapping(value)) {
     return Object.fromEntries(
       Object.entries(value)
         .map(([key, nested]) => [key, normalizeStructuralValue(nested)])
@@ -1438,7 +1437,7 @@ function containsNeedsReference(value) {
   if (Array.isArray(value)) {
     return value.some(containsNeedsReference);
   }
-  if (value !== null && typeof value === "object") {
+  if (isMapping(value)) {
     return Object.values(value).some(containsNeedsReference);
   }
   return false;
