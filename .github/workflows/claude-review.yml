@@ -2,36 +2,76 @@ name: claude-review
 
 # Automated PR code review via the ci-workflows reusable workflow. The caller
 # owns the triggers + GITHUB_TOKEN permission grant (a called workflow can only
-# downgrade them, never elevate); the reusable workflow owns the action pin and
-# the secret-handling safety model.
+# downgrade them, never elevate); the reusable workflow owns the action pin, the
+# model, the cadence guards, the kill-switches, and the secret-handling model.
+#
+# Repo-local rather than the sync-managed `claude-review-caller` component
+# (melodic-software/standards, components/claude-lanes/claude-review.yml): this
+# repository is the manifest SOURCE, not a sync target. It tracks that component
+# except where a documented constraint forces a deviation — see the runner and
+# concurrency notes below.
 #
 # Fork PRs receive no secrets and a read-only token, so they are simply not
-# reviewed by design (no token-exfiltration surface). Requires `standards` to be
-# in the CLAUDE_CODE_OAUTH_TOKEN org secret's selected-repositories scope.
-# Public repo: runs on the reusable's hosted default runner.
+# reviewed by design (no token-exfiltration surface).
+
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    # No `synchronize`: this lane reviews on open/ready/reopen only. Pushes do
+    # not re-trigger it — re-run the job for a fresh review (the security
+    # lane, whose check certifies execution, keeps `synchronize`). Cuts
+    # per-PR spend on active branches.
+    types: [opened, ready_for_review, reopened]
 
 permissions:
   contents: read
 
-# No caller-level concurrency: the reusable workflow already supersedes
-# in-flight reviews per PR via job-level concurrency (`claude-review-<pr>`),
-# and a caller group with the same name would deadlock the called job.
+# Per-PR supersede group: a newer event for the same PR cancels the older run,
+# so a rapid open→ready→reopen burst spends one review, not several. Distinct
+# by construction from the reusable's inner job-level group, which appends the
+# head SHA (`claude-review-<PR>-<headSHA>`), so no caller/inner same-name
+# deadlock is possible.
+#
+# DEVIATION from the component, which writes the group as
+# `claude-review-${{ github.event.pull_request.number || github.run_id }}`:
+# this repository enforces its own `concurrency-policy` component against its
+# workflows (`.github/workflows/ci.yml`, `Enforce concurrency policy on
+# standards`), and that policy requires the `${{ github.workflow }}`-prefixed
+# canonical group. Because this workflow is named `claude-review`, the two
+# forms resolve to the identical runtime group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   review:
     permissions:
       contents: read         # checkout + read the diff
       pull-requests: write   # post review + track_progress tracking comment
-      id-token: write        # OIDC — mints the Claude GitHub App token
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
+      id-token: write        # OIDC — mints the Claude GitHub App token (required
+                             # even with an OAuth/API-key credential)
+    # Repo-wide review queue — a SEPARATE block from the workflow-level cancel
+    # group above, because `queue: max` cannot be combined with
+    # `cancel-in-progress: true`, the value that block sets
+    # (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency)
+    # — and because this group is job-scoped and repo-wide, not per-PR.
+    # Serializes reviews repo-wide so parallel PRs queue for the shared Claude
+    # seat instead of contending for it.
+    concurrency:
+      group: claude-review-${{ github.repository }}
+      queue: max
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@c136b27f404dd32ce3873f39a6f3443891d1c16e # v0.9.1
     with:
+      # DEVIATION from the component, which resolves the runner through the
+      # governed selector: this repository is PUBLIC, and runner-policy admits
+      # the selector only for an enrolled private consumer
+      # (`components/runner-policy/README.md`, "Public repositories and
+      # repositories not enrolled for local CI cannot call the selector"), so
+      # this caller pins the approved hosted label directly.
       runner: ubuntu-24.04
-      # Passing skip-actors replaces the reusable's default (dependabot[bot]),
-      # so the default member is restated alongside the sync bot.
-      skip-actors: "dependabot[bot],melodic-standards-sync[bot]"
+      # No `skip-actors`: the reusable's default carries the self-trigger ban
+      # (Claude and the org's automation bots must never trigger their own
+      # lanes). Passing the input would override that default and freeze this
+      # lane's ban list at whatever was current when it was written.
     # Pass only the one named secret (least privilege) rather than `secrets:
     # inherit`, which would forward every parent secret to the called workflow.
     secrets:
