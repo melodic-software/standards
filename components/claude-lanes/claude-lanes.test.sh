@@ -49,11 +49,25 @@ mapfile -t lane_files < <(
 assert_nonzero 'manifest carries at least one claude lane caller component' "${#lane_files[@]}"
 mapfile -t lane_components < <(printf '%s\n' "${lane_files[@]}" | cut -f1 | sort -u)
 
+declare -A is_lane_component=()
+for component in "${lane_components[@]}"; do is_lane_component["$component"]=1; done
+
+# Membership is an exact key lookup, not a substring match: a future component
+# named as an extension of an existing one (`claude-review-caller-v2`) would
+# match a substring test here and fail the exact test used per target below,
+# and that asymmetry would silently drop this target's destination assertions.
 # shellcheck disable=SC2016  # yq expression; $t is a yq variable, not shell
-mapfile -t lane_targets < <(
-  yq -r '.targets | to_entries[] | .key as $t | (.value.managed // [])[] | $t + "\t" + .' "$manifest" |
-    grep -F -f <(printf '\t%s\n' "${lane_components[@]}") | cut -f1 | sort -u
+mapfile -t target_pairs < <(
+  yq -r '.targets | to_entries[] | .key as $t | (.value.managed // [])[] | $t + "\t" + .' "$manifest"
 )
+declare -A seen_target=()
+lane_targets=()
+for pair in "${target_pairs[@]}"; do
+  IFS=$'\t' read -r target component <<<"$pair"
+  [[ -n "${is_lane_component[$component]-}" && -z "${seen_target[$target]-}" ]] || continue
+  seen_target["$target"]=1
+  lane_targets+=("$target")
+done
 assert_nonzero 'at least one target manages a lane caller' "${#lane_targets[@]}"
 
 # Every lane caller's bytes at the destination path they take in a consumer,
@@ -68,6 +82,7 @@ for entry in "${lane_files[@]}"; do
   mkdir -p "$standalone/${destination%/*}"
   cp "$source" "$standalone/$destination"
   cp "$config" "$standalone/$config"
+  assert_file_exists "$component materializes at $destination" "$standalone/$destination"
   out="$(cd "$standalone" && actionlint -no-color 2>&1)"
   rc=$?
   assert_exit "$component lints clean at $destination" 0 "$rc"
@@ -86,18 +101,23 @@ for target in "${lane_targets[@]}"; do
   bash distribution/sync-manifest.sh apply --target "$target" --target-root "$consumer" >/dev/null
   assert_exit "$target materializes" 0 "$?"
 
-  # Read the managed list once and assert it is non-empty before testing
-  # membership. Skipping on a failed membership test is correct — most targets
-  # manage only one caller — but a query that silently returned nothing would
-  # skip every destination assertion and still report green, so the empty case
-  # has to fail rather than fall through.
+  # Skipping a component this target does not manage is correct — most targets
+  # manage exactly one caller — but the skip must not be able to swallow every
+  # destination assertion silently. Counting what actually ran and asserting
+  # the count is what fails closed: a broken lookup, a renamed component, or a
+  # membership test that stops matching all surface as a FAIL here rather than
+  # as a suite that shrinks quietly and still exits 0.
   mapfile -t managed < <(yq -r ".targets.\"$target\".managed[]" "$manifest")
-  assert_nonzero "$target has a readable managed list" "${#managed[@]}"
+  declare -A manages=()
+  for component in "${managed[@]}"; do manages["$component"]=1; done
+  destinations=0
   for entry in "${lane_files[@]}"; do
     IFS=$'\t' read -r component _ destination <<<"$entry"
-    printf '%s\n' "${managed[@]}" | grep -qxF "$component" || continue
+    [[ -n "${manages[$component]-}" ]] || continue
+    destinations=$((destinations + 1))
     assert_file_exists "$target receives $destination" "$consumer/$destination"
   done
+  assert_nonzero "$target ran a destination assertion" "$destinations"
 
   [[ -f "$consumer/$config" ]] || cp "$config" "$consumer/$config"
   out="$(cd "$consumer" && actionlint -no-color 2>&1)"
