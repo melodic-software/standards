@@ -490,9 +490,17 @@ arms squash auto-merge on a newly **created** sync PR unless the manifest
 record opts out with `automerge: false` (ci-workflows#213). Inputs, secrets,
 job-level `permissions`, and routing are unchanged, so the reviewed
 `runner-input` shape carries over. The widened grant is on the minted
-installation token, not the caller's `GITHUB_TOKEN`, and it is what lets the
-sync materialize a target's `.github/workflows/` files; a mint whose
-installation lacks the permission fails loudly before any target is touched.
+installation token, not the caller's `GITHUB_TOKEN`; no manifest component maps
+under `.github/workflows/` today, so the grant is currently unexercised
+capability — it is what will let the sync materialize a target's workflow files
+once such a mapping lands. A mint whose installation lacks the permission fails
+loudly before any target is touched.
+
+Read the two together before adding that first workflow mapping: a token that
+may write `.github/workflows/` plus arm-at-creation auto-merge plus targets
+whose `base` ruleset requires zero approving reviews means one merge on a
+standards PR can write workflow content into every target and have it
+self-merge. `ci-workflows`, which hosts the engine, is itself a target.
 
 The policy records each complete path@SHA, fixed runner label, caller-input
 allowlist, and exact secret map; changing any field requires another review.
