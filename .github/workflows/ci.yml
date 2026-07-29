@@ -464,6 +464,26 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/actionlint@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
       - name: Test actionlint component
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
+      # The lane caller test materializes each target through the distribution
+      # engine before linting, so this job needs the engine's yq the same way
+      # the distribution and pin-comment-convention jobs do.
+      - name: Install yq 4.53.3
+        run: |
+          set -euo pipefail
+          version=4.53.3
+          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
+          curl -fsSL "$url" -o yq
+          echo "${sha}  yq" | sha256sum -c -
+          sudo install yq /usr/local/bin/yq
+          rm yq
+          yq --version
+      # The lint above covers .github/workflows only, so the lane caller
+      # components — workflow bytes that live outside it until a sync
+      # materializes them — need the consumer entrypoint run over them here,
+      # in the one job that has the pinned engine installed.
+      - name: Test claude lane caller components
+        run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
 
   zizmor:
     permissions:
@@ -471,10 +491,16 @@ jobs:
     # Actions security lint. High-severity findings block the lane; lower
     # severities annotate. Gating runs in-lane via the SARIF guard, so it
     # rides the existing ci-status gate — no code-scanning, no elevated grant.
+    #
+    # `.` audits this repo's own workflows only: zizmor discovers workflow
+    # definitions by their `.github/workflows` location, so the workflow BYTES
+    # under components/claude-lanes/ — which become consumers'
+    # .github/workflows/ files — are invisible to a repo-root scan. They are
+    # named explicitly so the lane audits what it ships.
     uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
     with:
       runner: ubuntu-24.04
-      paths: .
+      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml
       fail-on-severity: high
 
   osv-scanner:
@@ -771,7 +797,13 @@ jobs:
         # index has only .yml today, but a future .yaml workflow must not silently
         # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
         # already tolerates a glob with no current matches).
-        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml
+        #
+        # components/claude-lanes/ holds workflow BYTES that ship to consumers'
+        # .github/workflows/. Every workflow-shaped lane in this repo discovers
+        # files by that location, so the caller components are invisible to all
+        # of them; scanning them here keeps their pins under the same convention
+        # the files they become are held to.
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml
       - name: Pin-comment-convention contract test
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 

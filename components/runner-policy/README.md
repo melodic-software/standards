@@ -418,9 +418,29 @@ no-checkout `issue_comment`, `pull_request_review`,
 without it the selector routes those events to the hosted fallback. It carries
 no other routing-surface change and, like the other fleet-routing revisions, is
 owner-scoped to `melodic-software`.
-Eleven selector revisions remain approved for an ordered consumer rollout.
+The Claude lane revision at `c136b27f404dd32ce3873f39a6f3443891d1c16e`
+(v0.9.1) carries the selector byte-identical to `e77f0126`; it is approved so
+the review and security lane callers pinning that revision keep a reviewed
+selector reference. Like the other fleet-routing revisions it is owner-scoped
+to `melodic-software`. Its two lane contracts are additive against each
+workflow's newest previously approved SHA: `claude-review` (`e2951077`) gains
+the `max-reviews-per-pr` and `retry-delay-seconds` inputs, and
+`claude-security-review` (`66073e58`) gains `paths-file`,
+`exclude-comments-by-actor`, and `retry-delay-seconds`. Neither removes an
+input, changes its secret key set, or changes its routing surface
+(`runs-on: ${{ inputs.runner }}` in both). One privilege delta is inside the
+security reusable rather than on its contract: its `changes` relevance job
+gains `contents: read` alongside `pull-requests: read`, to read the repo-owned
+paths file. That is inbound-safe — `contents: read` is the caller's own
+top-level grant and a called workflow can only downgrade it — and
+`allowedCallerPermissions` is unchanged. Each `allowedInputs` set stays
+narrower than the declared surface: the review caller may pass only `runner`
+(of 12 declared), the security caller only `runner` and `paths-file` (of 8),
+and neither may pass the review reusable's optional
+`STANDARDS_REVIEW_APP_ID` / `STANDARDS_REVIEW_APP_PRIVATE_KEY` secrets.
+Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these eight strict-scheduling
+owned by a different repository owner, so these nine strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.

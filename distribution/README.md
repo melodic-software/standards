@@ -62,7 +62,9 @@ split first.
 Native adoption remains authoritative where it naturally lives:
 
 - package and `extends` references in consumer manifests;
-- actions and reusable workflows in consumer workflow files;
+- actions and reusable workflows in consumer workflow files — with the
+  Claude review-lane callers as the recorded exception (see
+  [Claude review-lane caller components](#claude-review-lane-caller-components));
 - repository governance in the relevant `github-iac` repository;
 - repository reachability and App access in live GitHub state.
 
@@ -113,8 +115,11 @@ deletes files.
 2. Add only exact materializations to this manifest. Record a deliberate
    exception as `locally-owned` only when it clarifies an otherwise relevant
    component.
-3. Add native packages, local adapters, workflow callers, permissions, and the
-   CI gateway in the consumer repository where those executable facts belong.
+3. Add native packages, local adapters, workflow callers (other than the
+   sync-managed
+   [Claude review-lane callers](#claude-review-lane-caller-components)),
+   permissions, and the CI gateway in the consumer repository where those
+   executable facts belong.
 4. Review the generated materialization PR and verify CI.
 5. Enable required CI in `github-iac` only after the gateway exists and passes.
 
@@ -196,8 +201,11 @@ a general workload runner or fallback.
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
-each consumer. A materialization PR is not an adoption completion signal until
-its corresponding integration PR supplies this wiring and CI passes.
+each consumer — the
+[Claude review-lane callers](#claude-review-lane-caller-components) are the
+one recorded exception to that workflow-shape rule. A materialization PR is
+not an adoption completion signal until its corresponding integration PR
+supplies this wiring and CI passes.
 
 ## Go-analysis consumer handoff
 
@@ -222,6 +230,74 @@ workspace never enters its shell command. The wrapper rejects missing,
 malformed, unknown-version, unknown-key, out-of-repository, and unsupported
 workspace configurations before spawning `dotnet`. Implicit MSBuild workspace
 discovery is not an accepted default.
+
+## Claude review-lane caller components
+
+`claude-review-caller` and `claude-security-review-caller` materialize the
+thin workflow callers for the `ci-workflows` reusable Claude review lanes at
+`.github/workflows/claude-review.yml` and
+`.github/workflows/claude-security-review.yml`. They are the recorded
+exception to the rule that workflow callers stay consumer-owned: hand-written
+lane callers empirically drifted — a missing `reopened` trigger in medley,
+divergent `skip-actors` lists, and reusable-pin skew (v0.6.1 ↔ e295107) —
+which is exactly the fleet-normalization problem managed materialization
+exists to solve. The reusable workflows themselves remain native references
+in `ci-workflows`; only the caller files are managed bytes.
+
+What stays consumer-owned:
+
+- `.github/claude-security-paths` — the security lane's pattern file naming
+  the repo's security-sensitive surfaces, read by the reusable from the PR's
+  base branch. It is repo-specific tuning, so it is deliberately not a
+  managed file; an absent file fails open (every PR is security-reviewed).
+  The manifest has no seed-once mechanism, so a new adopter commits its
+  starter list in a repo-local PR alongside (or before) its caller
+  materialization PR.
+- The `CLAUDE_CODE_OAUTH_TOKEN` secret and the optional `CI_RUNNER_*`
+  selector variables and observer key, per the runner-policy consumer
+  handoff above.
+
+The two callers deliberately carry different concurrency values (per-PR
+cancel plus a repo-wide queue on the code-review caller; cancel disabled and
+no queue on the security caller, whose check may be a required
+execution-evidence context). The component sources record the rationale
+inline — do not normalize the two.
+
+Both components resolve the runner through the governed `select-runner`
+indirection, and `runner-policy` admits that selector only for a private
+self-hosted consumer — the ban consults neither `exceptions` nor
+`localRoutingGrants`, so a PUBLIC target has no configuration escape and would
+fail its own `runner-policy` lane (and with it `ci-status`) the moment the
+caller synced in. These components are therefore private-only, which resolves
+differently for each lane:
+
+- `claude-review-caller` is `managed` for the four private targets that run
+  the code-review lane (dotfiles, github-iac, medley, provisioning).
+- `claude-security-review-caller` is **parked: it has no managed target.** Both
+  repos running a security lane today — `claude-code-plugins` and
+  `ci-workflows` — are public, so there is no eligible consumer for the
+  selector-routed shape. The component is retained rather than deleted because
+  its bytes are the reviewed shape for the one lane whose check can be a
+  required context. It unparks when either a private repo adopts the security
+  lane or the removal trigger below fires.
+
+`melodic-software/claude-code-plugins`, the org's one public caller target and
+the only repo whose ruleset requires `security-review / security-review`, is
+`locally-owned` for both components and keeps its hand-written hosted-only
+callers that pass `runner: ubuntu-24.04` directly. Consequence to accept
+knowingly: that repo stays outside this normalization and re-pins by hand at
+each `ci-workflows` release.
+
+Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
+constraint: a selector-routed caller component may not be `managed` for a
+public target, every caller component must audit clean for a private
+self-hosted consumer, and a selector-routed caller is expected to be rejected
+outright on a public one.
+
+Removal trigger: a caller shape that resolves the runner without a caller-side
+selector reference — the indirection moving inside the `ci-workflows` reusable
+— lets one managed component serve both visibilities again, unparks the
+security caller, and re-absorbs `claude-code-plugins`.
 
 ## Review-instructions reconciliation (medley)
 

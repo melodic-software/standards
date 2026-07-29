@@ -1,0 +1,105 @@
+name: claude-review
+
+# SYNC-MANAGED FILE — DO NOT EDIT IN THE CONSUMING REPOSITORY.
+# Source of truth: melodic-software/standards,
+# components/claude-lanes/claude-review.yml (the `claude-review-caller`
+# component in distribution/sync-manifest.yml). Downstream edits are
+# overwritten by the next sync PR; change the component upstream, or move the
+# component to `locally-owned` in the manifest to customize.
+#
+# Thin caller for the org's reusable code-review lane. The reusable workflow
+# owns the action pin, model, cadence guards, retry, kill-switches, and the
+# secret-handling model; per its CONSUMER CONTRACT header, this caller owns
+# the triggers and the GITHUB_TOKEN permission grant (a called workflow can
+# only downgrade the caller's grant, never elevate it).
+#
+# Fork PRs receive no secrets and a read-only token, so they are simply not
+# reviewed by design (no token-exfiltration surface).
+
+on:
+  pull_request:
+    # No `synchronize`: this lane reviews on open/ready/reopen only. Pushes do
+    # not re-trigger it — re-run the job for a fresh review (the security
+    # lane, whose check certifies execution, keeps `synchronize`). Cuts
+    # per-PR spend on active branches.
+    types: [opened, ready_for_review, reopened]
+
+permissions:
+  contents: read
+
+# Per-PR supersede group: a newer event for the same PR cancels the older run,
+# so a rapid open→ready→reopen burst spends one review, not several. Distinct
+# by construction from the reusable's inner job-level group (which appends the
+# head SHA: claude-review-<PR>-<headSHA>), so a caller/inner same-name
+# concurrency deadlock — real under a pre-v0.9.0 reusable whose inner group
+# was claude-review-<PR> exactly — cannot recur. A skipped actor's same-PR
+# event can cancel an in-flight review through this group; that is accepted
+# as bounded: with no `synchronize` trigger, same-PR events are rare and
+# human-driven. This value is per-LANE and deliberate — the security caller
+# must NOT copy it (cancelling a REQUIRED check is not a skip and does not
+# read success).
+#
+# KNOWN CONFLICT with the standards `concurrency-policy` component, which
+# requires a `${{ github.workflow }}`-prefixed group name. The lane-scoped
+# name is what keeps this caller group distinct from the reusable's inner
+# per-(PR,head) group. No target repo runs `concurrency-policy` today, so
+# nothing fails now; a repo adopting BOTH must exempt this caller rather than
+# normalize it.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # Resolves the review tier's runner label through the governed selector. On
+  # public repos, and on repos without the CI_RUNNER_* configuration, the
+  # selector routes to the approved hosted runner, so this one shape serves
+  # every consumer. A selector failure skips the review (see the `if` on the
+  # review job) with no marker comment today — caller-side `class=runner`
+  # failure surfacing is planned and exercised by the incident-aggregator
+  # acceptance test (melodic-software/ci-workflows#238).
+  select-review:
+    name: Select runner
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@c136b27f404dd32ce3873f39a6f3443891d1c16e # v0.9.1
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
+  review:
+    needs: select-review
+    # !cancelled() overrides GitHub's skip propagation, so selector success
+    # must be required explicitly: a hard-failed selector emits no runner
+    # output and the hosted fallback below would otherwise run this
+    # privileged job.
+    if: ${{ !cancelled() && needs.select-review.result == 'success' }}
+    permissions:
+      contents: read         # checkout + read the diff
+      pull-requests: write   # post review + track_progress tracking comment
+      id-token: write        # OIDC — mints the Claude GitHub App token (required
+                             # even with an OAuth/API-key credential)
+    # Repo-wide review queue — a SEPARATE block from the workflow-level
+    # cancel group above, because `queue:` cannot share a concurrency block
+    # with cancel-in-progress. Serializes reviews repo-wide so parallel PRs
+    # queue for the shared Claude seat instead of contending for it.
+    concurrency:
+      group: claude-review-${{ github.repository }}
+      queue: max
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@c136b27f404dd32ce3873f39a6f3443891d1c16e # v0.9.1
+    with:
+      # Hosted fallback per the runner-policy recovery contract (never a
+      # self-hosted label, never vars.CI_HOSTED_RUNNER): if the selector
+      # succeeds but emits an empty runner (ci-workflows#278), a self-hosted
+      # fallback on a public repo would queue forever, while the approved
+      # hosted label is safe everywhere.
+      runner: ${{ needs.select-review.outputs.runner || 'ubuntu-24.04' }}
+    # Pass only the one named secret (least privilege) rather than
+    # `secrets: inherit`, which would forward every parent secret to the
+    # called workflow.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

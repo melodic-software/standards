@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { parse } from "yaml";
+
 import {
   auditRepository,
   ConfigurationError,
@@ -26,6 +28,7 @@ const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
 const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
 const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
 const ANCILLARY_OPT_IN_SELECTOR_SHA = "e77f0126b474144708719f99795e44d0ffe2541d";
+const PATHS_FILE_LANE_SHA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -2932,6 +2935,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
       `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
       `${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`,
+      `${SELECTOR_PATH}@${PATHS_FILE_LANE_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -2955,6 +2959,7 @@ test("production selector allowlist contains only independently reviewed commits
     MERGE_GROUP_ROUTING_SHA,
     GH_FREE_GATE_SHA,
     ANCILLARY_OPT_IN_SELECTOR_SHA,
+    PATHS_FILE_LANE_SHA,
   ]) {
     const root = await repository({
       repositoryOwner: "melodic-software",
@@ -7935,4 +7940,142 @@ test("anchored uses scalars retain provenance enforcement", async () => {
     (await audit(mismatched)).filter(({ rule }) => rule === "pin-provenance-drift").length,
     1,
   );
+});
+
+// Repository visibility, keyed by sync-manifest target name. `routingEnabled`
+// admits the governed selector only for private self-hosted consumers, and
+// that ban consults neither `exceptions` nor `localRoutingGrants` — so a
+// PUBLIC target has no configuration escape.
+//
+// Checked in rather than read from the GitHub API: these tests must run
+// offline and hermetically like the rest of this suite. The cost is that a
+// visibility flip lands here by hand, so the lookup FAILS CLOSED — a target
+// absent from this map is treated as public and rejected, rather than
+// silently assumed private. Add a repository here when it becomes a sync
+// target; a wrong entry surfaces as a failing test, a missing one as a
+// failing test naming the gap.
+const TARGET_VISIBILITY = new Map([
+  ["melodic-software/.github", "public"],
+  ["melodic-software/ci-runner", "public"],
+  ["melodic-software/ci-workflows", "public"],
+  ["melodic-software/claude-code-plugins", "public"],
+  ["melodic-software/standards", "public"],
+  ["melodic-software/dotfiles", "private"],
+  ["melodic-software/github-iac", "private"],
+  ["melodic-software/knowledge-corpus", "private"],
+  ["melodic-software/medley", "private"],
+  ["melodic-software/provisioning", "private"],
+  ["melodic-software/songwriting", "private"],
+]);
+
+function isPublicTarget(target) {
+  const visibility = TARGET_VISIBILITY.get(target);
+  assert.ok(
+    visibility,
+    `${target} is a sync target with no recorded visibility; add it to TARGET_VISIBILITY (public until proven private)`,
+  );
+  return visibility === "public";
+}
+
+async function claudeLaneCallerComponents() {
+  const manifest = parse(
+    await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
+  );
+  const components = [];
+  for (const [component, definition] of Object.entries(manifest.components)) {
+    for (const source of Object.keys(definition.files ?? {})) {
+      if (!source.startsWith("components/claude-lanes/")) continue;
+      const body = await readFile(new URL(`../../${source}`, import.meta.url), "utf8");
+      components.push({ component, source, body, manifest });
+    }
+  }
+  assert.ok(components.length > 0, "expected the manifest to carry claude lane caller components");
+  return components;
+}
+
+// A consumer root carrying one caller component, audited against the REAL
+// policy.json rather than the fixture policy `repository()` substitutes —
+// these assertions are about the shipped allowlist, not a synthetic one.
+async function consumerCarrying({ body, visibility, selfHostedCi }) {
+  const root = await mkdtemp(path.join(tmpdir(), "claude-lane-caller-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "runner-policy.json"),
+    `${JSON.stringify({ schemaVersion: 1, repositoryOwner: "melodic-software", visibility, selfHostedCi, exceptions: {} }, null, 2)}\n`,
+  );
+  await writeFile(path.join(root, ".github", "workflows", "caller.yml"), body);
+  return root;
+}
+
+// The parked security caller is otherwise doc-only: nothing fails if a later
+// change quietly gives it a managed target. Any target it gains must be one
+// runner-policy actually admits, so this asserts the property (every managed
+// target audits clean) rather than the current count — unparking legitimately,
+// by adding a PRIVATE consumer, passes; adding a public one does not.
+test("every managed target of a claude lane caller admits that caller", async () => {
+  for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
+    for (const [target, definition] of Object.entries(manifest.targets)) {
+      if (!(definition.managed ?? []).includes(component)) continue;
+      assert.ok(
+        !isPublicTarget(target),
+        `${source} is managed for ${target}, which is public — runner-policy rejects a selector-routed caller there`,
+      );
+      const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+      assert.deepEqual(
+        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        [],
+        `${source} is managed for ${target} but does not audit clean there`,
+      );
+    }
+  }
+});
+
+test("selector-routed claude lane callers are not managed for a public sync target", async () => {
+  for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
+    if (!body.includes("/select-runner.yml@")) continue;
+    for (const target of Object.keys(manifest.targets)) {
+      if (!isPublicTarget(target)) continue;
+      assert.ok(
+        !(manifest.targets[target]?.managed ?? []).includes(component),
+        `${source} routes through the governed selector, which a public repository may not reference; ` +
+          `component '${component}' must not be managed for ${target}`,
+      );
+    }
+  }
+});
+
+test("claude lane caller components pass runner policy for a private self-hosted consumer", async () => {
+  for (const { source, body } of await claudeLaneCallerComponents()) {
+    const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+    assert.deepEqual(
+      await auditRepository({
+        root,
+        githubRepository: "melodic-software/medley",
+        fetchImpl: HERMETIC_FETCH_STUB,
+      }),
+      [],
+      `${source} must audit clean for the private self-hosted consumers it is managed for`,
+    );
+  }
+});
+
+test("a selector-routed claude lane caller is rejected outright on a public consumer", async () => {
+  for (const { source, body } of await claudeLaneCallerComponents()) {
+    if (!body.includes("/select-runner.yml@")) continue;
+    const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
+    const rules = new Set(
+      (
+        await auditRepository({
+          root,
+          githubRepository: "melodic-software/claude-code-plugins",
+          fetchImpl: HERMETIC_FETCH_STUB,
+        })
+      ).map(({ rule }) => rule),
+    );
+    assert.ok(
+      rules.has("public-self-hosted-routing"),
+      `${source} is expected to be private-only; if it became public-safe, revisit TARGET_VISIBILITY handling deliberately`,
+    );
+  }
 });

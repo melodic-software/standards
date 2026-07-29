@@ -1,0 +1,115 @@
+name: claude-security-review
+
+# SYNC-MANAGED FILE — DO NOT EDIT IN THE CONSUMING REPOSITORY.
+# Source of truth: melodic-software/standards,
+# components/claude-lanes/claude-security-review.yml (the
+# `claude-security-review-caller` component in distribution/sync-manifest.yml).
+# Downstream edits are overwritten by the next sync PR; change the component
+# upstream, or move the component to `locally-owned` in the manifest to
+# customize.
+#
+# Thin caller for the org's reusable security-review lane (advisory verdict,
+# fail-closed execution check — a consumer's ruleset may REQUIRE the
+# `security-review / security-review` check as execution evidence). The
+# reusable workflow owns the action pin, model, relevance gate, retry,
+# kill-switches, and the secret-handling model; per its CONSUMER CONTRACT
+# header, this caller owns the triggers and the GITHUB_TOKEN permission
+# grant.
+#
+# PATHS-FILE CONVENTION: the consuming repo owns `.github/claude-security-paths`
+# — GitHub Actions `paths:` patterns, one per line (`#` comments and blank
+# lines ignored), naming that repo's security-sensitive surfaces. The
+# reusable reads it from the PR's BASE branch, never the head. An ABSENT file
+# FAILS OPEN: every PR is security-reviewed until the repo commits one. The
+# file is repo-owned tuning and is deliberately NOT sync-managed.
+#
+# NEVER add workflow-level `paths:`/`paths-ignore:` to this caller: a
+# required check whose workflow never triggers stays Pending forever and
+# wedges every out-of-scope PR. The reusable's `changes` job owns relevance
+# and reports a name-stable SKIPPED check instead, which a ruleset reads as
+# success.
+#
+# Fork PRs receive no secrets and a read-only token, so they are simply not
+# reviewed by design; a required check does NOT prove a fork PR was reviewed
+# (see the reusable's header).
+
+on:
+  pull_request:
+    # Keeps `synchronize`, unlike the code-review caller: a required
+    # execution-evidence check must report on the latest head. NO
+    # `merge_group:` — the pinned action cannot serve that event; see
+    # melodic-software/ci-workflows#272 before enabling a merge queue.
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+
+# cancel-in-progress: false is DELIBERATE, not an omission: a cancelled run
+# of a REQUIRED check is not a skip and does not read success, so cancelling
+# an in-flight review can wedge the merge behind a void check. And NO
+# job-level queue group: a full queue CANCELS new arrivals, which is the same
+# wedge; a queue is added only if overflow smoke-testing proves otherwise.
+# These are per-LANE values, deliberately different from the code-review
+# caller's (which cancels superseded runs and queues repo-wide) — do not
+# normalize the two.
+#
+# KNOWN CONFLICT with the standards `concurrency-policy` component, which
+# requires a `${{ github.workflow }}`-prefixed group and a literal
+# `cancel-in-progress: true`. Both of this lane's values are deliberate and
+# load-bearing (above), and the lane-scoped group name is what keeps the
+# caller's group distinct from the reusable's inner per-(PR,head) group. No
+# target repo runs `concurrency-policy` today, so nothing fails now; a repo
+# adopting BOTH must exempt these two lane callers rather than normalize them.
+concurrency:
+  group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # Resolves the review tier's runner label through the governed selector. On
+  # public repos, and on repos without the CI_RUNNER_* configuration, the
+  # selector routes to the approved hosted runner, so this one shape serves
+  # every consumer. A selector failure skips the review jobs below — a
+  # name-stable skip a ruleset reads as success — with no marker comment
+  # today; caller-side `class=runner` failure surfacing is planned and
+  # exercised by the incident-aggregator acceptance test
+  # (melodic-software/ci-workflows#238).
+  select-security:
+    name: Select runner
+    permissions: {}
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@c136b27f404dd32ce3873f39a6f3443891d1c16e # v0.9.1
+    secrets:
+      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
+    with:
+      policy: ${{ vars.CI_RUNNER_POLICY }}
+      self-hosted-label: ${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}
+      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
+      scope: ${{ vars.CI_RUNNER_SCOPE }}
+      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
+      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
+
+  security-review:
+    needs: select-security
+    # !cancelled() overrides GitHub's skip propagation, so selector success
+    # must be required explicitly: a hard-failed selector emits no runner
+    # output and the hosted fallback below would otherwise run this
+    # privileged job.
+    if: ${{ !cancelled() && needs.select-security.result == 'success' }}
+    permissions:
+      contents: read         # checkout + read the diff
+      pull-requests: write   # post the security review + tracking comment
+      id-token: write        # OIDC — mints the Claude GitHub App token (required
+                             # even with an OAuth/API-key credential)
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@c136b27f404dd32ce3873f39a6f3443891d1c16e # v0.9.1
+    with:
+      # Hosted fallback per the runner-policy recovery contract (never a
+      # self-hosted label, never vars.CI_HOSTED_RUNNER): if the selector
+      # succeeds but emits an empty runner (ci-workflows#278), a self-hosted
+      # fallback on a public repo would queue forever, while the approved
+      # hosted label is safe everywhere.
+      runner: ${{ needs.select-security.outputs.runner || 'ubuntu-24.04' }}
+      paths-file: .github/claude-security-paths
+    # Pass only the one named secret (least privilege) rather than
+    # `secrets: inherit`, which would forward every parent secret to the
+    # called workflow.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
