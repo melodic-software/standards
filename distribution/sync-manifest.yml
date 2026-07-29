@@ -162,6 +162,8 @@ components:
     files:
       _typos.toml: _typos.toml
 
+# Fleet automerge is disarmed for the Phase 3d rollout window so every sync PR
+# takes a human merge; restored to the opt-out default when the rollout closes.
 targets:
   melodic-software/.github:
     managed:
@@ -171,6 +173,7 @@ targets:
       - markdownlint
       - repository-text
       - typos
+    automerge: false
   melodic-software/ci-runner:
     managed:
       - editorconfig-checker
@@ -183,6 +186,7 @@ targets:
       - typos
     locally-owned:
       - actionlint
+    automerge: false
   melodic-software/ci-workflows:
     managed:
       - comment-hygiene-action
@@ -200,6 +204,7 @@ targets:
     # the removal trigger fires there too.
     locally-owned:
       - actionlint
+    automerge: false
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
@@ -215,6 +220,7 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+    automerge: false
   melodic-software/dotfiles:
     managed:
       - actionlint
@@ -239,6 +245,7 @@ targets:
       - typos
     locally-owned:
       - shellcheck
+    automerge: false
   melodic-software/github-iac:
     managed:
       - agent-orientation
@@ -256,6 +263,7 @@ targets:
       - typos
     locally-owned:
       - actionlint
+    automerge: false
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -267,6 +275,7 @@ targets:
       - agent-orientation
       - gitleaks
       - review-instructions
+    automerge: false
   melodic-software/provisioning:
     managed:
       - actionlint
@@ -285,3 +294,4 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+    automerge: false
