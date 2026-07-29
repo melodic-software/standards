@@ -86,9 +86,16 @@ for target in "${lane_targets[@]}"; do
   bash distribution/sync-manifest.sh apply --target "$target" --target-root "$consumer" >/dev/null
   assert_exit "$target materializes" 0 "$?"
 
+  # Read the managed list once and assert it is non-empty before testing
+  # membership. Skipping on a failed membership test is correct — most targets
+  # manage only one caller — but a query that silently returned nothing would
+  # skip every destination assertion and still report green, so the empty case
+  # has to fail rather than fall through.
+  mapfile -t managed < <(yq -r ".targets.\"$target\".managed[]" "$manifest")
+  assert_nonzero "$target has a readable managed list" "${#managed[@]}"
   for entry in "${lane_files[@]}"; do
     IFS=$'\t' read -r component _ destination <<<"$entry"
-    yq -r ".targets.\"$target\".managed[]" "$manifest" | grep -qxF "$component" || continue
+    printf '%s\n' "${managed[@]}" | grep -qxF "$component" || continue
     assert_file_exists "$target receives $destination" "$consumer/$destination"
   done
 
