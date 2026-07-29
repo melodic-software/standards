@@ -517,13 +517,14 @@ once such a mapping lands. A mint whose installation lacks the permission fails
 loudly before any target is touched.
 
 The standards-sync contract was bumped to
-`8202e03f30dd0c0189c862052d5f242b9a496798`. Its entire diff against the reviewed
-`ac223bbe` contract is the arming step (ci-workflows#291): the gate moves from
+`8202e03f30dd0c0189c862052d5f242b9a496798`. Its diff against the reviewed
+`ac223bbe` contract is two hunks — the arming step, and the file header comment
+that describes it (ci-workflows#291): the gate moves from
 `steps.cpr.outputs.pull-request-operation == 'created'` to
 `steps.cpr.outputs.pull-request-number != ''`, and the step reads the pull
 request through one GraphQL query — replacing a REST `pulls.get` — that returns
-early when an auto-merge, auto-squash, or auto-rebase enabled event already
-exists. Inputs, secrets, job-level `permissions`, and routing are unchanged, so
+early when the PR is currently armed, or when an auto-merge, auto-squash, or
+auto-rebase enabled event already records that arming once took. Inputs, secrets, job-level `permissions`, and routing are unchanged, so
 the reviewed `runner-input` shape carries over. What the bump changes is reach,
 not authority: the same mutation under the same token now applies to every sync
 PR the manifest marks `automerge: true` and that was never armed, rather than
