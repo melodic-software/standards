@@ -14,3 +14,8 @@ override. CI remains the authoritative gate.
 The fragment is check-only: hooks do not rewrite and restage work. The
 repository pins Lefthook in `package.json` and validates the composed local
 adapter in CI.
+
+`lefthook-base.test.sh` builds a temporary consumer, composes the managed
+fragment, and proves the Markdownlint lane resolves the consumer's own
+`node_modules/.bin` binary rather than an arbitrary one on `PATH`, and that a
+missing local install fails loudly with its remediation.
