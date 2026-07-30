@@ -203,11 +203,17 @@ jobs:
           # detection half still runs and still reports every day.
           echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY for a GitHub App installed on this repository with contents:write and pull-requests:write, then re-run. Until then, re-pin by hand."
 
-      # TODO(#274): the standards-sync App (client id STANDARDS_SYNC_APP_CLIENT_ID)
-      # already holds exactly these permissions but its selected-repositories
-      # list excludes this repository, which is what #274 tracks. Once that
-      # grant lands, either point these two secrets at that App's credentials
-      # or collapse them onto STANDARDS_SYNC_APP_* and delete this note.
+      # These secrets are unprovisioned; the job degrades to a warning until
+      # they exist (see the step above). They deliberately do NOT reuse
+      # STANDARDS_SYNC_APP_*, whose App holds the right permissions but is
+      # scoped to a selected set that github-iac requires to equal the
+      # sync-manifest target set exactly — and this repository is the sync
+      # SOURCE, never a target. Adding it there would fail the sync engine's
+      # own exact-set attestation closed and hand a fleet-privileged identity
+      # write access to the repository it distributes from. The resolution is
+      # a separate minimal App scoped to this repository alone, which is an
+      # org-owner action. melodic-software/standards#274 is the adjacent
+      # symptom, not this job's blocker; it needs no grant change either.
       - name: Mint the re-pin App token
         id: app-token
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
