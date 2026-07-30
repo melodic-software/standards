@@ -40,10 +40,11 @@ components:
   #
   # ACCEPTED LOSS, all targets: the code-review caller drops `synchronize`,
   # which every target's hand-written caller carries today. That is the plan's
-  # deliberate cadence cut (review on open/ready/reopen; re-run the job for a
-  # fresh review) — not drift — and it is the single largest behavior change
-  # this component makes. The security lane KEEPS `synchronize`: its check
-  # certifies execution against the latest head.
+  # deliberate cadence cut (review on open/ready/reopen) — not drift — and it
+  # is the single largest behavior change this component makes. Reviewing a
+  # newer head takes a fresh event, not a re-run; the component file states
+  # why. The security lane KEEPS `synchronize`: its check certifies execution
+  # against the latest head.
   #
   # Each component targets the repos that run that lane TODAY. Deliberate
   # exclusions:

@@ -20,13 +20,13 @@ on:
     # cuts per-PR spend on active branches. The security lane, whose check
     # certifies execution against the head, keeps `synchronize`.
     #
-    # DEVIATION from the component, which tells the reader to "re-run the job
-    # for a fresh review". A re-run replays the ORIGINAL event payload, so the
-    # reusable's freshness guard — it compares the payload's
-    # `pull_request.head.sha` against the live head — retires the run as
-    # superseded and every review step skips. Re-running only helps when the
-    # head has not moved. To review a newer head, reopen the PR, or mark it
-    # draft and ready again: either emits a fresh event at the current head.
+    # Re-running the job does NOT get a fresh review after a push: a re-run
+    # replays the ORIGINAL event payload, so the reusable's freshness guard —
+    # it compares the payload's `pull_request.head.sha` against the live
+    # head — retires the run as superseded and every review step skips.
+    # Re-running only helps when the head has not moved. To review a newer
+    # head, reopen the PR, or mark it draft and ready again: either emits a
+    # fresh event at the current head.
     types: [opened, ready_for_review, reopened]
 
 permissions:
@@ -38,13 +38,10 @@ permissions:
 # head SHA (`claude-review-<PR>-<headSHA>`), so no caller/inner same-name
 # deadlock is possible.
 #
-# DEVIATION from the component, which writes the group as
-# `claude-review-${{ github.event.pull_request.number || github.run_id }}`:
-# this repository enforces its own `concurrency-policy` component against its
-# workflows (`.github/workflows/ci.yml`, `Enforce concurrency policy on
-# standards`), and that policy requires the `${{ github.workflow }}`-prefixed
-# canonical group. Because this workflow is named `claude-review`, the two
-# forms resolve to the identical runtime group.
+# The `${{ github.workflow }}`-prefixed canonical group is what this
+# repository's own `concurrency-policy` component requires
+# (`.github/workflows/ci.yml`, `Enforce concurrency policy on standards`),
+# and it is the form the component ships.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
