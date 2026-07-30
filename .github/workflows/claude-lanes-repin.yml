@@ -1,0 +1,196 @@
+name: claude-lanes-repin
+
+# Fleet action-currency for the Claude review lanes. Every consumer's
+# Dependabot config `ignore`s `melodic-software/ci-workflows/*`, so a new
+# ci-workflows release reaches the fleet only along
+# release tag -> caller-component re-pin -> standards-sync cascade. This job
+# automates the middle hop; `sync.yml` already carries it the rest of the way.
+# Approved 2026-07-26 in melodic-software/ci-workflows
+# `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12 — "3g").
+#
+# It only ever proposes: the pull request it opens is reviewed and merged by a
+# human like any other, and nothing here arms auto-merge.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute daily poll, deliberately clear of `sync.yml`'s weekly
+    # `17 6 * * 1` reconciliation and the stuck-automerge watchdog's hourly
+    # `17 * * * *`. GitHub queues every scheduled workflow on the platform
+    # against one dispatcher, so the top of the hour and each quarter-hour are
+    # the most contended and most delayed slots; :41 is neither.
+    - cron: "41 14 * * *"
+
+permissions:
+  contents: read
+
+# A queued run must never race the branch push of the run ahead of it. A re-pin
+# already in flight is worth finishing rather than superseding, so the second
+# run waits instead of cancelling the first.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  repin:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # A boolean, never the credential. `secrets` is unavailable to a
+      # step-level `if`, and binding the secret itself into job-level `env`
+      # would hand it to every step in the job through the runner's process
+      # environment. The secrets reach exactly one step, through its `with`.
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID != ''
+            && secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY != '' }}
+    steps:
+      # PRIVILEGE PIN. On workflow_dispatch the operator chooses the ref, and
+      # both the code that runs below and the base of the pull request opened
+      # at the end would otherwise follow it: a dispatch from a feature branch
+      # would execute that branch's re-pin script under the App token and
+      # retarget the fixed `chore/repin-claude-lanes` pull request away from
+      # the default branch, leaving the fleet re-pin absent from main while
+      # later scheduled runs collided with the same head branch. Resolving the
+      # default branch BEFORE checkout, then checking that out, makes both the
+      # executed code and the pull-request base independent of the dispatch
+      # ref. Scheduled runs already run on the default branch by definition;
+      # this closes the manual path to the same guarantee.
+      #
+      # Resolved through the API rather than `github.event.repository`: the
+      # schedule event's payload is documented as "Not applicable", so that
+      # context is not dependable on this job's primary trigger.
+      - name: Resolve the default branch
+        id: default-branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          name="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if [[ -z "$name" ]]; then
+            echo "::error::Could not resolve the default branch of ${GITHUB_REPOSITORY}." >&2
+            exit 1
+          fi
+          echo "Default branch: ${name}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.default-branch.outputs.name }}
+          persist-credentials: false
+
+      # Both steps below delegate to components/claude-lanes/repin-callers.sh,
+      # whose branching, API-failure handling, and file rewriting are covered
+      # by components/claude-lanes/repin-callers.test.sh in the `actionlint`
+      # CI lane. Keeping the logic in a script is what makes it testable
+      # outside a scheduled run.
+      - name: Resolve the newest ci-workflows release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash components/claude-lanes/repin-callers.sh resolve melodic-software/ci-workflows
+
+      - name: Re-pin the lane caller components
+        id: repin
+        if: steps.release.outputs.resolved == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA"
+
+      - name: Report the missing re-pin credential
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Deliberately a warning, not a failure. A scheduled job that fails
+          # for want of a credential is a permanently red cron nobody reads —
+          # the exact failure mode of melodic-software/standards#274. The
+          # detection half still runs and still reports every day.
+          echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY for a GitHub App installed on this repository with contents:write and pull-requests:write, then re-run. Until then, re-pin by hand."
+
+      # These secrets are unprovisioned; the job degrades to a warning until
+      # they exist (see the step above). They deliberately do NOT reuse
+      # STANDARDS_SYNC_APP_*, whose App holds the right permissions but is
+      # scoped to a selected set that github-iac requires to equal the
+      # sync-manifest target set exactly — and this repository is the sync
+      # SOURCE, never a target. Adding it there would fail the sync engine's
+      # own exact-set attestation closed and hand a fleet-privileged identity
+      # write access to the repository it distributes from. The resolution is
+      # a separate minimal App scoped to this repository alone, which is an
+      # org-owner action. melodic-software/standards#274 is the adjacent
+      # symptom, not this job's blocker; it needs no grant change either.
+      - name: Mint the re-pin App token
+        id: app-token
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY }}
+          # `owner` and `repositories` are both omitted deliberately, which
+          # scopes the token to this repository alone. Naming `owner` while
+          # leaving `repositories` empty would instead scope it to EVERY
+          # repository in the App's installation, so deriving the repository
+          # name from the event payload would silently widen the token on any
+          # trigger whose payload omits it. Same shape the sibling
+          # standards-sync-stuck-automerge-alert reusable uses for its own
+          # single-repository token.
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Fixed branch plus fixed title: the action creates the pull request on
+      # the first run and updates that same one on every later run, so a lane
+      # left un-merged across several releases accumulates into one review
+      # rather than a queue of them. Auto-merge is never armed — the cascade
+      # this feeds rewrites four consumers' workflow files, which is a human
+      # review gate by design.
+      - name: Open or update the re-pin pull request
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: chore/repin-claude-lanes
+          # Stated rather than left to the action's default. The default is the
+          # branch this workflow checked out, which the step above already pins
+          # to the default branch — naming it here means a future change to the
+          # checkout cannot silently retarget this privileged pull request.
+          base: ${{ steps.default-branch.outputs.name }}
+          add-paths: components/claude-lanes
+          commit-message: |
+            chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
+
+            Co-Authored-By: claude-lanes-repin <noreply@github.com>
+          title: "chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}"
+          body: |
+            ## Summary
+
+            Re-pins every `melodic-software/ci-workflows` reference under
+            `components/claude-lanes/` from `${{ steps.repin.outputs.old-tags }}`
+            to `${{ steps.release.outputs.tag }}`
+            (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
+            release. Opened by `.github/workflows/claude-lanes-repin.yml`.
+
+            ${{ steps.repin.outputs.version-note }}
+
+            Merging this cascades: `sync.yml` re-materializes the lane callers
+            into every target `distribution/sync-manifest.yml` marks
+            `claude-review-caller` / `claude-security-review-caller` managed
+            for, as a reviewed pull request per target. This pull request is
+            never auto-merged.
+
+            ## Test plan
+
+            - `pin-comment-convention` covers `components/claude-lanes/*.yml`
+              and validates the rewritten pin comments' form.
+            - `claude-lanes` component tests materialize and lint the callers.
+            - Post-merge: the per-target sync pull requests are the real
+              acceptance signal.
+
+            ## Related
+
+            - Phase 3g of `melodic-software/ci-workflows`
+              `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12).
+            - Upstream release:
+              https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}

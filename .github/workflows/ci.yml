@@ -484,6 +484,13 @@ jobs:
       # in the one job that has the pinned engine installed.
       - name: Test claude lane caller components
         run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
+      # Behavioral coverage for the scheduled re-pin job's logic. It needs no
+      # yq and no actionlint — it lives in this job because this is where the
+      # rest of the claude-lanes coverage already runs, keeping one lane
+      # responsible for that component rather than adding a lane to ci-status
+      # for one script.
+      - name: Test the lane caller re-pin script
+        run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
 
   zizmor:
     permissions:
