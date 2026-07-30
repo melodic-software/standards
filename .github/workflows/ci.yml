@@ -159,6 +159,8 @@ jobs:
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
       - name: Markdownlint home contract test
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-home.test.sh
+      - name: Markdownlint schema-pin contract test
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
 
   runner-policy:
     name: Runner policy
