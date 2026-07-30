@@ -58,10 +58,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! tag="$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)"; then
-            echo "::notice::${UPSTREAM} has no published release to re-pin against."
-            echo 'resolved=false' >> "$GITHUB_OUTPUT"
-            exit 0
+          # Only one 404 here is benign — "this repository has published no
+          # release yet". A renamed, deleted, or no-longer-readable upstream
+          # returns the same 404, so confirm the repository itself still reads
+          # before accepting that reading. Every other failure is loud by
+          # default: an unattended daily job that reports green while it has
+          # silently stopped checking anything is worse than no job.
+          err="${RUNNER_TEMP}/releases-latest.err"
+          if ! tag="$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name 2>"$err")"; then
+            if grep -q 'HTTP 404' "$err" && gh api "repos/${UPSTREAM}" --jq .full_name > /dev/null 2>&1; then
+              echo "::notice::${UPSTREAM} has no published release to re-pin against."
+              echo 'resolved=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::Could not read the newest ${UPSTREAM} release." >&2
+            cat "$err" >&2
+            exit 1
           fi
 
           # The pin-comment convention's primary form accepts full SemVer only
@@ -172,7 +184,6 @@ jobs:
           {
             echo 'changed=true'
             echo "old-tags=${old_tags}"
-            echo "major-jump=${major_jump}"
             # Multi-line output needs a delimiter GitHub will not confuse for
             # content; a run-unique one also blocks injection through it.
             echo "version-note<<NOTE-${GITHUB_RUN_ID}"
@@ -204,8 +215,14 @@ jobs:
         with:
           client-id: ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID }}
           private-key: ${{ secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ${{ github.event.repository.name }}
+          # `owner` and `repositories` are both omitted deliberately, which
+          # scopes the token to this repository alone. Naming `owner` while
+          # leaving `repositories` empty would instead scope it to EVERY
+          # repository in the App's installation, so deriving the repository
+          # name from the event payload would silently widen the token on any
+          # trigger whose payload omits it. Same shape the sibling
+          # standards-sync-stuck-automerge-alert reusable uses for its own
+          # single-repository token.
           permission-contents: write
           permission-pull-requests: write
 
