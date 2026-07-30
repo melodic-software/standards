@@ -56,10 +56,22 @@ permissions:
 # KNOWN CONFLICT with the standards `concurrency-policy` component, which
 # requires a `${{ github.workflow }}`-prefixed group and a literal
 # `cancel-in-progress: true`. This lane's `false` is deliberate and
-# load-bearing (above), and no group name reconciles it, so an exemption in
-# the adopting repo is the only resolution for THIS caller — the code-review
-# caller ships the canonical group and needs none. Nothing fails today: this
-# component is parked with no managed target.
+# load-bearing (above), and no group name reconciles it — unlike the
+# code-review caller, which ships the canonical group and conflicts with
+# nothing.
+#
+# A repository exception does NOT resolve this, and an adopter should not
+# reach for one: an exception waives only a MISSING top-level block, so a
+# block that is present is validated anyway and the exception is itself
+# reported as `exception-inventory-drift`
+# (`components/concurrency-policy/concurrency-policy.mjs`). Adopting both as
+# written therefore fails the gate. Closing it needs a decision this file
+# cannot make for the adopter — express this lane's concurrency at the job
+# level, which is the shape the exception mechanism does waive, or widen the
+# policy to admit a required check's `cancel-in-progress: false`.
+#
+# Nothing fails today: this component is parked with no managed target, and
+# that decision is due when it unparks.
 concurrency:
   group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
