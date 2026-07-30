@@ -46,17 +46,16 @@ permissions:
 # must NOT copy it (cancelling a REQUIRED check is not a skip and does not
 # read success).
 #
-# A repo that also enforces the standards `concurrency-policy` component,
-# which requires a `${{ github.workflow }}`-prefixed group name, should
-# normalize this group to that prefixed form rather than exempt the caller:
-# standards itself runs both (`.github/workflows/ci.yml`, "Enforce
-# concurrency policy on standards") and normalizes safely, because this
-# workflow is named `claude-review`, so `${{ github.workflow }}-${{ … }}` and
-# the literal `claude-review-${{ … }}` resolve to the identical runtime
-# group — distinctness from the reusable's inner per-(PR,head) group is
-# preserved either way.
+# The group is the `${{ github.workflow }}`-prefixed canonical form the
+# standards `concurrency-policy` component requires, so a target enforcing
+# that policy passes without an exemption. Because this workflow is named
+# `claude-review`, the prefixed form and a literal `claude-review-${{ … }}`
+# resolve to the identical runtime group, so distinctness from the
+# reusable's inner per-(PR,head) group is preserved either way. A file whose
+# header says downstream edits are overwritten cannot ask its consumers to
+# normalize it themselves.
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
