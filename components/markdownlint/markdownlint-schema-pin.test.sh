@@ -6,7 +6,7 @@
 # schema reference), so nothing stops it drifting from the dependency it
 # describes the moment one is bumped without the other. This is the visibility
 # gate for that pair: fail loudly on drift instead of letting the comment keep
-# claiming a version it no longer matches (issue #261).
+# claiming a version it no longer matches.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
