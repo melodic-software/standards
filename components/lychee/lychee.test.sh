@@ -110,6 +110,19 @@ assert_not_contains 'current MySQL isolation manual page is excluded' "$dump_out
   'https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html'
 assert_not_contains 'current W3C time-zone guidance is excluded' "$dump_out" \
   'https://www.w3.org/International/wiki/WorkingWithTimeZones'
+assert_not_contains 'current ACM DL paper is excluded' "$dump_out" \
+  'https://dl.acm.org/doi/10.1145/3611643.3613871'
+assert_not_contains 'current ACM Queue article is excluded' "$dump_out" \
+  'https://queue.acm.org/detail.cfm?id=3454124'
+# Row count, not a substring absence: the excluded URL is the host ROOT, so
+# every sibling path that must stay checked contains it as a prefix and would
+# satisfy assert_not_contains only by deleting the sibling control. A
+# line-anchored count asserts the root itself is gone while the sibling below
+# proves the rest of the host is still checked.
+assert_row_count 'current Genius API docs root is excluded' "$dump_out" 0 \
+  '^https://docs\.genius\.com/?$'
+assert_not_contains 'current NTIA SBOM report is excluded' "$dump_out" \
+  'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf'
 assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
 assert_contains 'another Miro help path remains checked' "$dump_out" \
   'https://help.miro.com/hc/en-us/articles/example'
@@ -119,6 +132,14 @@ assert_contains 'another MySQL manual path remains checked' "$dump_out" \
   'https://dev.mysql.com/doc/refman/8.4/en/example.html'
 assert_contains 'another W3C International path remains checked' \
   "$dump_out" 'https://www.w3.org/International/'
+assert_contains 'another ACM DL DOI remains checked' "$dump_out" \
+  'https://dl.acm.org/doi/10.1145/example'
+assert_contains 'another ACM Queue article remains checked' "$dump_out" \
+  'https://queue.acm.org/detail.cfm?id=1'
+assert_contains 'another Genius docs path remains checked' "$dump_out" \
+  'https://docs.genius.com/example'
+assert_contains 'another NTIA publication remains checked' "$dump_out" \
+  'https://www.ntia.gov/files/ntia/publications/example.pdf'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \

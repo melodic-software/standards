@@ -25,6 +25,14 @@ The exact current public URLs that reject automated link checkers are excluded:
 - <https://www.npmjs.com/package/@mirohq/miro-api>
 - <https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html>
 - <https://www.w3.org/International/wiki/WorkingWithTimeZones>
+- <https://dl.acm.org/doi/10.1145/3611643.3613871>
+- <https://queue.acm.org/detail.cfm?id=3454124>
+- <https://docs.genius.com/>
+
+A host the checker cannot complete a TLS handshake against, though the chain
+verifies elsewhere:
+
+- <https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf>
 
 Other paths on those public hosts remain subject to checking:
 
@@ -34,6 +42,10 @@ Other paths on those public hosts remain subject to checking:
 - <https://www.npmjs.com/package/example>
 - <https://dev.mysql.com/doc/refman/8.4/en/example.html>
 - <https://www.w3.org/International/>
+- <https://dl.acm.org/doi/10.1145/example>
+- <https://queue.acm.org/detail.cfm?id=1>
+- <https://docs.genius.com/example>
+- <https://www.ntia.gov/files/ntia/publications/example.pdf>
 
 Public siblings and stale pre-transfer owner links remain subject to checking:
 
