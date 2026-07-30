@@ -12,7 +12,7 @@ MCP commands in settings.json"
 
 `claude-permissions.json` — one top-level `claudePermissions` object (a unique key, because
 the primary consumer merges the file into a shared template-data namespace) carrying
-`schemaVersion`, `allow`, and `deny`:
+`schemaVersion`, `allow`, `deny`, and `withdraw`:
 
 - **`deny`** — the safety floor: destructive git verbs (force-push, hard reset, clean,
   checkout/restore discards, forced branch deletion, `--no-verify` hook bypass) in both
@@ -109,6 +109,30 @@ bare name resolve. The end state also does not restore pre-classifier handling u
 `classifyAllShell: true` — a bare wrapper is still a shell rule. It buys rule clarity and
 the non-auto posture, not a classifier bypass.
 
+### `withdraw` — tombstones for rows retired from `allow`
+
+`withdraw` names the rows this component has retired from `allow`. It exists because the
+composition that carries this floor into a consumer's live settings **unions** it — so
+locally-accumulated rules survive — and a union cannot subtract. A row that has ever reached a
+machine's live allow list therefore stays granted by every later apply, however long ago this file
+dropped it. Measured, not theorised: the auto-mode re-derivation above retired 18 rows and all 18
+remained live on the operator's machine (melodic-software/dotfiles#337). Those 18 seed the array.
+
+Entries are exact strings, never globs — a tombstone that quietly matched more than it names would
+be a second eviction gap pointing the other way. They are append-only in practice: a retired row
+stays named for as long as any machine might still hold it, with no reliable signal for when that
+stops being true. The resulting growth is storage-only: the array is consumed by the composer and
+never reaches a live settings file, so it does not enter the auto-mode classifier's prompt the way
+`deny` does.
+
+**`withdraw` is `allow`-shaped only, and deliberately does not generalize to `deny`.** The two carry
+opposite hazards. `allow` accretes through the union and needs a subtract path. `deny` does not, at
+the active consumer: that composition force-sets `permissions.deny` from its own owned list before
+unioning this floor into it, so the live array is rebuilt each apply and a `deny` removal here
+already propagates. Nor should it gain one — dotfiles#337 records that a `deny` row is rendered into
+the auto-mode classifier's own prompt as a circumvention instruction, so a lever that makes dropping
+one easy weakens auto mode itself. Retiring a `deny` row stays an ordinary edit to `deny`.
+
 ### `--force-with-lease` is enforced by a hook, not by `deny`
 
 `deny` covers the force spellings it can express, but not this one. Claude Code's Bash rules are
@@ -149,6 +173,22 @@ file; the consumer owns the runtime composition that reads it.
   managed-settings precedence semantics.
 - A repository needing a stricter or looser posture layers its own project settings; the
   deny floor is not relaxable below this component wherever it is composed in.
+
+**`withdraw` is advisory data, not a contract.** It sits on the same footing as every other key
+here: the sync engine is byte-exact and merges nothing, so this component cannot make any consumer
+act on a tombstone. A consumer that ignores the key is exactly where it was before the key
+existed: the union still cannot subtract, and the retired row stays granted on every machine that
+holds it. That residual is the price of the advisory framing, and the reason the key is documented
+rather than assumed. A consumer that does compose it subtracts these rows *after* its union, keyed
+to the tombstone string **itself** rather than to "absent from this floor": the narrower key lets a
+genuinely machine-local grant survive untouched while the source of truth can still say "retire
+this". The key is additive and optional, so `schemaVersion` stays at `1` — a consumer reading only
+`allow` and `deny` parses this file unchanged.
+
+Colocation is the point. The withdrawal decision is made here, in the same reviewed PR that removes
+the entry and records why; carrying the tombstone here keeps cause and effect in one place and stops
+each consumer re-authoring the same list by hand. The user layer already holds a hand-copied
+duplicate of all 18 seeded rows — the drift this key exists to end.
 
 ## Threat model — what the deny floor is and is not
 
@@ -196,3 +236,8 @@ empty array means the built-in set covers it and the entry is dead weight. Verif
 binary is on `PATH` first — a denial fires before execution, so an uninstalled tool and a
 denied one look alike in the exit status but differ in `permission_denials`. Record the
 result in the PR; a removal without one is not reviewable.
+
+**A removal lands with its tombstone.** The same PR that drops a row from `allow` adds that exact
+string to `withdraw`. A removal without one retires the row for fresh machines only and leaves it
+granted on every machine that already holds it — spending the burden above on a withdrawal that
+does not take effect where it matters.

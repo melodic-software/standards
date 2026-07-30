@@ -357,6 +357,26 @@
       "Read(.env.*)",
       "Read(secrets.json)",
       "Read(secrets/**)"
+    ],
+    "withdraw": [
+      "Bash(git branch --list *)",
+      "Bash(git branch)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git ls-files *)",
+      "Bash(git merge-base *)",
+      "Bash(git rev-parse *)",
+      "Bash(git show *)",
+      "Bash(git status *)",
+      "Bash(git status)",
+      "Bash(source-control-babysit-merge *)",
+      "Bash(source-control-babysit-resolve-thread *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git merge-base *)",
+      "PowerShell(git rev-parse *)",
+      "PowerShell(git show *)",
+      "PowerShell(git status *)"
     ]
   }
 }
