@@ -1,0 +1,262 @@
+name: claude-lanes-repin
+
+# Fleet action-currency for the Claude review lanes. Every consumer's
+# Dependabot config `ignore`s `melodic-software/ci-workflows/*`, so a new
+# ci-workflows release reaches the fleet only along
+# release tag -> caller-component re-pin -> standards-sync cascade. This job
+# automates the middle hop; `sync.yml` already carries it the rest of the way.
+# Approved 2026-07-26 in melodic-software/ci-workflows
+# `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12 — "3g").
+#
+# It only ever proposes: the pull request it opens is reviewed and merged by a
+# human like any other, and nothing here arms auto-merge.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute daily poll, deliberately clear of `sync.yml`'s weekly
+    # `17 6 * * 1` reconciliation and the stuck-automerge watchdog's hourly
+    # `17 * * * *`. GitHub queues every scheduled workflow on the platform
+    # against one dispatcher, so the top of the hour and each quarter-hour are
+    # the most contended and most delayed slots; :41 is neither.
+    - cron: "41 14 * * *"
+
+permissions:
+  contents: read
+
+# A queued run must never race the branch push of the run ahead of it. A re-pin
+# already in flight is worth finishing rather than superseding, so the second
+# run waits instead of cancelling the first.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  repin:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # A boolean, never the credential. `secrets` is unavailable to a
+      # step-level `if`, and binding the secret itself into job-level `env`
+      # would hand it to every step in the job through the runner's process
+      # environment. The secrets reach exactly one step, through its `with`.
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID != ''
+            && secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve the newest ci-workflows release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM: melodic-software/ci-workflows
+        run: |
+          set -euo pipefail
+
+          if ! tag="$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)"; then
+            echo "::notice::${UPSTREAM} has no published release to re-pin against."
+            echo 'resolved=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The pin-comment convention's primary form accepts full SemVer only
+          # (components/pin-comment-convention/README.md), so a tag outside that
+          # shape would have this job author a comment this repository's own CI
+          # then rejects on the pull request it just opened.
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Newest ${UPSTREAM} release tag '${tag}' is not full SemVer (vX.Y.Z); the pin-comment convention has no form for it." >&2
+            exit 1
+          fi
+
+          # An annotated tag's ref points at a tag object that must be
+          # dereferenced again to reach the commit; a lightweight tag's ref
+          # points at the commit already. Both shapes are legal and upstream
+          # has cut both, so branch on the object type explicitly rather than
+          # through an endpoint that resolves it invisibly.
+          ref="$(gh api "repos/${UPSTREAM}/git/ref/tags/${tag}" --jq '[.object.type, .object.sha] | @tsv')"
+          object_type="${ref%%$'\t'*}"
+          object_sha="${ref##*$'\t'}"
+
+          case "$object_type" in
+            tag) sha="$(gh api "repos/${UPSTREAM}/git/tags/${object_sha}" --jq .object.sha)" ;;
+            commit) sha="$object_sha" ;;
+            *)
+              echo "::error::Tag '${tag}' points at an unexpected object type '${object_type}'." >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Dereferenced '${tag}' to '${sha}', which is not a 40-character commit SHA." >&2
+            exit 1
+          fi
+
+          echo "Resolved ${tag} (${object_type} object) to ${sha}."
+          {
+            echo 'resolved=true'
+            echo "tag=${tag}"
+            echo "sha=${sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Re-pin the lane caller components
+        id: repin
+        if: steps.release.outputs.resolved == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          # Enumerated by literal glob, never discovered by searching for pins.
+          # A repository-wide sweep would also rewrite
+          # components/pin-comment-convention/fixtures/{bad,good}/workflow.yml,
+          # whose ci-workflows pins are that component's test corpus and are
+          # malformed on purpose.
+          targets=(components/claude-lanes/*.yml)
+          for file in "${targets[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "::error::Expected lane caller component '${file}' does not exist." >&2
+              exit 1
+            fi
+          done
+
+          pin_re='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
+          expected="$(grep -hoE "$pin_re" "${targets[@]}" | wc -l || true)"
+          old_tags="$(grep -hoE "${pin_re}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \
+            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
+
+          sed -i -E "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${SHA} # ${TAG}|" \
+            "${targets[@]}"
+
+          rewritten="$(grep -hoE "${pin_re}[[:space:]]+# ${TAG}\$" "${targets[@]}" | wc -l || true)"
+          if [[ "$expected" -eq 0 || "$expected" -ne "$rewritten" ]]; then
+            echo "::error::Expected ${expected} ci-workflows pins to carry '@${SHA} # ${TAG}'; ${rewritten} do." >&2
+            exit 1
+          fi
+
+          # Runtime companion to the enumerated glob above: prove the rewrite
+          # reached nothing else, whatever the regex did.
+          if ! git diff --quiet -- . ':(exclude)components/claude-lanes/'; then
+            echo '::error::The re-pin modified files outside components/claude-lanes/:' >&2
+            git diff --name-only -- . ':(exclude)components/claude-lanes/' >&2
+            exit 1
+          fi
+
+          if git diff --quiet -- components/claude-lanes/; then
+            echo "::notice::components/claude-lanes/ already pins ${TAG}; nothing to propose."
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          new_major="${TAG#v}"
+          new_major="${new_major%%.*}"
+          major_jump=false
+          for old_tag in ${old_tags//,/ }; do
+            old_major="${old_tag#v}"
+            old_major="${old_major%%.*}"
+            [[ "$old_major" == "$new_major" ]] || major_jump=true
+          done
+
+          if [[ "$major_jump" == true ]]; then
+            note="> [!WARNING]
+          > **Major-version jump** from \`${old_tags}\` to \`${TAG}\`. This is not a drop-in bump: read the upstream release notes for breaking changes to the lane callers' inputs, secrets, and required check names before merging."
+          else
+            note="Same major version as the pin it replaces (\`${old_tags}\` to \`${TAG}\`)."
+          fi
+
+          {
+            echo 'changed=true'
+            echo "old-tags=${old_tags}"
+            echo "major-jump=${major_jump}"
+            # Multi-line output needs a delimiter GitHub will not confuse for
+            # content; a run-unique one also blocks injection through it.
+            echo "version-note<<NOTE-${GITHUB_RUN_ID}"
+            echo "$note"
+            echo "NOTE-${GITHUB_RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Report the missing re-pin credential
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Deliberately a warning, not a failure. A scheduled job that fails
+          # for want of a credential is a permanently red cron nobody reads —
+          # the exact failure mode of melodic-software/standards#274. The
+          # detection half still runs and still reports every day.
+          echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY for a GitHub App installed on this repository with contents:write and pull-requests:write, then re-run. Until then, re-pin by hand."
+
+      # TODO(#274): the standards-sync App (client id STANDARDS_SYNC_APP_CLIENT_ID)
+      # already holds exactly these permissions but its selected-repositories
+      # list excludes this repository, which is what #274 tracks. Once that
+      # grant lands, either point these two secrets at that App's credentials
+      # or collapse them onto STANDARDS_SYNC_APP_* and delete this note.
+      - name: Mint the re-pin App token
+        id: app-token
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Fixed branch plus fixed title: the action creates the pull request on
+      # the first run and updates that same one on every later run, so a lane
+      # left un-merged across several releases accumulates into one review
+      # rather than a queue of them. Auto-merge is never armed — the cascade
+      # this feeds rewrites four consumers' workflow files, which is a human
+      # review gate by design.
+      - name: Open or update the re-pin pull request
+        if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: chore/repin-claude-lanes
+          # `base` is left at the action's default — the branch checked out in
+          # this workflow, which is the default branch on both triggers.
+          add-paths: components/claude-lanes
+          commit-message: |
+            chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
+
+            Co-Authored-By: claude-lanes-repin <noreply@github.com>
+          title: "chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}"
+          body: |
+            ## Summary
+
+            Re-pins every `melodic-software/ci-workflows` reference under
+            `components/claude-lanes/` from `${{ steps.repin.outputs.old-tags }}`
+            to `${{ steps.release.outputs.tag }}`
+            (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
+            release. Opened by `.github/workflows/claude-lanes-repin.yml`.
+
+            ${{ steps.repin.outputs.version-note }}
+
+            Merging this cascades: `sync.yml` re-materializes the lane callers
+            into every target `distribution/sync-manifest.yml` marks
+            `claude-review-caller` / `claude-security-review-caller` managed
+            for, as a reviewed pull request per target. This pull request is
+            never auto-merged.
+
+            ## Test plan
+
+            - `pin-comment-convention` covers `components/claude-lanes/*.yml`
+              and validates the rewritten pin comments' form.
+            - `claude-lanes` component tests materialize and lint the callers.
+            - Post-merge: the per-target sync pull requests are the real
+              acceptance signal.
+
+            ## Related
+
+            - Phase 3g of `melodic-software/ci-workflows`
+              `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12).
+            - Upstream release:
+              https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}
