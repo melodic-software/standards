@@ -46,8 +46,12 @@ pre-commit:
       run: editorconfig-checker {staged_files}
       fail_text: "EditorConfig violation. Align with .editorconfig (most editors auto-fix on save)."
     markdownlint:
-      # npx resolves the consumer's pinned markdownlint-cli2 from node_modules
-      # (node_modules/.bin is not on a hook's PATH); auto-discovers the config.
+      # Resolve the consumer's pinned markdownlint-cli2 directly from
+      # node_modules/.bin (node_modules/.bin is not on a hook's PATH) instead of
+      # npx --no-install, which silently falls back to an arbitrary global
+      # version when the local package is missing. Hard-fail loudly instead, so
+      # a missing dependency surfaces as "run npm ci" rather than a
+      # wrong-version lint. The binary still auto-discovers its own config.
       glob: "**/*.{md,markdown}"
-      run: npx --no-install markdownlint-cli2 {staged_files}
-      fail_text: "Markdown lint failures. Run: npx --no-install markdownlint-cli2 --fix <file>"
+      run: "test -x node_modules/.bin/markdownlint-cli2 || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
+      fail_text: "Markdown lint failures, or markdownlint-cli2 missing (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
