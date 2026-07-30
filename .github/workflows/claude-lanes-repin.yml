@@ -45,75 +45,51 @@ jobs:
         ${{ secrets.CLAUDE_LANES_REPIN_APP_CLIENT_ID != ''
             && secrets.CLAUDE_LANES_REPIN_APP_PRIVATE_KEY != '' }}
     steps:
+      # PRIVILEGE PIN. On workflow_dispatch the operator chooses the ref, and
+      # both the code that runs below and the base of the pull request opened
+      # at the end would otherwise follow it: a dispatch from a feature branch
+      # would execute that branch's re-pin script under the App token and
+      # retarget the fixed `chore/repin-claude-lanes` pull request away from
+      # the default branch, leaving the fleet re-pin absent from main while
+      # later scheduled runs collided with the same head branch. Resolving the
+      # default branch BEFORE checkout, then checking that out, makes both the
+      # executed code and the pull-request base independent of the dispatch
+      # ref. Scheduled runs already run on the default branch by definition;
+      # this closes the manual path to the same guarantee.
+      #
+      # Resolved through the API rather than `github.event.repository`: the
+      # schedule event's payload is documented as "Not applicable", so that
+      # context is not dependable on this job's primary trigger.
+      - name: Resolve the default branch
+        id: default-branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          name="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if [[ -z "$name" ]]; then
+            echo "::error::Could not resolve the default branch of ${GITHUB_REPOSITORY}." >&2
+            exit 1
+          fi
+          echo "Default branch: ${name}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ steps.default-branch.outputs.name }}
           persist-credentials: false
 
+      # Both steps below delegate to components/claude-lanes/repin-callers.sh,
+      # whose branching, API-failure handling, and file rewriting are covered
+      # by components/claude-lanes/repin-callers.test.sh in the `actionlint`
+      # CI lane. Keeping the logic in a script is what makes it testable
+      # outside a scheduled run.
       - name: Resolve the newest ci-workflows release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          UPSTREAM: melodic-software/ci-workflows
-        run: |
-          set -euo pipefail
-
-          # Only one 404 here is benign — "this repository has published no
-          # release yet". A renamed, deleted, or no-longer-readable upstream
-          # returns the same 404, so confirm the repository itself still reads
-          # before accepting that reading. Every other failure is loud by
-          # default: an unattended daily job that reports green while it has
-          # silently stopped checking anything is worse than no job.
-          err="${RUNNER_TEMP}/releases-latest.err"
-          if ! tag="$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name 2>"$err")"; then
-            if grep -q 'HTTP 404' "$err" && gh api "repos/${UPSTREAM}" --jq .full_name > /dev/null 2>&1; then
-              echo "::notice::${UPSTREAM} has no published release to re-pin against."
-              echo 'resolved=false' >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "::error::Could not read the newest ${UPSTREAM} release." >&2
-            cat "$err" >&2
-            exit 1
-          fi
-
-          # The pin-comment convention's primary form accepts full SemVer only
-          # (components/pin-comment-convention/README.md), so a tag outside that
-          # shape would have this job author a comment this repository's own CI
-          # then rejects on the pull request it just opened.
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Newest ${UPSTREAM} release tag '${tag}' is not full SemVer (vX.Y.Z); the pin-comment convention has no form for it." >&2
-            exit 1
-          fi
-
-          # An annotated tag's ref points at a tag object that must be
-          # dereferenced again to reach the commit; a lightweight tag's ref
-          # points at the commit already. Both shapes are legal and upstream
-          # has cut both, so branch on the object type explicitly rather than
-          # through an endpoint that resolves it invisibly.
-          ref="$(gh api "repos/${UPSTREAM}/git/ref/tags/${tag}" --jq '[.object.type, .object.sha] | @tsv')"
-          object_type="${ref%%$'\t'*}"
-          object_sha="${ref##*$'\t'}"
-
-          case "$object_type" in
-            tag) sha="$(gh api "repos/${UPSTREAM}/git/tags/${object_sha}" --jq .object.sha)" ;;
-            commit) sha="$object_sha" ;;
-            *)
-              echo "::error::Tag '${tag}' points at an unexpected object type '${object_type}'." >&2
-              exit 1
-              ;;
-          esac
-
-          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Dereferenced '${tag}' to '${sha}', which is not a 40-character commit SHA." >&2
-            exit 1
-          fi
-
-          echo "Resolved ${tag} (${object_type} object) to ${sha}."
-          {
-            echo 'resolved=true'
-            echo "tag=${tag}"
-            echo "sha=${sha}"
-          } >> "$GITHUB_OUTPUT"
+        run: bash components/claude-lanes/repin-callers.sh resolve melodic-software/ci-workflows
 
       - name: Re-pin the lane caller components
         id: repin
@@ -121,75 +97,7 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
           SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          set -euo pipefail
-
-          # Enumerated by literal glob, never discovered by searching for pins.
-          # A repository-wide sweep would also rewrite
-          # components/pin-comment-convention/fixtures/{bad,good}/workflow.yml,
-          # whose ci-workflows pins are that component's test corpus and are
-          # malformed on purpose.
-          targets=(components/claude-lanes/*.yml)
-          for file in "${targets[@]}"; do
-            if [[ ! -f "$file" ]]; then
-              echo "::error::Expected lane caller component '${file}' does not exist." >&2
-              exit 1
-            fi
-          done
-
-          pin_re='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
-          expected="$(grep -hoE "$pin_re" "${targets[@]}" | wc -l || true)"
-          old_tags="$(grep -hoE "${pin_re}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \
-            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
-
-          sed -i -E "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${SHA} # ${TAG}|" \
-            "${targets[@]}"
-
-          rewritten="$(grep -hoE "${pin_re}[[:space:]]+# ${TAG}\$" "${targets[@]}" | wc -l || true)"
-          if [[ "$expected" -eq 0 || "$expected" -ne "$rewritten" ]]; then
-            echo "::error::Expected ${expected} ci-workflows pins to carry '@${SHA} # ${TAG}'; ${rewritten} do." >&2
-            exit 1
-          fi
-
-          # Runtime companion to the enumerated glob above: prove the rewrite
-          # reached nothing else, whatever the regex did.
-          if ! git diff --quiet -- . ':(exclude)components/claude-lanes/'; then
-            echo '::error::The re-pin modified files outside components/claude-lanes/:' >&2
-            git diff --name-only -- . ':(exclude)components/claude-lanes/' >&2
-            exit 1
-          fi
-
-          if git diff --quiet -- components/claude-lanes/; then
-            echo "::notice::components/claude-lanes/ already pins ${TAG}; nothing to propose."
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          new_major="${TAG#v}"
-          new_major="${new_major%%.*}"
-          major_jump=false
-          for old_tag in ${old_tags//,/ }; do
-            old_major="${old_tag#v}"
-            old_major="${old_major%%.*}"
-            [[ "$old_major" == "$new_major" ]] || major_jump=true
-          done
-
-          if [[ "$major_jump" == true ]]; then
-            note="> [!WARNING]
-          > **Major-version jump** from \`${old_tags}\` to \`${TAG}\`. This is not a drop-in bump: read the upstream release notes for breaking changes to the lane callers' inputs, secrets, and required check names before merging."
-          else
-            note="Same major version as the pin it replaces (\`${old_tags}\` to \`${TAG}\`)."
-          fi
-
-          {
-            echo 'changed=true'
-            echo "old-tags=${old_tags}"
-            # Multi-line output needs a delimiter GitHub will not confuse for
-            # content; a run-unique one also blocks injection through it.
-            echo "version-note<<NOTE-${GITHUB_RUN_ID}"
-            echo "$note"
-            echo "NOTE-${GITHUB_RUN_ID}"
-          } >> "$GITHUB_OUTPUT"
+        run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA"
 
       - name: Report the missing re-pin credential
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
@@ -244,8 +152,11 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           branch: chore/repin-claude-lanes
-          # `base` is left at the action's default — the branch checked out in
-          # this workflow, which is the default branch on both triggers.
+          # Stated rather than left to the action's default. The default is the
+          # branch this workflow checked out, which the step above already pins
+          # to the default branch — naming it here means a future change to the
+          # checkout cannot silently retarget this privileged pull request.
+          base: ${{ steps.default-branch.outputs.name }}
           add-paths: components/claude-lanes
           commit-message: |
             chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
