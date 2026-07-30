@@ -44,3 +44,8 @@ only the exclusions that hold anywhere — vendored `node_modules` and `.venv`.
   no flag, that the discovered ruleset is this one rather than stock defaults,
   ruleset parity with the root config, and that authored Markdown under `bin/`
   is linted rather than silently excluded.
+- `markdownlint-schema-pin.test.sh` proves both configs' `$schema` URL still
+  names this repository's own pinned `markdownlint-cli2` `package.json`
+  version — that pin authors authoring-time validation here and makes no claim
+  about a consumer's tool version, so nothing else keeps it from drifting
+  silently when one is bumped without the other.
