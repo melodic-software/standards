@@ -55,11 +55,11 @@ permissions:
 #
 # KNOWN CONFLICT with the standards `concurrency-policy` component, which
 # requires a `${{ github.workflow }}`-prefixed group and a literal
-# `cancel-in-progress: true`. Both of this lane's values are deliberate and
-# load-bearing (above), and the lane-scoped group name is what keeps the
-# caller's group distinct from the reusable's inner per-(PR,head) group. No
-# target repo runs `concurrency-policy` today, so nothing fails now; a repo
-# adopting BOTH must exempt these two lane callers rather than normalize them.
+# `cancel-in-progress: true`. This lane's `false` is deliberate and
+# load-bearing (above), and no group name reconciles it, so an exemption in
+# the adopting repo is the only resolution for THIS caller — the code-review
+# caller ships the canonical group and needs none. Nothing fails today: this
+# component is parked with no managed target.
 concurrency:
   group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
