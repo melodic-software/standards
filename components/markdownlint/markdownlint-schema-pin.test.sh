@@ -14,8 +14,18 @@ source "$root/harness/shell/lib.sh"
 
 cd "$root" || exit 1
 
+if [[ ! -d node_modules ]]; then
+  skip_suite 'dependencies not installed (run: npm ci)'
+fi
+
+# jsonc-parser is a direct devDependency, so an install that succeeded has it.
+# Skipping on its absence would report a green build at exactly the upgrade
+# boundary this guard exists to police — the drift would land unwatched while
+# the suite claimed to be watching.
 if ! node -e 'require("jsonc-parser")' 2>/dev/null; then
-  skip_suite 'schema-pin assertions require jsonc-parser (run: npm ci)'
+  fail 'jsonc-parser resolves from the installed dependencies' \
+    'declared in package.json devDependencies but not resolvable; re-run npm ci'
+  exit 1
 fi
 
 pinned_version="$(node -e '

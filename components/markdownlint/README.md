@@ -10,9 +10,11 @@ editor integrations at the location they deploy to:
 | `markdownlint` | root-canonical [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | a repository's own `.markdownlint-cli2.jsonc` |
 | `markdownlint-home` | [`home/.markdownlint-cli2.jsonc`](home/.markdownlint-cli2.jsonc) | `~/.markdownlint-cli2.jsonc`, via the dotfiles `dot_` source name |
 
-Both configs pin their schema to the supported CLI version and own rule
-choices. The root config additionally declares a repository traversal scope;
-the home config declares its own, deliberately different one.
+Both configs own their rule choices, and both pin their `$schema` URL to this
+repository's own `markdownlint-cli2` `package.json` version — authoring-time
+validation here, not a statement about which CLI version a consumer runs. The
+root config additionally declares a repository traversal scope; the home config
+declares its own, deliberately different one.
 
 ## Why the home payload is a sibling, not the same file
 
