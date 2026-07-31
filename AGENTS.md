@@ -52,3 +52,40 @@ required status. Merges are squash-only. An unresolved review-comment thread
 blocks merge — see
 [`conventions/review/reply-protocol.md`](conventions/review/reply-protocol.md)
 for how a thread closes once its finding is addressed.
+
+## Cursor Cloud specific instructions
+
+This repository has no runnable application or dev server: the "product" is
+the validation suite (lint gates plus component contract tests). Developing
+here means running those gates, not starting a service. The canonical command
+list lives in [`README.md`'s Validation section](README.md#validation) — use
+it as the source of truth rather than duplicating commands here.
+
+- Node is pinned to the version in [`.node-version`](.node-version)
+  (currently 24.18.0) and installed via `nvm`. The base VM's default `node`
+  on `PATH` is a `/exec-daemon` shim reporting v22; the pinned Node 24 is put
+  ahead of that shim by a line appended to `~/.bashrc`, so new interactive
+  shells already resolve `node` to v24 (`node --version` confirms). If a shell
+  ever reports v22, prepend the nvm bin dir or run `nvm use` before invoking
+  the Node-based gates — the repo's `engines` field requires `>=24 <25`.
+- Dependencies live at five npm roots, each with its own lockfile: the
+  repository root, `components/runner-policy`, `components/concurrency-policy`,
+  `components/dependabot-policy`, and `distribution`. The startup update script
+  runs `npm ci` in each; re-run any one after editing its `package.json`.
+- The Node-based gates (`lint:md`, `lint:hooks`, the `lint:*-policy` and
+  `test:*` scripts, and `bash harness/shell/run-tests.sh …`) run fully in this
+  VM. CI additionally exercises external engines (ShellCheck, lychee, PowerShell,
+  ruff/pyright, Go/golangci-lint, .NET, yq, typos, gitleaks, editorconfig-checker,
+  actionlint) that are not installed here; component contract tests needing an
+  absent engine skip cleanly rather than fail, so a green local run is expected
+  to cover fewer lanes than CI.
+- `npm ci` prints an `allow-scripts` warning that `lefthook`'s `postinstall`
+  did not run; this is benign — `lefthook validate` (the `lint:hooks` gate)
+  still works without it.
+- The `lefthook` pre-commit hook is active and runs engine-backed lanes
+  (`editorconfig-checker`, `gitleaks`, `typos`, plus language-specific lanes on
+  matching staged files). Those engines are not installed in this VM, so the
+  lanes fail closed with `exit status 127` and block a normal `git commit`.
+  Commit with `git commit --no-verify` here after running the relevant Node
+  gates by hand; CI installs the pinned engines and enforces every lane
+  regardless.
