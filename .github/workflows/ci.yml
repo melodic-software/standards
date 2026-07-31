@@ -717,6 +717,8 @@ jobs:
           yq --version
       - name: Test distribution engine
         run: bash distribution/sync-manifest.test.sh
+      - name: Claude-permissions tombstone contract test
+        run: bash harness/shell/run-tests.sh components/claude-permissions/claude-permissions.test.sh
       - name: Validate production manifest
         run: bash distribution/sync-manifest.sh validate
 

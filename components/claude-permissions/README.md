@@ -119,11 +119,22 @@ dropped it. Measured, not theorised: the auto-mode re-derivation above retired 1
 remained live on the operator's machine (melodic-software/dotfiles#337). Those 18 seed the array.
 
 Entries are exact strings, never globs — a tombstone that quietly matched more than it names would
-be a second eviction gap pointing the other way. They are append-only in practice: a retired row
-stays named for as long as any machine might still hold it, with no reliable signal for when that
-stops being true. The resulting growth is storage-only: the array is consumed by the composer and
-never reaches a live settings file, so it does not enter the auto-mode classifier's prompt the way
-`deny` does.
+be a second eviction gap pointing the other way. They are append-only with one exception, the
+regrant: a retired row otherwise stays named for as long as any machine might still hold it, with
+no reliable signal for when that stops being true. The resulting growth is storage-only: the array
+is consumed by the composer and never reaches a live settings file, so it does not enter the
+auto-mode classifier's prompt the way `deny` does.
+
+**Regrant lifecycle: `allow` and `withdraw` are disjoint, and a regrant deletes its tombstone.**
+The composer subtracts `withdraw` after its union, so a row present in both arrays is evicted on
+the next apply no matter how recently `allow` re-added it — a tombstone that outlives its removal
+silently defeats the regrant. Re-granting a previously withdrawn row therefore means, in the same
+reviewed PR: delete the row's tombstone from `withdraw` and add the row back to `allow`. The
+disjointness invariant (no string appears in both arrays) is enforced by
+`claude-permissions.test.sh` in CI, so a regrant that forgets its tombstone fails the build instead
+of failing on the fleet. The two bare-wrapper tombstones below are the standing example: when
+melodic-software/claude-code-plugins#843 makes the bare wrapper names resolve, the end state above
+re-adds those rows to `allow` — and that PR deletes their tombstones as part of the same change.
 
 **`withdraw` is `allow`-shaped only, and deliberately does not generalize to `deny`.** The two carry
 opposite hazards. `allow` accretes through the union and needs a subtract path. `deny` does not, at
@@ -215,8 +226,16 @@ session routes shell through the classifier. If it does, a rule here will not st
 prompt — the fix is a prose `autoMode.allow` entry in the consumer's user or managed
 settings. Reserve floor additions for grants that must hold in a non-auto session.
 
-**Removals carry the heavier burden, and only one argument retires an entry: that Claude
-Code's built-in read-only set covers the command in every mode.** That claim must be tested
+**Removals carry the heavier burden, and exactly two arguments retire an entry.** The first:
+Claude Code's built-in read-only set covers the command in every mode. The second: the rule is
+proven non-resolving — its command name resolves to no executable on any fleet machine, so the
+rule matches nothing and is dead weight; the evidence is a `command -v <name>` (or `Get-Command`)
+failure recorded in the PR together with why the name is expected to stay unresolvable until a
+named trigger (the two bare-wrapper tombstones seeded by this file are the standing example:
+their names resolve only when melodic-software/claude-code-plugins#843 lands, which is also their
+regrant trigger). A non-resolving removal still lands with its tombstone — the dead row is
+harmless where it lingers, but the tombstone is what actually clears it from machines that hold
+it. For the first argument, the claim must be tested
 before it is acted on, never inferred — from the command being read-only in spirit, from a
 sibling command being covered, or from auto mode's classifier approving it. Auto-mode
 coverage is specifically *not* an argument: it does not reach the lanes that never enter
