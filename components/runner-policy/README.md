@@ -437,7 +437,12 @@ top-level grant and a called workflow can only downgrade it — and
 narrower than the declared surface: the review caller may pass only `runner`
 (of 12 declared), the security caller only `runner`, `paths-file`, and
 `skip-actors` (of 8), and neither may pass the review reusable's optional
-`STANDARDS_REVIEW_APP_ID` / `STANDARDS_REVIEW_APP_PRIVATE_KEY` secrets.
+`STANDARDS_REVIEW_APP_ID` / `STANDARDS_REVIEW_APP_PRIVATE_KEY` secrets. The
+security caller's `skip-actors` restores parity with the `66073e58` contract,
+which already admitted it: a consumer whose ruleset makes the security check
+required needs the input to narrow the reusable's four-actor default, and
+inheriting that default silently widens a review-bypass exception
+(melodic-software/claude-code-plugins#1767).
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
