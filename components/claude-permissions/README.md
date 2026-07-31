@@ -12,7 +12,7 @@ MCP commands in settings.json"
 
 `claude-permissions.json` — one top-level `claudePermissions` object (a unique key, because
 the primary consumer merges the file into a shared template-data namespace) carrying
-`schemaVersion`, `allow`, and `deny`:
+`schemaVersion`, `allow`, `deny`, and `withdraw`:
 
 - **`deny`** — the safety floor: destructive git verbs (force-push, hard reset, clean,
   checkout/restore discards, forced branch deletion, `--no-verify` hook bypass) in both
@@ -109,6 +109,41 @@ bare name resolve. The end state also does not restore pre-classifier handling u
 `classifyAllShell: true` — a bare wrapper is still a shell rule. It buys rule clarity and
 the non-auto posture, not a classifier bypass.
 
+### `withdraw` — tombstones for rows retired from `allow`
+
+`withdraw` names the rows this component has retired from `allow`. It exists because the
+composition that carries this floor into a consumer's live settings **unions** it — so
+locally-accumulated rules survive — and a union cannot subtract. A row that has ever reached a
+machine's live allow list therefore stays granted by every later apply, however long ago this file
+dropped it. Measured, not theorised: the auto-mode re-derivation above retired 18 rows and all 18
+remained live on the operator's machine (melodic-software/dotfiles#337). Those 18 seed the array.
+
+Entries are exact strings, never globs — a tombstone that quietly matched more than it names would
+be a second eviction gap pointing the other way. They are append-only with one exception, the
+regrant: a retired row otherwise stays named for as long as any machine might still hold it, with
+no reliable signal for when that stops being true. The resulting growth is storage-only: the array
+is consumed by the composer and never reaches a live settings file, so it does not enter the
+auto-mode classifier's prompt the way `deny` does.
+
+**Regrant lifecycle: `allow` and `withdraw` are disjoint, and a regrant deletes its tombstone.**
+The composer subtracts `withdraw` after its union, so a row present in both arrays is evicted on
+the next apply no matter how recently `allow` re-added it — a tombstone that outlives its removal
+silently defeats the regrant. Re-granting a previously withdrawn row therefore means, in the same
+reviewed PR: delete the row's tombstone from `withdraw` and add the row back to `allow`. The
+disjointness invariant (no string appears in both arrays) is enforced by
+`claude-permissions.test.sh` in CI, so a regrant that forgets its tombstone fails the build instead
+of failing on the fleet. The two bare-wrapper tombstones below are the standing example: when
+melodic-software/claude-code-plugins#843 makes the bare wrapper names resolve, the end state above
+re-adds those rows to `allow` — and that PR deletes their tombstones as part of the same change.
+
+**`withdraw` is `allow`-shaped only, and deliberately does not generalize to `deny`.** The two carry
+opposite hazards. `allow` accretes through the union and needs a subtract path. `deny` does not, at
+the active consumer: that composition force-sets `permissions.deny` from its own owned list before
+unioning this floor into it, so the live array is rebuilt each apply and a `deny` removal here
+already propagates. Nor should it gain one — dotfiles#337 records that a `deny` row is rendered into
+the auto-mode classifier's own prompt as a circumvention instruction, so a lever that makes dropping
+one easy weakens auto mode itself. Retiring a `deny` row stays an ordinary edit to `deny`.
+
 ### `--force-with-lease` is enforced by a hook, not by `deny`
 
 `deny` covers the force spellings it can express, but not this one. Claude Code's Bash rules are
@@ -150,6 +185,22 @@ file; the consumer owns the runtime composition that reads it.
 - A repository needing a stricter or looser posture layers its own project settings; the
   deny floor is not relaxable below this component wherever it is composed in.
 
+**`withdraw` is advisory data, not a contract.** It sits on the same footing as every other key
+here: the sync engine is byte-exact and merges nothing, so this component cannot make any consumer
+act on a tombstone. A consumer that ignores the key is exactly where it was before the key
+existed: the union still cannot subtract, and the retired row stays granted on every machine that
+holds it. That residual is the price of the advisory framing, and the reason the key is documented
+rather than assumed. A consumer that does compose it subtracts these rows *after* its union, keyed
+to the tombstone string **itself** rather than to "absent from this floor": the narrower key lets a
+genuinely machine-local grant survive untouched while the source of truth can still say "retire
+this". The key is additive and optional, so `schemaVersion` stays at `1` — a consumer reading only
+`allow` and `deny` parses this file unchanged.
+
+Colocation is the point. The withdrawal decision is made here, in the same reviewed PR that removes
+the entry and records why; carrying the tombstone here keeps cause and effect in one place and stops
+each consumer re-authoring the same list by hand. The user layer already holds a hand-copied
+duplicate of all 18 seeded rows — the drift this key exists to end.
+
 ## Threat model — what the deny floor is and is not
 
 The deny list pins the COMMON destructive and secret-reaching spellings. The rule grammar is
@@ -175,8 +226,16 @@ session routes shell through the classifier. If it does, a rule here will not st
 prompt — the fix is a prose `autoMode.allow` entry in the consumer's user or managed
 settings. Reserve floor additions for grants that must hold in a non-auto session.
 
-**Removals carry the heavier burden, and only one argument retires an entry: that Claude
-Code's built-in read-only set covers the command in every mode.** That claim must be tested
+**Removals carry the heavier burden, and exactly two arguments retire an entry.** The first:
+Claude Code's built-in read-only set covers the command in every mode. The second: the rule is
+proven non-resolving — its command name resolves to no executable on any fleet machine, so the
+rule matches nothing and is dead weight; the evidence is a `command -v <name>` (or `Get-Command`)
+failure recorded in the PR together with why the name is expected to stay unresolvable until a
+named trigger (the two bare-wrapper tombstones seeded by this file are the standing example:
+their names resolve only when melodic-software/claude-code-plugins#843 lands, which is also their
+regrant trigger). A non-resolving removal still lands with its tombstone — the dead row is
+harmless where it lingers, but the tombstone is what actually clears it from machines that hold
+it. For the first argument, the claim must be tested
 before it is acted on, never inferred — from the command being read-only in spirit, from a
 sibling command being covered, or from auto mode's classifier approving it. Auto-mode
 coverage is specifically *not* an argument: it does not reach the lanes that never enter
@@ -196,3 +255,8 @@ empty array means the built-in set covers it and the entry is dead weight. Verif
 binary is on `PATH` first — a denial fires before execution, so an uninstalled tool and a
 denied one look alike in the exit status but differ in `permission_denials`. Record the
 result in the PR; a removal without one is not reviewable.
+
+**A removal lands with its tombstone.** The same PR that drops a row from `allow` adds that exact
+string to `withdraw`. A removal without one retires the row for fresh machines only and leaves it
+granted on every machine that already holds it — spending the burden above on a withdrawal that
+does not take effect where it matters.
