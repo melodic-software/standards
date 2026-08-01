@@ -7962,10 +7962,8 @@ const TARGET_VISIBILITY = new Map([
   ["melodic-software/standards", "public"],
   ["melodic-software/dotfiles", "private"],
   ["melodic-software/github-iac", "private"],
-  ["melodic-software/knowledge-corpus", "private"],
   ["melodic-software/medley", "private"],
   ["melodic-software/provisioning", "private"],
-  ["melodic-software/songwriting", "private"],
 ]);
 
 function isPublicTarget(target) {

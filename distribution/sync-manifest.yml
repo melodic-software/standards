@@ -48,13 +48,30 @@ components:
   #
   # Each component targets the repos that run that lane TODAY. Deliberate
   # exclusions:
-  # - .github, ci-runner: exempt from lane components (near-zero PR traffic;
-  #   ci-runner is runner infra where a wedged lane job could block its own
-  #   substrate).
+  # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
-  # - knowledge-corpus, songwriting: planned NEW targets, blocked on the org
-  #   owner extending the sync App's selected access first — add them only
-  #   with that grant recorded.
+  # - ci-runner, cursor-plugins: adopted as review-lane targets by the wave
+  #   retarget (ci-workflows claude-review-lanes plan, ratified 2026-08-01),
+  #   which reverses ci-runner's earlier runner-infra exemption. BLOCKED, not
+  #   pending: both are PUBLIC, and a selector-routed caller is rejected
+  #   outright on a public repository (see PARKED below). They become
+  #   adoptable on the same removal trigger the parked security caller
+  #   carries, and not before.
+  # - claude-code-proxy: adopted by the same retarget and admissible on
+  #   visibility (private), but BLOCKED on the org owner extending the sync
+  #   App's selected access. The attest step requires the installation's
+  #   selected set to EQUAL this manifest's target set, so a target added
+  #   before the grant fails the sync for every target, not just the new one.
+  #   Add it only with that grant recorded, alongside its `TARGET_VISIBILITY`
+  #   entry in `components/runner-policy/runner-policy.test.mjs`.
+  # - knowledge-corpus, songwriting: dropped as targets by the same retarget —
+  #   neither is a code repo, so a code-review lane has near-zero signal.
+  #   songwriting (lyric files) is dropped outright. knowledge-corpus is
+  #   DEFERRED rather than dropped: its scraped third-party HTML is content an
+  #   agent later reads, which is a prompt-injection surface rather than a
+  #   code-quality one. Trigger to revisit — prompt-injection hardening for a
+  #   review lane over untrusted third-party content; and then for a security
+  #   or content-scanning lane, not for claude-review as written.
   # The security caller reads the repo-owned `.github/claude-security-paths`
   # pattern file (absent = fail-open: every PR reviewed). That file is
   # deliberately NOT sync-managed, and the manifest has no seed-once
