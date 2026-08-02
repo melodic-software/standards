@@ -55,18 +55,20 @@ components:
   #   reverses its earlier runner-infra exemption. It is ALREADY a target
   #   block below, so adding this component to its existing `managed:` list
   #   adds no repository to the installation's attested set and needs no App
-  #   grant. Blocked on visibility alone: ci-runner is PUBLIC, and a
-  #   selector-routed caller is rejected outright on a public repository (see
-  #   PARKED below). Removal trigger: the one the parked security caller
-  #   carries — the runner indirection moving inside the ci-workflows
-  #   reusable. STILL LIVE when that fires, and not rebutted by the reversal:
-  #   the original exemption reason, that ci-runner is runner infrastructure
-  #   where a wedged lane job could block its own substrate. Visibility became
-  #   the nearer blocker; it did not answer that concern.
+  #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
+  #   ci-runner is PUBLIC, and a selector-routed caller is rejected outright
+  #   on a public repository (see PARKED below). Removal trigger: the one the
+  #   parked security caller carries — the runner indirection moving inside
+  #   the ci-workflows reusable. STILL LIVE when that fires, and not rebutted
+  #   by the reversal: the original exemption reason, that ci-runner is runner
+  #   infrastructure where a wedged lane job could block its own substrate.
+  #   Visibility became the nearer blocker; it did not answer that concern, so
+  #   adoption must clear it on the merits rather than inherit a pass.
   # - cursor-plugins: adopted by the same retarget, and blocked TWICE over. It
   #   is PUBLIC, so the removal trigger above gates it; and it is not a target
   #   at all, so adopting it is a NEW target and also needs the App grant
-  #   below, exactly like claude-code-proxy.
+  #   below, plus its own `TARGET_VISIBILITY` entry — exactly like
+  #   claude-code-proxy on both counts.
   # - claude-code-proxy: adopted by the same retarget and admissible on
   #   visibility (private), but BLOCKED on the org owner extending the sync
   #   App's selected access. The attest step derives its expected set from the
