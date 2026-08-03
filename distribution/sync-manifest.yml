@@ -48,13 +48,59 @@ components:
   #
   # Each component targets the repos that run that lane TODAY. Deliberate
   # exclusions:
-  # - .github, ci-runner: exempt from lane components (near-zero PR traffic;
-  #   ci-runner is runner infra where a wedged lane job could block its own
-  #   substrate).
+  # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
-  # - knowledge-corpus, songwriting: planned NEW targets, blocked on the org
-  #   owner extending the sync App's selected access first — add them only
-  #   with that grant recorded.
+  # - ci-runner: adopted as a review-lane target by the wave retarget
+  #   (ci-workflows claude-review-lanes plan, ratified 2026-08-01), which
+  #   reverses its earlier runner-infra exemption. It is ALREADY a target
+  #   block below, so adding this component to its existing `managed:` list
+  #   adds no repository to the installation's attested set and needs no App
+  #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
+  #   ci-runner is PUBLIC, and a selector-routed caller is rejected outright
+  #   on a public repository (see PARKED below). Removal trigger: the one the
+  #   parked security caller carries — the runner indirection moving inside
+  #   the ci-workflows reusable. STILL LIVE when that fires, and not rebutted
+  #   by the reversal: the original exemption reason, that ci-runner is runner
+  #   infrastructure where a wedged lane job could block its own substrate.
+  #   Visibility became the nearer blocker; it did not answer that concern, so
+  #   adoption must clear it on the merits rather than inherit a pass.
+  # - cursor-plugins: adopted by the same retarget, and blocked TWICE over. It
+  #   is PUBLIC, so the removal trigger above gates it; and it is not a target
+  #   at all, so adopting it is a NEW target and also needs the App grant
+  #   below, plus its own `TARGET_VISIBILITY` entry — exactly like
+  #   claude-code-proxy on both counts.
+  # - claude-code-proxy: adopted by the same retarget and admissible on
+  #   visibility (private), but BLOCKED on the org owner extending the sync
+  #   App's selected access. The attest step derives its expected set from the
+  #   target repositories alone and requires the installation's selected set
+  #   to EQUAL it, so ANY new target added before the grant fails the sync for
+  #   every target, not just the new one. Add it only with that grant
+  #   recorded, alongside its `TARGET_VISIBILITY` entry in
+  #   `components/runner-policy/runner-policy.test.mjs`.
+  # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
+  #   the same retarget. Neither ever held a target block, so nothing left
+  #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
+  #   entries. Neither is a code repo, so a code-review lane has near-zero
+  #   signal. songwriting (lyric files) is dropped outright. knowledge-corpus
+  #   is DEFERRED rather than dropped: its scraped third-party HTML is content
+  #   an agent later reads, which is a prompt-injection surface rather than a
+  #   code-quality one. Removal trigger: prompt-injection hardening for a
+  #   review lane over untrusted third-party content — and then for a security
+  #   or content-scanning lane, not for claude-review as written.
+  #
+  # PUBLIC-SAFE SHAPE, CONSIDERED AND REJECTED for the two public adoptions:
+  # a hand-written hosted-only caller passing `runner: ubuntu-24.04` directly,
+  # with no caller-side selector — the shape claude-code-plugins already owns
+  # `locally-owned`. runner-policy admits it on a public repository, so the
+  # bar is a property of the SELECTOR-ROUTED shape, not of public visibility
+  # as such. Rejected because it forks the reviewed caller into a second
+  # per-visibility variant, which this repository deliberately declined
+  # pending the reusable-side indirection. It would also require revisiting
+  # `runner-policy.test.mjs`: its "every managed target of a claude lane
+  # caller admits that caller" test rejects a public managed target for EVERY
+  # component sourced from `components/claude-lanes/`, selector-using or not,
+  # so a hosted-only component in that directory still fails the build.
+  #
   # The security caller reads the repo-owned `.github/claude-security-paths`
   # pattern file (absent = fail-open: every PR reviewed). That file is
   # deliberately NOT sync-managed, and the manifest has no seed-once
