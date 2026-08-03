@@ -9,7 +9,15 @@ scope, and explicit local exceptions.
 ## Ownership boundaries
 
 - This repository owns lint, hygiene, analyzer, text, runtime-pin,
-  hook-adapter, and review policy.
+  hook-adapter, and review policy as **org policy choices** — rules binding
+  Melodic Software repositories, which it would be wrong to impose on a
+  repository we do not control.
+- [`melodic-software/claude-code-plugins`](https://github.com/melodic-software/claude-code-plugins)
+  owns **agnostic audit tooling** — surfaces any consumer could adopt
+  unchanged, whose defaults yield to that consumer's own declared policy where
+  one exists. It ships by marketplace version bump, not by sync PR.
+  [`conventions/README.md`](conventions/README.md) records how the `review`
+  plugin resolves this repository's criteria.
 - [`melodic-software/ci-workflows`](https://github.com/melodic-software/ci-workflows)
   owns reusable GitHub Actions execution.
 - the relevant `github-iac` repository owns organization/repository governance
@@ -17,7 +25,10 @@ scope, and explicit local exceptions.
 - consumers compose these capabilities and own repository-specific behavior.
 
 The accepted architecture is recorded in
-[`docs/adr/0001-federated-component-distribution.md`](docs/adr/0001-federated-component-distribution.md).
+[`docs/adr/0001-federated-component-distribution.md`](docs/adr/0001-federated-component-distribution.md),
+which establishes the federated control plane, and
+[`docs/adr/0002-agnostic-audit-tooling-ownership.md`](docs/adr/0002-agnostic-audit-tooling-ownership.md),
+which names the agnostic-audit-tooling owner.
 
 ## Repository shape
 
