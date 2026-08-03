@@ -25,7 +25,10 @@ scope, and explicit local exceptions.
 - consumers compose these capabilities and own repository-specific behavior.
 
 The accepted architecture is recorded in
-[`docs/adr/0001-federated-component-distribution.md`](docs/adr/0001-federated-component-distribution.md).
+[`docs/adr/0001-federated-component-distribution.md`](docs/adr/0001-federated-component-distribution.md),
+which establishes the federated control plane, and
+[`docs/adr/0002-agnostic-audit-tooling-ownership.md`](docs/adr/0002-agnostic-audit-tooling-ownership.md),
+which names the agnostic-audit-tooling owner.
 
 ## Repository shape
 
