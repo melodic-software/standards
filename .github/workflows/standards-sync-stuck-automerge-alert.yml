@@ -10,12 +10,12 @@ name: standards-sync-stuck-automerge-alert
 #
 # That repository is `medley`, for a caller-specific reason on top of the
 # reusable's own (its header owns why the destination must be a repository the
-# issue-authoring App is installed on, which this one is not): the alert body
-# embeds each reported PR's repository name, number, and URL, four of the eight
-# scanned targets are private, and this repository is public — filing here
-# would republish private repository names and PR URLs in public. `medley` is
-# itself one of the scanned targets, and private; that it may report on its own
-# sync PRs is incidental, not the reason it was chosen.
+# issue-authoring App is installed on, which this calling repo is not): the
+# alert body embeds each reported PR's repository name, number, and URL, four
+# of the eight scanned targets are private, and this repository is public —
+# filing here would republish private repository names and PR URLs in public.
+# `medley` is itself one of the scanned targets, and private; that it may
+# report on its own sync PRs is incidental, not the reason it was chosen.
 #
 # The never-armed half only considers `automerge: true` targets, so it is inert
 # for the duration of a rollout window that opts every target out.
