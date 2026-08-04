@@ -4,7 +4,18 @@ name: standards-sync-stuck-automerge-alert
 # (read from the manifest, never hardcoded) for App-authored sync PRs in either
 # failure state — armed but BLOCKED past a threshold, or never armed at all on
 # a target the manifest marks `automerge: true` — and files/refreshes a rolling
-# tracking issue in this repo — the calling repo, not any scanned target.
+# tracking issue in the one repository named below through
+# `tracking-issue-repository` — never defaulted to this repo, never scattered
+# across the scanned targets.
+#
+# That repository is `medley`, for a caller-specific reason on top of the
+# reusable's own (its header owns why the destination must be a repository the
+# issue-authoring App is installed on, which this calling repo is not): the
+# alert body embeds each reported PR's repository name, number, and URL, four
+# of the eight scanned targets are private, and this repository is public —
+# filing here would republish private repository names and PR URLs in public.
+# `medley` is itself one of the scanned targets, and private; that it may
+# report on its own sync PRs is incidental, not the reason it was chosen.
 #
 # The never-armed half only considers `automerge: true` targets, so it is inert
 # for the duration of a rollout window that opts every target out.
@@ -20,9 +31,12 @@ permissions:
 
 jobs:
   alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@8202e03f30dd0c0189c862052d5f242b9a496798 # 8202e03 2026-07-29
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@ed6d410c1fe10d9deb40241bbe46428b31fafd57 # ed6d410 2026-08-04
     with:
       runner: ubuntu-24.04
+      # Bare name under this repository's own owner — `owner/repo` is rejected
+      # by the reusable's first step.
+      tracking-issue-repository: medley
     secrets:
       app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
