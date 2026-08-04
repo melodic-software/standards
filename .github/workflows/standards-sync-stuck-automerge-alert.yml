@@ -4,15 +4,18 @@ name: standards-sync-stuck-automerge-alert
 # (read from the manifest, never hardcoded) for App-authored sync PRs in either
 # failure state — armed but BLOCKED past a threshold, or never armed at all on
 # a target the manifest marks `automerge: true` — and files/refreshes a rolling
-# tracking issue in `medley`, named below through `tracking-issue-repository`:
-# neither this repo nor any scanned target.
+# tracking issue in the one repository named below through
+# `tracking-issue-repository` — never defaulted to this repo, never scattered
+# across the scanned targets.
 #
-# `medley` for a caller-specific reason on top of the reusable's own (its
-# header owns why the destination must be a repository the issue-authoring App
-# is installed on, which this one is not): the alert body embeds each reported
-# PR's repository name, number, and URL, four of the eight scanned targets are
-# private, and this repository is public — filing here would republish private
-# repository names and PR URLs in public.
+# That repository is `medley`, for a caller-specific reason on top of the
+# reusable's own (its header owns why the destination must be a repository the
+# issue-authoring App is installed on, which this one is not): the alert body
+# embeds each reported PR's repository name, number, and URL, four of the eight
+# scanned targets are private, and this repository is public — filing here
+# would republish private repository names and PR URLs in public. `medley` is
+# itself one of the scanned targets, and private; that it may report on its own
+# sync PRs is incidental, not the reason it was chosen.
 #
 # The never-armed half only considers `automerge: true` targets, so it is inert
 # for the duration of a rollout window that opts every target out.
