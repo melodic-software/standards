@@ -549,9 +549,19 @@ reached only the arming step. The predecessor `43bc8d0f` also predated
 ci-workflows#234, which split the stuck-PR scan into a cheap page fetch and a
 per-candidate merge-state probe with retry, so this bump carries a reliability
 fix to the armed-but-BLOCKED path as well as the new never-armed detection.
-Inputs, secrets, and routing are unchanged across both SHAs — `runner`,
+Inputs, secrets, and routing were unchanged across those two SHAs — `runner`,
 `manifest`, `standards-ref`, `threshold-hours`, the same two App secrets — so
-the reviewed `runner-input` shape carries over; the caller passes only `runner`.
+the reviewed `runner-input` shape carried over unmodified.
+
+The live pin is now `ed6d410c1fe10d9deb40241bbe46428b31fafd57`, the first
+contract in this family whose input surface actually grew: it adds the required
+`tracking-issue-repository`, naming the one repository the watchdog files its
+rolling tracking issue in rather than defaulting to the caller — a default that
+404'd on every run, because `standards` is the sync source and deliberately
+outside the App's selected access (standards#273). Routing, secrets, and
+job-level `permissions` are unchanged: the reusable mints its own issue-scoped
+token, so the caller's ambient token still needs only `contents: read`. The
+caller now passes `runner` and `tracking-issue-repository`.
 
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the
