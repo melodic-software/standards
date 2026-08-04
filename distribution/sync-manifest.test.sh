@@ -605,4 +605,105 @@ if [[ -f "$root/distribution/node_modules/ajv/package.json" ]]; then
     "$(cat "$automerge_schema_error")" 'automerge'
 fi
 
+# Malformed-shape coverage for the consolidated structural pass. Validation reads
+# the whole manifest in one yq pass per section, so a record whose shape cannot be
+# descended into must still produce that record's own diagnostic rather than
+# collapsing the pass itself. Every shape below is one that a naive single-pass
+# expression evaluates as an error instead of a finding.
+component_block='  consumer:'$'\n''    files:'$'\n''      consumer.txt: consumer.txt'$'\n''    requires:'$'\n''      - base'
+requires_block='    requires:'$'\n''      - base'
+target_block='  beta/two:'$'\n''    managed:'$'\n''      - consumer'$'\n''    locally-owned:'$'\n''      - base'
+
+bad="${manifest/"$component_block"/'  consumer: "oops"'}"
+invalid_case 'component is a scalar string' "$bad" "component 'consumer' must be a mapping"
+
+bad="${manifest/"$component_block"/'  consumer:'$'\n''    - one'$'\n''    - two'}"
+invalid_case 'component is a sequence' "$bad" "component 'consumer' must be a mapping"
+
+bad="${manifest/"$component_block"/'  consumer: {}'}"
+invalid_case 'component is an empty mapping' "$bad" "component 'consumer' is missing required key 'files'"
+
+bad="${manifest/'    files:'$'\n''      consumer.txt: consumer.txt'/'    files: "oops"'}"
+invalid_case 'component files is a scalar string' "$bad" \
+  "component 'consumer' files must be a non-empty mapping"
+
+bad="${manifest/'    files:'$'\n''      consumer.txt: consumer.txt'/'    files:'$'\n''      - a'$'\n''      - b'}"
+invalid_case 'component files is a sequence' "$bad" \
+  "component 'consumer' files must be a non-empty mapping"
+
+bad="${manifest/consumer.txt: consumer.txt/consumer.txt: 42}"
+invalid_case 'component file destination is not a string' "$bad" \
+  "component 'consumer' file sources and destinations must be strings"
+
+bad="${manifest/"$requires_block"/'    requires: "oops"'}"
+invalid_case 'component requires is a scalar string' "$bad" \
+  "component 'consumer' requires must be a non-empty sequence"
+
+bad="${manifest/"$requires_block"/'    requires:'$'\n''      key: value'}"
+invalid_case 'component requires is a mapping' "$bad" \
+  "component 'consumer' requires must be a non-empty sequence"
+
+bad="${manifest/"$requires_block"/'    requires:'$'\n''      - 42'}"
+invalid_case 'component dependency is not a string' "$bad" \
+  "component 'consumer' dependencies must be strings"
+
+bad="${manifest/"$target_block"/'  beta/two: "oops"'}"
+invalid_case 'target is a scalar string' "$bad" "target 'beta/two' must be a mapping"
+
+bad="${manifest/"$target_block"/'  beta/two:'$'\n''    - one'}"
+invalid_case 'target is a sequence' "$bad" "target 'beta/two' must be a mapping"
+
+bad="${manifest/"$target_block"/'  beta/two: {}'}"
+invalid_case 'target is an empty mapping' "$bad" \
+  "target 'beta/two' is missing required key 'managed'"
+
+bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed: "oops"'}"
+invalid_case 'target managed is a scalar string' "$bad" \
+  "target 'beta/two' managed must be a non-empty sequence"
+
+bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed:'$'\n''      - 42'}"
+invalid_case 'target managed entry is not a string' "$bad" \
+  "target 'beta/two' managed entries must be strings"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned: "oops"'}"
+invalid_case 'target locally-owned is a scalar string' "$bad" \
+  "target 'beta/two' locally-owned must be a non-empty sequence when present"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned:'$'\n''      - 42'}"
+invalid_case 'target locally-owned entry is not a string' "$bad" \
+  "target 'beta/two' locally-owned entries must be strings"
+
+# Regression: probing an absent optional key must not materialize it. yq creates
+# a node for a traversed missing path, so a structural pass that reaches for
+# `.requires` before reading a component's keys would report every component as
+# carrying `requires` — and then reject the null it just created.
+absent_optional_dir="$tmp_root/absent-optional-keys"
+make_source "$absent_optional_dir" "$manifest"
+out="$(run_engine "$absent_optional_dir" validate 2>&1)"
+rc=$?
+assert_exit 'component without requires validates' 0 "$rc"
+assert_not_contains 'absent requires is never reported as an empty sequence' \
+  "$out" 'requires must be a non-empty sequence'
+assert_not_contains 'absent locally-owned is never reported as an empty sequence' \
+  "$out" 'locally-owned must be a non-empty sequence'
+
+# Empty-string paths. These frame the structural pass rather than the validator:
+# `@tsv` renders an empty string as a genuinely empty column, and tab is an IFS
+# *whitespace* character, so reading a row with `IFS=$'\t' read` would merge the
+# empty column into its neighbour and reconstruct a path pair that the manifest
+# never declared — turning a rejection into a silent acceptance that `apply`
+# would then materialize.
+bad="${manifest/policy.txt: .policy/policy.txt: \"\"}"
+invalid_case 'file destination is the empty string' "$bad" \
+  "component 'base' has unsafe destination path ''"
+
+bad="${manifest/policy.txt: .policy/\"\": .policy}"
+empty_source_dir="$tmp_root/empty-file-source"
+make_source "$empty_source_dir" "$bad"
+out="$(run_engine "$empty_source_dir" validate 2>&1)"
+rc=$?
+assert_nonzero 'file source is the empty string is rejected' "$rc"
+assert_not_contains 'empty file source never reports a valid manifest' \
+  "$out" 'Manifest valid'
+
 [[ $FAILED -eq 0 ]] || exit 1

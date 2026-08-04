@@ -266,11 +266,23 @@ declare -A TARGET_AUTOMERGE_SHAPE=() TARGET_AUTOMERGE_VALUE=()
 # then find nothing to reject and the command would report a valid manifest.
 # The expected record count is asserted against the names read separately.
 load_manifest_rows() {
-  local expression="$1" label="$2" expected="$3" rows kind name rest record_count=0
+  local expression="$1" label="$2" expected="$3" rows row kind name rest record_count=0
   rows="$(yq eval -r "$expression" "$MANIFEST_ABS")" ||
     die "could not read the $label catalog from the manifest"
-  while IFS=$'\t' read -r kind name rest; do
-    [[ -n "$kind" ]] || continue
+  # Tab is an IFS *whitespace* character, so `IFS=$'\t' read` merges runs of
+  # tabs and strips trailing ones: an empty column would disappear and the next
+  # value would slide into its place. A path may legitimately be the empty
+  # string — and must still be rejected as unsafe rather than silently become
+  # its neighbour — so every row is split verbatim. Each emitted kind carries at
+  # least three columns, so a row with fewer is a corrupt stream, not a value.
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    [[ "$row" == *$'\t'*$'\t'* ]] ||
+      die "internal error: malformed manifest row '$row'"
+    kind="${row%%$'\t'*}"
+    rest="${row#*$'\t'}"
+    name="${rest%%$'\t'*}"
+    rest="${rest#*$'\t'}"
     case "$kind" in
     ctag)
       COMPONENT_TAG["$name"]="$rest"
