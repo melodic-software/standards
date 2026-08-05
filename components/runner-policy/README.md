@@ -459,6 +459,11 @@ The follow-up revision at `d25b689c1b8509c63d6516bcbe72cedb8511cc2f`
 ([v0.10.1 release][16]) carries `pr-issue-linkage.yml` byte-identical to
 v0.10.0; the release contains only the independently reviewed aggregator
 documentation correction from ci-workflows#334.
+The code-masking revision at `e94438746c300b02385a7f8a2a2dcd19a7f4ad4a`
+([v0.10.2 release][17]) preserves the same workflow-call contract and runner
+routing. It masks inline, fenced, and indented Markdown code before validating
+linkage markers, so example-only metadata cannot satisfy the required check;
+24 focused parser regressions cover the resulting fail-closed behavior.
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
@@ -863,3 +868,4 @@ default `GITHUB_TOKEN` permissions][7].
 [14]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.0
 [15]: https://github.com/melodic-software/ci-workflows/pull/354
 [16]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.1
+[17]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.2
