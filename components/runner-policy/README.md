@@ -444,7 +444,8 @@ required needs the input to narrow the reusable's four-actor default, and
 inheriting that default silently widens a review-bypass exception
 (melodic-software/claude-code-plugins#1767).
 The PR-linkage revision at `2b14f0c06e497e4bfbe14f2792b222822b789a65`
-(v0.10.0) preserves the reviewed `runner`, `prerequisite-result`, and
+([v0.10.0 release][14]; parser change [ci-workflows#354][15]) preserves the
+reviewed `runner`, `prerequisite-result`, and
 `exempt-authors` input surface and declares no secrets or caller permissions.
 Its scheduling change removes the reusable's implicit hosted fallback when a
 prerequisite fails: every outcome now honors the caller-provided `runner`, while
@@ -855,3 +856,5 @@ default `GITHUB_TOKEN` permissions][7].
 [11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
 [12]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow
 [13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
+[14]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.0
+[15]: https://github.com/melodic-software/ci-workflows/pull/354
