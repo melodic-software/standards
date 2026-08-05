@@ -443,6 +443,17 @@ which already admitted it: a consumer whose ruleset makes the security check
 required needs the input to narrow the reusable's four-actor default, and
 inheriting that default silently widens a review-bypass exception
 (melodic-software/claude-code-plugins#1767).
+The PR-linkage revision at `2b14f0c06e497e4bfbe14f2792b222822b789a65`
+(v0.10.0) preserves the reviewed `runner`, `prerequisite-result`, and
+`exempt-authors` input surface and declares no secrets or caller permissions.
+Its scheduling change removes the reusable's implicit hosted fallback when a
+prerequisite fails: every outcome now honors the caller-provided `runner`, while
+direct callers that omit it retain the declared `ubuntu-24.04` default. The
+required check still rejects every non-success prerequisite before body
+validation. The remaining delta replaces regex-only HTML-comment stripping
+with a tested Markdown-aware parser so literal comment markers in code spans
+and fences do not hide live linkage metadata, while unmatched code spans and
+unterminated comments continue to fail closed.
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
