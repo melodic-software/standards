@@ -443,6 +443,22 @@ which already admitted it: a consumer whose ruleset makes the security check
 required needs the input to narrow the reusable's four-actor default, and
 inheriting that default silently widens a review-bypass exception
 (melodic-software/claude-code-plugins#1767).
+The PR-linkage revision at `2b14f0c06e497e4bfbe14f2792b222822b789a65`
+([v0.10.0 release][14]; parser change [ci-workflows#354][15]) preserves the
+reviewed `runner`, `prerequisite-result`, and
+`exempt-authors` input surface and declares no secrets or caller permissions.
+Its scheduling change removes the reusable's implicit hosted fallback when a
+prerequisite fails: every outcome now honors the caller-provided `runner`, while
+direct callers that omit it retain the declared `ubuntu-24.04` default. The
+required check still rejects every non-success prerequisite before body
+validation. The remaining delta replaces regex-only HTML-comment stripping
+with a tested Markdown-aware parser so literal comment markers in code spans
+and fences do not hide live linkage metadata, while unmatched code spans and
+unterminated comments continue to fail closed.
+The follow-up revision at `d25b689c1b8509c63d6516bcbe72cedb8511cc2f`
+([v0.10.1 release][16]) carries `pr-issue-linkage.yml` byte-identical to
+v0.10.0; the release contains only the independently reviewed aggregator
+documentation correction from ci-workflows#334.
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
@@ -844,3 +860,6 @@ default `GITHUB_TOKEN` permissions][7].
 [11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
 [12]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow
 [13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
+[14]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.0
+[15]: https://github.com/melodic-software/ci-workflows/pull/354
+[16]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.1

@@ -21,7 +21,7 @@ concurrency:
 jobs:
   pr-issue-linkage:
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@d7734df8c557084edc2df7cf578cf62ad2f261e4 # d7734df 2026-07-20
+    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@d25b689c1b8509c63d6516bcbe72cedb8511cc2f # v0.10.1
     with:
       runner: ubuntu-24.04
       # Dependabot owns its generated body and cannot add this repository's
