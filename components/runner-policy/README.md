@@ -455,6 +455,10 @@ validation. The remaining delta replaces regex-only HTML-comment stripping
 with a tested Markdown-aware parser so literal comment markers in code spans
 and fences do not hide live linkage metadata, while unmatched code spans and
 unterminated comments continue to fail closed.
+The follow-up revision at `d25b689c1b8509c63d6516bcbe72cedb8511cc2f`
+([v0.10.1 release][16]) carries `pr-issue-linkage.yml` byte-identical to
+v0.10.0; the release contains only the independently reviewed aggregator
+documentation correction from ci-workflows#334.
 Twelve selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these nine strict-scheduling
@@ -858,3 +862,4 @@ default `GITHUB_TOKEN` permissions][7].
 [13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
 [14]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.0
 [15]: https://github.com/melodic-software/ci-workflows/pull/354
+[16]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.1
