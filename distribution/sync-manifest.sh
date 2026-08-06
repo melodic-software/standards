@@ -181,6 +181,158 @@ declare -A MANAGED_BY_TARGET=() LOCAL_BY_TARGET=() VISIT_STATE=()
 declare -A AUTOMERGE_BY_TARGET=()
 declare -a VISIT_PATH=()
 
+# Structural facts for every component and target, read in one yq pass each
+# instead of one pass per record. Two yq behaviors shape the row design:
+#
+#   * Traversing an absent key materializes it, so a bare `.value.requires`
+#     probe would make a later `keys` report a key the manifest never declared.
+#     Every descent is gated behind `has(...)`.
+#   * `@tsv` does not escape embedded tabs or newlines, so a path containing one
+#     would split its own row and desynchronize the stream. Payload rows are
+#     emitted only for records that already satisfy the control-character check,
+#     and the shell reports that violation from the boolean columns below before
+#     it reads any payload.
+#
+# Each row is `kind<TAB>record-name<TAB>value...`. Record names are proven free
+# of control characters before either pass runs, so the first two columns always
+# frame correctly.
+# The $-prefixed names below are yq's own binding variables, not shell
+# parameters, so the expressions are deliberately single-quoted.
+# shellcheck disable=SC2016
+readonly COMPONENT_ROW_EXPRESSION='.components | to_entries[] | (
+  ["ctag", .key, (.value | tag)],
+  (select((.value | tag) == "!!map") | . as $c | (
+    ($c.value | keys[] | ["ckey", $c.key, .]),
+    (select($c.value | has("files")) | . as $h | (
+      ["cftag", $h.key, ($h.value.files | tag), (($h.value.files | length) > 0)],
+      (select(($h.value.files | tag) == "!!map") | . as $f | (
+        ["cfstr", $f.key,
+          ($f.value.files | [to_entries[] | (.key, .value) | (tag == "!!str")] | all),
+          ($f.value.files | [to_entries[] | (.key, .value) | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+        (select($f.value.files | [to_entries[] | (.key, .value) | (tag == "!!str")] | all)
+          | select($f.value.files | [to_entries[] | (.key, .value) | (test(strenv(CONTROL_RE)) | not)] | all)
+          | . as $g | ($g.value.files | to_entries[] | ["cfile", $g.key, .key, .value])))))),
+    (select($c.value | has("requires")) | . as $q | (
+      ["crtag", $q.key, ($q.value.requires | tag), (($q.value.requires | length) > 0)],
+      (select(($q.value.requires | tag) == "!!seq") | . as $r | (
+        ["crstr", $r.key,
+          ($r.value.requires | [.[] | (tag == "!!str")] | all),
+          ($r.value.requires | [.[] | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+        (select($r.value.requires | [.[] | (tag == "!!str")] | all)
+          | select($r.value.requires | [.[] | (test(strenv(CONTROL_RE)) | not)] | all)
+          | . as $s | ($s.value.requires[] | ["creq", $s.key, .]))))))
+  ))
+) | @tsv'
+
+# shellcheck disable=SC2016 # yq binding variables; see COMPONENT_ROW_EXPRESSION.
+readonly TARGET_ROW_EXPRESSION='.targets | to_entries[] | (
+  ["ttag", .key, (.value | tag)],
+  (select((.value | tag) == "!!map") | . as $t | (
+    ($t.value | keys[] | ["tkey", $t.key, .]),
+    (select($t.value | has("managed")) | . as $m | (
+      ["tmtag", $m.key, ($m.value.managed | tag), (($m.value.managed | length) > 0)],
+      (select(($m.value.managed | tag) == "!!seq") | . as $n | (
+        ["tmstr", $n.key,
+          ($n.value.managed | [.[] | (tag == "!!str")] | all),
+          ($n.value.managed | [.[] | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+        (select($n.value.managed | [.[] | (tag == "!!str")] | all)
+          | select($n.value.managed | [.[] | (test(strenv(CONTROL_RE)) | not)] | all)
+          | . as $o | ($o.value.managed[] | ["tman", $o.key, .])))))),
+    (select($t.value | has("locally-owned")) | . as $l | (
+      ["tltag", $l.key, ($l.value["locally-owned"] | tag), (($l.value["locally-owned"] | length) > 0)],
+      (select(($l.value["locally-owned"] | tag) == "!!seq") | . as $p | (
+        ["tlstr", $p.key,
+          ($p.value["locally-owned"] | [.[] | (tag == "!!str")] | all),
+          ($p.value["locally-owned"] | [.[] | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+        (select($p.value["locally-owned"] | [.[] | (tag == "!!str")] | all)
+          | select($p.value["locally-owned"] | [.[] | (test(strenv(CONTROL_RE)) | not)] | all)
+          | . as $q | ($q.value["locally-owned"][] | ["tloc", $q.key, .])))))),
+    (select($t.value | has("automerge")) | . as $a | (
+      ["tam", $a.key, ($a.value.automerge | tag)],
+      (select(($a.value.automerge | tag) == "!!bool") | . as $b | ["tamv", $b.key, $b.value.automerge])))
+  ))
+) | @tsv'
+
+declare -A COMPONENT_TAG=() COMPONENT_KEY_ROWS=() COMPONENT_FILES_SHAPE=()
+declare -A COMPONENT_FILES_STRINGS=() COMPONENT_FILE_ROWS=()
+declare -A COMPONENT_REQUIRES_SHAPE=() COMPONENT_REQUIRES_STRINGS=()
+declare -A COMPONENT_REQUIRE_ROWS=()
+declare -A TARGET_TAG=() TARGET_KEY_ROWS=() TARGET_MANAGED_SHAPE=()
+declare -A TARGET_MANAGED_STRINGS=() TARGET_MANAGED_ROWS=()
+declare -A TARGET_LOCAL_SHAPE=() TARGET_LOCAL_STRINGS=() TARGET_LOCAL_ROWS=()
+declare -A TARGET_AUTOMERGE_SHAPE=() TARGET_AUTOMERGE_VALUE=()
+
+# A failed pass must not degrade into an empty stream: every loop below would
+# then find nothing to reject and the command would report a valid manifest.
+# The expected record count is asserted against the names read separately.
+load_manifest_rows() {
+  local expression="$1" label="$2" expected="$3" rows row kind name rest record_count=0
+  rows="$(yq eval -r "$expression" "$MANIFEST_ABS")" ||
+    die "could not read the $label catalog from the manifest"
+  # Tab is an IFS *whitespace* character, so `IFS=$'\t' read` merges runs of
+  # tabs and strips trailing ones: an empty column would disappear and the next
+  # value would slide into its place. A path may legitimately be the empty
+  # string — and must still be rejected as unsafe rather than silently become
+  # its neighbour — so every row is split verbatim. Each emitted kind carries at
+  # least three columns, so a row with fewer is a corrupt stream, not a value.
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    [[ "$row" == *$'\t'*$'\t'* ]] ||
+      die "internal error: malformed manifest row '$row'"
+    kind="${row%%$'\t'*}"
+    rest="${row#*$'\t'}"
+    name="${rest%%$'\t'*}"
+    rest="${rest#*$'\t'}"
+    case "$kind" in
+    ctag)
+      COMPONENT_TAG["$name"]="$rest"
+      record_count=$((record_count + 1))
+      ;;
+    ckey) COMPONENT_KEY_ROWS["$name"]+="$rest"$'\n' ;;
+    cftag) COMPONENT_FILES_SHAPE["$name"]="$rest" ;;
+    cfstr) COMPONENT_FILES_STRINGS["$name"]="$rest" ;;
+    cfile) COMPONENT_FILE_ROWS["$name"]+="$rest"$'\n' ;;
+    crtag) COMPONENT_REQUIRES_SHAPE["$name"]="$rest" ;;
+    crstr) COMPONENT_REQUIRES_STRINGS["$name"]="$rest" ;;
+    creq) COMPONENT_REQUIRE_ROWS["$name"]+="$rest"$'\n' ;;
+    ttag)
+      TARGET_TAG["$name"]="$rest"
+      record_count=$((record_count + 1))
+      ;;
+    tkey) TARGET_KEY_ROWS["$name"]+="$rest"$'\n' ;;
+    tmtag) TARGET_MANAGED_SHAPE["$name"]="$rest" ;;
+    tmstr) TARGET_MANAGED_STRINGS["$name"]="$rest" ;;
+    tman) TARGET_MANAGED_ROWS["$name"]+="$rest"$'\n' ;;
+    tltag) TARGET_LOCAL_SHAPE["$name"]="$rest" ;;
+    tlstr) TARGET_LOCAL_STRINGS["$name"]="$rest" ;;
+    tloc) TARGET_LOCAL_ROWS["$name"]+="$rest"$'\n' ;;
+    tam) TARGET_AUTOMERGE_SHAPE["$name"]="$rest" ;;
+    tamv) TARGET_AUTOMERGE_VALUE["$name"]="$rest" ;;
+    *) die "internal error: unrecognized manifest row kind '$kind'" ;;
+    esac
+  done <<<"$rows"
+  [[ "$record_count" -eq "$expected" ]] ||
+    die "manifest $label pass reported $record_count records, expected $expected"
+}
+
+# Split a stored row into fields without letting a value's own tabs create
+# extra ones: the caller names exactly the columns the row kind carries.
+read_row_fields() {
+  local row="$1"
+  shift
+  IFS=$'\t' read -r "$@" <<<"$row"
+}
+
+# Emit an accumulated row block as ROW_VALUES, mirroring read_exact_index_entries'
+# global-output idiom so the script keeps working on Bash 4.0 (no namerefs).
+declare -a ROW_VALUES=()
+read_row_values() {
+  local text="$1"
+  ROW_VALUES=()
+  [[ -n "$text" ]] || return 0
+  mapfile -t ROW_VALUES <<<"${text%$'\n'}"
+}
+
 visit_component() {
   local component="$1" dependency cycle
   case "${VISIT_STATE[$component]-}" in
@@ -207,7 +359,11 @@ visit_component() {
 validate_manifest() {
   local root_key component key source destination existing_destination mode dependency target selected_component
   local has_requires has_local has_automerge automerge_value
-  local -a root_keys component_keys file_sources dependencies target_keys managed locally_owned
+  local files_tag files_nonempty files_strings files_control file_row
+  local requires_tag requires_nonempty requires_strings requires_control
+  local managed_tag managed_nonempty managed_strings managed_control
+  local local_tag local_nonempty local_strings local_control automerge_tag
+  local -a root_keys component_keys file_sources file_rows dependencies target_keys managed locally_owned
   local -A destination_owner=() selected=()
 
   yq eval-all --exit-status '[.] | length == 1' "$MANIFEST_ABS" >/dev/null 2>&1 ||
@@ -250,45 +406,42 @@ validate_manifest() {
     COMPONENT_EXISTS["$component"]=1
   done
 
+  load_manifest_rows "$COMPONENT_ROW_EXPRESSION" component "${#COMPONENT_NAMES[@]}"
   for component in "${COMPONENT_NAMES[@]}"; do
-    COMPONENT="$component" yq eval --exit-status \
-      '.components[strenv(COMPONENT)] | tag == "!!map"' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    [[ "${COMPONENT_TAG[$component]-}" == '!!map' ]] ||
       die "component '$component' must be a mapping"
-    mapfile -t component_keys < <(
-      COMPONENT="$component" yq eval -r \
-        '.components[strenv(COMPONENT)] | keys[]' "$MANIFEST_ABS"
-    )
-    validate_record_keys "component '$component'" files requires "${component_keys[@]}"
+    read_row_values "${COMPONENT_KEY_ROWS[$component]-}"
+    component_keys=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+    validate_record_keys "component '$component'" files requires \
+      "${component_keys[@]+"${component_keys[@]}"}"
     has_requires=false
-    for key in "${component_keys[@]}"; do
+    for key in "${component_keys[@]+"${component_keys[@]}"}"; do
       [[ "$key" == requires ]] && has_requires=true
     done
 
-    COMPONENT="$component" yq eval --exit-status \
-      '(.components[strenv(COMPONENT)].files | tag == "!!map") and
-       (.components[strenv(COMPONENT)].files | length > 0)' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    read_row_fields "${COMPONENT_FILES_SHAPE[$component]-}" files_tag files_nonempty
+    [[ "$files_tag" == '!!map' && "$files_nonempty" == true ]] ||
       die "component '$component' files must be a non-empty mapping"
-    COMPONENT="$component" yq eval --exit-status \
-      '.components[strenv(COMPONENT)].files |
-       [to_entries[] | (.key, .value) | tag == "!!str"] | all' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    read_row_fields "${COMPONENT_FILES_STRINGS[$component]-}" files_strings files_control
+    [[ "$files_strings" == true ]] ||
       die "component '$component' file sources and destinations must be strings"
-    COMPONENT="$component" yq eval --exit-status \
-      '.components[strenv(COMPONENT)].files |
-       [to_entries[] | (.key, .value) |
-        (test(strenv(CONTROL_RE)) | not)] | all' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    [[ "$files_control" == true ]] ||
       die "component '$component' file paths may not contain control characters"
-    mapfile -t file_sources < <(
-      COMPONENT="$component" yq eval -r \
-        '.components[strenv(COMPONENT)].files | keys[]' "$MANIFEST_ABS"
-    )
-    assert_sorted_unique "component '$component' file sources" "${file_sources[@]}"
+    read_row_values "${COMPONENT_FILE_ROWS[$component]-}"
+    file_rows=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+    file_sources=()
+    for file_row in "${file_rows[@]+"${file_rows[@]}"}"; do
+      source="${file_row%%$'\t'*}"
+      [[ -n "$source" ]] ||
+        die "component '$component' has unsafe source path '$source'"
+      file_sources+=("$source")
+    done
+    assert_sorted_unique "component '$component' file sources" \
+      "${file_sources[@]+"${file_sources[@]}"}"
     FILES_BY_COMPONENT["$component"]=''
-    while IFS=$'\t' read -r source destination; do
-      [[ -n "$source" ]] || continue
+    for file_row in "${file_rows[@]+"${file_rows[@]}"}"; do
+      source="${file_row%%$'\t'*}"
+      destination="${file_row#*$'\t'}"
       # Predicate calls intentionally run in conditions; the function contains
       # no errexit-dependent commands.
       # shellcheck disable=SC2310
@@ -315,35 +468,25 @@ validate_manifest() {
       mode="$(tracked_regular_mode "$SOURCE_ROOT" "$source" "component '$component' source")"
       SOURCE_MODES["$source"]="$mode"
       FILES_BY_COMPONENT["$component"]+="$source"$'\t'"$destination"$'\n'
-    done < <(
-      COMPONENT="$component" yq eval -r \
-        '.components[strenv(COMPONENT)].files |
-         to_entries[] | [.key, .value] | @tsv' "$MANIFEST_ABS"
-    )
+    done
 
     REQUIRES_BY_COMPONENT["$component"]=''
     if [[ "$has_requires" == true ]]; then
-      COMPONENT="$component" yq eval --exit-status \
-        '(.components[strenv(COMPONENT)].requires | tag == "!!seq") and
-         (.components[strenv(COMPONENT)].requires | length > 0)' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      read_row_fields "${COMPONENT_REQUIRES_SHAPE[$component]-}" \
+        requires_tag requires_nonempty
+      [[ "$requires_tag" == '!!seq' && "$requires_nonempty" == true ]] ||
         die "component '$component' requires must be a non-empty sequence"
-      COMPONENT="$component" yq eval --exit-status \
-        '.components[strenv(COMPONENT)].requires |
-         [.[] | tag == "!!str"] | all' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      read_row_fields "${COMPONENT_REQUIRES_STRINGS[$component]-}" \
+        requires_strings requires_control
+      [[ "$requires_strings" == true ]] ||
         die "component '$component' dependencies must be strings"
-      COMPONENT="$component" yq eval --exit-status \
-        '.components[strenv(COMPONENT)].requires |
-         [.[] | (test(strenv(CONTROL_RE)) | not)] | all' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      [[ "$requires_control" == true ]] ||
         die "component '$component' dependencies may not contain control characters"
-      mapfile -t dependencies < <(
-        COMPONENT="$component" yq eval -r \
-          '.components[strenv(COMPONENT)].requires[]' "$MANIFEST_ABS"
-      )
-      assert_sorted_unique "component '$component' dependencies" "${dependencies[@]}"
-      for dependency in "${dependencies[@]}"; do
+      read_row_values "${COMPONENT_REQUIRE_ROWS[$component]-}"
+      dependencies=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+      assert_sorted_unique "component '$component' dependencies" \
+        "${dependencies[@]+"${dependencies[@]}"}"
+      for dependency in "${dependencies[@]+"${dependencies[@]}"}"; do
         [[ -n "${COMPONENT_EXISTS[$dependency]+present}" ]] ||
           die "component '$component' requires unknown component '$dependency'"
         [[ "$dependency" != "$component" ]] ||
@@ -365,77 +508,58 @@ validate_manifest() {
     TARGET_EXISTS["$target"]=1
   done
 
+  load_manifest_rows "$TARGET_ROW_EXPRESSION" target "${#TARGET_NAMES[@]}"
   for target in "${TARGET_NAMES[@]}"; do
-    TARGET="$target" yq eval --exit-status \
-      '.targets[strenv(TARGET)] | tag == "!!map"' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    [[ "${TARGET_TAG[$target]-}" == '!!map' ]] ||
       die "target '$target' must be a mapping"
-    mapfile -t target_keys < <(
-      TARGET="$target" yq eval -r \
-        '.targets[strenv(TARGET)] | keys[]' "$MANIFEST_ABS"
-    )
-    validate_record_keys "target '$target'" managed "locally-owned,automerge" "${target_keys[@]}"
+    read_row_values "${TARGET_KEY_ROWS[$target]-}"
+    target_keys=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+    validate_record_keys "target '$target'" managed "locally-owned,automerge" \
+      "${target_keys[@]+"${target_keys[@]}"}"
     has_local=false
     has_automerge=false
-    for key in "${target_keys[@]}"; do
+    for key in "${target_keys[@]+"${target_keys[@]}"}"; do
       [[ "$key" == locally-owned ]] && has_local=true
       [[ "$key" == automerge ]] && has_automerge=true
     done
 
-    TARGET="$target" yq eval --exit-status \
-      '(.targets[strenv(TARGET)].managed | tag == "!!seq") and
-       (.targets[strenv(TARGET)].managed | length > 0)' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    read_row_fields "${TARGET_MANAGED_SHAPE[$target]-}" managed_tag managed_nonempty
+    [[ "$managed_tag" == '!!seq' && "$managed_nonempty" == true ]] ||
       die "target '$target' managed must be a non-empty sequence"
-    TARGET="$target" yq eval --exit-status \
-      '.targets[strenv(TARGET)].managed | [.[] | tag == "!!str"] | all' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    read_row_fields "${TARGET_MANAGED_STRINGS[$target]-}" managed_strings managed_control
+    [[ "$managed_strings" == true ]] ||
       die "target '$target' managed entries must be strings"
-    TARGET="$target" yq eval --exit-status \
-      '.targets[strenv(TARGET)].managed |
-       [.[] | (test(strenv(CONTROL_RE)) | not)] | all' \
-      "$MANIFEST_ABS" >/dev/null 2>&1 ||
+    [[ "$managed_control" == true ]] ||
       die "target '$target' managed entries may not contain control characters"
-    mapfile -t managed < <(
-      TARGET="$target" yq eval -r '.targets[strenv(TARGET)].managed[]' "$MANIFEST_ABS"
-    )
-    assert_sorted_unique "target '$target' managed components" "${managed[@]}"
+    read_row_values "${TARGET_MANAGED_ROWS[$target]-}"
+    managed=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+    assert_sorted_unique "target '$target' managed components" \
+      "${managed[@]+"${managed[@]}"}"
 
     locally_owned=()
     if [[ "$has_local" == true ]]; then
-      TARGET="$target" yq eval --exit-status \
-        '(.targets[strenv(TARGET)]["locally-owned"] | tag == "!!seq") and
-         (.targets[strenv(TARGET)]["locally-owned"] | length > 0)' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      read_row_fields "${TARGET_LOCAL_SHAPE[$target]-}" local_tag local_nonempty
+      [[ "$local_tag" == '!!seq' && "$local_nonempty" == true ]] ||
         die "target '$target' locally-owned must be a non-empty sequence when present"
-      TARGET="$target" yq eval --exit-status \
-        '.targets[strenv(TARGET)]["locally-owned"] |
-         [.[] | tag == "!!str"] | all' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      read_row_fields "${TARGET_LOCAL_STRINGS[$target]-}" local_strings local_control
+      [[ "$local_strings" == true ]] ||
         die "target '$target' locally-owned entries must be strings"
-      TARGET="$target" yq eval --exit-status \
-        '.targets[strenv(TARGET)]["locally-owned"] |
-         [.[] | (test(strenv(CONTROL_RE)) | not)] | all' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      [[ "$local_control" == true ]] ||
         die "target '$target' locally-owned entries may not contain control characters"
-      mapfile -t locally_owned < <(
-        TARGET="$target" yq eval -r \
-          '.targets[strenv(TARGET)]["locally-owned"][]' "$MANIFEST_ABS"
-      )
-      assert_sorted_unique "target '$target' locally-owned components" "${locally_owned[@]}"
+      read_row_values "${TARGET_LOCAL_ROWS[$target]-}"
+      locally_owned=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
+      assert_sorted_unique "target '$target' locally-owned components" \
+        "${locally_owned[@]+"${locally_owned[@]}"}"
     fi
 
     # Absent means true: automerge is opt-out policy-as-data, so a target that
     # never mentions the key keeps the fleet-default armed behavior.
     automerge_value=true
     if [[ "$has_automerge" == true ]]; then
-      TARGET="$target" yq eval --exit-status \
-        '.targets[strenv(TARGET)].automerge | tag == "!!bool"' \
-        "$MANIFEST_ABS" >/dev/null 2>&1 ||
+      read_row_fields "${TARGET_AUTOMERGE_SHAPE[$target]-}" automerge_tag
+      [[ "$automerge_tag" == '!!bool' ]] ||
         die "target '$target' automerge must be a boolean"
-      automerge_value="$(
-        TARGET="$target" yq eval -r '.targets[strenv(TARGET)].automerge' "$MANIFEST_ABS"
-      )"
+      automerge_value="${TARGET_AUTOMERGE_VALUE[$target]-}"
     fi
     AUTOMERGE_BY_TARGET["$target"]="$automerge_value"
 
