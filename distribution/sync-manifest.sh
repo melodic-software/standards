@@ -431,7 +431,10 @@ validate_manifest() {
     file_rows=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
     file_sources=()
     for file_row in "${file_rows[@]+"${file_rows[@]}"}"; do
-      file_sources+=("${file_row%%$'\t'*}")
+      source="${file_row%%$'\t'*}"
+      [[ -n "$source" ]] ||
+        die "component '$component' has unsafe source path '$source'"
+      file_sources+=("$source")
     done
     assert_sorted_unique "component '$component' file sources" \
       "${file_sources[@]+"${file_sources[@]}"}"
