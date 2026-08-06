@@ -439,7 +439,6 @@ validate_manifest() {
     for file_row in "${file_rows[@]+"${file_rows[@]}"}"; do
       source="${file_row%%$'\t'*}"
       destination="${file_row#*$'\t'}"
-      [[ -n "$source" ]] || continue
       # Predicate calls intentionally run in conditions; the function contains
       # no errexit-dependent commands.
       # shellcheck disable=SC2310

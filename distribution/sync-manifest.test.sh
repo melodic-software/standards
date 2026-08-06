@@ -703,6 +703,8 @@ make_source "$empty_source_dir" "$bad"
 out="$(run_engine "$empty_source_dir" validate 2>&1)"
 rc=$?
 assert_nonzero 'file source is the empty string is rejected' "$rc"
+assert_contains 'empty file source reports the unsafe source' "$out" \
+  "component 'base' has unsafe source path ''"
 assert_not_contains 'empty file source never reports a valid manifest' \
   "$out" 'Manifest valid'
 
