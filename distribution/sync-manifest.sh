@@ -141,6 +141,9 @@ assert_sorted_unique() {
   local value previous='' first=true
   local -A seen=()
   for value in "$@"; do
+    # An empty element must be rejected before it reaches an associative-array
+    # subscript, which Bash refuses outright rather than treating as a key.
+    [[ -n "$value" ]] || die "$label contains an empty element"
     [[ -z "${seen[$value]+present}" ]] || die "$label contains duplicate '$value'"
     seen["$value"]=1
     if [[ "$first" == false && "$previous" > "$value" ]]; then

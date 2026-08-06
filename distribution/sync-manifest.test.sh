@@ -708,4 +708,28 @@ assert_contains 'empty file source reports the unsafe source' "$out" \
 assert_not_contains 'empty file source never reports a valid manifest' \
   "$out" 'Manifest valid'
 
+# Every remaining list a manifest can drive into `assert_sorted_unique`. Bash
+# refuses an empty associative-array subscript rather than treating it as a key,
+# so an unguarded empty element aborts the whole run with a bash internal error
+# naming neither the record nor the offending list.
+bad="${manifest/'components:'$'\n''  base:'/'components:'$'\n''  "":'$'\n''    files:'$'\n''      consumer.txt: consumer.txt'$'\n''  base:'}"
+invalid_case 'component name is the empty string' "$bad" \
+  'component names contains an empty element'
+
+bad="${manifest/"$requires_block"/'    requires:'$'\n''      - ""'}"
+invalid_case 'component dependency is the empty string' "$bad" \
+  "component 'consumer' dependencies contains an empty element"
+
+bad="${manifest/'targets:'$'\n''  alpha/one:'/'targets:'$'\n''  "":'$'\n''    managed:'$'\n''      - base'$'\n''  alpha/one:'}"
+invalid_case 'target name is the empty string' "$bad" \
+  'target names contains an empty element'
+
+bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed:'$'\n''      - ""'}"
+invalid_case 'target managed entry is the empty string' "$bad" \
+  "target 'beta/two' managed components contains an empty element"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned:'$'\n''      - ""'}"
+invalid_case 'target locally-owned entry is the empty string' "$bad" \
+  "target 'beta/two' locally-owned components contains an empty element"
+
 [[ $FAILED -eq 0 ]] || exit 1
