@@ -753,6 +753,21 @@ bad="${manifest/"$requires_block"/'    "x\nctag\tconsumer\tboom": 1'}"
 invalid_case 'component key forges a row naming a real record' "$bad" \
   "component 'consumer' keys may not contain control characters"
 
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    "y\nttag\tbeta/two\tboom": 1'}"
+invalid_case 'target key forges a row naming a real record' "$bad" \
+  "target 'beta/two' keys may not contain control characters"
+
+# A non-string key must be reported before the control-character test runs: `test`
+# only matches strings and aborts the entire pass on anything else, which would
+# lose the record name along with the diagnostic.
+bad="${manifest/"$requires_block"/'    7: 1'}"
+invalid_case 'component key is not a string' "$bad" \
+  "component 'consumer' keys must be strings"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    true: 1'}"
+invalid_case 'target key is not a string' "$bad" \
+  "target 'beta/two' keys must be strings"
+
 # A bare newline with no forged continuation used to surface as a malformed-row
 # internal error; it now reports the offending record like every other key.
 bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
