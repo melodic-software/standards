@@ -409,9 +409,18 @@ version-pin default bump (v1.26.1 to v1.27.0) and curl timeout hardening
 with its input surface unchanged.
 No contract changes its input, secret, routing, or caller-permission
 surface.
-Ten selector revisions remain approved for an ordered consumer rollout.
+The ancillary-events opt-in revision at
+`e77f0126b474144708719f99795e44d0ffe2541d`, owner-scoped to
+`melodic-software` (ci-workflows v0.8.0), admits the boolean
+`admits-ancillary-events` selector input — and its deprecated alias
+`admits-comment-events` — so a caller may opt its no-checkout
+`issue_comment`, `pull_request_review`, `pull_request_review_comment`, and
+`issues` jobs into fleet routing. Only the literal `true` is accepted; the
+opt-in relaxes no job-level control and widens only which event types the
+selector will route self-hosted (ci-workflows#224, #225).
+Eleven selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these seven strict-scheduling
+owned by a different repository owner, so these eight strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
