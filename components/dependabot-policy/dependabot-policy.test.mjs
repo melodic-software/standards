@@ -3,8 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { auditRepository, ConfigurationError, parseUniqueJson } from "./dependabot-policy.mjs";
+import {
+  auditRepository,
+  ConfigurationError,
+  parseArguments,
+  parseUniqueJson,
+} from "./dependabot-policy.mjs";
 
 const temporaryRoots = [];
 
@@ -48,6 +54,36 @@ function rules(findings) {
 
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
+});
+
+test("command-line parsing preserves defaults and follows strict Node syntax", () => {
+  assert.deepEqual(parseArguments(["--"]), {
+    root: process.cwd(),
+    configPath: ".github/dependabot-policy.json",
+    policyPath: fileURLToPath(new URL("./policy.json", import.meta.url)),
+    json: false,
+  });
+  assert.deepEqual(
+    parseArguments(["--json", "--root=repo", "--config=config.json", "--policy=policy.json"]),
+    {
+      root: "repo",
+      configPath: "config.json",
+      policyPath: "policy.json",
+      json: true,
+    },
+  );
+  assert.equal(parseArguments(["--policy=-policy.json"]).policyPath, "-policy.json");
+
+  for (const [argv, pattern] of [
+    [["--unknown"], /Unknown option/u],
+    [["--policy", "-policy.json"], /ambiguous/u],
+    [["repo"], /Unexpected argument/u],
+  ]) {
+    assert.throws(
+      () => parseArguments(argv),
+      (error) => error instanceof ConfigurationError && pattern.test(error.message),
+    );
+  }
 });
 
 test("a fully conformant config passes", async () => {

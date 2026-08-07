@@ -201,7 +201,13 @@ test("requires a nonzero full commit SHA baseline", () => {
     baseRef: sha,
     packageDirectories: ["components/example"],
   });
+  assert.deepEqual(parseArguments([`--base-ref=${sha}`, "--", "--package"], {}), {
+    baseRef: sha,
+    packageDirectories: ["--package"],
+  });
   assert.throws(() => parseArguments([], {}), /provide --base-ref/);
+  assert.throws(() => parseArguments(["--unknown"], { PACKAGE_BASE_REF: sha }), /Unknown option/u);
+  assert.throws(() => parseArguments(["--base-ref", "-ref"], {}), /ambiguous/u);
   assert.throws(() => validateBaseRef("HEAD"), /nonzero 40-character/);
   assert.throws(() => validateBaseRef("0".repeat(40)), /nonzero 40-character/);
 });

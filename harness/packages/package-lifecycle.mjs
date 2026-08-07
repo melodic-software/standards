@@ -3,6 +3,7 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
 
 import semver from "semver";
 
@@ -209,16 +210,13 @@ export function validateBaseRef(value) {
 }
 
 export function parseArguments(argv, environment = process.env) {
-  let baseRef = environment.PACKAGE_BASE_REF;
-  const packageDirectories = [];
-  for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === "--base-ref") {
-      baseRef = argv[index + 1];
-      index += 1;
-    } else {
-      packageDirectories.push(argv[index]);
-    }
-  }
+  const { values, positionals: packageDirectories } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: { "base-ref": { type: "string" } },
+    strict: true,
+  });
+  const baseRef = values["base-ref"] ?? environment.PACKAGE_BASE_REF;
   if (!baseRef) throw new Error("provide --base-ref <git-ref> or PACKAGE_BASE_REF");
   return {
     baseRef: validateBaseRef(baseRef),
