@@ -732,4 +732,55 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned:'$'\n
 invalid_case 'target locally-owned entry is the empty string' "$bad" \
   "target 'beta/two' locally-owned components contains an empty element"
 
+# A record's own key list is the one payload `@tsv` emits unescaped, so a key
+# carrying a literal newline splits its row in two. Where the injected text
+# continues with a recognized row kind, the forged second row satisfies the
+# column-count check and reaches the `case`, which then writes an
+# associative-array subscript Bash refuses. The YAML here is double-quoted so
+# `\n` and `\t` become real control characters rather than two-character escapes.
+bad="${manifest/"$requires_block"/'    "x\nctag\t\tboom": 1'}"
+invalid_case 'component key forges a row with an empty record name' "$bad" \
+  "component 'consumer' keys may not contain control characters"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    "y\nttag\t\tboom": 1'}"
+invalid_case 'target key forges a row with an empty record name' "$bad" \
+  "target 'beta/two' keys may not contain control characters"
+
+# Naming a real record instead of an empty one does not crash — `record_count`
+# rises above the separately-read name count and the fail-loud assertion catches
+# it — but the key is still rejected, and rejected for the right reason.
+bad="${manifest/"$requires_block"/'    "x\nctag\tconsumer\tboom": 1'}"
+invalid_case 'component key forges a row naming a real record' "$bad" \
+  "component 'consumer' keys may not contain control characters"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    "y\nttag\tbeta/two\tboom": 1'}"
+invalid_case 'target key forges a row naming a real record' "$bad" \
+  "target 'beta/two' keys may not contain control characters"
+
+# A non-string key must be reported before the control-character test runs: `test`
+# only matches strings and aborts the entire pass on anything else, which would
+# lose the record name along with the diagnostic.
+bad="${manifest/"$requires_block"/'    7: 1'}"
+invalid_case 'component key is not a string' "$bad" \
+  "component 'consumer' keys must be strings"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    true: 1'}"
+invalid_case 'target key is not a string' "$bad" \
+  "target 'beta/two' keys must be strings"
+
+# A bare newline with no forged continuation used to surface as a malformed-row
+# internal error; it now reports the offending record like every other key.
+bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
+control_key_dir="$tmp_root/control-char-component-key"
+make_source "$control_key_dir" "$bad"
+out="$(run_engine "$control_key_dir" validate 2>&1)"
+rc=$?
+assert_nonzero 'component key with a bare newline is rejected' "$rc"
+assert_contains 'bare-newline key names the offending component' "$out" \
+  "component 'consumer' keys may not contain control characters"
+assert_not_contains 'control-character key never reaches an array subscript' \
+  "$out" 'bad array subscript'
+assert_not_contains 'control-character key never degrades to a malformed row' \
+  "$out" 'malformed manifest row'
+
 [[ $FAILED -eq 0 ]] || exit 1

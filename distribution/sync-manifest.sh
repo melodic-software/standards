@@ -194,7 +194,11 @@ declare -a VISIT_PATH=()
 #     would split its own row and desynchronize the stream. Payload rows are
 #     emitted only for records that already satisfy the control-character check,
 #     and the shell reports that violation from the boolean columns below before
-#     it reads any payload.
+#     it reads any payload. That includes a record's own key list: a key carrying
+#     a newline can otherwise forge a second row whose columns the `case` below
+#     accepts, so `ckey`/`tkey` are gated behind `ckstr`/`tkstr`. Those columns
+#     also report whether the keys are strings at all, because `test` aborts the
+#     whole pass on a non-string and would take the record name down with it.
 #
 # Each row is `kind<TAB>record-name<TAB>value...`. Record names are proven free
 # of control characters before either pass runs, so the first two columns always
@@ -205,7 +209,12 @@ declare -a VISIT_PATH=()
 readonly COMPONENT_ROW_EXPRESSION='.components | to_entries[] | (
   ["ctag", .key, (.value | tag)],
   (select((.value | tag) == "!!map") | . as $c | (
-    ($c.value | keys[] | ["ckey", $c.key, .]),
+    ["ckstr", $c.key,
+      ($c.value | [keys[] | (tag == "!!str")] | all),
+      ($c.value | [keys[] | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+    (select($c.value | [keys[] | (tag == "!!str")] | all)
+      | select($c.value | [keys[] | (test(strenv(CONTROL_RE)) | not)] | all)
+      | . as $k | ($k.value | keys[] | ["ckey", $k.key, .])),
     (select($c.value | has("files")) | . as $h | (
       ["cftag", $h.key, ($h.value.files | tag), (($h.value.files | length) > 0)],
       (select(($h.value.files | tag) == "!!map") | . as $f | (
@@ -231,7 +240,12 @@ readonly COMPONENT_ROW_EXPRESSION='.components | to_entries[] | (
 readonly TARGET_ROW_EXPRESSION='.targets | to_entries[] | (
   ["ttag", .key, (.value | tag)],
   (select((.value | tag) == "!!map") | . as $t | (
-    ($t.value | keys[] | ["tkey", $t.key, .]),
+    ["tkstr", $t.key,
+      ($t.value | [keys[] | (tag == "!!str")] | all),
+      ($t.value | [keys[] | select(tag == "!!str") | (test(strenv(CONTROL_RE)) | not)] | all)],
+    (select($t.value | [keys[] | (tag == "!!str")] | all)
+      | select($t.value | [keys[] | (test(strenv(CONTROL_RE)) | not)] | all)
+      | . as $k | ($k.value | keys[] | ["tkey", $k.key, .])),
     (select($t.value | has("managed")) | . as $m | (
       ["tmtag", $m.key, ($m.value.managed | tag), (($m.value.managed | length) > 0)],
       (select(($m.value.managed | tag) == "!!seq") | . as $n | (
@@ -256,6 +270,7 @@ readonly TARGET_ROW_EXPRESSION='.targets | to_entries[] | (
   ))
 ) | @tsv'
 
+declare -A COMPONENT_KEYS_STRINGS=() TARGET_KEYS_STRINGS=()
 declare -A COMPONENT_TAG=() COMPONENT_KEY_ROWS=() COMPONENT_FILES_SHAPE=()
 declare -A COMPONENT_FILES_STRINGS=() COMPONENT_FILE_ROWS=()
 declare -A COMPONENT_REQUIRES_SHAPE=() COMPONENT_REQUIRES_STRINGS=()
@@ -286,11 +301,17 @@ load_manifest_rows() {
     rest="${row#*$'\t'}"
     name="${rest%%$'\t'*}"
     rest="${rest#*$'\t'}"
+    # Unreachable from manifest content once the key gates above hold; it stays
+    # because an empty name would otherwise reach an associative-array subscript,
+    # which Bash refuses outright rather than treating as a key.
+    [[ -n "$name" ]] ||
+      die "internal error: manifest row has an empty record name: '$row'"
     case "$kind" in
     ctag)
       COMPONENT_TAG["$name"]="$rest"
       record_count=$((record_count + 1))
       ;;
+    ckstr) COMPONENT_KEYS_STRINGS["$name"]="$rest" ;;
     ckey) COMPONENT_KEY_ROWS["$name"]+="$rest"$'\n' ;;
     cftag) COMPONENT_FILES_SHAPE["$name"]="$rest" ;;
     cfstr) COMPONENT_FILES_STRINGS["$name"]="$rest" ;;
@@ -302,6 +323,7 @@ load_manifest_rows() {
       TARGET_TAG["$name"]="$rest"
       record_count=$((record_count + 1))
       ;;
+    tkstr) TARGET_KEYS_STRINGS["$name"]="$rest" ;;
     tkey) TARGET_KEY_ROWS["$name"]+="$rest"$'\n' ;;
     tmtag) TARGET_MANAGED_SHAPE["$name"]="$rest" ;;
     tmstr) TARGET_MANAGED_STRINGS["$name"]="$rest" ;;
@@ -363,6 +385,7 @@ validate_manifest() {
   local root_key component key source destination existing_destination mode dependency target selected_component
   local has_requires has_local has_automerge automerge_value
   local files_tag files_nonempty files_strings files_control file_row
+  local keys_strings keys_control
   local requires_tag requires_nonempty requires_strings requires_control
   local managed_tag managed_nonempty managed_strings managed_control
   local local_tag local_nonempty local_strings local_control automerge_tag
@@ -413,6 +436,11 @@ validate_manifest() {
   for component in "${COMPONENT_NAMES[@]}"; do
     [[ "${COMPONENT_TAG[$component]-}" == '!!map' ]] ||
       die "component '$component' must be a mapping"
+    read_row_fields "${COMPONENT_KEYS_STRINGS[$component]-}" keys_strings keys_control
+    [[ "$keys_strings" == true ]] ||
+      die "component '$component' keys must be strings"
+    [[ "$keys_control" == true ]] ||
+      die "component '$component' keys may not contain control characters"
     read_row_values "${COMPONENT_KEY_ROWS[$component]-}"
     component_keys=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
     validate_record_keys "component '$component'" files requires \
@@ -515,6 +543,11 @@ validate_manifest() {
   for target in "${TARGET_NAMES[@]}"; do
     [[ "${TARGET_TAG[$target]-}" == '!!map' ]] ||
       die "target '$target' must be a mapping"
+    read_row_fields "${TARGET_KEYS_STRINGS[$target]-}" keys_strings keys_control
+    [[ "$keys_strings" == true ]] ||
+      die "target '$target' keys must be strings"
+    [[ "$keys_control" == true ]] ||
+      die "target '$target' keys may not contain control characters"
     read_row_values "${TARGET_KEY_ROWS[$target]-}"
     target_keys=("${ROW_VALUES[@]+"${ROW_VALUES[@]}"}")
     validate_record_keys "target '$target'" managed "locally-owned,automerge" \
