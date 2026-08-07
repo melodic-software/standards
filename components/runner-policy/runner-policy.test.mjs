@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   auditRepository,
   ConfigurationError,
+  isMapping,
   parseArguments,
   parseUniqueJson,
 } from "./runner-policy.mjs";
@@ -67,7 +68,59 @@ const CANONICAL_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_SELF_HOSTED_LABEL }
 const REVIEW_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}`;
 const ARBITRARY_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.ARBITRARY_SELF_HOSTED_LABEL }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
+const RUNNER_POLICY_SOURCE = await readFile(
+  new URL("./runner-policy.mjs", import.meta.url),
+  "utf8",
+);
 const temporaryRoots = [];
+
+for (const [name, value] of [
+  ["an object literal", {}],
+  ["a null-prototype object", Object.create(null)],
+  ["a class instance", new (class MappingFixture {})()],
+  ["a Map instance", new Map()],
+  ["a boxed primitive", Object(1)],
+]) {
+  test(`mapping guard accepts ${name}`, () => {
+    assert.equal(isMapping(value), true);
+  });
+}
+
+for (const [name, value] of [
+  ["null", null],
+  ["undefined", undefined],
+  ["an array", []],
+  ["a proxied array", new Proxy([], {})],
+  ["a function", () => {}],
+  ["a string", "mapping"],
+  ["a number", 1],
+  ["a boolean", true],
+  ["a symbol", Symbol("mapping")],
+]) {
+  test(`mapping guard rejects ${name}`, () => {
+    assert.equal(isMapping(value), false);
+  });
+}
+
+test("mapping guard accounts for all 38 former inline checks", () => {
+  const positiveGuards =
+    RUNNER_POLICY_SOURCE.match(
+      /\b[A-Za-z_$][\w$.]*\s*!==\s*null\s*&&\s*typeof\s+[A-Za-z_$][\w$.]*\s*===\s*"object"\s*&&\s*!Array\.isArray\([A-Za-z_$][\w$.]*\)/gu,
+    ) ?? [];
+  const negativeGuards =
+    RUNNER_POLICY_SOURCE.match(
+      /\b[A-Za-z_$][\w$.]*\s*===\s*null\s*\|\|\s*typeof\s+[A-Za-z_$][\w$.]*\s*!==\s*"object"\s*\|\|\s*Array\.isArray\([A-Za-z_$][\w$.]*\)/gu,
+    ) ?? [];
+  const mappingReferences = RUNNER_POLICY_SOURCE.match(/\bisMapping\(/gu) ?? [];
+
+  assert.equal(positiveGuards.length, 1, "only isMapping may spell out the positive guard");
+  assert.equal(negativeGuards.length, 0, "all negative guards must delegate to isMapping");
+  assert.equal(mappingReferences.length, 39, "38 former guards plus the predicate declaration");
+  assert.match(
+    RUNNER_POLICY_SOURCE,
+    /function isValidJobRecord\(job\)\s*{\s*return isMapping\(job\);\s*}/u,
+  );
+});
 
 test("duplicate JSON object members fail closed with their policy or schema path", () => {
   for (const [location, source] of [

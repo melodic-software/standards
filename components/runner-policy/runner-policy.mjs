@@ -386,6 +386,10 @@ async function readJson(filePath, location) {
   return parseUniqueJson(source, `${location} at ${filePath}`);
 }
 
+export function isMapping(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function parseWorkflow(source, file) {
   const document = parseDocument(source, {
     maxAliasCount: 0,
@@ -398,10 +402,10 @@ function parseWorkflow(source, file) {
     throw new Error(document.errors.map((error) => error.message).join("; "));
   }
   const workflow = document.toJS({ maxAliasCount: 0 });
-  if (workflow === null || typeof workflow !== "object" || Array.isArray(workflow)) {
+  if (!isMapping(workflow)) {
     throw new Error(`${file} must contain a workflow mapping`);
   }
-  if (workflow.jobs === null || typeof workflow.jobs !== "object" || Array.isArray(workflow.jobs)) {
+  if (!isMapping(workflow.jobs)) {
     throw new Error(`${file} must contain a jobs mapping`);
   }
   return workflow;
@@ -488,9 +492,7 @@ function isWorkflowCallExclusive(workflow) {
     return workflow.on.length === 1 && workflow.on[0] === "workflow_call";
   }
   return (
-    workflow.on !== null &&
-    typeof workflow.on === "object" &&
-    !Array.isArray(workflow.on) &&
+    isMapping(workflow.on) &&
     Object.keys(workflow.on).length === 1 &&
     Object.hasOwn(workflow.on, "workflow_call")
   );
@@ -503,15 +505,11 @@ function validateLocalCallMapping(job, calledWorkflow) {
   }
 
   const declaredInputs = declaration.inputs ?? {};
-  if (
-    declaredInputs === null ||
-    typeof declaredInputs !== "object" ||
-    Array.isArray(declaredInputs)
-  ) {
+  if (!isMapping(declaredInputs)) {
     return "the repository-local workflow has an invalid workflow_call.inputs mapping";
   }
   const inputs = job.with ?? {};
-  if (inputs === null || typeof inputs !== "object" || Array.isArray(inputs)) {
+  if (!isMapping(inputs)) {
     return "repository-local reusable workflow inputs must be an explicit mapping";
   }
   const extraInputs = Object.keys(inputs).filter((name) => !Object.hasOwn(declaredInputs, name));
@@ -521,11 +519,7 @@ function validateLocalCallMapping(job, calledWorkflow) {
   const missingInputs = Object.entries(declaredInputs)
     .filter(
       ([name, input]) =>
-        input !== null &&
-        typeof input === "object" &&
-        !Array.isArray(input) &&
-        input.required === true &&
-        !Object.hasOwn(inputs, name),
+        isMapping(input) && input.required === true && !Object.hasOwn(inputs, name),
     )
     .map(([name]) => name);
   if (missingInputs.length > 0) {
@@ -536,15 +530,11 @@ function validateLocalCallMapping(job, calledWorkflow) {
     return "repository-local reusable workflows must not use secrets: inherit";
   }
   const declaredSecrets = declaration.secrets ?? {};
-  if (
-    declaredSecrets === null ||
-    typeof declaredSecrets !== "object" ||
-    Array.isArray(declaredSecrets)
-  ) {
+  if (!isMapping(declaredSecrets)) {
     return "the repository-local workflow has an invalid workflow_call.secrets mapping";
   }
   const secrets = job.secrets ?? {};
-  if (secrets === null || typeof secrets !== "object" || Array.isArray(secrets)) {
+  if (!isMapping(secrets)) {
     return "repository-local reusable workflow secrets must be an explicit mapping";
   }
   const extraSecrets = Object.keys(secrets).filter((name) => !Object.hasOwn(declaredSecrets, name));
@@ -554,11 +544,7 @@ function validateLocalCallMapping(job, calledWorkflow) {
   const missingSecrets = Object.entries(declaredSecrets)
     .filter(
       ([name, secret]) =>
-        secret !== null &&
-        typeof secret === "object" &&
-        !Array.isArray(secret) &&
-        secret.required === true &&
-        !Object.hasOwn(secrets, name),
+        isMapping(secret) && secret.required === true && !Object.hasOwn(secrets, name),
     )
     .map(([name]) => name);
   if (missingSecrets.length > 0) {
@@ -703,9 +689,7 @@ function permissionCapability(workflow, job, inherited = "may-write") {
   }
   const requestsOnlyRead =
     declaration === "read-all" ||
-    (declaration !== null &&
-      typeof declaration === "object" &&
-      !Array.isArray(declaration) &&
+    (isMapping(declaration) &&
       Object.values(declaration).every((access) => access === "read" || access === "none"));
   if (requestsOnlyRead || inherited === "read-only") {
     return "read-only";
@@ -730,7 +714,7 @@ function auditLocalPermissionFlow({
   visited.add(visitKey);
   const findings = [];
   for (const [jobId, job] of Object.entries(record.workflow.jobs)) {
-    if (job === null || typeof job !== "object" || Array.isArray(job)) {
+    if (!isMapping(job)) {
       continue;
     }
     const capability = permissionCapability(record.workflow, job, inherited);
@@ -843,7 +827,7 @@ function canonicalExpectation(expected) {
 }
 
 function exactCanonicalMap(actual, required, optional, allowedNames, location) {
-  if (actual === null || typeof actual !== "object" || Array.isArray(actual)) {
+  if (!isMapping(actual)) {
     return `${location} must be an explicit mapping`;
   }
   const actualNames = Object.keys(actual);
@@ -909,7 +893,7 @@ function selectorStatus(job, policy) {
       reason: "the selector must not use secrets: inherit",
     };
   }
-  if (job.secrets === null || typeof job.secrets !== "object" || Array.isArray(job.secrets)) {
+  if (!isMapping(job.secrets)) {
     return {
       approved: false,
       isSelector: true,
@@ -981,7 +965,7 @@ function reusableWorkflowStatus(job, policy, workflow) {
     return { isReusable: true, approved: false, reason: secretError };
   }
   const inputs = job.with === undefined ? {} : job.with;
-  if (inputs === null || typeof inputs !== "object" || Array.isArray(inputs)) {
+  if (!isMapping(inputs)) {
     return {
       isReusable: true,
       approved: false,
@@ -1038,15 +1022,11 @@ function normalizeStructuralValue(value) {
 }
 
 function normalizedWorkflowJobs(workflow) {
-  return workflow.jobs !== null &&
-    typeof workflow.jobs === "object" &&
-    !Array.isArray(workflow.jobs)
-    ? workflow.jobs
-    : {};
+  return isMapping(workflow.jobs) ? workflow.jobs : {};
 }
 
 function isValidJobRecord(job) {
-  return job !== null && typeof job === "object" && !Array.isArray(job);
+  return isMapping(job);
 }
 
 function normalizePermissionsSurface(permissions) {
@@ -1056,7 +1036,7 @@ function normalizePermissionsSurface(permissions) {
   if (permissions === "read-all" || permissions === "write-all") {
     return { declaration: "all", value: permissions };
   }
-  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+  if (!isMapping(permissions)) {
     return { declaration: "invalid", value: permissions };
   }
   return {
@@ -1158,12 +1138,7 @@ function workflowCallSurface(workflow) {
     return { declared: false };
   }
 
-  if (
-    workflow.on !== null &&
-    typeof workflow.on === "object" &&
-    !Array.isArray(workflow.on) &&
-    Object.hasOwn(workflow.on, "workflow_call")
-  ) {
+  if (isMapping(workflow.on) && Object.hasOwn(workflow.on, "workflow_call")) {
     const rawDeclaration = workflow.on.workflow_call;
     if (
       rawDeclaration !== null &&
@@ -1235,7 +1210,7 @@ function jobCredentialSurface(workflow, policy) {
 // change becomes a visible diff here even though it changes no credential
 // expression and no category.
 function credentialBearingEntries(mapping) {
-  if (mapping === null || typeof mapping !== "object" || Array.isArray(mapping)) {
+  if (!isMapping(mapping)) {
     return containsCredentialExpression(mapping)
       ? { "*": normalizeStructuralValue(mapping) }
       : undefined;
@@ -1294,7 +1269,7 @@ function jobCredentialReferenceSurface(workflow, job, policy) {
   const stepEntries = Array.isArray(steps)
     ? steps
         .map((step, index) => {
-          if (step === null || typeof step !== "object" || Array.isArray(step)) {
+          if (!isMapping(step)) {
             return undefined;
           }
           const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
@@ -1390,7 +1365,7 @@ function malformedJobIds(workflow) {
   return Object.keys(jobs)
     .filter((jobId) => {
       const job = jobs[jobId];
-      return job === null || typeof job !== "object" || Array.isArray(job);
+      return !isMapping(job);
     })
     .sort((left, right) => left.localeCompare(right));
 }
@@ -1473,7 +1448,7 @@ function dynamicRoutingReferenceJobIds(workflow) {
   return Object.keys(jobs)
     .filter((jobId) => {
       const job = jobs[jobId];
-      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      if (!isMapping(job)) {
         return false;
       }
       return DYNAMIC_ROUTING_FIELDS.some(
@@ -1504,7 +1479,7 @@ function localReferenceJobIds(workflow) {
   return Object.keys(jobs)
     .filter((jobId) => {
       const job = jobs[jobId];
-      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      if (!isMapping(job)) {
         return false;
       }
       if (typeof job.uses === "string" && job.uses.startsWith("./")) {
@@ -1512,12 +1487,7 @@ function localReferenceJobIds(workflow) {
       }
       const steps = Array.isArray(job.steps) ? job.steps : [];
       return steps.some(
-        (step) =>
-          step !== null &&
-          typeof step === "object" &&
-          !Array.isArray(step) &&
-          typeof step.uses === "string" &&
-          step.uses.startsWith("./"),
+        (step) => isMapping(step) && typeof step.uses === "string" && step.uses.startsWith("./"),
       );
     })
     .sort((left, right) => left.localeCompare(right));
@@ -1634,7 +1604,7 @@ async function resolveAutoApprovedContracts({
       continue;
     }
     for (const job of Object.values(record.workflow.jobs)) {
-      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      if (!isMapping(job)) {
         continue;
       }
       const parsed = parseReusableWorkflowReference(job.uses);
@@ -1943,9 +1913,7 @@ function unroutableFailureStatus(jobId, target, job, jobs, policy) {
   }
   if (
     job["timeout-minutes"] !== 1 ||
-    job.permissions === null ||
-    typeof job.permissions !== "object" ||
-    Array.isArray(job.permissions) ||
+    !isMapping(job.permissions) ||
     Object.keys(job.permissions).length !== 0
   ) {
     return {
@@ -1960,8 +1928,7 @@ function unroutableFailureStatus(jobId, target, job, jobs, policy) {
     };
   }
   const [step] = job.steps;
-  const stepKeys =
-    step !== null && typeof step === "object" && !Array.isArray(step) ? Object.keys(step) : [];
+  const stepKeys = isMapping(step) ? Object.keys(step) : [];
   const lines = typeof step?.run === "string" ? step.run.trim().split(/\r?\n/) : [];
   if (
     stepKeys.some((key) => key !== "name" && key !== "run") ||
@@ -2004,7 +1971,7 @@ function routeStatus(jobId, target, job, jobs, policy, reusableContract, localRu
     };
   }
   const selector = jobs[selectorId];
-  if (selector === null || typeof selector !== "object" || Array.isArray(selector)) {
+  if (!isMapping(selector)) {
     return { attempted: true, approved: false, reason: `${selectorId} is not a workflow job` };
   }
   const status = selectorStatus(selector, policy);
@@ -2146,9 +2113,7 @@ function cancellationSafeConditionStatus(value) {
 function governedReusableRunnerStatus(workflow, policy) {
   const contract = policy.governedReusableRunnerInput;
   if (
-    workflow.on === null ||
-    typeof workflow.on !== "object" ||
-    Array.isArray(workflow.on) ||
+    !isMapping(workflow.on) ||
     Object.keys(workflow.on).length !== 1 ||
     !Object.hasOwn(workflow.on, "workflow_call")
   ) {
@@ -2159,7 +2124,7 @@ function governedReusableRunnerStatus(workflow, policy) {
   }
   const workflowCall = workflow.on?.workflow_call;
   const declaration = workflowCall?.inputs?.[contract.name];
-  if (declaration === null || typeof declaration !== "object" || Array.isArray(declaration)) {
+  if (!isMapping(declaration)) {
     return {
       approved: false,
       reason: `${contract.expression} requires on.workflow_call.inputs.${contract.name}`,
@@ -2195,7 +2160,7 @@ function hostedMatrixStatus(job, target, policy) {
     };
   }
   const matrix = job.strategy?.matrix;
-  if (matrix === null || typeof matrix !== "object" || Array.isArray(matrix)) {
+  if (!isMapping(matrix)) {
     return { approved: false, reason: `${target} requires a static strategy.matrix mapping` };
   }
   if (Object.hasOwn(matrix, "include") || Object.hasOwn(matrix, "exclude")) {
@@ -2360,7 +2325,7 @@ function permissionHostedRequirement(workflow, job, { requireExplicitReadOnly = 
   if (permissions === "read-all") {
     return undefined;
   }
-  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+  if (!isMapping(permissions)) {
     if (requireExplicitReadOnly) {
       return {
         reason: "privileged-control-plane",
@@ -2602,7 +2567,7 @@ function hasStaticallyReadOnlyPermissions(workflow, job) {
   if (permissions === "read-all") {
     return true;
   }
-  if (permissions === null || typeof permissions !== "object" || Array.isArray(permissions)) {
+  if (!isMapping(permissions)) {
     return false;
   }
   return Object.values(permissions).every((access) => access === "read" || access === "none");
@@ -2644,7 +2609,7 @@ function localCredentialRequirement(
   }
   const readOnly = hasStaticallyReadOnlyPermissions(workflow, job);
   const credentialMappingRequirement = (mapping) => {
-    if (mapping === null || typeof mapping !== "object" || Array.isArray(mapping)) {
+    if (!isMapping(mapping)) {
       if (containsCredentialExpression(mapping)) {
         return "a transformed or indirect credential expression";
       }
@@ -2692,7 +2657,7 @@ function localCredentialRequirement(
     return undefined;
   }
   for (const step of steps) {
-    if (step === null || typeof step !== "object" || Array.isArray(step)) {
+    if (!isMapping(step)) {
       continue;
     }
     const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
@@ -2720,7 +2685,7 @@ function localCredentialRequirement(
 // exact-ref value used for auto-approval's surface diff) both derive from it
 // so the two can never disagree on which steps count.
 function credentialActionUses(step, policy) {
-  if (step === null || typeof step !== "object" || Array.isArray(step)) {
+  if (!isMapping(step)) {
     return undefined;
   }
   if (typeof step.uses !== "string") {
@@ -2982,7 +2947,7 @@ function pinnedUsesEntries(source, workflow) {
 
   const entries = [];
   for (const [jobId, job] of Object.entries(workflow?.jobs ?? {})) {
-    if (job === null || typeof job !== "object" || Array.isArray(job)) {
+    if (!isMapping(job)) {
       continue;
     }
     const paths = [["jobs", jobId, "uses"]];
@@ -3178,7 +3143,7 @@ export async function auditRepository({
     const requiredNoDefaultCallers = new Map();
     const approvedFailureSentinels = new Map();
     for (const [jobId, job] of Object.entries(workflow.jobs)) {
-      if (job === null || typeof job !== "object" || Array.isArray(job)) {
+      if (!isMapping(job)) {
         findings.push(finding("job-shape", file, jobId, "job must be a mapping"));
         continue;
       }
