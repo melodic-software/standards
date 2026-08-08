@@ -464,9 +464,28 @@ The code-masking revision at `e94438746c300b02385a7f8a2a2dcd19a7f4ad4a`
 routing. It masks inline, fenced, and indented Markdown code before validating
 linkage markers, so example-only metadata cannot satisfy the required check;
 24 focused parser regressions cover the resulting fail-closed behavior.
-Twelve selector revisions remain approved for an ordered consumer rollout.
+The same revision also carries the Claude lanes, whose selector is
+byte-identical to `c136b27f`; it is approved so the review and security lane
+callers pinning it keep a reviewed selector reference, and like the other
+fleet-routing revisions it is owner-scoped to `melodic-software`. Both lane
+contracts are byte-identical to their `c136b27f` predecessors: neither adds nor
+removes an input, changes its secret key set, changes `allowedCallerPermissions`,
+or changes its routing surface (`runs-on: ${{ inputs.runner }}` in both). The
+lane deltas are internal — the review lane moves its inline-comment tool grant
+out of the caller-replaceable `claude-args` default into the compose step (so
+replacing the default can no longer drop it), adds a scoped `Bash(gh pr diff:*)`
+grant in its place, directs findings to line-anchored review comments, and
+narrows its retry gate to count real assistant turns. One security-relevant
+delta sits inside the review reusable rather than on its contract: routing every
+line-anchorable finding through the inline-comment tool widens the surface on
+which untrusted diff content reaches a rendered comment that can carry a
+one-click-applicable suggestion block. That grant predates this revision and the
+security lane already drives the same tool, so it widens an existing surface
+rather than opening a new one, and no caller-visible input or permission
+changes.
+Thirteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these nine strict-scheduling
+owned by a different repository owner, so these ten strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
