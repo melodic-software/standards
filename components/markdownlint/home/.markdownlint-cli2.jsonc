@@ -15,10 +15,11 @@
   // ~/bin holds authored markdown, not build output — so the repository-only traversal
   // exclusions are dropped and only the genuinely-never-authored trees remain.
   //
-  // The $schema URL pins to THIS repo's own markdownlint-cli2 devDependency
-  // (package.json), same as the root config — it makes no claim about which
-  // markdownlint-cli2 version a consumer runs. markdownlint-schema-pin.test.sh
-  // fails the build if this drifts from package.json or from the root config.
+  // The $schema URL pins to the markdownlint-cli2 devDependency of
+  // melodic-software/standards (its package.json), same as the root config —
+  // it makes no claim about which markdownlint-cli2 version a consumer runs.
+  // markdownlint-schema-pin.test.sh fails the standards build if this drifts
+  // from that package.json or from the root config.
   "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.23.2/schema/markdownlint-cli2-config-schema.json",
   "ignores": [
     // Dependency and virtualenv trees — vendored, never authored, at any depth.
