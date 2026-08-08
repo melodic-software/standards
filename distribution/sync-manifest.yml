@@ -327,9 +327,22 @@ targets:
     # resolves the runner without a caller-side selector reference (e.g. the
     # indirection moving inside the ci-workflows reusable) makes one managed
     # component serve both visibilities again.
+    #
+    # `ruff`: the canonical policy reports 385 findings against that tree
+    # against 166 under upstream's bare defaults, so adoption is a migration
+    # rather than a config flip — most of the delta is `S`, `ERA`, `FIX`,
+    # `PTH`, `ARG`, `RET`, and the `TID` relative-import ban meeting a codebase
+    # never held to them. The repo owns a `ruff.toml` selecting `E4`, `E7`,
+    # `E9`, and `F`, which is what stops upstream default churn from being a
+    # repo-breaking event (ruff 0.16.0 moved the default set from 59 rules to
+    # 413 and turned two of its contract suites red on an unmodified `main`).
+    # Recorded here rather than left absent because absence is what produced an
+    # implicit policy nobody chose. Removal trigger: that migration being
+    # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
       - claude-review-caller
       - claude-security-review-caller
+      - ruff
     automerge: false
   melodic-software/dotfiles:
     managed:
