@@ -34,7 +34,11 @@
 # directory with no child) never matches — but the child needs NO trailing
 # separator: the class excludes whitespace and the double quote, so a match
 # ends at the segment's natural value boundary (EOL, whitespace, quote, or
-# the next separator). A mandatory trailing separator was the original design
+# the next separator). Only the segment's FIRST character excludes %, so a
+# %VAR%-style env interpolation — which always opens with % — stays clean while
+# a literal % later in a real segment (a directory named `build%2026`) is still
+# detected. Excluding % throughout, the earlier design, dropped those real
+# machine paths silently. A mandatory trailing separator was the original design
 # and inverted detection both ways: a real bare value at end of line
 # ("root = <drive>:/Dev/GitHub") has no trailing separator and was MISSED,
 # while prose satisfied the requirement anyway — the old space-permitting
@@ -43,9 +47,9 @@
 # the class is what makes dropping the separator prose-safe: a phrase like
 # "/Users/ for details" cannot match because at least one non-space child
 # character must follow the root.
-HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^\\$%<{~"[:space:]/]+(~[0-9]+)?'
-HPP_MACOS_USER_BODY='/Users/[^\\$%<{~"[:space:]/]+'
-HPP_LINUX_USER_BODY='/home/[^\\$%<{~"[:space:]/]+'
+HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^\\$%<{~"[:space:]/][^\\$<{~"[:space:]/]*(~[0-9]+)?'
+HPP_MACOS_USER_BODY='/Users/[^\\$%<{~"[:space:]/][^\\$<{~"[:space:]/]*'
+HPP_LINUX_USER_BODY='/home/[^\\$%<{~"[:space:]/][^\\$<{~"[:space:]/]*'
 # The checkout-parent segment is drive-letter-anchored, so broadening it beyond
 # `repos` to the other common checkout-root names stays false-positive-safe —
 # only a genuine `X:\<root>\<child>\` absolute path matches, never prose. Both
@@ -54,5 +58,5 @@ HPP_LINUX_USER_BODY='/home/[^\\$%<{~"[:space:]/]+'
 # OWN checkout root is already caught by the driver's project-root literal scan;
 # this generic body catches references to OTHER machines' checkout paths in
 # written content.
-HPP_WIN_REPO_BODY='[A-Za-z]:(/|\\\\?)(repos|Repos|projects|Projects|dev|Dev)(/|\\\\?)[^\\$%<{~"[:space:]/]+(~[0-9]+)?'
-HPP_ESCAPED_WIN_REPO_BODY='[A-Za-z]:\\\\(repos|Repos|projects|Projects|dev|Dev)\\\\[^\\$%<{~"[:space:]/]+(~[0-9]+)?'
+HPP_WIN_REPO_BODY='[A-Za-z]:(/|\\\\?)(repos|Repos|projects|Projects|dev|Dev)(/|\\\\?)[^\\$%<{~"[:space:]/][^\\$<{~"[:space:]/]*(~[0-9]+)?'
+HPP_ESCAPED_WIN_REPO_BODY='[A-Za-z]:\\\\(repos|Repos|projects|Projects|dev|Dev)\\\\[^\\$%<{~"[:space:]/][^\\$<{~"[:space:]/]*(~[0-9]+)?'

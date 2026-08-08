@@ -9,8 +9,12 @@ the segment class itself (it excludes whitespace and the double quote), not a
 trailing separator. A root with no child segment (`C:\Users`, a lone
 `D:/repos/`) never matches. Portable placeholders such as `C:\Users\<user>\`
 and `<repo-root>/` stay clean by construction (the negative character classes
-exclude `<`, `$`, `{`, and bare `~`); every body excludes `%`, so percent-env
-interpolations like `C:\Users\%USERNAME%\` are not flagged.
+exclude `<`, `$`, `{`, and bare `~`); every body excludes `%` at a segment's
+FIRST character, so percent-env interpolations like `C:\Users\%USERNAME%\` — which
+always open with `%` — are not flagged, while a literal `%` later in a real
+segment (a directory named `build%2026`) stays inside the match. Excluding `%`
+throughout truncated such a path's matched span at the `%`, handing drivers a
+path that does not exist.
 
 `machine-path-patterns.sh` is a define-only Bash library: the five `HPP_*`
 pattern bodies and nothing else. Scan drivers own everything around them —
