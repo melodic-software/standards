@@ -483,9 +483,9 @@ one-click-applicable suggestion block. That grant predates this revision and the
 security lane already drives the same tool, so it widens an existing surface
 rather than opening a new one, and no caller-visible input or permission
 changes.
-Twelve selector revisions remain approved for an ordered consumer rollout.
+Thirteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these nine strict-scheduling
+owned by a different repository owner, so these ten strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
