@@ -483,9 +483,31 @@ one-click-applicable suggestion block. That grant predates this revision and the
 security lane already drives the same tool, so it widens an existing surface
 rather than opening a new one, and no caller-visible input or permission
 changes.
-Thirteen selector revisions remain approved for an ordered consumer rollout.
+The drop-proof grant revision at `ee96bd28a43eebfa06b61aee8b518cc5b1b195b3`
+([v0.11.0 release][18]) carries the selector byte-identical to `e9443874`; it
+is approved so the review and security lane callers pinning it keep a reviewed
+selector reference, and like the other fleet-routing revisions it is
+owner-scoped to `melodic-software`. Neither lane contract adds or removes an
+input, changes its secret key set, changes `allowedCallerPermissions`, or
+changes its routing surface (`runs-on: ${{ inputs.runner }}` in both). One
+declared default moved: the security lane's `claude-args` default drops the
+inline-comment tool grant, which now rides a compose step that appends it
+after whatever the caller passed — the same drop-proof shape the review lane
+adopted at `e9443874` — so a caller replacing the default wholesale keeps a
+grant it previously lost silently (ci-workflows#382, ci-workflows#395), and
+default-inheriting callers see identical effective grants. The remaining lane
+deltas are internal: both lanes now fail closed on a claude-code-action
+workflow-validation self-skip — the outcome composite gains a `review-ran`
+output, the security lane's required check turns red when a PR was in scope
+and nothing ran (previously a silent green), and the review lane stops
+crediting validation skips against its per-PR review cap (ci-workflows#387,
+ci-workflows#389, ci-workflows#392) — and both lanes bump `claude-code-action`
+from 1.0.185 to 1.0.187. No privilege widens: the appended grant drives the
+same inline-comment tool both lanes already used, and the fail-closed change
+alters check conclusions, not permissions.
+Fourteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these ten strict-scheduling
+owned by a different repository owner, so these eleven strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -888,3 +910,4 @@ default `GITHUB_TOKEN` permissions][7].
 [15]: https://github.com/melodic-software/ci-workflows/pull/354
 [16]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.1
 [17]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.2
+[18]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.11.0
