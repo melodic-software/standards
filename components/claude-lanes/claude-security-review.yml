@@ -88,7 +88,7 @@ jobs:
   select-security:
     name: Select runner
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@ee96bd28a43eebfa06b61aee8b518cc5b1b195b3 # v0.11.0
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@734158c4cb6e67b0b99fd703045ac0f7f9f042d5 # v0.12.0
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -111,7 +111,7 @@ jobs:
       pull-requests: write   # post the security review + tracking comment
       id-token: write        # OIDC — mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@ee96bd28a43eebfa06b61aee8b518cc5b1b195b3 # v0.11.0
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@734158c4cb6e67b0b99fd703045ac0f7f9f042d5 # v0.12.0
     with:
       # Hosted fallback per the runner-policy recovery contract (never a
       # self-hosted label, never vars.CI_HOSTED_RUNNER): if the selector

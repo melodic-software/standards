@@ -31,6 +31,7 @@ const ANCILLARY_OPT_IN_SELECTOR_SHA = "e77f0126b474144708719f99795e44d0ffe2541d"
 const PATHS_FILE_LANE_SHA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const INLINE_COMMENT_LANE_SHA = "e94438746c300b02385a7f8a2a2dcd19a7f4ad4a";
 const DROP_PROOF_GRANT_LANE_SHA = "ee96bd28a43eebfa06b61aee8b518cc5b1b195b3";
+const AVAILABILITY_RULING_LANE_SHA = "734158c4cb6e67b0b99fd703045ac0f7f9f042d5";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -2940,6 +2941,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${PATHS_FILE_LANE_SHA}`,
       `${SELECTOR_PATH}@${INLINE_COMMENT_LANE_SHA}`,
       `${SELECTOR_PATH}@${DROP_PROOF_GRANT_LANE_SHA}`,
+      `${SELECTOR_PATH}@${AVAILABILITY_RULING_LANE_SHA}`,
     ],
   });
   for (const sha of selectorShas) {
