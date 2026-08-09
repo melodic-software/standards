@@ -505,9 +505,19 @@ ci-workflows#389, ci-workflows#392) — and both lanes bump `claude-code-action`
 from 1.0.185 to 1.0.187. No privilege widens: the appended grant drives the
 same inline-comment tool both lanes already used, and the fail-closed change
 alters check conclusions, not permissions.
-Fourteen selector revisions remain approved for an ordered consumer rollout.
+The revision at `734158c4cb6e67b0b99fd703045ac0f7f9f042d5` (v0.12.0) is
+approved on the same basis: `select-runner.yml` is byte-identical to the prior
+revision, and neither lane contract changes an input, secret, caller
+permission, or routing surface. Its payload is the security lane's two-tier
+availability ruling (ci-workflows#397, docs in #398): the required check stays
+red only for the caller-drift validation skip — the shape the PR itself
+clears — while every classified external failure (auth, billing, rate-limit,
+server, `other`) concludes green with a warning annotation, the failure marker
+comment, and the incident aggregator's conclusion-independent escalation as
+the compensating alarm chain. Check conclusions change; permissions do not.
+Fifteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these eleven strict-scheduling
+owned by a different repository owner, so these twelve strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
