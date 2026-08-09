@@ -36,6 +36,36 @@ assert_exit 'win user: percent-env user segment stays clean' 1 "$?"
 matches "$HPP_WIN_USER_BODY" 'C:/Users/%USERPROFILE%/project'
 assert_exit 'win user: percent-env forward-slash form stays clean' 1 "$?"
 
+# A % is admitted mid-segment only when a DIGIT follows. `build%2026` is a real
+# directory name; `%VAR%` and the embedded `build-%VAR%` form are env
+# interpolations, and a Windows env var cannot start with a digit.
+#
+# These assert the SPAN, not a boolean. Excluding % throughout still matched a
+# literal-% path but truncated the span at the % (`C:\Users\build` for
+# `C:\Users\build%2026`), so a driver reporting or rewriting the matched text
+# handled a path that does not exist — a `matches` assertion passes under both
+# bodies and would pin nothing.
+span=$(printf '%s' 'C:\Users\build%2026\project' | grep -oE "$HPP_WIN_USER_BODY")
+assert_eq 'win user: literal % stays inside the matched segment' 'C:\Users\build%2026' "$span"
+span=$(printf '%s' '/Users/build%2026/project' | grep -oE "$HPP_MACOS_USER_BODY")
+assert_eq 'macos user: literal % stays inside the matched segment' '/Users/build%2026' "$span"
+span=$(printf '%s' '/home/build%2026/project' | grep -oE "$HPP_LINUX_USER_BODY")
+assert_eq 'linux user: literal % stays inside the matched segment' '/home/build%2026' "$span"
+matches "$HPP_MACOS_USER_BODY" '/Users/%USER%/project'
+assert_exit 'macos user: percent-env segment stays clean' 1 "$?"
+matches "$HPP_LINUX_USER_BODY" '/home/%USER%/project'
+assert_exit 'linux user: percent-env segment stays clean' 1 "$?"
+
+# An EMBEDDED %VAR% — prefixed inside the segment rather than opening it — is
+# still a portable dynamically-expanded path. The digit gate is what keeps it
+# out: admitting % unconditionally after the first character would match the
+# whole `build-%USERNAME%` span and report a portable path as machine-specific.
+# The span stops at the %, so the token itself is never claimed.
+span=$(printf '%s' 'C:\Users\build-%USERNAME%\project' | grep -oE "$HPP_WIN_USER_BODY")
+assert_eq 'win user: embedded percent-env token is not claimed' 'C:\Users\build-' "$span"
+span=$(printf '%s' 'D:\repos\build-%BUILD_ID%\project' | grep -oE "$HPP_WIN_REPO_BODY")
+assert_eq 'win repo: embedded percent-env token is not claimed' 'D:\repos\build-' "$span"
+
 # macOS / Linux user-home bodies (drivers add their own boundary prefix).
 matches "$HPP_MACOS_USER_BODY" '/Users/alice/project'
 assert_exit 'macos user: real path is flagged' 0 "$?"
@@ -61,6 +91,10 @@ matches "$HPP_WIN_REPO_BODY" 'D:\repos\%BUILD_ID%\project'
 assert_exit 'win repo: percent-env segment stays clean' 1 "$?"
 matches "$HPP_ESCAPED_WIN_REPO_BODY" 'D:\\repos\\%BUILD_ID%\\project'
 assert_exit 'win repo: JSON-escaped percent-env segment stays clean' 1 "$?"
+span=$(printf '%s' 'D:\repos\build%2026\project' | grep -oE "$HPP_WIN_REPO_BODY")
+assert_eq 'win repo: literal % stays inside the matched segment' 'D:\repos\build%2026' "$span"
+span=$(printf '%s' 'D:\\repos\\build%2026\\project' | grep -oE "$HPP_ESCAPED_WIN_REPO_BODY")
+assert_eq 'win repo: JSON-escaped literal % stays inside the matched segment' 'D:\\repos\\build%2026' "$span"
 
 # Broadened checkout-root names beyond `repos` (both spellings each).
 matches "$HPP_WIN_REPO_BODY" 'C:\Projects\acme\project'
