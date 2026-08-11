@@ -119,6 +119,13 @@ assert_exit 'managed mapping renderer succeeds' 0 "$rc"
 assert_contains 'mapping renderer includes managed component' "$out" '**consumer**'
 assert_not_contains 'mapping renderer excludes locally-owned payload' "$out" '**base**'
 
+out="$(run_engine "$source_repo" dest-paths --target beta/two 2>&1)"
+rc=$?
+assert_exit 'dest-paths renderer succeeds' 0 "$rc"
+assert_contains 'dest-paths includes managed destination' "$out" 'consumer.txt'
+assert_not_contains 'dest-paths excludes Markdown chrome' "$out" '**'
+assert_not_contains 'dest-paths excludes locally-owned destination' "$out" '.policy'
+
 target_repo="$tmp_root/target-beta"
 make_target "$target_repo" beta/two
 printf 'local policy\n' >"$target_repo/.policy"

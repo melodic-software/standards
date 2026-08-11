@@ -13,15 +13,17 @@ Usage:
   sync-manifest.sh validate [--source-root DIR] [--manifest PATH]
   sync-manifest.sh matrix   [--source-root DIR] [--manifest PATH] [--targets CSV]
   sync-manifest.sh plan     [--source-root DIR] [--manifest PATH] [--targets CSV]
-  sync-manifest.sh mappings [--source-root DIR] [--manifest PATH] --target OWNER/REPO
-  sync-manifest.sh apply    [--source-root DIR] [--manifest PATH] --target OWNER/REPO --target-root DIR
+  sync-manifest.sh mappings   [--source-root DIR] [--manifest PATH] --target OWNER/REPO
+  sync-manifest.sh dest-paths [--source-root DIR] [--manifest PATH] --target OWNER/REPO
+  sync-manifest.sh apply      [--source-root DIR] [--manifest PATH] --target OWNER/REPO --target-root DIR
 
 Commands:
-  validate  Validate the schema, catalog, sources, and adoption graph.
-  matrix    Emit only the filtered GitHub Actions matrix JSON.
-  plan      Print the filtered, human-readable dry-run plan.
-  mappings  Print Markdown bullets for one target's managed mappings.
-  apply     Copy one target's managed components and reproduce Git modes.
+  validate    Validate the schema, catalog, sources, and adoption graph.
+  matrix      Emit only the filtered GitHub Actions matrix JSON.
+  plan        Print the filtered, human-readable dry-run plan.
+  mappings    Print Markdown bullets for one target's managed mappings.
+  dest-paths  Print one managed destination path per line for machine use.
+  apply       Copy one target's managed components and reproduce Git modes.
 
 PATH is relative to source-root. --targets is a comma-separated exact
 allowlist; empty selects every target in manifest order.
@@ -686,6 +688,27 @@ emit_managed_mappings() {
   done <<<"${MANAGED_BY_TARGET[$target]}"
 }
 
+# Machine-readable companion to mappings (ci-workflows#208): one destination
+# path per line, sorted uniquely, with no Markdown. Non-target callers get no
+# output (exit 0) so a reusable PR check can no-op outside the manifest.
+emit_managed_dest_paths() {
+  local target="$1" component source destination
+  local -A seen=()
+  local -a paths=()
+  while IFS= read -r component; do
+    [[ -n "$component" ]] || continue
+    while IFS=$'\t' read -r source destination; do
+      [[ -n "$destination" ]] || continue
+      [[ -z "${seen[$destination]+x}" ]] || continue
+      seen[$destination]=1
+      paths+=("$destination")
+    done <<<"${FILES_BY_COMPONENT[$component]}"
+  done <<<"${MANAGED_BY_TARGET[$target]-}"
+  if ((${#paths[@]} > 0)); then
+    printf '%s\n' "${paths[@]}" | LC_ALL=C sort -u
+  fi
+}
+
 emit_plan() {
   local target component source destination mode
   printf 'Distribution plan:\n'
@@ -812,7 +835,7 @@ apply_target() {
 COMMAND="$1"
 shift
 case "$COMMAND" in
-validate | matrix | plan | mappings | apply) ;;
+validate | matrix | plan | mappings | dest-paths | apply) ;;
 -h | --help)
   usage
   exit 0
@@ -886,10 +909,10 @@ matrix | plan)
   [[ -z "$TARGET" && -z "$TARGET_ROOT" ]] ||
     die "$COMMAND does not accept --target or --target-root"
   ;;
-mappings)
+mappings | dest-paths)
   [[ -z "$TARGETS_FILTER" && -z "$TARGET_ROOT" ]] ||
-    die 'mappings does not accept --targets or --target-root'
-  [[ -n "$TARGET" ]] || die 'mappings requires --target OWNER/REPO'
+    die "$COMMAND does not accept --targets or --target-root"
+  [[ -n "$TARGET" ]] || die "$COMMAND requires --target OWNER/REPO"
   ;;
 apply)
   [[ -z "$TARGETS_FILTER" ]] || die 'apply does not accept --targets'
@@ -918,6 +941,10 @@ plan)
 mappings)
   [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
   emit_managed_mappings "$TARGET"
+  ;;
+dest-paths)
+  [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
+  emit_managed_dest_paths "$TARGET"
   ;;
 apply)
   [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
