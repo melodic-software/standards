@@ -33,4 +33,23 @@ else
   pass 'allow and withdraw are disjoint'
 fi
 
+required_restore_denies=(
+  'Bash(git restore -- *)'
+  'Bash(git restore * -- *)'
+  'Bash(git restore *)'
+  'PowerShell(git restore -- *)'
+  'PowerShell(git restore * -- *)'
+  'PowerShell(git restore *)'
+  'PowerShell(git * restore -- *)'
+  'PowerShell(git * restore *)'
+)
+for pattern in "${required_restore_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required restore discard rule"
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
