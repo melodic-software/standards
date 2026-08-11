@@ -17,8 +17,9 @@ name: claude-security-review
 # grant.
 #
 # PATHS-FILE CONVENTION: the consuming repo owns `.github/claude-security-paths`
-# — GitHub Actions `paths:` patterns, one per line (`#` comments and blank
-# lines ignored), naming that repo's security-sensitive surfaces. The
+# — root-anchored gitignore patterns, one per line, matched via `git
+# check-ignore` (`#` comments and blank lines ignored). Hard-errors on `!`,
+# `?`, or `+`. Names that repo's security-sensitive surfaces. The
 # reusable reads it from the PR's BASE branch, never the head. An ABSENT file
 # FAILS OPEN: every PR is security-reviewed until the repo commits one. The
 # file is repo-owned tuning and is deliberately NOT sync-managed.
