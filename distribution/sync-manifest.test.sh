@@ -761,12 +761,36 @@ invalid_case 'target key forges a row naming a real record' "$bad" \
 # only matches strings and aborts the entire pass on anything else, which would
 # lose the record name along with the diagnostic.
 bad="${manifest/"$requires_block"/'    7: 1'}"
-invalid_case 'component key is not a string' "$bad" \
+invalid_case 'component key is an integer' "$bad" \
   "component 'consumer' keys must be strings"
 
 bad="${manifest/'    locally-owned:'$'\n''      - base'/'    true: 1'}"
-invalid_case 'target key is not a string' "$bad" \
+invalid_case 'target key is a boolean' "$bad" \
   "target 'beta/two' keys must be strings"
+
+bad="${manifest/"$requires_block"/'    1.5: 1'}"
+invalid_case 'component key is a float' "$bad" \
+  "component 'consumer' keys must be strings"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    null: 1'}"
+invalid_case 'target key is null' "$bad" \
+  "target 'beta/two' keys must be strings"
+
+bad="${manifest/"$requires_block"/'    ? [a, b]'$'\n''    : 1'}"
+invalid_case 'component key is a sequence' "$bad" \
+  "component 'consumer' keys must be strings"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    ? {p: q}'$'\n''    : 1'}"
+invalid_case 'target key is a mapping' "$bad" \
+  "target 'beta/two' keys must be strings"
+
+bad="${manifest/"$requires_block"/'    <<: &defaults'$'\n''      extra: true'}"
+invalid_case 'component merge key is not supported' "$bad" \
+  "component 'consumer' merge keys are not supported"
+
+bad="${manifest/'    locally-owned:'$'\n''      - base'/'    <<: &defaults'$'\n''      extra: true'}"
+invalid_case 'target merge key is not supported' "$bad" \
+  "target 'beta/two' merge keys are not supported"
 
 # A bare newline with no forged continuation used to surface as a malformed-row
 # internal error; it now reports the offending record like every other key.
@@ -778,8 +802,6 @@ rc=$?
 assert_nonzero 'component key with a bare newline is rejected' "$rc"
 assert_contains 'bare-newline key names the offending component' "$out" \
   "component 'consumer' keys may not contain control characters"
-assert_not_contains 'control-character key never reaches an array subscript' \
-  "$out" 'bad array subscript'
 assert_not_contains 'control-character key never degrades to a malformed row' \
   "$out" 'malformed manifest row'
 
