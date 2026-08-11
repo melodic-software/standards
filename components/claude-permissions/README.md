@@ -165,6 +165,15 @@ the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which p
 requires an immutable `<expect>`, and also honors `--force-if-includes` and the last-wins
 negations. The docs name a PreToolUse hook as the mechanism for exactly what globs cannot express.
 
+### Bare `git restore <path>` shares the same glob limit
+
+`deny` mirrors checkout's `--`-separator discard forms (`git restore -- <path>`,
+`git restore <opts> -- <path>`, and the whole-tree `.` / `:/` spellings). A catch-all
+`git restore *` would also match `git restore --staged <path>` (unstage without discarding),
+and deny→ask→allow precedence cannot carve that exception back out. Bare-path working-tree
+discards without `--` therefore remain a classifier/hook concern, same class as
+`--force-with-lease`.
+
 ## Composition model — data component, consumer-owned merge
 
 The sync engine is byte-exact and this file is NOT a Claude Code settings file. No consumer

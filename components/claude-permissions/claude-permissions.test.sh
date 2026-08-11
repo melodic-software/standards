@@ -33,15 +33,15 @@ else
   pass 'allow and withdraw are disjoint'
 fi
 
+# Mirror checkout's `--`-separator path-discard forms only. A bare
+# `git restore *` catch-all would also deny `git restore --staged <path>`,
+# and deny→ask→allow precedence cannot carve that exception back out.
 required_restore_denies=(
   'Bash(git restore -- *)'
   'Bash(git restore * -- *)'
-  'Bash(git restore *)'
   'PowerShell(git restore -- *)'
   'PowerShell(git restore * -- *)'
-  'PowerShell(git restore *)'
   'PowerShell(git * restore -- *)'
-  'PowerShell(git * restore *)'
 )
 for pattern in "${required_restore_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \
