@@ -23,6 +23,7 @@ Commands:
   plan        Print the filtered, human-readable dry-run plan.
   mappings    Print Markdown bullets for one target's managed mappings.
   dest-paths  Print one managed destination path per line for machine use.
+              Unknown targets exit 0 with no output (reusable PR-check no-op).
   apply       Copy one target's managed components and reproduce Git modes.
 
 PATH is relative to source-root. --targets is a comma-separated exact
@@ -943,8 +944,11 @@ mappings)
   emit_managed_mappings "$TARGET"
   ;;
 dest-paths)
-  [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"
-  emit_managed_dest_paths "$TARGET"
+  # Unknown targets are a successful empty result so shared PR checks can
+  # no-op outside the manifest. mappings/apply keep the hard error.
+  if [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]]; then
+    emit_managed_dest_paths "$TARGET"
+  fi
   ;;
 apply)
   [[ -n "${TARGET_EXISTS[$TARGET]+present}" ]] || die "unknown manifest target '$TARGET'"

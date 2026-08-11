@@ -126,6 +126,11 @@ assert_contains 'dest-paths includes managed destination' "$out" 'consumer.txt'
 assert_not_contains 'dest-paths excludes Markdown chrome' "$out" '**'
 assert_not_contains 'dest-paths excludes locally-owned destination' "$out" '.policy'
 
+out="$(run_engine "$source_repo" dest-paths --target unknown/repo 2>&1)"
+rc=$?
+assert_exit 'dest-paths unknown target is a successful no-op' 0 "$rc"
+assert_eq 'dest-paths unknown target emits no paths' '' "$out"
+
 target_repo="$tmp_root/target-beta"
 make_target "$target_repo" beta/two
 printf 'local policy\n' >"$target_repo/.policy"
