@@ -1,0 +1,2 @@
+# The next line is intentional: the case-sensitive allowlist must not cover it.
+dum
