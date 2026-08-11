@@ -1,1 +1,0 @@
-lowercase dum must remain a finding under the case-sensitive DUM allowlist.
