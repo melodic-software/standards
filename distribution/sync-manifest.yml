@@ -32,7 +32,7 @@ components:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
   # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
   # 3a): thin sync-managed callers for the ci-workflows reusable review lanes,
-  # pinned at the v0.9.1 release SHA (c136b27; v0.9.0 predates the
+  # pinned at the v0.12.0 release SHA (734158c4; v0.9.0 predates the
   # `paths-file` input the security caller passes). Managed — a recorded
   # exception to the workflow-caller exclusion in README.md — because
   # hand-written lane callers empirically drifted: medley's missing `reopened`
