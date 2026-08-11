@@ -690,8 +690,8 @@ emit_managed_mappings() {
 }
 
 # Machine-readable companion to mappings (ci-workflows#208): one destination
-# path per line, sorted uniquely, with no Markdown. Non-target callers get no
-# output (exit 0) so a reusable PR check can no-op outside the manifest.
+# path per line, sorted uniquely, with no Markdown. Unknown targets are handled
+# by the dest-paths dispatcher (exit 0, no output) before this runs.
 emit_managed_dest_paths() {
   local target="$1" component source destination
   local -A seen=()
@@ -704,7 +704,7 @@ emit_managed_dest_paths() {
       seen[$destination]=1
       paths+=("$destination")
     done <<<"${FILES_BY_COMPONENT[$component]}"
-  done <<<"${MANAGED_BY_TARGET[$target]-}"
+  done <<<"${MANAGED_BY_TARGET[$target]}"
   if ((${#paths[@]} > 0)); then
     printf '%s\n' "${paths[@]}" | LC_ALL=C sort -u
   fi

@@ -126,6 +126,12 @@ assert_contains 'dest-paths includes managed destination' "$out" 'consumer.txt'
 assert_not_contains 'dest-paths excludes Markdown chrome' "$out" '**'
 assert_not_contains 'dest-paths excludes locally-owned destination' "$out" '.policy'
 
+out="$(run_engine "$source_repo" dest-paths --target alpha/one 2>&1)"
+rc=$?
+assert_exit 'dest-paths multi-file target succeeds' 0 "$rc"
+assert_eq 'dest-paths emits sorted unique destinations' \
+  $'.policy\nconsumer.txt\ndocs/adr/README.md\ntools/check.sh' "$out"
+
 out="$(run_engine "$source_repo" dest-paths --target unknown/repo 2>&1)"
 rc=$?
 assert_exit 'dest-paths unknown target is a successful no-op' 0 "$rc"
