@@ -71,6 +71,15 @@ const EXACT_GITHUB_TOKEN_EXPRESSIONS = new Set([
   `\${{ secrets.GITHUB_TOKEN }}`,
   `\${{ github.token }}`,
 ]);
+const VISIBILITY_SCOPED_REUSABLE_WORKFLOW_PATHS = new Set([
+  "melodic-software/ci-workflows/.github/workflows/claude-review.yml",
+  "melodic-software/ci-workflows/.github/workflows/claude-security-review.yml",
+]);
+const PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_INPUTS = new Set(["standards-ref"]);
+const PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS = new Set([
+  "STANDARDS_REVIEW_APP_ID",
+  "STANDARDS_REVIEW_APP_PRIVATE_KEY",
+]);
 
 // The shared object-shape check behind every "must be a mapping" decision in
 // this analyzer. It admits any non-null, non-array object, which under the
@@ -2921,6 +2930,61 @@ function finding(rule, file, job, message) {
   return { rule, file, ...(job ? { job } : {}), message };
 }
 
+function visibilityScopedReusableContractFindings(
+  contracts,
+  { visibility, repositoryVisibility, policyFile },
+) {
+  const findings = [];
+  for (const [reference, contract] of contracts) {
+    const parsed = parseReusableWorkflowReference(reference);
+    if (!parsed || !VISIBILITY_SCOPED_REUSABLE_WORKFLOW_PATHS.has(parsed.workflow)) {
+      continue;
+    }
+    const denylistedInputs = [...contract.allowedInputs].filter((name) =>
+      PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_INPUTS.has(name),
+    );
+    const denylistedSecrets = new Set(
+      [...contract.allowedSecretNames].filter((name) =>
+        PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS.has(name),
+      ),
+    );
+    for (const expression of Object.values(contract.allowedSecrets)) {
+      const match = EXACT_NAMED_SECRET_EXPRESSION.exec(expression);
+      if (match !== null && PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS.has(match[1])) {
+        denylistedSecrets.add(match[1]);
+      }
+    }
+    if (denylistedInputs.length === 0 && denylistedSecrets.size === 0) {
+      continue;
+    }
+    const listed = [...denylistedInputs, ...denylistedSecrets]
+      .sort((left, right) => left.localeCompare(right))
+      .join(", ");
+    if (!repositoryVisibility) {
+      findings.push(
+        finding(
+          "visibility-evidence-required",
+          policyFile,
+          undefined,
+          `reusable workflow contract ${reference} lists visibility-scoped surface (${listed}); CI_REPOSITORY_VISIBILITY is required`,
+        ),
+      );
+      continue;
+    }
+    if (visibility === "public") {
+      findings.push(
+        finding(
+          "visibility-scoped-reusable-contract",
+          policyFile,
+          undefined,
+          `reusable workflow contract ${reference} lists visibility-scoped surface (${listed}) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+        ),
+      );
+    }
+  }
+  return findings;
+}
+
 const COMMENT_HEX_TOKENS = /(?<=^|[^0-9a-f])[0-9a-f]{7,40}(?=[^0-9a-f]|$)/giu;
 
 // A hex run reads as a short-SHA claim only when it mixes digits and letters
@@ -3128,6 +3192,13 @@ export async function auditRepository({
     }
     policy.autoApprovalDiagnostics = autoApproval.diagnostics;
   }
+  findings.push(
+    ...visibilityScopedReusableContractFindings(policy.approvedReusableWorkflowContracts, {
+      visibility: config.visibility,
+      repositoryVisibility,
+      policyFile: path.relative(resolvedRoot, resolvedPolicy) || path.basename(resolvedPolicy),
+    }),
+  );
   const localPermissionVisits = new Set();
   const localIncomingFiles = new Set();
   for (const record of workflowIndex.values()) {
