@@ -13,12 +13,12 @@ Literal duplication is easy to grep. Semantic duplication is the harder, equally
 
 When two passages look duplicated, copy-count thresholds are not the decision. The Rule of Three and "share at the second consumer" are heuristics subordinated to this ordered sequence — run the tests in order; the first decisive test wins.
 
-1. **T1 — Same knowledge or coincidental?** Identical text encoding different knowledge is a coincidence, not duplication (Hunt/Thomas); never consolidate — consolidation actively harms.
-2. **T2 — Crosses an encapsulation boundary?** Bounded contexts, services, availability seams: duplication is correct by design (DDD divergent models; event-carried state transfer). Consolidate only via an explicit shared-kernel-style decision with an owner.
-3. **T3 — Change-together acid test.** One fact forcing edits in multiple places or formats (including code+docs pairs) is true knowledge duplication — consolidate now, even at two copies; count is irrelevant.
-4. **T4 — Abstraction namable and stable?** Cannot name it → the Rule-of-Three brake applies (wrong-abstraction avoidance); can name it → two copies suffice.
-5. **T5 — Reversibility.** Cheap to inline back → early consolidation is low-risk; load-bearing/hard-to-unwind abstraction → demand the third occurrence as evidence.
-6. **T6 — Churn/friction.** High co-change frequency multiplies drift cost → consolidate earlier; static content tolerates copies longer.
+1. **T1 — Same knowledge or coincidental?** Identical text encoding different knowledge is a coincidence, not duplication ([Hunt/Thomas](https://media.pragprog.com/titles/tpp20/dry.pdf)); never consolidate — consolidation actively harms.
+2. **T2 — Crosses an encapsulation boundary?** Bounded contexts, services, availability seams: duplication is correct by design ([DDD divergent models](https://martinfowler.com/bliki/BoundedContext.html); [event-carried state transfer](https://martinfowler.com/articles/201701-event-driven.html)). Consolidate only via an explicit shared-kernel-style decision with an owner.
+3. **T3 — Change-together acid test.** One fact forcing edits in multiple places or formats (including code+docs pairs) is true knowledge duplication — consolidate now, even at two copies; count is irrelevant ([Hunt/Thomas](https://media.pragprog.com/titles/tpp20/dry.pdf)).
+4. **T4 — Abstraction namable and stable?** Both must hold to consolidate at two copies. Cannot name it, or the shape is still changing → the [Rule-of-Three brake](https://blog.jbrains.ca/permalink/clarifying-the-rule-of-three-in-refactoring/) applies ([wrong-abstraction avoidance](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction)); namable **and** stable → two copies suffice.
+5. **T5 — Reversibility.** Cheap to inline back → early consolidation is low-risk; load-bearing/hard-to-unwind abstraction → demand the third occurrence as evidence ([Rainsberger](https://blog.jbrains.ca/permalink/clarifying-the-rule-of-three-in-refactoring/)).
+6. **T6 — Churn/friction.** High co-change frequency multiplies drift cost → consolidate earlier; static content tolerates copies longer ([DITA single-sourcing](https://www.oreilly.com/library/view/dita-best-practices/9780132374323/ch10.html); [Write the Docs reuse caveats](https://www.writethedocs.org/videos/portland/2022/don-t-shoot-yourself-in-the-foot-with-content-reuse-anna-gasparyan/)).
 
 **Prose overlay:** knowledge-bearing docs content (values, procedures, policy) consolidates from first reuse (DITA single-sourcing posture — no Rule-of-Three wait exists in tech-writing doctrine); audience-, context-, or SEO-sensitive prose is legitimately duplicated (Write the Docs); reuse-eligibility alone never justifies consolidation.
 
