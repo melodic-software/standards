@@ -189,18 +189,23 @@ unset STUB_RELEASE_TAGS
 # ------------------------------------------------- resolve: 404 vs 404
 
 # Benign: the repository reads, it simply has no published release. A clean
-# no-op, because there is nothing to re-pin against yet.
+# no-op, because there is nothing to re-pin against yet. Under the LIST
+# endpoint that case is 200 with an empty body — not the 404 the old
+# `releases/latest` endpoint returned.
 out_file="$scratch/out-no-release"
-export STUB_RELEASES_STATUS=404 STUB_REPO_STATUS=200 STUB_TAG_NAME='unused' STUB_REF_TYPE='commit' STUB_REF_SHA="$old_sha"
+export STUB_RELEASES_STATUS=200 STUB_RELEASE_TAGS='' STUB_REPO_STATUS=200 STUB_TAG_NAME='unused' STUB_REF_TYPE='commit' STUB_REF_SHA="$old_sha"
 rc=0; out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: no published release exits 0' 0 "$rc"
 assert_contains 'resolve: no published release emits resolved=false' "$(cat "$out_file")" 'resolved=false'
 assert_contains 'resolve: no published release is a notice' "$out" '::notice::'
 assert_not_contains 'resolve: no published release raises no error' "$out" '::error::'
+unset STUB_RELEASE_TAGS
 
-# Fatal: the repository itself does not read. Identical 404 on the release
-# endpoint, opposite verdict — this is the discrimination that keeps a renamed,
-# deleted, or access-revoked upstream from reading as "nothing to do" forever.
+# Fatal: the repository itself does not read. The LIST endpoint does not
+# overload its 404 the way `releases/latest` did — nothing-published is the
+# 200-empty case above — so a 404 here means only that the upstream is gone or
+# unreadable, and it must stay loud. A renamed, deleted, or access-revoked
+# upstream reading as "nothing to do" forever is the failure this guards.
 out_file="$scratch/out-unreadable"
 export STUB_RELEASES_STATUS=404 STUB_REPO_STATUS=404
 rc=0; out="$(run_resolve "$out_file")" || rc=$?
@@ -208,6 +213,18 @@ assert_nonzero 'resolve: unreadable upstream fails loudly' "$rc"
 assert_contains 'resolve: unreadable upstream raises an error' "$out" '::error::'
 assert_not_contains 'resolve: unreadable upstream never emits resolved=false' "$(cat "$out_file")" 'resolved=false'
 export STUB_REPO_STATUS=200
+
+# A 404 on the release list is fatal even when the repository itself still
+# reads: under the list endpoint that combination is not "nothing published",
+# it is an unreadable releases surface, and the old disambiguating second call
+# would have mistaken it for a clean no-op.
+out_file="$scratch/out-releases-404-repo-ok"
+export STUB_RELEASES_STATUS=404 STUB_REPO_STATUS=200
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_nonzero 'resolve: releases 404 with a readable repo still fails loudly' "$rc"
+assert_contains 'resolve: releases 404 with a readable repo raises an error' "$out" '::error::'
+assert_not_contains 'resolve: releases 404 with a readable repo emits no resolved=false' "$(cat "$out_file")" 'resolved=false'
+export STUB_RELEASES_STATUS=200
 
 # A tag outside full SemVer has no pin-comment form, so re-pinning would author
 # a comment this repository's own pin-comment lane then rejects.

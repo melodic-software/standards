@@ -73,27 +73,26 @@ repin::resolve() {
   # shellcheck disable=SC2064  # expand $err now: the trap must survive it going out of scope
   trap "rm -f '$err'" RETURN
 
-  # Only one 404 here is benign — "this repository has published no release
-  # yet". A renamed, deleted, or no-longer-readable upstream returns the same
-  # 404, so confirm the repository itself still reads before accepting that
-  # reading. Every other failure stays loud: an unattended daily job that
-  # reports green while it has silently stopped checking anything is worse
-  # than no job at all.
+  # NO failure of this read is benign. That is a change from the endpoint this
+  # used to call: `releases/latest` answered 404 both for "this repository has
+  # published no release yet" and for a renamed, deleted, or no-longer-readable
+  # upstream, so the benign case had to be disambiguated with a second call.
+  # The LIST endpoint does not overload its 404 — it answers 200 with an empty
+  # body when nothing is published (handled below), so a 404 here means only
+  # that the repository itself is gone or unreadable. Disambiguating would now
+  # be dead code that reports a missing upstream as "nothing to re-pin".
+  #
+  # Every failure therefore stays loud: an unattended daily job that reports
+  # green while it has silently stopped checking anything is worse than no job
+  # at all.
   if ! releases="$(gh api --paginate "repos/${upstream}/releases" \
     --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' 2> "$err")"; then
-    if grep -q 'HTTP 404' "$err" && gh api "repos/${upstream}" --jq .full_name > /dev/null 2>&1; then
-      echo "::notice::${upstream} has no published release to re-pin against."
-      echo 'resolved=false' >> "$GITHUB_OUTPUT"
-      return 0
-    fi
     echo "::error::Could not read the published ${upstream} releases." >&2
     cat "$err" >&2
     return 1
   fi
 
-  # The list endpoint answers 200 with an empty body for a repository that has
-  # published nothing, where `releases/latest` answered 404. Same benign
-  # verdict, reached without having to tell two 404s apart.
+  # The benign "nothing published yet" case: 200 with an empty body.
   if [[ -z "${releases//[[:space:]]/}" ]]; then
     echo "::notice::${upstream} has no published release to re-pin against."
     echo 'resolved=false' >> "$GITHUB_OUTPUT"
