@@ -823,7 +823,7 @@ assert_contains 'bare-newline key names the offending component' "$out" \
 assert_not_contains 'control-character key never degrades to a malformed row' \
   "$out" 'malformed manifest row'
 
-bash "$root/distribution/control-char-equivalence.test.sh" ||
+bash "$root/distribution/control-char-equivalence.sh" ||
   { echo 'control-character equivalence test failed' >&2; exit 1; }
 
 [[ $FAILED -eq 0 ]] || exit 1
