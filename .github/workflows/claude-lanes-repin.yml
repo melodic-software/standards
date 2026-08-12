@@ -141,7 +141,7 @@ jobs:
           # for want of a credential is a permanently red cron nobody reads —
           # the exact failure mode of melodic-software/standards#274. The
           # detection half still runs and still reports every day.
-          echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY for a GitHub App installed on this repository with contents:write and pull-requests:write, then re-run. Until then, re-pin by hand."
+          echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY for a GitHub App installed on this repository with contents:write, pull-requests:write, and workflows:write, then re-run. Until then, re-pin by hand."
 
       # These secrets are unprovisioned; the job degrades to a warning until
       # they exist (see the step above). They deliberately do NOT reuse
