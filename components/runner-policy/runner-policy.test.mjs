@@ -107,6 +107,9 @@ const SELECTOR = `    uses: ${SELECTOR_REFERENCE}
       managed-runner-prefix: \${{ vars.CI_MANAGED_RUNNER_PREFIX }}
       observer-client-id: \${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
 `;
+const TEST_SELECTOR_INPUT_CONTRACT = {
+  allowedInputs: ["self-hosted-labels-json", "admits-ancillary-events", "admits-comment-events"],
+};
 
 async function repository({
   repositoryOwner,
@@ -143,6 +146,10 @@ async function repository({
       {
         ...BASE_POLICY,
         approvedSelectorReferences: [SELECTOR_REFERENCE],
+        approvedSelectorReferencesByRepositoryOwner: {},
+        approvedSelectorInputContracts: {
+          [SELECTOR_REFERENCE]: TEST_SELECTOR_INPUT_CONTRACT,
+        },
         approvedReusableWorkflowContracts: {
           [REUSABLE_REFERENCE]: {
             routing: "runner-input",
@@ -3153,6 +3160,28 @@ test("production selector allowlist contains only independently reviewed commits
     ],
   });
   for (const sha of selectorShas) {
+    const reference = `${SELECTOR_PATH}@${sha}`;
+    assert.deepEqual(BASE_POLICY.approvedSelectorInputContracts[reference], {
+      allowedInputs: ["self-hosted-labels-json"],
+    });
+  }
+  for (const sha of [
+    ANCILLARY_OPT_IN_SELECTOR_SHA,
+    PATHS_FILE_LANE_SHA,
+    INLINE_COMMENT_LANE_SHA,
+    DROP_PROOF_GRANT_LANE_SHA,
+    AVAILABILITY_RULING_LANE_SHA,
+  ]) {
+    const reference = `${SELECTOR_PATH}@${sha}`;
+    assert.deepEqual(BASE_POLICY.approvedSelectorInputContracts[reference], {
+      allowedInputs: [
+        "self-hosted-labels-json",
+        "admits-ancillary-events",
+        "admits-comment-events",
+      ],
+    });
+  }
+  for (const sha of selectorShas) {
     const root = await repository({
       workflows: {
         "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, sha)}`,
@@ -3651,6 +3680,21 @@ test("selector accepts admits-ancillary-events on the owner-scoped v0.8.0 revisi
         ANCILLARY_OPT_IN_SELECTOR_SHA,
       )}      admits-ancillary-events: true\n`,
     },
+    policyOverrides: {
+      approvedSelectorReferences: [],
+      approvedSelectorReferencesByRepositoryOwner: {
+        "melodic-software": [`${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`],
+      },
+      approvedSelectorInputContracts: {
+        [`${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`]: {
+          allowedInputs: [
+            "self-hosted-labels-json",
+            "admits-ancillary-events",
+            "admits-comment-events",
+          ],
+        },
+      },
+    },
   });
   assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
 });
@@ -3667,6 +3711,56 @@ test("admits-ancillary-events on an unapproved selector revision fails closed", 
   const findings = await audit(root);
   assert.equal(findings[0].rule, "selector-pin");
   assert.match(findings[0].message, /not in the reviewed approval allowlist/);
+});
+
+test("admits-ancillary-events on a pre-v0.8.0 approved selector revision fails closed", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        SHA,
+        PRODUCTION_SHA,
+      )}      admits-ancillary-events: true\n`,
+    },
+    policyOverrides: {
+      approvedSelectorReferences: [`${SELECTOR_PATH}@${PRODUCTION_SHA}`],
+      approvedSelectorInputContracts: {
+        [`${SELECTOR_PATH}@${PRODUCTION_SHA}`]: {
+          allowedInputs: ["self-hosted-labels-json"],
+        },
+      },
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(findings[0].message, /has unapproved properties: admits-ancillary-events/);
+});
+
+test("admits-ancillary-events on a pre-v0.8.0 owner-scoped revision fails closed", async () => {
+  const root = await repository({
+    repositoryOwner: "melodic-software",
+    workflows: {
+      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
+        SHA,
+        GH_FREE_GATE_SHA,
+      )}      admits-ancillary-events: true\n`,
+    },
+    policyOverrides: {
+      approvedSelectorReferences: [],
+      approvedSelectorReferencesByRepositoryOwner: {
+        "melodic-software": [`${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`],
+      },
+      approvedSelectorInputContracts: {
+        [`${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`]: {
+          allowedInputs: ["self-hosted-labels-json"],
+        },
+      },
+    },
+  });
+  const findings = await audit(root, { githubRepository: "melodic-software/standards" });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "selector-pin");
+  assert.match(findings[0].message, /has unapproved properties: admits-ancillary-events/);
 });
 
 test("policy schema rejects a boolean opt-in value other than true", async () => {
@@ -3688,6 +3782,53 @@ test("policy rejects a boolean opt-in input that duplicates a canonical input", 
     policyOverrides: { optionalBooleanSelectorInputs: { "self-hosted-label": true } },
   });
   await assert.rejects(() => audit(root), ConfigurationError);
+});
+
+test("policy rejects an approved selector reference without an input contract", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedSelectorInputContracts: {},
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("missing an approvedSelectorInputContracts entry"),
+  );
+});
+
+test("policy rejects a selector input contract for an unapproved reference", async () => {
+  const orphanReference = `${SELECTOR_PATH}@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`;
+  const root = await repository({
+    policyOverrides: {
+      approvedSelectorInputContracts: {
+        [SELECTOR_REFERENCE]: TEST_SELECTOR_INPUT_CONTRACT,
+        [orphanReference]: { allowedInputs: [] },
+      },
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("is not an approved selector reference"),
+  );
+});
+
+test("policy rejects a selector input contract that names an unregistered optional input", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedSelectorInputContracts: {
+        [SELECTOR_REFERENCE]: { allowedInputs: ["admits-unknown-events"] },
+      },
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError && error.message.includes("unregistered optional inputs"),
+  );
 });
 
 test("a claude-review caller routes to the review tier through the governed selector without findings", async () => {
@@ -7297,7 +7438,7 @@ test("reserved unroutable sentinel rejects every widened execution surface", asy
 
 test("sentinel requires an approved selector and private self-hosted enrollment", async () => {
   const unapprovedSelector = await repository({
-    policyOverrides: { approvedSelectorReferences: [] },
+    policyOverrides: { approvedSelectorReferences: [], approvedSelectorInputContracts: {} },
     workflows: { "ci.yml": selectorFailureWorkflow() },
   });
   assert.ok((await audit(unapprovedSelector)).length > 0);

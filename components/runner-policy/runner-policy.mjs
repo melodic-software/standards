@@ -171,6 +171,66 @@ export function validatePolicy(value) {
     approvedSelectorReferencesByRepositoryOwner.set(owner, new Set(references));
   }
 
+  const canonicalInputNames = new Set(Object.keys(value.canonicalSelectorInputs));
+  for (const name of Object.keys(value.optionalCanonicalSelectorInputs)) {
+    if (canonicalInputNames.has(name)) {
+      throw new ConfigurationError(
+        `policy optional selector input ${name} duplicates a required canonical input`,
+      );
+    }
+  }
+  const optionalStringInputNames = new Set(Object.keys(value.optionalCanonicalSelectorInputs));
+  const optionalBooleanInputNames = new Set(Object.keys(value.optionalBooleanSelectorInputs));
+  for (const name of optionalBooleanInputNames) {
+    if (canonicalInputNames.has(name) || optionalStringInputNames.has(name)) {
+      throw new ConfigurationError(
+        `policy optional boolean selector input ${name} duplicates another selector input`,
+      );
+    }
+  }
+  const knownOptionalSelectorInputNames = new Set([
+    ...optionalStringInputNames,
+    ...optionalBooleanInputNames,
+  ]);
+
+  const approvedSelectorInputContracts = new Map();
+  for (const [reference, contract] of Object.entries(value.approvedSelectorInputContracts)) {
+    validateSelectorReference(reference, "policy.approvedSelectorInputContracts");
+    const unknownInputs = contract.allowedInputs.filter(
+      (name) => !knownOptionalSelectorInputNames.has(name),
+    );
+    if (unknownInputs.length > 0) {
+      throw new ConfigurationError(
+        `selector input contract ${reference}.allowedInputs has unregistered optional inputs: ${unknownInputs.join(", ")}`,
+      );
+    }
+    approvedSelectorInputContracts.set(reference, {
+      allowedInputs: new Set(contract.allowedInputs),
+      allowedInputNames: new Set([...canonicalInputNames, ...contract.allowedInputs]),
+    });
+  }
+
+  const approvedSelectorReferences = new Set([
+    ...value.approvedSelectorReferences,
+    ...[...approvedSelectorReferencesByRepositoryOwner.values()].flatMap((references) => [
+      ...references,
+    ]),
+  ]);
+  for (const reference of approvedSelectorReferences) {
+    if (!approvedSelectorInputContracts.has(reference)) {
+      throw new ConfigurationError(
+        `approved selector reference ${JSON.stringify(reference)} is missing an approvedSelectorInputContracts entry`,
+      );
+    }
+  }
+  for (const reference of approvedSelectorInputContracts.keys()) {
+    if (!approvedSelectorReferences.has(reference)) {
+      throw new ConfigurationError(
+        `selector input contract ${JSON.stringify(reference)} is not an approved selector reference`,
+      );
+    }
+  }
+
   const approvedReusableWorkflowContracts = new Map();
   for (const [reference, contract] of Object.entries(value.approvedReusableWorkflowContracts)) {
     const parsed = parseReusableWorkflowReference(reference);
@@ -264,23 +324,6 @@ export function validatePolicy(value) {
     });
   }
 
-  const canonicalInputNames = new Set(Object.keys(value.canonicalSelectorInputs));
-  for (const name of Object.keys(value.optionalCanonicalSelectorInputs)) {
-    if (canonicalInputNames.has(name)) {
-      throw new ConfigurationError(
-        `policy optional selector input ${name} duplicates a required canonical input`,
-      );
-    }
-  }
-  const optionalStringInputNames = new Set(Object.keys(value.optionalCanonicalSelectorInputs));
-  for (const name of Object.keys(value.optionalBooleanSelectorInputs)) {
-    if (canonicalInputNames.has(name) || optionalStringInputNames.has(name)) {
-      throw new ConfigurationError(
-        `policy optional boolean selector input ${name} duplicates another selector input`,
-      );
-    }
-  }
-
   if (!approvedHostedRunnerLabels.has(value.governedReusableRunnerInput.default)) {
     throw new ConfigurationError(
       "policy.governedReusableRunnerInput.default must be an approved hosted runner label",
@@ -328,12 +371,8 @@ export function validatePolicy(value) {
     approvedSelectorReferences: new Set(value.approvedSelectorReferences),
     approvedSelectorReferencesByRepositoryOwner,
     scopedSelectorOwnersByReference,
+    approvedSelectorInputContracts,
     approvedReusableWorkflowContracts,
-    canonicalSelectorInputNames: new Set([
-      ...Object.keys(value.canonicalSelectorInputs),
-      ...Object.keys(value.optionalCanonicalSelectorInputs),
-      ...Object.keys(value.optionalBooleanSelectorInputs),
-    ]),
     canonicalSelectorSecretNames: new Set(Object.keys(value.canonicalSelectorSecrets)),
     approvedHostedRunnerLabels,
     hostedMatrixAxes,
@@ -939,6 +978,23 @@ function selectorStatus(job, policy) {
       reason: secretError,
     };
   }
+  const inputContract = policy.approvedSelectorInputContracts.get(job.uses);
+  if (!inputContract) {
+    return {
+      approved: false,
+      isSelector: true,
+      reason: "the selector path@SHA has no reviewed input contract",
+    };
+  }
+  const optionalCanonicalSelectorInputs = {};
+  const optionalBooleanSelectorInputs = {};
+  for (const name of inputContract.allowedInputs) {
+    if (Object.hasOwn(policy.optionalCanonicalSelectorInputs, name)) {
+      optionalCanonicalSelectorInputs[name] = policy.optionalCanonicalSelectorInputs[name];
+    } else if (Object.hasOwn(policy.optionalBooleanSelectorInputs, name)) {
+      optionalBooleanSelectorInputs[name] = policy.optionalBooleanSelectorInputs[name];
+    }
+  }
   // Boolean opt-in inputs share the optional exact-match contract: present or
   // absent, and when present the caller's parsed value must equal the reviewed
   // literal (true). Merging them into the optional map reuses that fail-closed
@@ -947,8 +1003,8 @@ function selectorStatus(job, policy) {
   const inputError = exactCanonicalMap(
     job.with,
     policy.canonicalSelectorInputs,
-    { ...policy.optionalCanonicalSelectorInputs, ...policy.optionalBooleanSelectorInputs },
-    policy.canonicalSelectorInputNames,
+    { ...optionalCanonicalSelectorInputs, ...optionalBooleanSelectorInputs },
+    inputContract.allowedInputNames,
     "selector inputs",
   );
   if (inputError) {
