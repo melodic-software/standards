@@ -202,9 +202,10 @@ validated by the selector.
 A repository-local reusable workflow may instead require its runner input with
 no default. That zero-hosted-fallback form passes the raw selector output only
 behind the exact successful self-hosted-route proof. The reserved
-`ci-runner-selection-failed` literal is accepted solely for the narrowly shaped
-scheduled rejection guard documented by the runner-policy component; it is not
-a general workload runner or fallback.
+`ci-runner-selection-failed` marker step is accepted solely for the narrowly
+shaped hosted rejection guard documented by the runner-policy component; it is
+not a general workload runner or fallback. During migration the legacy unroutable
+`runs-on: ci-runner-selection-failed` shape remains accepted.
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by

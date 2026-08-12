@@ -7255,7 +7255,8 @@ function selectorFailureJob({
   selectorId = "choose",
   needs = selectorId,
   condition = `\${{ !cancelled() && (needs.${selectorId}.result != 'success' || !(needs.${selectorId}.outputs.route == 'self-hosted' && needs.${selectorId}.outputs.runner != '' && needs.${selectorId}.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}`,
-  target = "ci-runner-selection-failed",
+  target = BASE_POLICY.governedReusableRunnerInput.failureSentinel,
+  stepName = BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
   timeout = 1,
   permissions = "{}",
   extra = "",
@@ -7268,7 +7269,8 @@ function selectorFailureJob({
     timeout-minutes: ${timeout}
     permissions: ${permissions}
 ${extra}    steps:
-      - name: Reject non-governed route
+      - name: ${stepName}
+        shell: bash
         run: |
           ${run}
 `;
@@ -7280,7 +7282,7 @@ function selectorFailureWorkflow(options = {}) {
 ${SELECTOR}${selectorFailureJob(options)}`;
 }
 
-test("reserved unroutable sentinel accepts only the exact selector rejection topology", async () => {
+test("hosted selector failure sentinel accepts only the exact selector rejection topology", async () => {
   const root = await repository({ workflows: { "ci.yml": selectorFailureWorkflow() } });
   assert.deepEqual(await audit(root), []);
 });
@@ -7398,9 +7400,10 @@ jobs:
   );
 });
 
-test("reserved unroutable sentinel rejects every widened execution surface", async () => {
+test("hosted selector failure sentinel rejects every widened execution surface", async () => {
   for (const [label, overrides] of [
     ["wrong literal", { target: "another-unmatched-label" }],
+    ["wrong marker", { stepName: "Reject non-governed route" }],
     ["multiple needs", { needs: "[choose, choose]" }],
     ["weak condition", { condition: `\${{ !cancelled() }}` }],
     [
@@ -7462,18 +7465,116 @@ test("sentinel requires an approved selector and private self-hosted enrollment"
   );
 });
 
-test("sentinel cannot enter any hosted or managed runner label set", async () => {
+test("legacy unroutable sentinel shape remains accepted during migration", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": selectorFailureWorkflow({
+        target: BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
+        stepName: "Reject non-governed route",
+      }),
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(
+      ({ rule, job }) => rule === "selector-failure-sentinel-legacy" && job === "reject-route",
+    ),
+  );
+});
+
+test("hosted selector failure sentinel rejects workflow defaults that syntax-check only", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `defaults:
+  run:
+    shell: bash -n {0}
+jobs:
+  choose:
+${SELECTOR}  reject-route:
+    needs: choose
+    if: \${{ !cancelled() && (needs.choose.result != 'success' || !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}
+    runs-on: ${BASE_POLICY.governedReusableRunnerInput.failureSentinel}
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: ${BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker}
+        run: |
+          echo "::error::A governed self-hosted route is required"
+          exit 1
+`,
+    },
+  });
+  assert.ok(
+    (await audit(root)).some(({ message }) => message.includes("pin shell: bash")),
+  );
+});
+
+test("policy schema fixes the hosted sentinel label and declared marker", async () => {
+  for (const policyOverrides of [
+    {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        failureSentinel: "windows-2025",
+      },
+    },
+    {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        failureSentinelMarker: "something-else",
+      },
+    },
+  ]) {
+    const root = await repository({
+      policyOverrides,
+      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    });
+    await assert.rejects(
+      () => audit(root),
+      /governedReusableRunnerInput\.(failureSentinel|failureSentinelMarker)/,
+    );
+  }
+});
+
+test("failureSentinel must be an approved hosted runner label", async () => {
+  for (const policyOverrides of [
+    {
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        failureSentinel: "another-unmatched-label",
+      },
+    },
+    {
+      approvedHostedRunnerLabels: ["windows-2025"],
+      fallbackLabelAllowlist: ["windows-2025", "melodic-ubuntu-24.04-x64"],
+      governedReusableRunnerInput: {
+        ...BASE_POLICY.governedReusableRunnerInput,
+        default: "windows-2025",
+      },
+    },
+  ]) {
+    const root = await repository({
+      policyOverrides,
+      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    });
+    await assert.rejects(
+      () => audit(root),
+      /failureSentinel must be an approved hosted runner label|governedReusableRunnerInput\.failureSentinel/,
+    );
+  }
+});
+
+test("failureSentinelMarker cannot enter any hosted or managed runner label set", async () => {
   for (const policyOverrides of [
     {
       approvedHostedRunnerLabels: [
         ...BASE_POLICY.approvedHostedRunnerLabels,
-        BASE_POLICY.governedReusableRunnerInput.failureSentinel,
+        BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
       ],
     },
     {
       forbiddenHostedRunnerLabels: [
         ...BASE_POLICY.forbiddenHostedRunnerLabels,
-        BASE_POLICY.governedReusableRunnerInput.failureSentinel,
+        BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
       ],
     },
     {
@@ -7484,21 +7585,8 @@ test("sentinel cannot enter any hosted or managed runner label set", async () =>
       policyOverrides,
       workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
     });
-    await assert.rejects(() => audit(root), /failureSentinel must remain outside/);
+    await assert.rejects(() => audit(root), /failureSentinelMarker must remain outside/);
   }
-});
-
-test("policy schema fixes the reserved sentinel literal", async () => {
-  const root = await repository({
-    policyOverrides: {
-      governedReusableRunnerInput: {
-        ...BASE_POLICY.governedReusableRunnerInput,
-        failureSentinel: "another-unmatched-label",
-      },
-    },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
-  });
-  await assert.rejects(() => audit(root), /governedReusableRunnerInput\.failureSentinel/);
 });
 
 test("fallback label allowlist policy remains required", async () => {
@@ -7592,7 +7680,7 @@ test("the fallback label allowlist can be extended to admit another approved def
   assert.deepEqual(await audit(root), []);
 });
 
-test("sentinel is not a general local reusable runner value", async () => {
+test("sentinel marker is not a general local reusable runner value", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
@@ -7603,7 +7691,7 @@ ${SELECTOR}  build:
     if: \${{ !cancelled() && needs.choose.result == 'success' }}
     uses: ./.github/workflows/build.yml
     with:
-      runner: ci-runner-selection-failed
+      runner: ${BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker}
 `,
       "build.yml": `on:
   workflow_call:
