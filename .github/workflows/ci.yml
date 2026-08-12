@@ -805,6 +805,19 @@ jobs:
       - name: Comment-hygiene contract test
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
+  local-lane-guards:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Local-lane-guards contract test
+        run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
+
   pin-comment-convention:
     permissions:
       contents: read
@@ -917,6 +930,7 @@ jobs:
       - machine-specific-paths
       - eol-renormalize
       - comment-hygiene
+      - local-lane-guards
       - pin-comment-convention
       - actionlint
       - zizmor
@@ -961,6 +975,7 @@ jobs:
             ${{ needs.machine-specific-paths.result }}
             ${{ needs.eol-renormalize.result }}
             ${{ needs.comment-hygiene.result }}
+            ${{ needs.local-lane-guards.result }}
             ${{ needs.pin-comment-convention.result }}
             ${{ needs.actionlint.result }}
             ${{ needs.zizmor.result }}
