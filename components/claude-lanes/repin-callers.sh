@@ -53,12 +53,12 @@ require_output_file() {
 #
 # SINGLE SOURCE OF TRUTH: the highest-SemVer PUBLISHED RELEASE.
 #
-# Upstream's own `release.yml` computes the next version by the same rule
-# (melodic-software/ci-workflows#449), so the two halves of the release ->
-# re-pin chain read one artefact under one ordering. They did not, before
-# 2026-08-12: `release.yml` computed from the newest TAG while this resolver
-# read a Release, so tag `v0.13.0` (036c390, no Release) advanced the version
-# counter while staying invisible here, and the fleet went v0.12.0 -> v0.14.0.
+# Upstream's own `release.yml` computes the next version by the same rule, so
+# the two halves of the release -> re-pin chain read one artefact under one
+# ordering. They did not always: `release.yml` once computed from the newest
+# TAG while this resolver read a Release, so a tag published without a Release
+# advanced the version counter while staying invisible here — the fleet
+# skipped that version entirely and never pinned to it.
 #
 # Deliberately NOT the `releases/latest` endpoint, which this used to call:
 # that endpoint orders by `created_at`, which GitHub sets from the tag target's
