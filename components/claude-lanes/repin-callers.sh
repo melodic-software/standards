@@ -50,9 +50,24 @@ require_output_file() {
 #
 # Emits resolved=false and exits 0 when the upstream has published no release;
 # emits resolved=true plus tag and sha otherwise. Any other fault exits 1.
+#
+# SINGLE SOURCE OF TRUTH: the highest-SemVer PUBLISHED RELEASE.
+#
+# Upstream's own `release.yml` computes the next version by the same rule
+# (melodic-software/ci-workflows#449), so the two halves of the release ->
+# re-pin chain read one artefact under one ordering. They did not, before
+# 2026-08-12: `release.yml` computed from the newest TAG while this resolver
+# read a Release, so tag `v0.13.0` (036c390, no Release) advanced the version
+# counter while staying invisible here, and the fleet went v0.12.0 -> v0.14.0.
+#
+# Deliberately NOT the `releases/latest` endpoint, which this used to call:
+# that endpoint orders by `created_at`, which GitHub sets from the tag target's
+# COMMIT date rather than publish time, so a release cut from an older commit
+# outranks a newer version. Sorting the published set by SemVer has no such
+# dependence on commit chronology.
 repin::resolve() {
   local upstream="$1"
-  local err tag ref object_type object_sha sha
+  local err releases tag ref object_type object_sha sha
 
   err="$(mktemp)"
   # shellcheck disable=SC2064  # expand $err now: the trap must survive it going out of scope
@@ -64,23 +79,38 @@ repin::resolve() {
   # reading. Every other failure stays loud: an unattended daily job that
   # reports green while it has silently stopped checking anything is worse
   # than no job at all.
-  if ! tag="$(gh api "repos/${upstream}/releases/latest" --jq .tag_name 2>"$err")"; then
+  if ! releases="$(gh api --paginate "repos/${upstream}/releases" \
+    --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' 2> "$err")"; then
     if grep -q 'HTTP 404' "$err" && gh api "repos/${upstream}" --jq .full_name > /dev/null 2>&1; then
       echo "::notice::${upstream} has no published release to re-pin against."
       echo 'resolved=false' >> "$GITHUB_OUTPUT"
       return 0
     fi
-    echo "::error::Could not read the newest ${upstream} release." >&2
+    echo "::error::Could not read the published ${upstream} releases." >&2
     cat "$err" >&2
     return 1
+  fi
+
+  # The list endpoint answers 200 with an empty body for a repository that has
+  # published nothing, where `releases/latest` answered 404. Same benign
+  # verdict, reached without having to tell two 404s apart.
+  if [[ -z "${releases//[[:space:]]/}" ]]; then
+    echo "::notice::${upstream} has no published release to re-pin against."
+    echo 'resolved=false' >> "$GITHUB_OUTPUT"
+    return 0
   fi
 
   # The pin-comment convention's primary form accepts full SemVer only
   # (components/pin-comment-convention/README.md), so a tag outside that shape
   # would have this job author a comment this repository's own CI then rejects
-  # on the pull request it just opened.
-  if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "::error::Newest ${upstream} release tag '${tag}' is not full SemVer (vX.Y.Z); the pin-comment convention has no form for it." >&2
+  # on the pull request it just opened. Selecting the highest FULL-SemVer
+  # release means a stray non-SemVer release no longer decides the pin — but a
+  # published set containing nothing else still fails loudly below rather than
+  # silently re-pinning to an older version.
+  tag="$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' <<< "$releases" | sort -V | tail -n1 || true)"
+  if [[ -z "$tag" ]]; then
+    echo "::error::No ${upstream} release carries a full-SemVer (vX.Y.Z) tag; the pin-comment convention has no form for any of them:" >&2
+    printf '%s\n' "$releases" >&2
     return 1
   fi
 

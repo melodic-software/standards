@@ -48,16 +48,38 @@ stub_gh() {
   mkdir -p "$dir"
   cat > "$dir/gh" <<'STUB'
 #!/usr/bin/env bash
-# Test double for the gh CLI. Only `gh api <path> --jq <expr>` is supported;
-# the subject calls nothing else.
+# Test double for the gh CLI. Only `gh api [flags] <path> --jq <expr>` is
+# supported; the subject calls nothing else.
 set -uo pipefail
 not_found() { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
 [[ "${1:-}" == 'api' ]] || { echo "stub gh: unsupported command ${1:-}" >&2; exit 64; }
-path="${2:-}"
+# The route is the first non-flag argument after `api`. Scanning for it rather
+# than reading $2 keeps the stub correct as the subject adds flags such as
+# `--paginate`, which the release-list read passes ahead of the path.
+shift
+path=''
+for arg in "$@"; do
+  case "$arg" in
+    -*) continue ;;
+    *) path="$arg"; break ;;
+  esac
+done
 case "$path" in
-  */releases/latest)
+  */releases)
+    # The published-release LIST — the subject's source of truth. Answers 200
+    # with an empty body for a repository that has published nothing.
     [[ "${STUB_RELEASES_STATUS:-200}" == '200' ]] || not_found
-    printf '%s\n' "${STUB_TAG_NAME:?stub gh: STUB_TAG_NAME unset}"
+    if [[ -n "${STUB_RELEASE_TAGS+x}" ]]; then
+      [[ -z "$STUB_RELEASE_TAGS" ]] || printf '%s\n' "$STUB_RELEASE_TAGS"
+    else
+      printf '%s\n' "${STUB_TAG_NAME:?stub gh: STUB_TAG_NAME unset}"
+    fi
+    ;;
+  */releases/latest)
+    # Retained so a regression that reintroduces the created_at-ordered
+    # endpoint is a loud stub failure rather than a silently different answer.
+    echo 'stub gh: releases/latest is not the source of truth; use the release list' >&2
+    exit 64
     ;;
   */git/ref/tags/*)
     printf '%s\t%s\n' "${STUB_REF_TYPE:?stub gh: STUB_REF_TYPE unset}" \
@@ -116,6 +138,53 @@ assert_contains 'resolve: annotated tag reports the tag object' "$out" 'tag obje
 assert_contains 'resolve: annotated tag dereferences to the commit' "$(cat "$out_file")" "sha=$new_sha"
 assert_not_contains 'resolve: annotated tag never emits the tag object SHA' "$(cat "$out_file")" "$tag_object"
 unset STUB_TAG_OBJECT_SHA
+
+# ------------------------------------------- resolve: highest SemVer wins
+
+# THE SOURCE-OF-TRUTH RULE. The subject picks the highest-SemVer published
+# release, not the first entry and not the one the `releases/latest` endpoint
+# would name. `releases/latest` orders by `created_at`, which GitHub sets from
+# the tag target's COMMIT date, so a release cut from an older commit outranks
+# a newer version there; this ordering has no such dependence.
+out_file="$scratch/out-highest-semver"
+export STUB_RELEASES_STATUS=200 STUB_REF_TYPE='commit' STUB_REF_SHA="$new_sha"
+export STUB_RELEASE_TAGS='v0.9.1
+v0.14.0
+v0.12.0'
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_exit 'resolve: a multi-release set exits 0' 0 "$rc"
+assert_contains 'resolve: the highest SemVer release wins' "$(cat "$out_file")" 'tag=v0.14.0'
+assert_not_contains 'resolve: a lower release never wins' "$(cat "$out_file")" 'tag=v0.12.0'
+
+# Version ordering, not lexical: v0.10.0 is newer than v0.9.1, and a lexical
+# sort would answer v0.9.1.
+out_file="$scratch/out-semver-order"
+export STUB_RELEASE_TAGS='v0.9.1
+v0.10.0'
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_exit 'resolve: SemVer ordering exits 0' 0 "$rc"
+assert_contains 'resolve: v0.10.0 outranks v0.9.1' "$(cat "$out_file")" 'tag=v0.10.0'
+
+# A stray non-SemVer release no longer decides the pin: it is skipped and the
+# highest full-SemVer release is chosen instead.
+out_file="$scratch/out-mixed-shapes"
+export STUB_RELEASE_TAGS='nightly
+v0.12.0
+v1.4'
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_exit 'resolve: a mixed-shape release set exits 0' 0 "$rc"
+assert_contains 'resolve: non-SemVer releases are skipped' "$(cat "$out_file")" 'tag=v0.12.0'
+
+# An empty published set is the benign "nothing to re-pin against" verdict the
+# list endpoint reports as 200 rather than 404.
+out_file="$scratch/out-empty-list"
+export STUB_RELEASE_TAGS=''
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_exit 'resolve: an empty published release set exits 0' 0 "$rc"
+assert_contains 'resolve: an empty release set emits resolved=false' "$(cat "$out_file")" 'resolved=false'
+assert_contains 'resolve: an empty release set is a notice' "$out" '::notice::'
+assert_not_contains 'resolve: an empty release set raises no error' "$out" '::error::'
+unset STUB_RELEASE_TAGS
 
 # ------------------------------------------------- resolve: 404 vs 404
 
