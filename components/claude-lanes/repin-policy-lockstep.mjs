@@ -13,7 +13,13 @@ import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse as parseYaml } from "yaml";
+
+import {
+  ConfigurationError,
+  parseUniqueJson,
+  reusableWorkflowSecuritySurfacesMatch,
+  validatePolicy,
+} from "../runner-policy/runner-policy.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -27,14 +33,22 @@ const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
 const TEST_PATH = path.join(ROOT, "components/runner-policy/runner-policy.test.mjs");
 const LOCAL_CALLER_PATH = path.join(ROOT, ".github/workflows/claude-review.yml");
 
+function emitError(message) {
+  process.stderr.write(`${message}\n`);
+}
+
+function emitNotice(message) {
+  process.stdout.write(`${message}\n`);
+}
+
 function usage() {
-  console.error(`usage: repin-policy-lockstep.mjs <old-sha> <new-sha> <tag>`);
+  emitError("usage: repin-policy-lockstep.mjs <old-sha> <new-sha> <tag>");
 }
 
 function requireOutputFile() {
   const file = process.env.GITHUB_OUTPUT;
   if (!file) {
-    console.error("::error::GITHUB_OUTPUT is not set; nothing can report a result.");
+    emitError("::error::GITHUB_OUTPUT is not set; nothing can report a result.");
     process.exit(2);
   }
   return file;
@@ -63,9 +77,27 @@ function fetchUpstreamFile(repoPath, ref) {
   return Buffer.from(content, "base64").toString("utf8");
 }
 
-function workflowCallSurface(yamlText) {
-  const doc = parseYaml(yamlText);
-  return JSON.stringify(doc.on?.workflow_call ?? null);
+function laneSecuritySurfacesMatch(oldSource, newSource, lanePath, policy) {
+  try {
+    const result = reusableWorkflowSecuritySurfacesMatch({
+      oldSource,
+      newSource,
+      workflowPath: lanePath,
+      policy,
+    });
+    if (!result.unchanged) {
+      return {
+        unchanged: false,
+        reason: `${lanePath} ${result.diffField} changed between revisions`,
+      };
+    }
+    return { unchanged: true };
+  } catch (error) {
+    if (error instanceof ConfigurationError) {
+      return { unchanged: false, reason: error.message };
+    }
+    throw error;
+  }
 }
 
 function constantNameForTag(tag) {
@@ -149,10 +181,12 @@ async function updateTestMjs(newSha, tag, selectorUnchanged) {
   const lineEnd = text.indexOf("\n", anchorIndex);
   text = `${text.slice(0, lineEnd + 1)}${constLine}${text.slice(lineEnd + 1)}`;
 
-  const arrayNeedle = "${SELECTOR_PATH}@${AVAILABILITY_RULING_LANE_SHA}`,";
+  const arrayNeedle = "$" + "{SELECTOR_PATH}@" + "${AVAILABILITY_RULING_LANE_SHA}`,";
   const arrayIndex = text.indexOf(arrayNeedle);
   if (arrayIndex === -1) {
-    throw new Error("could not locate production selector allowlist array in runner-policy.test.mjs");
+    throw new Error(
+      "could not locate production selector allowlist array in runner-policy.test.mjs",
+    );
   }
   const insertAt = arrayIndex + arrayNeedle.length;
   const insertion = `\n      \`\${SELECTOR_PATH}@\${${constantName}}\`,`;
@@ -169,11 +203,11 @@ async function main() {
     process.exit(2);
   }
   if (!/^[0-9a-f]{40}$/u.test(oldSha) || !/^[0-9a-f]{40}$/u.test(newSha)) {
-    console.error("::error::old-sha and new-sha must be 40-character commit SHAs.");
+    emitError("::error::old-sha and new-sha must be 40-character commit SHAs.");
     process.exit(1);
   }
   if (oldSha === newSha) {
-    console.log("::notice::Old and new SHAs are identical; policy lockstep is a no-op.");
+    emitNotice("::notice::Old and new SHAs are identical; policy lockstep is a no-op.");
     await appendOutput(requireOutputFile(), [
       ["lockstep", "noop"],
       ["policy-note", "Policy lockstep skipped: callers already carry the target SHA."],
@@ -182,29 +216,41 @@ async function main() {
   }
 
   const outputFile = requireOutputFile();
+  const policy = validatePolicy(parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH));
   const selectorOld = fetchUpstreamFile(".github/workflows/select-runner.yml", oldSha);
   const selectorNew = fetchUpstreamFile(".github/workflows/select-runner.yml", newSha);
   const selectorUnchanged = selectorOld === selectorNew;
 
   let laneUnchanged = true;
+  const laneReasons = [];
   for (const lanePath of LANE_PATHS) {
     const repoPath = lanePath.replace(`${UPSTREAM}/`, "");
-    const oldSurface = workflowCallSurface(fetchUpstreamFile(repoPath, oldSha));
-    const newSurface = workflowCallSurface(fetchUpstreamFile(repoPath, newSha));
-    if (oldSurface !== newSurface) laneUnchanged = false;
+    const oldSource = fetchUpstreamFile(repoPath, oldSha);
+    const newSource = fetchUpstreamFile(repoPath, newSha);
+    const laneResult = laneSecuritySurfacesMatch(oldSource, newSource, lanePath, policy);
+    if (!laneResult.unchanged) {
+      laneUnchanged = false;
+      laneReasons.push(laneResult.reason);
+    }
   }
 
   if (!selectorUnchanged || !laneUnchanged) {
     const reasons = [];
     if (!selectorUnchanged) reasons.push("`select-runner.yml` changed between revisions");
-    if (!laneUnchanged) reasons.push("a lane `workflow_call` surface changed between revisions");
+    if (!laneUnchanged) {
+      reasons.push(
+        laneReasons.length > 0
+          ? laneReasons.join("; ")
+          : "a lane reusable-workflow security surface changed between revisions",
+      );
+    }
     const note =
       `> [!WARNING]\n` +
       `> **Runner-policy lockstep requires a human.** ${reasons.join("; ")}. ` +
       "Before merging, add the selector allowlist entry, both lane contract entries, " +
       "the README rollout record, and the test constants — see PR #345 for precedent. " +
       "This pull request is never auto-merged.";
-    console.log(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
+    emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
     await appendOutput(outputFile, [
       ["lockstep", "manual"],
       ["policy-note", note],
@@ -217,13 +263,13 @@ async function main() {
   const callerChanged = await rewriteLocalCaller(newSha, tag);
 
   const note =
-    "Runner-policy lockstep applied automatically: selector and both lane contracts are " +
-    "byte-identical / unchanged between revisions, so `policy.json`, " +
+    "Runner-policy lockstep applied automatically: selector is byte-identical and both lane " +
+    "reusable-workflow security surfaces are unchanged between revisions, so `policy.json`, " +
     "`runner-policy.test.mjs`, and the repo-local caller pin were copy-forwarded. " +
     "**Operator:** add the README rollout record describing what this revision carries " +
     "before merging (see `components/runner-policy/README.md` precedent).";
 
-  console.log(
+  emitNotice(
     `Policy lockstep applied (policy=${policyChanged}, test=${testChanged}, caller=${callerChanged}).`,
   );
   await appendOutput(outputFile, [
@@ -233,6 +279,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`::error::${error.message}`);
+  emitError(`::error::${error.message}`);
   process.exit(1);
 });

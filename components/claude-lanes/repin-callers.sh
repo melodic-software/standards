@@ -121,7 +121,7 @@ repin::resolve() {
 # rewritten files in the working tree for the caller to commit.
 repin::apply() {
   local tag="$1" sha="$2"
-  local root expected rewritten old_tags new_major old_major old_tag note delim
+  local root expected rewritten old_sha old_tags new_major old_major old_tag note delim
   local -a targets
 
   root="$(git rev-parse --show-toplevel)"

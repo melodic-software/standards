@@ -103,6 +103,7 @@ jobs:
         id: policy-lockstep
         if: steps.repin.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           OLD_SHA: ${{ steps.repin.outputs.old-sha }}
           NEW_SHA: ${{ steps.release.outputs.sha }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -148,6 +149,7 @@ jobs:
           # single-repository token.
           permission-contents: write
           permission-pull-requests: write
+          permission-workflows: write
 
       # Fixed branch plus fixed title: the action creates the pull request on
       # the first run and updates that same one on every later run, so a lane
