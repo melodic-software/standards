@@ -21,7 +21,13 @@ Labels follow one grammar across every axis, so a reader parses any label withou
 
 ## Issue titles
 
-The naming grammar above governs labels only. Issue titles are free text: there is no enforced prefix vocabulary, and titles do not carry a conventional-commit-style tag such as `[CC]` or `feat:`. This is a deliberate choice, not a gap — the type, status, and area axes already have a governed home as Issue Types and labels, so a title prefix would duplicate an axis that already exists elsewhere and drift out of sync with it. Write a title that describes the issue.
+The naming grammar above governs labels only. Issue titles are free text: there is no enforced prefix vocabulary, and titles do not carry a conventional-commit-style tag such as `[CC]` or `feat(scope):`. This is a deliberate choice, not a gap — GitHub's categorization mechanism is structured metadata (org Issue Types, labels, milestones), not title encoding. The type axis lives in native Issue Types (`Bug`, `Feature`, `Task`); the area axis lives in labels. A title prefix would duplicate an axis that already exists elsewhere and drift out of sync with it. Write a plain summary that describes the issue.
+
+**Structured metadata, not title prefixes.** Set the type with `--type` or the issue form's Types field; set area and other axes with labels. PR titles are unchanged — they remain Conventional Commits and are enforced by the `pr-title` gate — because squash-merge makes the PR title the default-branch subject line. Issue titles and PR titles serve different layers and follow different rules.
+
+**Template-default bracket prefixes are permitted cosmetics.** GitHub's own issue-form examples ship a `title: "[Bug]: "` default prefix. A bracket prefix a form inserts is display-only template text, not a metadata carrier. Do not encode type, area, or status in a title by hand.
+
+**Forward-only.** Existing issue titles are not backfilled. This convention applies to new issues and to titles an author chooses to revise; no fleet-wide rename campaign.
 
 ## The type axis
 
@@ -38,6 +44,20 @@ Prefer a native mechanism over a status label wherever GitHub offers one, becaus
 - **Blocking is a dependency edge, not a label.** Model "this cannot proceed until that is done" as a native blocked-by relationship between issues. The edge resolves itself when the blocker closes; a label has to be cleared by hand and silently goes stale.
 - **Claiming is an assignee plus a lease, not a label — active.** A worker taking an issue sets themselves as its assignee under a time-boxed lease, so ownership and its freshness live in the native field where a second worker can trust them, rather than in a label anyone can leave behind. The activation trigger this convention named — assignment contention becoming real — was met when autonomous multi-worker loop lanes began claiming from the same backlog; the mechanism is the work-items plugin's [tracker-seam lease protocol](https://github.com/melodic-software/claude-code-plugins/blob/main/plugins/work-items/tools/work-item-tracker/CONTRACT.md#lease-protocol), which defines the lease semantics (expiration, renewal, concurrent-claim arbitration). The former interim 🔒 marker is retired.
 - **The remaining status labels are the human-gate signals.** What stays a label is the small set of states that mean *a human must act before work can continue* — an issue waiting on information, waiting on a decision, or cleared and ready to start. These have no native equivalent, so they remain labels under the naming grammar; their exact spelling is defined in infrastructure-as-code.
+
+### Triage floor: bare `needs-triage`
+
+Every new issue passes through triage. The floor label is a **bare status label** `needs-triage` — lifecycle semantics on the status axis, not a priority value. Priority labels are reserved for assigned priorities after triage; conflating "not yet triaged" with a priority axis value (for example `priority: needs-triage`) mixes a lifecycle state with an assignment that has not happened yet.
+
+A workflow applies `needs-triage` when an issue opens **without** any triage-status label already present — label-absence conditioning, not author allowlists. The creating bot or scheduler for infrastructure issues (lane telemetry, rolling reports, scheduled maintenance) applies its own status label at creation time; because the floor fires only on absence, self-labeled infrastructure issues skip it. Issue-form `labels:` and `type:` keys are the official deterministic auto-apply path for human-filed issues but fire only for template-created issues; API and bot-created issues bypass forms, so absence conditioning is the robust pattern.
+
+Exit is human-gated: a maintainer clears `needs-triage` and assigns the real status, priority, and area labels during triage. Label provisioning and rename mechanics live in `github-iac`; the auto-apply workflow lives in `ci-workflows` — this playbook records the posture only.
+
+### Recurring and rolling items
+
+GitHub's `in:title` search is containment-only — there is no exact-title-equality qualifier — so reconciling recurring or rolling work items by title match is fragile: any edit, punctuation drift, or superset match breaks client-side exact-match logic.
+
+Reconcile recurring items by a dedicated label (for example `recurring`) **plus** a hidden HTML-comment body marker that carries the stable identity. The title is display-only. The work-items plugin consumes this convention; its implementation lives in `claude-code-plugins`, but the org-wide rule is recorded here.
 
 ## Closing pull requests
 
