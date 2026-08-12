@@ -13,7 +13,7 @@ Agent-agnostic engineering standards that no linter can decide for you — the a
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
 | [shareable-artifact-design.md](shareable-artifact-design.md) | consumer-agnostic behavior, externalized configuration, consumer tiers, explicit adoption for anything built to be shared |
 | [documentation-existence.md](documentation-existence.md) | whether a tracked page may exist at all — the admission test upstream of the documentation family |
-| [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap (in-repo) |
+| [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap; consolidation doctrine (ordered tests T1–T6) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
 | [source-authority-tiers.md](source-authority-tiers.md) | how much authority a source carries; how many independent corroborators a claim needs |
 | [deterministic-artifact-scaffolding.md](deterministic-artifact-scaffolding.md) | stable artifact structure in deterministic mechanisms; judgment-bearing slots stay human- or agent-owned |
