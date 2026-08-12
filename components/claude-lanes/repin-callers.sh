@@ -139,6 +139,7 @@ repin::apply() {
   # grep exits 1 on no match, which pipefail would turn into a failed
   # assignment under errexit; `|| true` keeps the count (0) and drops the exit.
   expected="$(grep -hoE "$PIN_RE" "${targets[@]}" | wc -l || true)"
+  old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${targets[@]}" | head -1 | tr '[:upper:]' '[:lower:]' | tr -d '@')"
   old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \
     | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
 
@@ -187,6 +188,7 @@ repin::apply() {
   delim="NOTE_${RANDOM}${RANDOM}${RANDOM}"
   {
     echo 'changed=true'
+    echo "old-sha=${old_sha}"
     echo "old-tags=${old_tags}"
     echo "version-note<<${delim}"
     echo "$note"

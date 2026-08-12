@@ -99,6 +99,15 @@ jobs:
           SHA: ${{ steps.release.outputs.sha }}
         run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA"
 
+      - name: Apply runner-policy lockstep when contracts are unchanged
+        id: policy-lockstep
+        if: steps.repin.outputs.changed == 'true'
+        env:
+          OLD_SHA: ${{ steps.repin.outputs.old-sha }}
+          NEW_SHA: ${{ steps.release.outputs.sha }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: node components/claude-lanes/repin-policy-lockstep.mjs "$OLD_SHA" "$NEW_SHA" "$TAG"
+
       - name: Report the missing re-pin credential
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
         env:
@@ -151,13 +160,18 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ steps.app-token.outputs.token }}
+          sign-commits: true
           branch: chore/repin-claude-lanes
           # Stated rather than left to the action's default. The default is the
           # branch this workflow checked out, which the step above already pins
           # to the default branch — naming it here means a future change to the
           # checkout cannot silently retarget this privileged pull request.
           base: ${{ steps.default-branch.outputs.name }}
-          add-paths: components/claude-lanes
+          add-paths: |
+            components/claude-lanes
+            components/runner-policy/policy.json
+            components/runner-policy/runner-policy.test.mjs
+            .github/workflows/claude-review.yml
           commit-message: |
             chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
 
@@ -172,7 +186,11 @@ jobs:
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
             release. Opened by `.github/workflows/claude-lanes-repin.yml`.
 
+            No linked issue.
+
             ${{ steps.repin.outputs.version-note }}
+
+            ${{ steps.policy-lockstep.outputs.policy-note }}
 
             Merging this cascades: `sync.yml` re-materializes the lane callers
             into every target `distribution/sync-manifest.yml` marks
@@ -185,11 +203,14 @@ jobs:
             - `pin-comment-convention` covers `components/claude-lanes/*.yml`
               and validates the rewritten pin comments' form.
             - `claude-lanes` component tests materialize and lint the callers.
+            - `runner-policy` lints and tests pass when lockstep applied
+              (`policy-lockstep=${{ steps.policy-lockstep.outputs.lockstep }}`).
             - Post-merge: the per-target sync pull requests are the real
               acceptance signal.
 
             ## Related
 
+            - No linked issue.
             - Phase 3g of `melodic-software/ci-workflows`
               `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12).
             - Upstream release:
