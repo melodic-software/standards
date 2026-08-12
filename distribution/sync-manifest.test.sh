@@ -406,6 +406,98 @@ assert_nonzero 'dirty tracked source is rejected' "$rc"
 assert_contains 'dirty source diagnostic identifies index mismatch' \
   "$out" 'worktree bytes differ from the indexed object'
 
+manifest_symlink_source="$tmp_root/manifest-symlink-source"
+make_source "$manifest_symlink_source" "$manifest"
+mv "$manifest_symlink_source/manifest.yml" "$manifest_symlink_source/manifest.real.yml"
+ln -s manifest.real.yml "$manifest_symlink_source/manifest.yml"
+out="$(run_engine "$manifest_symlink_source" validate 2>&1)"
+rc=$?
+assert_nonzero 'manifest symlink is rejected before parsing' "$rc"
+assert_contains 'manifest symlink diagnostic identifies worktree shape' \
+  "$out" 'must exist as a non-symlink regular worktree file'
+
+manifest_fifo_source="$tmp_root/manifest-fifo-source"
+make_source "$manifest_fifo_source" "$manifest"
+rm "$manifest_fifo_source/manifest.yml"
+mkfifo "$manifest_fifo_source/manifest.yml"
+out="$(run_engine "$manifest_fifo_source" validate 2>&1)"
+rc=$?
+assert_nonzero 'manifest FIFO is rejected before parsing' "$rc"
+assert_contains 'manifest FIFO diagnostic identifies worktree shape' \
+  "$out" 'must exist as a non-symlink regular worktree file'
+
+# Batched index reads attribute exact recorded paths even when a shared
+# directory prefix would also select descendants under ls-files pathspec rules.
+nested_manifest="$(cat <<'YAML'
+version: 2
+
+components:
+  base:
+    files:
+      pkg/dir-a/file-a.txt: out-a.txt
+      pkg/dir-b/file-b.txt: out-b.txt
+targets:
+  alpha/one:
+    managed:
+      - base
+YAML
+)"
+nested_source="$tmp_root/nested-prefix-source"
+make_repo "$nested_source"
+mkdir -p "$nested_source/pkg/dir-a" "$nested_source/pkg/dir-b"
+printf 'a\n' >"$nested_source/pkg/dir-a/file-a.txt"
+printf 'b\n' >"$nested_source/pkg/dir-b/file-b.txt"
+printf '%s\n' "$nested_manifest" >"$nested_source/manifest.yml"
+git -C "$nested_source" add pkg/dir-a/file-a.txt pkg/dir-b/file-b.txt manifest.yml
+git -C "$nested_source" commit -m 'nested prefix fixture' -q
+out="$(run_engine "$nested_source" validate 2>&1)"
+rc=$?
+assert_exit 'nested directory prefix sources validate under batched index reads' 0 "$rc"
+assert_contains 'nested prefix validation reports catalog size' "$out" '1 components, 1 targets'
+nested_target="$tmp_root/nested-prefix-target"
+make_target "$nested_target"
+out="$(run_engine "$nested_source" apply --target alpha/one --target-root "$nested_target" 2>&1)"
+rc=$?
+assert_exit 'nested prefix sources apply under batched destination index reads' 0 "$rc"
+assert_file_exists 'nested prefix apply writes first destination' "$nested_target/out-a.txt"
+assert_file_exists 'nested prefix apply writes second destination' "$nested_target/out-b.txt"
+
+spawn_count_dir="$tmp_root/spawn-count"
+mkdir -p "$spawn_count_dir/bin"
+cat >"$spawn_count_dir/bin/git" <<'SH'
+#!/usr/bin/env bash
+REAL_GIT="${REAL_GIT:?}"
+COUNT_DIR="${COUNT_DIR:?}"
+for argument in "$@"; do
+  case "$argument" in
+  ls-files)
+    echo $(( $(cat "$COUNT_DIR/ls-files" 2>/dev/null || echo 0) + 1 )) >"$COUNT_DIR/ls-files"
+    ;;
+  hash-object)
+    echo $(( $(cat "$COUNT_DIR/hash-object" 2>/dev/null || echo 0) + 1 )) >"$COUNT_DIR/hash-object"
+    ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$spawn_count_dir/bin/git"
+: >"$spawn_count_dir/ls-files"
+: >"$spawn_count_dir/hash-object"
+real_git="$(command -v git)"
+out="$(
+  COUNT_DIR="$spawn_count_dir" REAL_GIT="$real_git" \
+    PATH="$spawn_count_dir/bin:$PATH" \
+    "$engine" validate --source-root "$root" \
+    --manifest distribution/sync-manifest.yml 2>&1
+)"
+rc=$?
+assert_exit 'production validate succeeds under spawn-counting git shim' 0 "$rc"
+assert_eq 'production validate batches tracked-source ls-files calls' '1' \
+  "$(cat "$spawn_count_dir/ls-files")"
+assert_eq 'production validate batches tracked-source hash-object calls' '1' \
+  "$(cat "$spawn_count_dir/hash-object")"
+assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 8 targets'
+
 if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   rm "$tmp_root/symlink-probe"
   source_repo="$tmp_root/valid-source"

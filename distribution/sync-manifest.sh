@@ -77,13 +77,46 @@ canonical_git_root() {
   printf '%s' "$physical"
 }
 
-# Emit mode/object/stage for index entries whose recorded path is exactly the
-# supplied literal path. A directory-shaped pathspec may also select descendants.
-exact_index_entries() {
-  local root="$1" path="$2" line metadata recorded mode object stage index_output
+INDEX_CACHE_ROOT=''
+declare -A INDEX_ENTRY_CACHE=() INDEX_ENTRY_LOADED=() WORKTREE_HASH_CACHE=()
+
+reset_index_cache() {
+  INDEX_CACHE_ROOT=''
+  INDEX_ENTRY_CACHE=()
+  INDEX_ENTRY_LOADED=()
+  WORKTREE_HASH_CACHE=()
+}
+
+# Load Git index rows for one or more literal paths in a single ls-files call.
+# Directory-shaped pathspecs may also select descendants; only rows whose
+# recorded path exactly equals a requested path are attributed to that path.
+prefetch_index_entries() {
+  local root="$1"
+  shift
+  local -a paths=("$@")
+  local -A want=()
+  local -a to_fetch=()
+  local path line metadata recorded mode object stage index_output
+
+  [[ ${#paths[@]} -gt 0 ]] || return 0
+
+  if [[ "$INDEX_CACHE_ROOT" != "$root" ]]; then
+    reset_index_cache
+    INDEX_CACHE_ROOT="$root"
+  fi
+
+  for path in "${paths[@]}"; do
+    [[ -z "${INDEX_ENTRY_LOADED[$path]+present}" ]] || continue
+    want["$path"]=1
+    to_fetch+=("$path")
+    INDEX_ENTRY_LOADED["$path"]=1
+    INDEX_ENTRY_CACHE["$path"]=''
+  done
+  [[ ${#to_fetch[@]} -gt 0 ]] || return 0
+
   index_output="$(mktemp "${TMPDIR:-/tmp}/standards-index.XXXXXX")" || return 1
   if ! git -C "$root" --literal-pathspecs -c core.quotePath=false \
-    ls-files --stage -z -- "$path" >"$index_output"; then
+    ls-files --stage -z -- "${to_fetch[@]}" >"$index_output"; then
     rm -f -- "$index_output"
     return 1
   fi
@@ -91,26 +124,65 @@ exact_index_entries() {
     [[ "$line" == *$'\t'* ]] || continue
     metadata="${line%%$'\t'*}"
     recorded="${line#*$'\t'}"
-    [[ "$recorded" == "$path" ]] || continue
+    [[ -n "${want[$recorded]+present}" ]] || continue
     read -r mode object stage <<<"$metadata"
-    printf '%s %s %s\n' "$mode" "$object" "$stage"
+    if [[ -z "${INDEX_ENTRY_CACHE[$recorded]}" ]]; then
+      INDEX_ENTRY_CACHE["$recorded"]="$mode $object $stage"
+    else
+      INDEX_ENTRY_CACHE["$recorded"]+=$'\n'"$mode $object $stage"
+    fi
   done <"$index_output"
   rm -f -- "$index_output"
 }
 
 read_exact_index_entries() {
-  local root="$1" path="$2" output
+  local root="$1" path="$2" lines
   INDEX_ENTRIES=()
-  # exact_index_entries checks each fallible command and intentionally runs as
-  # the condition whose status is propagated here.
-  # shellcheck disable=SC2310
-  output="$(exact_index_entries "$root" "$path")" ||
-    die "could not inspect Git index path: $path"
-  [[ -z "$output" ]] || mapfile -t INDEX_ENTRIES <<<"$output"
+  if [[ -z "${INDEX_ENTRY_LOADED[$path]+present}" ]]; then
+    # prefetch_index_entries checks each fallible command and intentionally runs
+    # as the condition whose status is propagated here.
+    # shellcheck disable=SC2310
+    prefetch_index_entries "$root" "$path" ||
+      die "could not inspect Git index path: $path"
+  fi
+  lines="${INDEX_ENTRY_CACHE[$path]-}"
+  [[ -z "$lines" ]] || mapfile -t INDEX_ENTRIES <<<"$lines"
 }
 
-tracked_regular_mode() {
-  local root="$1" path="$2" purpose="$3" mode object stage worktree_object
+prefetch_worktree_hashes() {
+  local root="$1"
+  shift
+  local -a paths=("$@")
+  local -A claimed=()
+  local -a to_hash=()
+  local path hash_output
+  local -a hashes
+
+  [[ ${#paths[@]} -gt 0 ]] || return 0
+  if [[ "$INDEX_CACHE_ROOT" != "$root" ]]; then
+    reset_index_cache
+    INDEX_CACHE_ROOT="$root"
+  fi
+
+  for path in "${paths[@]}"; do
+    [[ -z "${WORKTREE_HASH_CACHE[$path]+present}" ]] || continue
+    [[ -z "${claimed[$path]+present}" ]] || continue
+    claimed["$path"]=1
+    to_hash+=("$path")
+  done
+  [[ ${#to_hash[@]} -gt 0 ]] || return 0
+
+  hash_output="$(git -C "$root" hash-object --no-filters -- "${to_hash[@]}")" ||
+    return 1
+  mapfile -t hashes <<<"$hash_output"
+  [[ "${#hashes[@]}" -eq "${#to_hash[@]}" ]] || return 1
+  for path in "${!to_hash[@]}"; do
+    WORKTREE_HASH_CACHE["${to_hash[$path]}"]="${hashes[$path]}"
+  done
+}
+
+assert_tracked_regular_shape() {
+  local root="$1" path="$2" purpose="$3" mode object stage
   local -a entries
   read_exact_index_entries "$root" "$path"
   entries=("${INDEX_ENTRIES[@]}")
@@ -125,7 +197,20 @@ tracked_regular_mode() {
   [[ ! "$object" =~ ^0+$ ]] || die "$purpose has no indexed object yet: $path"
   [[ -f "$root/$path" && ! -L "$root/$path" ]] ||
     die "$purpose must exist as a non-symlink regular worktree file: $path"
-  worktree_object="$(git -C "$root" hash-object --no-filters -- "$path")" ||
+}
+
+tracked_regular_mode() {
+  local root="$1" path="$2" purpose="$3" mode object stage worktree_object
+  assert_tracked_regular_shape "$root" "$path" "$purpose"
+  read -r mode object stage <<<"${INDEX_ENTRIES[0]}"
+  worktree_object="${WORKTREE_HASH_CACHE[$path]-}"
+  if [[ -z "$worktree_object" ]]; then
+    # shellcheck disable=SC2310
+    prefetch_worktree_hashes "$root" "$path" ||
+      die "could not hash $purpose worktree file: $path"
+    worktree_object="${WORKTREE_HASH_CACHE[$path]-}"
+  fi
+  [[ -n "$worktree_object" ]] ||
     die "could not hash $purpose worktree file: $path"
   [[ "$worktree_object" == "$object" ]] ||
     die "$purpose worktree bytes differ from the indexed object: $path"
@@ -400,6 +485,10 @@ validate_manifest() {
   local -a root_keys component_keys file_sources file_rows dependencies target_keys managed locally_owned
   local -A destination_owner=() selected=()
 
+  # Reject FIFO/symlink manifest worktree paths before yq opens MANIFEST_ABS.
+  [[ -f "$SOURCE_ROOT/$MANIFEST" && ! -L "$SOURCE_ROOT/$MANIFEST" ]] ||
+    die "manifest must exist as a non-symlink regular worktree file: $MANIFEST"
+
   yq eval-all --exit-status '[.] | length == 1' "$MANIFEST_ABS" >/dev/null 2>&1 ||
     die 'manifest must be valid, single-document YAML'
   yq_assert 'tag == "!!map"' 'manifest root must be a mapping'
@@ -507,8 +596,6 @@ validate_manifest() {
         fi
       done
       destination_owner["$destination"]="$component"
-      mode="$(tracked_regular_mode "$SOURCE_ROOT" "$source" "component '$component' source")"
-      SOURCE_MODES["$source"]="$mode"
       FILES_BY_COMPONENT["$component"]+="$source"$'\t'"$destination"$'\n'
     done
 
@@ -536,6 +623,37 @@ validate_manifest() {
         REQUIRES_BY_COMPONENT["$component"]+="$dependency"$'\n'
       done
     fi
+  done
+
+  local -a unique_sources=() hash_paths=()
+  local -A source_seen=()
+  for component in "${COMPONENT_NAMES[@]}"; do
+    while IFS=$'\t' read -r source destination; do
+      [[ -n "$source" ]] || continue
+      [[ -z "${source_seen[$source]+present}" ]] || continue
+      source_seen["$source"]=1
+      unique_sources+=("$source")
+    done <<<"${FILES_BY_COMPONENT[$component]}"
+  done
+  reset_index_cache
+  # shellcheck disable=SC2310
+  prefetch_index_entries "$SOURCE_ROOT" "$MANIFEST" "${unique_sources[@]+"${unique_sources[@]}"}" ||
+    die "could not inspect Git index path: $MANIFEST"
+  hash_paths=("$MANIFEST")
+  for source in "${unique_sources[@]+"${unique_sources[@]}"}"; do
+    [[ -f "$SOURCE_ROOT/$source" && ! -L "$SOURCE_ROOT/$source" ]] &&
+      hash_paths+=("$source")
+  done
+  # shellcheck disable=SC2310
+  prefetch_worktree_hashes "$SOURCE_ROOT" "${hash_paths[@]}" ||
+    die "could not hash manifest worktree file: $MANIFEST"
+  tracked_regular_mode "$SOURCE_ROOT" "$MANIFEST" manifest >/dev/null
+  for component in "${COMPONENT_NAMES[@]}"; do
+    while IFS=$'\t' read -r source destination; do
+      [[ -n "$source" ]] || continue
+      mode="$(tracked_regular_mode "$SOURCE_ROOT" "$source" "component '$component' source")"
+      SOURCE_MODES["$source"]="$mode"
+    done <<<"${FILES_BY_COMPONENT[$component]}"
   done
 
   VISIT_STATE=()
@@ -807,6 +925,10 @@ preflight_destination() {
 apply_target() {
   local target="$1" target_root="$2" component source destination mode index
   local -a components sources=() destinations=() modes=()
+  local -a index_paths=()
+  local -A index_path_seen=()
+  local parent prefix='' segment
+  local -a segments
   target_root="$(canonical_git_root "$target_root")"
   verify_target_identity "$target_root" "$target"
   mapfile -t components < <(
@@ -814,6 +936,37 @@ apply_target() {
       [[ -n "$component" ]] && printf '%s\n' "$component"
     done <<<"${MANAGED_BY_TARGET[$target]}"
   )
+  queue_destination_index_path() {
+    local path="$1"
+    [[ -z "${index_path_seen[$path]+present}" ]] || return 0
+    index_path_seen["$path"]=1
+    index_paths+=("$path")
+  }
+  collect_destination_index_paths() {
+    local destination="$1"
+    parent="${destination%/*}"
+    [[ "$parent" != "$destination" ]] || parent=''
+    prefix=''
+    if [[ -n "$parent" ]]; then
+      IFS='/' read -r -a segments <<<"$parent"
+      for segment in "${segments[@]}"; do
+        prefix="${prefix:+$prefix/}$segment"
+        queue_destination_index_path "$prefix"
+      done
+    fi
+    queue_destination_index_path "$destination"
+  }
+  for component in "${components[@]}"; do
+    while IFS=$'\t' read -r source destination; do
+      [[ -n "$source" ]] || continue
+      collect_destination_index_paths "$destination"
+    done <<<"${FILES_BY_COMPONENT[$component]}"
+  done
+  if [[ ${#index_paths[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2310
+    prefetch_index_entries "$target_root" "${index_paths[@]}" ||
+      die "could not inspect Git index path: ${index_paths[0]}"
+  fi
   # Validate all destinations before the first mutation. A later I/O error stops
   # the workflow before PR creation, so no partial component update is published.
   for component in "${components[@]}"; do
@@ -909,7 +1062,6 @@ SOURCE_ROOT="$(canonical_git_root "$SOURCE_ROOT")"
 # Intentional predicate; see validation calls above.
 # shellcheck disable=SC2310
 if ! is_safe_repo_path "$MANIFEST"; then die "unsafe manifest path '$MANIFEST'"; fi
-tracked_regular_mode "$SOURCE_ROOT" "$MANIFEST" manifest >/dev/null
 MANIFEST_ABS="$SOURCE_ROOT/$MANIFEST"
 
 case "$COMMAND" in
