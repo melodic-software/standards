@@ -24,11 +24,13 @@ their description stays out of the model-facing skill listing (zero per-session 
 model-invocable prompt is the exception: it must carry named stumble evidence explaining why the
 model should discover and invoke it without an explicit user slash command.
 
-**Spec-portability caveat.** `disable-model-invocation` is a Claude Code extension, not one of the
-six Agent Skills specification frontmatter fields. Upload or packaging paths that enforce the
-portable six-field surface (for example claude.ai upload) fail hard on the extension field.
-Spec-portable packaging is a separate, opt-in step that strips to the six portable fields; do not
-treat Claude Code-only frontmatter as portable by default.
+**Spec-portability caveat.** `disable-model-invocation` is a Claude Code extension, not part of the
+portable Agent Skills frontmatter surface. The live portable field set and upload-validator
+behavior are upstream-owned — see [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview);
+fetch the current spec at read time rather than treating any field count here as durable. Upload or
+packaging paths that enforce the portable surface (for example claude.ai upload) fail hard on
+extension fields. Spec-portable packaging is a separate, opt-in step that strips to the current
+portable fields; do not treat Claude Code-only frontmatter as portable by default.
 
 ## Tiers by reach
 
