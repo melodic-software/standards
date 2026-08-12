@@ -23,9 +23,10 @@ name: standards-sync-stuck-automerge-alert
 # A mint or infrastructure failure in the reusable leaves the watchdog dark
 # without filing a tracking issue — the same silent-death mode
 # queue-monitor-liveness.yml guards against for the queue monitor
-# (melodic-software/ci-workflows#105). The `liveness` job below fails the
-# caller workflow loudly on any `alert` failure so the next occurrence is
-# visible without reading run history (standards#318).
+# (melodic-software/ci-workflows#105). The `classify-alert-failure` job
+# inspects the reusable's step graph so the `liveness` job below fires only
+# on infrastructure or cancellation death modes, not on the reusable's
+# deliberate failure after it files on stuck PRs (standards#318).
 on:
   workflow_dispatch:
   schedule:
@@ -48,10 +49,53 @@ jobs:
       app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
 
+  classify-alert-failure:
+    name: Distinguish alert failure modes
+    needs: alert
+    if: always() && needs.alert.result != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      infrastructure-failure: ${{ steps.classify.outputs.infrastructure-failure }}
+    steps:
+      - name: Classify whether alert failed for infrastructure
+        id: classify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_RESULT: ${{ needs.alert.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$ALERT_RESULT" == "cancelled" ]]; then
+            echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$ALERT_RESULT" != "failure" ]]; then
+            echo "infrastructure-failure=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The reusable's final step fails deliberately after filing when stuck
+          # PRs are found. Only earlier step failures are infrastructure death.
+          jobs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs")"
+          alert_job_id="$(jq -r '.jobs[] | select(.name == "Detect standards-sync auto-merge PRs that cannot merge themselves") | .id' <<<"$jobs_json" | head -1)"
+          if [[ -z "$alert_job_id" || "$alert_job_id" == "null" ]]; then
+            echo "::warning::Could not locate the alert job; treating failure as infrastructure."
+            echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          steps_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${alert_job_id}/steps")"
+          notify_conclusion="$(jq -r '.steps[] | select(.name == "Fail so the scheduled run notifies") | .conclusion' <<<"$steps_json" | head -1)"
+          if [[ "$notify_conclusion" == "failure" ]]; then
+            echo "infrastructure-failure=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
+          fi
+
   liveness:
     name: Fail loudly when the watchdog cannot run
-    needs: alert
-    if: failure()
+    needs: [alert, classify-alert-failure]
+    if: always() && needs.classify-alert-failure.outputs.infrastructure-failure == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
