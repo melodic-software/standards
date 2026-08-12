@@ -401,7 +401,12 @@ function validateRepositoryConfig(value, policy) {
     localRoutingGrants.set(key, grant);
   }
 
-  return { ...value, exceptions, localRoutingGrants };
+  const requiredReusableCallInputs = new Map();
+  for (const [key, entry] of Object.entries(value.requiredReusableCallInputs ?? {})) {
+    requiredReusableCallInputs.set(key, entry);
+  }
+
+  return { ...value, exceptions, localRoutingGrants, requiredReusableCallInputs };
 }
 
 async function readJson(filePath, location) {
@@ -3181,6 +3186,7 @@ export async function auditRepository({
   const findings = [];
   const consumedExceptions = new Set();
   const consumedLocalRoutingGrants = new Set();
+  const consumedRequiredReusableCallInputs = new Set();
   const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
   if (!disableAutoApproval) {
     const autoApproval = await resolveAutoApprovedContracts({ policy, workflowIndex, fetchImpl });
@@ -3233,10 +3239,14 @@ export async function auditRepository({
       const key = `${file}#${jobId}`;
       const exception = config.exceptions.get(key);
       const grant = config.localRoutingGrants.get(key);
+      const requiredCallInputs = config.requiredReusableCallInputs.get(key);
       const selector = selectorStatus(job, policy);
       const localCall = selector.isSelector
         ? undefined
         : localReusableWorkflowStatus(file, job, policy, workflowIndex);
+      const reusable = selector.isSelector
+        ? undefined
+        : reusableWorkflowStatus(job, policy, workflow);
       const target = selector.isSelector
         ? undefined
         : runnerTargetStatus(jobId, job, workflow.jobs, workflow, policy, file, workflowIndex);
@@ -3366,6 +3376,50 @@ export async function auditRepository({
         !attemptsSelectorRoute
       ) {
         findings.push(finding("runner-target-contract", file, jobId, target.reason));
+      }
+
+      if (requiredCallInputs) {
+        // Required inputs govern the cross-repository contract call only. A
+        // repository-local wrapper may accept the named input without
+        // forwarding it to the reviewed external workflow.
+        if (reusable?.isReusable && !localCall?.isLocal) {
+          consumedRequiredReusableCallInputs.add(key);
+          const contract = policy.approvedReusableWorkflowContracts.get(job.uses);
+          if (contract) {
+            for (const name of requiredCallInputs.requiredInputs) {
+              if (!contract.allowedInputs.has(name)) {
+                throw new ConfigurationError(
+                  `requiredReusableCallInputs ${key} names input ${name}, which is not in the reviewed contract for ${job.uses}`,
+                );
+              }
+            }
+          }
+          const inputs = job.with === undefined ? {} : job.with;
+          if (!isMapping(inputs)) {
+            findings.push(
+              finding(
+                "required-reusable-call-input",
+                file,
+                jobId,
+                `the reusable workflow call omits repository-required inputs: ${requiredCallInputs.requiredInputs.join(", ")} (configured at ${key})`,
+              ),
+            );
+          } else {
+            const missingInputs = requiredCallInputs.requiredInputs.filter(
+              (name) => !Object.hasOwn(inputs, name),
+            );
+            if (missingInputs.length > 0) {
+              findings.push(
+                finding(
+                  "required-reusable-call-input",
+                  file,
+                  jobId,
+                  `the reusable workflow call omits repository-required inputs: ${missingInputs.join(", ")} (configured at ${key})`,
+                ),
+              );
+            }
+          }
+        }
       }
 
       if (hostedRequirement) {
@@ -3518,6 +3572,19 @@ export async function auditRepository({
           key.split("#", 1)[0],
           key.includes("#") ? key.slice(key.indexOf("#") + 1) : undefined,
           `configured local-routing grant ${key} is unused; remove or correct it`,
+        ),
+      );
+    }
+  }
+
+  for (const key of config.requiredReusableCallInputs.keys()) {
+    if (!consumedRequiredReusableCallInputs.has(key)) {
+      findings.push(
+        finding(
+          "required-reusable-call-input-drift",
+          key.split("#", 1)[0],
+          key.includes("#") ? key.slice(key.indexOf("#") + 1) : undefined,
+          `configured requiredReusableCallInputs entry ${key} is unused; remove or correct it`,
         ),
       );
     }

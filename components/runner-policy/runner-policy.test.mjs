@@ -114,6 +114,7 @@ async function repository({
   selfHostedCi = true,
   exceptions = {},
   localRoutingGrants,
+  requiredReusableCallInputs,
   policyOverrides = {},
   workflows = {},
 } = {}) {
@@ -130,6 +131,7 @@ async function repository({
         selfHostedCi,
         exceptions,
         ...(localRoutingGrants ? { localRoutingGrants } : {}),
+        ...(requiredReusableCallInputs ? { requiredReusableCallInputs } : {}),
       },
       null,
       2,
@@ -3720,6 +3722,295 @@ test("a claude-review caller routes to the review tier through the governed sele
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("repository-required reusable inputs fail when a configured input is absent", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification:
+          "The security lane must keep an explicit skip-actors list so a re-pin cannot silently widen the exception.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "required-reusable-call-input");
+  assert.match(
+    findings[0].message,
+    /omits repository-required inputs: skip-actors \(configured at \.github\/workflows\/claude-review\.yml#review\)/,
+  );
+});
+
+test("repository-required reusable inputs are presence-only", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification:
+          "Presence makes a widening edit visible even when the widened value is spelled out explicitly.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot],claude[bot],melodic-ai[bot],melodic-standards-sync[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("repository-required reusable inputs pass when every configured input is present", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification:
+          "The security lane must keep an explicit skip-actors list so a re-pin cannot silently widen the exception.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot],melodic-standards-sync[bot]
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("required reusable call input inventory drift fails", async () => {
+  const root = await repository({
+    requiredReusableCallInputs: {
+      ".github/workflows/ci.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification: "This intentionally exercises required input inventory drift.",
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  test:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ${REUSABLE_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["required-reusable-call-input-drift"],
+  );
+});
+
+test("required reusable call inputs must name inputs admitted by the reviewed contract", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {},
+        },
+      },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification: "This intentionally exercises contract admission.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot]
+`,
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes(
+        "requiredReusableCallInputs .github/workflows/claude-review.yml#review names input skip-actors, which is not in the reviewed contract",
+      ),
+  );
+});
+
+test("repository-required reusable inputs ignore repository-local wrapper calls", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification:
+          "The security lane must keep an explicit skip-actors list on the cross-repository contract call.",
+      },
+    },
+    workflows: {
+      "review-wrapper.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: ubuntu-24.04
+      skip-actors:
+        type: string
+        default: dependabot[bot]
+jobs:
+  wrapped:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ inputs.runner }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ./.github/workflows/review-wrapper.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot],melodic-standards-sync[bot]
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(({ rule }) => rule === "required-reusable-call-input-drift"),
+    "a local wrapper must not consume a cross-repository required-input entry",
+  );
+  assert.match(
+    findings.find(({ rule }) => rule === "required-reusable-call-input-drift").message,
+    /configured requiredReusableCallInputs entry \.github\/workflows\/claude-review\.yml#review is unused/,
+  );
 });
 
 test("selector observer key must use the exact governed secret expression", async () => {

@@ -237,6 +237,20 @@ unknown secret names, and alternate expressions:
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
 
+`requiredReusableCallInputs` is the repository-local complement to that shared
+contract surface. It is keyed by `<workflow path>#<job id>` on the caller job
+that invokes a cross-repository reusable workflow, requires a non-empty
+`justification`, and names one or more input keys in `requiredInputs`. The
+check is presence-only: every listed input must appear in the caller's `with:`
+mapping, but its value is not pinned. That lets a consumer require an explicit
+`skip-actors` line — so deleting it becomes a visible diff and policy failure
+rather than a silent re-widening to the reusable's default — without binding
+every fleet consumer of the same pin to one consumer-specific value. Each named
+input must still be admitted by the job's reviewed `allowedInputs` contract;
+value pinning belongs in the caller workflow itself, not in this inventory.
+An unconsumed entry fails as `required-reusable-call-input-drift`, exactly like
+exception and local-routing grant inventory drift.
+
 A path@SHA with no `approvedReusableWorkflowContracts` entry is not
 automatically rejected if the same workflow path already has a reviewed
 contract at a different SHA: this is the common Dependabot-bump case. Before
