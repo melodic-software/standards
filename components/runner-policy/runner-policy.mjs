@@ -113,7 +113,7 @@ function validateStructure(value, validator, location) {
   throw new ConfigurationError(`${errorLocation} ${error.message}`);
 }
 
-function validatePolicy(value) {
+export function validatePolicy(value) {
   validateStructure(value, validatePolicyStructure, "policy");
 
   const approvedHostedRunnerLabels = new Set(value.approvedHostedRunnerLabels);
@@ -1536,6 +1536,61 @@ function securitySurfaceDiffField(basis, candidate) {
     }
   }
   return undefined;
+}
+
+function assertReusableWorkflowDiffable(workflow, revisionLabel) {
+  const malformedJobs = malformedJobIds(workflow);
+  if (malformedJobs.length > 0) {
+    throw new ConfigurationError(
+      `${revisionLabel} revision job ${malformedJobs[0]} is malformed; jobs.${malformedJobs[0]} must be a mapping`,
+    );
+  }
+  const dynamicRoutingJobs = dynamicRoutingReferenceJobIds(workflow);
+  if (dynamicRoutingJobs.length > 0) {
+    throw new ConfigurationError(
+      `${revisionLabel} revision job ${dynamicRoutingJobs[0]} references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
+    );
+  }
+  const localReferenceJobs = localReferenceJobIds(workflow);
+  if (localReferenceJobs.length > 0) {
+    throw new ConfigurationError(
+      `${revisionLabel} revision job ${localReferenceJobs[0]} uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
+    );
+  }
+}
+
+// Shared by auditRepository auto-approval and claude-lanes repin lockstep: the
+// same bounded security surface comparison documented in README.md.
+export function reusableWorkflowSecuritySurfacesMatch({
+  oldSource,
+  newSource,
+  workflowPath,
+  policy,
+}) {
+  const oldWorkflow = parseWorkflow(oldSource, workflowPath);
+  const newWorkflow = parseWorkflow(newSource, workflowPath);
+  assertReusableWorkflowDiffable(oldWorkflow, "old");
+  assertReusableWorkflowDiffable(newWorkflow, "new");
+
+  const oldSurface = reusableWorkflowSecuritySurface(oldWorkflow, policy);
+  const newSurface = reusableWorkflowSecuritySurface(newWorkflow, policy);
+  for (const [revisionLabel, surface] of [
+    ["old", oldSurface],
+    ["new", newSurface],
+  ]) {
+    const malformedField = malformedWorkflowCallMappingField(surface);
+    if (malformedField) {
+      throw new ConfigurationError(
+        `${revisionLabel} revision ${malformedField} declaration is malformed; on.workflow_call.${malformedField} must be a mapping when declared`,
+      );
+    }
+  }
+
+  const diffField = securitySurfaceDiffField(oldSurface, newSurface);
+  if (diffField) {
+    return { unchanged: false, diffField };
+  }
+  return { unchanged: true };
 }
 
 // Every field here is a human-reviewed contract term that this module's
