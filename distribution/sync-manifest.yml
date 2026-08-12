@@ -225,6 +225,15 @@ components:
     files:
       components/pin-comment-convention/pin-comment-patterns.sh: .github/standards/pin-comment-convention/pin-comment-patterns.sh
       components/pin-comment-convention/scan-workflow-files.sh: .github/standards/pin-comment-convention/scan-workflow-files.sh
+  pr-convention-policy:
+    requires:
+      - node-runtime
+    files:
+      components/pr-convention-policy/package-lock.json: .github/standards/pr-convention-policy/package-lock.json
+      components/pr-convention-policy/package.json: .github/standards/pr-convention-policy/package.json
+      components/pr-convention-policy/policy.json: .github/standards/pr-convention-policy/policy.json
+      components/pr-convention-policy/policy.schema.json: .github/standards/pr-convention-policy/policy.schema.json
+      components/pr-convention-policy/pr-convention-policy.mjs: .github/standards/pr-convention-policy/pr-convention-policy.mjs
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
@@ -313,6 +322,7 @@ targets:
       - markdownlint
       - node-runtime
       - path-detection-guardrails
+      - pr-convention-policy
       - repository-text
       - review-instructions
       - runner-policy
@@ -360,6 +370,7 @@ targets:
       - markdownlint
       - markdownlint-home
       - node-runtime
+      - pr-convention-policy
       - psscriptanalyzer
       - pyright
       - repository-text
@@ -382,6 +393,7 @@ targets:
       - lychee
       - markdownlint
       - node-runtime
+      - pr-convention-policy
       - repository-text
       - review-instructions
       - runner-policy
@@ -400,6 +412,7 @@ targets:
       - claude-review-caller
       - node-runtime
       - path-detection-tools
+      - pr-convention-policy
       - runner-policy
     locally-owned:
       - actionlint
@@ -420,6 +433,7 @@ targets:
       - lychee
       - markdownlint
       - node-runtime
+      - pr-convention-policy
       - psscriptanalyzer
       - repository-text
       - review-instructions
