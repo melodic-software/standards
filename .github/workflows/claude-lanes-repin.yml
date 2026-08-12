@@ -99,6 +99,28 @@ jobs:
           SHA: ${{ steps.release.outputs.sha }}
         run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA"
 
+      # repin-policy-lockstep.mjs imports components/runner-policy/runner-policy.mjs,
+      # which imports `ajv` and `yaml` from that component's own package.json.
+      # Both of these steps are gated on the same condition as the lockstep step
+      # below: a scheduled run that resolves the pin it already carries does no
+      # work, and must not pay for a toolchain it will not use.
+      #
+      # This gap stayed latent from the day the lockstep step landed until
+      # ci-workflows v0.14.0, because `changed` is only ever true on a run that
+      # actually moves the pin — and no ci-workflows release was cut in between.
+      # Every green run in the log is a run that short-circuited before here.
+      - name: Set up Node
+        if: steps.repin.outputs.changed == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: components/runner-policy/package-lock.json
+
+      - name: Install runner-policy dependencies
+        if: steps.repin.outputs.changed == 'true'
+        run: npm ci --prefix components/runner-policy
+
       - name: Apply runner-policy lockstep when contracts are unchanged
         id: policy-lockstep
         if: steps.repin.outputs.changed == 'true'
