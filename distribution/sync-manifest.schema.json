@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://standards.melodic.software/distribution/sync-manifest.schema.json",
   "title": "Standards distribution sync manifest",
+  "description": "Overlapping structural subset of sync-manifest.sh rules for fixture authoring. The Bash engine remains authoritative for the live manifest and enforces additional Git-index, path-safety, dependency-graph, and apply-time constraints.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "components", "targets"],
