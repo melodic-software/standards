@@ -20,9 +20,11 @@
     "lint:hooks": "lefthook validate",
     "lint:concurrency-policy": "node components/concurrency-policy/concurrency-policy.mjs --root .",
     "lint:dependabot-policy": "node components/dependabot-policy/dependabot-policy.mjs --root .",
+    "lint:pr-convention-policy": "node components/pr-convention-policy/pr-convention-policy.mjs --title \"feat(distribution): add pr-convention-policy component\" --body \"$(cat components/pr-convention-policy/fixtures/good/pr-body.md)\"",
     "lint:runner-policy": "node components/runner-policy/runner-policy.mjs --root .",
     "test:concurrency-policy": "node --test components/concurrency-policy/concurrency-policy.test.mjs",
     "test:dependabot-policy": "node --test components/dependabot-policy/dependabot-policy.test.mjs",
+    "test:pr-convention-policy": "node --test components/pr-convention-policy/pr-convention-policy.test.mjs",
     "test:lefthook-dotnet": "node --test components/lefthook-dotnet/dotnet-format-staged.test.mjs",
     "test:packages": "node --test harness/packages/package-lifecycle.test.mjs",
     "test:runner-policy": "node --test components/runner-policy/runner-policy.test.mjs"
