@@ -19,6 +19,13 @@ name: standards-sync-stuck-automerge-alert
 #
 # The never-armed half only considers `automerge: true` targets, so it is inert
 # for the duration of a rollout window that opts every target out.
+#
+# A mint or infrastructure failure in the reusable leaves the watchdog dark
+# without filing a tracking issue — the same silent-death mode
+# queue-monitor-liveness.yml guards against for the queue monitor
+# (melodic-software/ci-workflows#105). The `liveness` job below fails the
+# caller workflow loudly on any `alert` failure so the next occurrence is
+# visible without reading run history (standards#318).
 on:
   workflow_dispatch:
   schedule:
@@ -40,3 +47,27 @@ jobs:
     secrets:
       app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+
+  liveness:
+    name: Fail loudly when the watchdog cannot run
+    needs: alert
+    if: failure()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Surface stuck-automerge alert failure
+        env:
+          ALERT_RESULT: ${{ needs.alert.result }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Stuck-automerge alert liveness failure"
+            echo
+            echo "The \`alert\` job finished with \`${ALERT_RESULT}\`. The standards-sync stuck-automerge watchdog is dark and would not have filed or refreshed a tracking issue in \`medley\`."
+            echo
+            echo "Inspect the \`alert\` job logs — token-mint failures, manifest checkout faults, and upstream API errors commonly land here."
+            echo
+            echo "When stuck PRs are detected, the reusable workflow still fails and files through \`tracking-issue-repository: medley\`; this liveness job covers infrastructure death modes only."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::standards-sync-stuck-automerge-alert failed (alert job result: ${ALERT_RESULT}). The watchdog is dark — inspect mint credentials, App installation selection, and upstream API health."
+          exit 1
