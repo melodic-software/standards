@@ -56,7 +56,7 @@ is_safe_repo_path() {
   [[ "$path" != *\\* ]] || return 1
   [[ "${path: -1}" != / ]] || return 1
   [[ "$path" != *'//'* ]] || return 1
-  if printf '%s' "$path" | grep -q "$CONTROL_RE"; then return 1; fi
+  [[ "$path" == *[[:cntrl:]]* ]] && return 1
   IFS='/' read -r -a segments <<<"$path"
   for segment in "${segments[@]}"; do
     [[ -n "$segment" && "$segment" != '.' && "$segment" != '..' ]] || return 1
