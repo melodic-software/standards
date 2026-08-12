@@ -2943,10 +2943,18 @@ function visibilityScopedReusableContractFindings(
     const denylistedInputs = [...contract.allowedInputs].filter((name) =>
       PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_INPUTS.has(name),
     );
-    const denylistedSecrets = [...contract.allowedSecretNames].filter((name) =>
-      PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS.has(name),
+    const denylistedSecrets = new Set(
+      [...contract.allowedSecretNames].filter((name) =>
+        PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS.has(name),
+      ),
     );
-    if (denylistedInputs.length === 0 && denylistedSecrets.length === 0) {
+    for (const expression of Object.values(contract.allowedSecrets)) {
+      const match = EXACT_NAMED_SECRET_EXPRESSION.exec(expression);
+      if (match !== null && PUBLIC_REPOSITORY_DENYLISTED_REUSABLE_SECRETS.has(match[1])) {
+        denylistedSecrets.add(match[1]);
+      }
+    }
+    if (denylistedInputs.length === 0 && denylistedSecrets.size === 0) {
       continue;
     }
     const listed = [...denylistedInputs, ...denylistedSecrets]

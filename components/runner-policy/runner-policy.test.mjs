@@ -1131,6 +1131,66 @@ test("visibility-scoped reusable contract surface fails closed without CI_REPOSI
   ]);
 });
 
+test("public repository rejects claude-review contracts mapping denylisted secrets under aliased input names", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+          routing: "hosted-only",
+          allowedInputs: [],
+          allowedSecrets: {
+            REVIEW_APP_ID: `\${{ secrets.STANDARDS_REVIEW_APP_ID }}`,
+          },
+          fixedRunsOn: ["ubuntu-24.04"],
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    },
+  });
+  const findings = await audit(root, { repositoryVisibility: "public" });
+  assert.deepEqual(findings, [
+    {
+      rule: "visibility-scoped-reusable-contract",
+      file: "runner-policy-policy.json",
+      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+    },
+  ]);
+});
+
+test("aliased denylisted secret mapping requires CI_REPOSITORY_VISIBILITY", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+          routing: "hosted-only",
+          allowedInputs: [],
+          allowedSecrets: {
+            REVIEW_APP_PRIVATE_KEY: `\${{ secrets.STANDARDS_REVIEW_APP_PRIVATE_KEY }}`,
+          },
+          fixedRunsOn: ["ubuntu-24.04"],
+        },
+      },
+    },
+    workflows: {
+      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(findings, [
+    {
+      rule: "visibility-evidence-required",
+      file: "runner-policy-policy.json",
+      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_PRIVATE_KEY); CI_REPOSITORY_VISIBILITY is required`,
+    },
+  ]);
+});
+
 test("missing CI_REPOSITORY_VISIBILITY stays harmless when no visibility-scoped contract surface is listed", async () => {
   const root = await repository({
     visibility: "private",
