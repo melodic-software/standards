@@ -69,7 +69,10 @@ git -C "$tmpdir/path-clean" commit -qm 'portable path'
 assert_exit 'machine-specific-paths passes a portable placeholder' 0 "$?"
 
 make_repo "$tmpdir/path-bad"
-printf 'root = /home/alice/project/src\n' >"$tmpdir/path-bad/config.ini"
+# Build the planted path at runtime so this source file never contains a
+# contiguous machine-specific absolute path (the repo-wide gate would flag it).
+user=alice
+printf 'root = /home/%s/project/src\n' "$user" >"$tmpdir/path-bad/config.ini"
 git -C "$tmpdir/path-bad" add config.ini
 git -C "$tmpdir/path-bad" commit -qm 'machine path'
 (
@@ -102,6 +105,7 @@ assert_exit 'comment-hygiene fails a TODO comment' 1 "$?"
 # --- reference-integrity ---
 make_repo "$tmpdir/ref-clean"
 printf '# Target\n\nBody.\n' >"$tmpdir/ref-clean/target.md"
+# shellcheck disable=SC2016 # backticks are markdown cite syntax, not shell expansion
 printf 'See `target.md` "Target" for details.\n' >"$tmpdir/ref-clean/source.md"
 git -C "$tmpdir/ref-clean" add target.md source.md
 git -C "$tmpdir/ref-clean" commit -qm 'resolving cite'
@@ -113,6 +117,7 @@ assert_exit 'reference-integrity passes a resolving cite' 0 "$?"
 
 make_repo "$tmpdir/ref-bad"
 printf '# Target\n\nBody.\n' >"$tmpdir/ref-bad/target.md"
+# shellcheck disable=SC2016 # backticks are markdown cite syntax, not shell expansion
 printf 'See `target.md` "Missing Anchor" for details.\n' >"$tmpdir/ref-bad/source.md"
 git -C "$tmpdir/ref-bad" add target.md source.md
 git -C "$tmpdir/ref-bad" commit -qm 'broken cite'
@@ -127,6 +132,7 @@ make_repo "$tmpdir/all-clean"
 printf '#!/usr/bin/env bash\necho ok\n' >"$tmpdir/all-clean/ok.sh"
 printf '# fine\necho x\n' >"$tmpdir/all-clean/note.sh"
 printf 'path = <repo-root>/a\n' >"$tmpdir/all-clean/cfg.ini"
+# shellcheck disable=SC2016 # backticks are markdown cite syntax, not shell expansion
 printf '# Heading\n\nSee `doc.md` "Heading".\n' >"$tmpdir/all-clean/doc.md"
 git -C "$tmpdir/all-clean" add ok.sh note.sh cfg.ini doc.md
 git -C "$tmpdir/all-clean" update-index --chmod=+x -- ok.sh note.sh
