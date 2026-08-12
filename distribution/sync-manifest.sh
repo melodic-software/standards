@@ -153,6 +153,7 @@ prefetch_worktree_hashes() {
   local root="$1"
   shift
   local -a paths=("$@")
+  local -A claimed=()
   local -a to_hash=()
   local path hash_output
   local -a hashes
@@ -165,6 +166,8 @@ prefetch_worktree_hashes() {
 
   for path in "${paths[@]}"; do
     [[ -z "${WORKTREE_HASH_CACHE[$path]+present}" ]] || continue
+    [[ -z "${claimed[$path]+present}" ]] || continue
+    claimed["$path"]=1
     to_hash+=("$path")
   done
   [[ ${#to_hash[@]} -gt 0 ]] || return 0
@@ -178,8 +181,8 @@ prefetch_worktree_hashes() {
   done
 }
 
-tracked_regular_mode() {
-  local root="$1" path="$2" purpose="$3" mode object stage worktree_object
+assert_tracked_regular_shape() {
+  local root="$1" path="$2" purpose="$3" mode object stage
   local -a entries
   read_exact_index_entries "$root" "$path"
   entries=("${INDEX_ENTRIES[@]}")
@@ -194,6 +197,12 @@ tracked_regular_mode() {
   [[ ! "$object" =~ ^0+$ ]] || die "$purpose has no indexed object yet: $path"
   [[ -f "$root/$path" && ! -L "$root/$path" ]] ||
     die "$purpose must exist as a non-symlink regular worktree file: $path"
+}
+
+tracked_regular_mode() {
+  local root="$1" path="$2" purpose="$3" mode object stage worktree_object
+  assert_tracked_regular_shape "$root" "$path" "$purpose"
+  read -r mode object stage <<<"${INDEX_ENTRIES[0]}"
   worktree_object="${WORKTREE_HASH_CACHE[$path]-}"
   if [[ -z "$worktree_object" ]]; then
     # shellcheck disable=SC2310
@@ -475,6 +484,10 @@ validate_manifest() {
   local local_tag local_nonempty local_strings local_control automerge_tag
   local -a root_keys component_keys file_sources file_rows dependencies target_keys managed locally_owned
   local -A destination_owner=() selected=()
+
+  # Reject FIFO/symlink manifest worktree paths before yq opens MANIFEST_ABS.
+  [[ -f "$SOURCE_ROOT/$MANIFEST" && ! -L "$SOURCE_ROOT/$MANIFEST" ]] ||
+    die "manifest must exist as a non-symlink regular worktree file: $MANIFEST"
 
   yq eval-all --exit-status '[.] | length == 1' "$MANIFEST_ABS" >/dev/null 2>&1 ||
     die 'manifest must be valid, single-document YAML'

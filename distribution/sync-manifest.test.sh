@@ -406,6 +406,26 @@ assert_nonzero 'dirty tracked source is rejected' "$rc"
 assert_contains 'dirty source diagnostic identifies index mismatch' \
   "$out" 'worktree bytes differ from the indexed object'
 
+manifest_symlink_source="$tmp_root/manifest-symlink-source"
+make_source "$manifest_symlink_source" "$manifest"
+mv "$manifest_symlink_source/manifest.yml" "$manifest_symlink_source/manifest.real.yml"
+ln -s manifest.real.yml "$manifest_symlink_source/manifest.yml"
+out="$(run_engine "$manifest_symlink_source" validate 2>&1)"
+rc=$?
+assert_nonzero 'manifest symlink is rejected before parsing' "$rc"
+assert_contains 'manifest symlink diagnostic identifies worktree shape' \
+  "$out" 'must exist as a non-symlink regular worktree file'
+
+manifest_fifo_source="$tmp_root/manifest-fifo-source"
+make_source "$manifest_fifo_source" "$manifest"
+rm "$manifest_fifo_source/manifest.yml"
+mkfifo "$manifest_fifo_source/manifest.yml"
+out="$(run_engine "$manifest_fifo_source" validate 2>&1)"
+rc=$?
+assert_nonzero 'manifest FIFO is rejected before parsing' "$rc"
+assert_contains 'manifest FIFO diagnostic identifies worktree shape' \
+  "$out" 'must exist as a non-symlink regular worktree file'
+
 # Batched index reads attribute exact recorded paths even when a shared
 # directory prefix would also select descendants under ls-files pathspec rules.
 nested_manifest="$(cat <<'YAML'
