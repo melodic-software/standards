@@ -9,11 +9,26 @@ Every fact has one source of truth. A consumer of that fact cites it; it never r
 
 Literal duplication is easy to grep. Semantic duplication is the harder, equally costly smell — every update touches N sites, divergent phrasings produce silent contradictions, and readers cannot tell which is authoritative.
 
-## Smell signals — any one triggers the rule
+## Consolidation doctrine — ordered tests
 
-1. You edit the same idea in three or more files in a single change.
-2. A search finds three or more near-matches saying almost-but-not-quite the same thing.
-3. Two files assert the same rule with contradicting nuance.
+When two passages look duplicated, copy-count thresholds are not the decision. The Rule of Three and "share at the second consumer" are heuristics subordinated to this ordered sequence — run the tests in order; the first decisive test wins.
+
+1. **T1 — Same knowledge or coincidental?** Identical text encoding different knowledge is a coincidence, not duplication ([Hunt/Thomas](https://media.pragprog.com/titles/tpp20/dry.pdf)); never consolidate — consolidation actively harms.
+2. **T2 — Crosses an encapsulation boundary?** Bounded contexts, services, availability seams: duplication is correct by design ([DDD divergent models](https://martinfowler.com/bliki/BoundedContext.html); [event-carried state transfer](https://martinfowler.com/articles/201701-event-driven.html)). Consolidate only via an explicit shared-kernel-style decision with an owner.
+3. **T3 — Change-together acid test.** One fact forcing edits in multiple places or formats (including code+docs pairs) is true knowledge duplication — consolidate now, even at two copies; count is irrelevant ([Hunt/Thomas](https://media.pragprog.com/titles/tpp20/dry.pdf)).
+4. **T4 — Abstraction namable and stable?** Both must hold to consolidate at two copies. Cannot name it, or the shape is still changing → the [Rule-of-Three brake](https://blog.jbrains.ca/permalink/clarifying-the-rule-of-three-in-refactoring/) applies ([wrong-abstraction avoidance](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction)); namable **and** stable → two copies suffice.
+5. **T5 — Reversibility.** Cheap to inline back → early consolidation is low-risk; load-bearing/hard-to-unwind abstraction → demand the third occurrence as evidence ([Rainsberger](https://blog.jbrains.ca/permalink/clarifying-the-rule-of-three-in-refactoring/)).
+6. **T6 — Churn/friction.** High co-change frequency multiplies drift cost → consolidate earlier; static content tolerates copies longer ([DITA single-sourcing](https://www.oreilly.com/library/view/dita-best-practices/9780132374323/ch10.html); [Write the Docs reuse caveats](https://www.writethedocs.org/videos/portland/2022/don-t-shoot-yourself-in-the-foot-with-content-reuse-anna-gasparyan/)).
+
+**Prose overlay:** knowledge-bearing docs content (values, procedures, policy) consolidates from first reuse (DITA single-sourcing posture — no Rule-of-Three wait exists in tech-writing doctrine); audience-, context-, or SEO-sensitive prose is legitimately duplicated (Write the Docs); reuse-eligibility alone never justifies consolidation.
+
+The Rule of Three is not a cost calculus — the claim that three copies makes maintenance cost definitively outweigh refactoring cost was refuted. It is a heuristic brake against premature wrong abstractions, permissive about two, never a prohibition on earlier extraction when T3–T6 say consolidate.
+
+## Smell signals — any one triggers the doctrine
+
+1. One change edits the same fact in multiple places or formats (including a code+docs pair) — run T3.
+2. A search finds near-matches saying almost-but-not-quite the same thing — run T1 before consolidating.
+3. Two files assert the same rule with contradicting nuance — never leave both authoritative; run T1–T3.
 
 ## Classify a file's role before flagging
 
@@ -36,6 +51,19 @@ Cite a source by something durable: a file's documented heading, a configuration
 ## The code and config equivalent
 
 The same discipline holds outside prose. Deduplicate with the language's idiomatic mechanism — a shared constant, a build property and its reference, a YAML anchor and alias, a JSON `$ref`, an environment variable with a default — rather than copying a literal across call sites. A repeated literal is both the duplication and the missing name; the named constant deduplicates and documents in one move.
+
+## Sources
+
+- Hunt/Thomas, *The Pragmatic Programmer* (20th Anniv.) DRY chapter — [DRY excerpt (PDF)](https://media.pragprog.com/titles/tpp20/dry.pdf)
+- Dave Thomas, Artima interview — [Orthogonality and the DRY Principle](https://www.artima.com/articles/orthogonality-and-the-dry-principle)
+- Rule of Three — [Wikipedia](https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming))
+- Rainsberger — [Clarifying the Rule of Three](https://blog.jbrains.ca/permalink/clarifying-the-rule-of-three-in-refactoring/)
+- Fowler — [Bounded Context](https://martinfowler.com/bliki/BoundedContext.html) (quoting Evans)
+- Fowler — [What do you mean by "Event-Driven"?](https://martinfowler.com/articles/201701-event-driven.html)
+- DITA Best Practices ch. 10 — [O'Reilly](https://www.oreilly.com/library/view/dita-best-practices/9780132374323/ch10.html)
+- Gasparyan, WTD Portland 2022 — [Don't shoot yourself in the foot with content reuse](https://www.writethedocs.org/videos/portland/2022/don-t-shoot-yourself-in-the-foot-with-content-reuse-anna-gasparyan/)
+
+Further reading (links only — not load-bearing until a targeted primary-source verify pass): [Metz, *The Wrong Abstraction*](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction); [Dodds, AHA Programming](https://kentcdodds.com/blog/aha-programming); [Swett, counter-argument to Metz](https://www.codewithjason.com/duplication-cheaper-wrong-abstraction/); [Go proverb — copy a little](https://go-proverbs.github.io/en/#copy).
 
 ## Related
 

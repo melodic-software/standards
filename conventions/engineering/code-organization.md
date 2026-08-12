@@ -9,7 +9,7 @@ How code is grouped, shared, and exposed determines how cheaply it can change. T
 
 Promote a co-located helper to a shared location *in the same change* that adds its second consumer. Until two real consumers exist, inline duplication is cheaper than a premature abstraction.
 
-This governs verbatim reuse of identical logic; deciding the shape of a new abstraction follows the rule of three — see `simpler-code.md`.
+This governs verbatim reuse of identical logic; whether and when to extract a new abstraction follows the consolidation doctrine in `reference-dont-duplicate.md` (T3–T5). The second-consumer rule above is the default for verbatim sharing; T3 can demand consolidation sooner when one fact forces co-edits.
 
 ## Name a shared unit for its capability, not its callers
 

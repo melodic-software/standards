@@ -27,7 +27,7 @@ Several of these read the whole changed unit or the whole diff, not a single hun
 ## Abstraction fit
 
 - **Missing abstractions** — third-party libraries, infrastructure, or volatile dependencies referenced directly from domain or application code instead of behind an owned interface.
-- **Duplicated structure, not just duplicated lines** — repeated field/property/method scaffolding across three or more classes signals a missing base or helper. A new class in an established family should extend it, not re-implement it. (Rule of three; see `../engineering/simpler-code.md`.)
+- **Duplicated structure, not just duplicated lines** — repeated field/property/method scaffolding across multiple classes in the same family signals a missing base or helper when the shared shape is namable (consolidation doctrine T4 in `../engineering/reference-dont-duplicate.md`). A new class in an established family should extend it, not re-implement it.
 - **Speculative generality** — an abstraction added with no current second consumer: an interface with one implementation, an unused generic parameter, an extension hook nothing varies, or a config knob no code reads. Suggestion; Important when the indirection sits on a hot path or a public API.
 - **Needless indirection** — a wrapper, layer, or interface that adds a call hop without adding an abstraction: a pass-through whose surface is identical to its single implementation.
 - **Interface segregation** — an interface bundles members no single client uses together, forcing consumers to depend on or implement methods they do not use. Suggestion; Important at a public contract surface.

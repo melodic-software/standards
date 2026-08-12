@@ -32,4 +32,4 @@ These show up repeatedly across consuming repos and are elaborated in their own 
 - Strict dependency direction and feature/vertical-slice organization — see `architecture-and-design.md`.
 - Modeling expected failures as explicit results rather than exceptions — see `architecture-and-design.md`.
 - Naming by responsibility — see `naming.md`.
-- A single source of truth for every fact, cited rather than copied — see `reference-dont-duplicate.md`.
+- A single source of truth for every fact, cited rather than copied — consolidation doctrine and cite discipline in `reference-dont-duplicate.md`.
