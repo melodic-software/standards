@@ -3379,7 +3379,10 @@ export async function auditRepository({
       }
 
       if (requiredCallInputs) {
-        if (reusable?.isReusable) {
+        // Required inputs govern the cross-repository contract call only. A
+        // repository-local wrapper may accept the named input without
+        // forwarding it to the reviewed external workflow.
+        if (reusable?.isReusable && !localCall?.isLocal) {
           consumedRequiredReusableCallInputs.add(key);
           const contract = policy.approvedReusableWorkflowContracts.get(job.uses);
           if (contract) {

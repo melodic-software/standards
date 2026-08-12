@@ -3942,6 +3942,77 @@ ${SELECTOR}  review:
   );
 });
 
+test("repository-required reusable inputs ignore repository-local wrapper calls", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner", "skip-actors"],
+    allowedSecrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+    allowedCallerPermissions: {
+      contents: "read",
+      "pull-requests": "write",
+      "id-token": "write",
+    },
+  };
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+    },
+    requiredReusableCallInputs: {
+      ".github/workflows/claude-review.yml#review": {
+        requiredInputs: ["skip-actors"],
+        justification:
+          "The security lane must keep an explicit skip-actors list on the cross-repository contract call.",
+      },
+    },
+    workflows: {
+      "review-wrapper.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: ubuntu-24.04
+      skip-actors:
+        type: string
+        default: dependabot[bot]
+jobs:
+  wrapped:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: \${{ inputs.runner }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+      "claude-review.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  review:
+    needs: choose
+    if: \${{ !cancelled() }}
+    uses: ./.github/workflows/review-wrapper.yml
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      skip-actors: dependabot[bot],melodic-standards-sync[bot]
+`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(
+    findings.some(({ rule }) => rule === "required-reusable-call-input-drift"),
+    "a local wrapper must not consume a cross-repository required-input entry",
+  );
+  assert.match(
+    findings.find(({ rule }) => rule === "required-reusable-call-input-drift").message,
+    /configured requiredReusableCallInputs entry \.github\/workflows\/claude-review\.yml#review is unused/,
+  );
+});
+
 test("selector observer key must use the exact governed secret expression", async () => {
   const root = await repository({
     workflows: {
