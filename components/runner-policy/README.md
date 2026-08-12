@@ -529,9 +529,33 @@ clears — while every classified external failure (auth, billing, rate-limit,
 server, `other`) concludes green with a warning annotation, the failure marker
 comment, and the incident aggregator's conclusion-independent escalation as
 the compensating alarm chain. Check conclusions change; permissions do not.
-Fifteen selector revisions remain approved for an ordered consumer rollout.
+The revision at `62bef7bab01e8532fedfa739879034a210e9e67d` (v0.14.0) is the
+first in this sequence whose selector is NOT byte-identical to its
+predecessor, so it is approved on a narrower reading. `select-runner.yml`
+gains one optional input, `billing-minutes-state` (default empty), and a new
+`prefer-hosted-while-free` policy value that routes the selector job itself
+onto the managed runner and treats an empty selection as an error rather than
+silently falling back to hosted (ci-workflows#439). Neither reaches a caller
+here: the lane components' `with:` blocks are unchanged, and
+`billing-minutes-state` is absent from both `canonicalSelectorInputs` and
+`optionalCanonicalSelectorInputs`, so a caller cannot begin passing it without
+its own review. Both lane contracts copy forward unchanged for the same
+reason. The lanes gain only additive optional inputs — `plugins`,
+`plugin-marketplaces`, `plugin-command`, `pr-number` — none required, none
+passed by the components, with secret key sets, `allowedCallerPermissions`,
+and routing surface (`runs-on: ${{ inputs.runner }}` in both) identical.
+This revision carries thirty-nine commits rather than a single theme, because
+no release was cut between v0.12.0 and v0.14.0. The caller-visible ones are
+the review lane's V2 move of its review logic into org plugin commands
+(ci-workflows#437), the `allowed_bots` fix admitting `cursor[bot]` to both
+lanes (ci-workflows#442), the security lane's incremental relevance gating on
+`synchronize` (ci-workflows#417), the V1 `@claude` mention-responder
+(ci-workflows#435), the approval agent behind opt-in guardrails
+(ci-workflows#436), and absorbed runtime and tool pins. No privilege widens:
+no lane adds a secret, a caller permission, or a routing surface.
+Sixteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these twelve strict-scheduling
+owned by a different repository owner, so these thirteen strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
