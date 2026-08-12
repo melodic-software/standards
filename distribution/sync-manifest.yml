@@ -129,6 +129,9 @@ components:
   comment-hygiene-action:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
+  comment-hygiene-tools:
+    files:
+      components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
   concurrency-policy:
     requires:
       - node-runtime
@@ -200,6 +203,17 @@ components:
       - shellcheck
     files:
       components/lefthook-shellcheck/lefthook.yml: .lefthook/shellcheck.yml
+  local-lane-guards:
+    requires:
+      - comment-hygiene-tools
+      - path-detection-tools
+    files:
+      components/local-lane-guards/check-exec-bit.sh: tools/shared/local-lane-guards/check-exec-bit.sh
+      components/local-lane-guards/check-heading-cites.sh: tools/shared/local-lane-guards/check-heading-cites.sh
+      components/local-lane-guards/check-machine-specific-paths.sh: tools/shared/local-lane-guards/check-machine-specific-paths.sh
+      components/local-lane-guards/coarse-prefilter.sh: tools/shared/local-lane-guards/coarse-prefilter.sh
+      components/local-lane-guards/run-local-lane-guards.sh: tools/shared/local-lane-guards/run-local-lane-guards.sh
+      components/local-lane-guards/scan-comment-hygiene.sh: tools/shared/local-lane-guards/scan-comment-hygiene.sh
   lychee:
     files:
       lychee.toml: lychee.toml
