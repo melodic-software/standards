@@ -107,3 +107,52 @@ test("validatePullRequest aggregates title and body findings", () => {
   );
   assert.deepEqual(findings, []);
 });
+
+test("duplicate JSON object members fail closed", () => {
+  assert.throws(
+    () => parseUniqueJson('{"schemaVersion":1,"schemaVersion":1}', "policy at /tmp/policy.json"),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("policy at /tmp/policy.json") &&
+      error.message.includes("duplicate"),
+  );
+});
+
+test("closing keyword validation follows policy-authored keywords", () => {
+  const customPolicy = validatePolicy({
+    schemaVersion: 1,
+    title: { allowedTypes: ["docs"], requireScope: false },
+    body: {
+      requiredSections: ["Related"],
+      closingKeywords: ["Completes"],
+      noIssueMarkers: ["No linked issue"],
+    },
+  });
+  const accepted = `Completes #42
+
+## Related
+- standards#171`;
+  assert.deepEqual(rules(validateBody(accepted, customPolicy)), []);
+
+  const rejected = `Closes #42
+
+## Related
+- standards#171`;
+  assert.deepEqual(rules(validateBody(rejected, customPolicy)), ["body:closing-keyword-missing"]);
+});
+
+test("title validation follows policy-authored allowed types", () => {
+  const customPolicy = validatePolicy({
+    schemaVersion: 1,
+    title: { allowedTypes: ["docs"], requireScope: false },
+    body: {
+      requiredSections: ["Related"],
+      closingKeywords: ["Closes"],
+      noIssueMarkers: ["No linked issue"],
+    },
+  });
+  assert.deepEqual(rules(validateTitle("docs: update readme", customPolicy)), []);
+  assert.deepEqual(rules(validateTitle("feat: add feature", customPolicy)), [
+    "title:title-not-conventional",
+  ]);
+});

@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import Ajv2020 from "ajv/dist/2020.js";
+import { parseDocument } from "yaml";
 
 export class ConfigurationError extends Error {
   constructor(message) {
@@ -16,6 +17,19 @@ export class ConfigurationError extends Error {
 }
 
 export function parseUniqueJson(source, location) {
+  const document = parseDocument(source, {
+    maxAliasCount: 0,
+    merge: false,
+    prettyErrors: true,
+    schema: "json",
+    strict: true,
+    uniqueKeys: true,
+  });
+  if (document.errors.length > 0) {
+    throw new ConfigurationError(
+      `${location} has duplicate object members or ambiguous structure: ${document.errors[0].message}`,
+    );
+  }
   try {
     return JSON.parse(source);
   } catch (error) {
@@ -36,9 +50,6 @@ const SCHEMA_VALIDATOR = new Ajv2020({
   validateFormats: false,
 });
 const validatePolicyStructure = SCHEMA_VALIDATOR.compile(POLICY_SCHEMA);
-
-const CLOSING_KEYWORD_BODY =
-  /\b(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*(?:[\w.-]+\/[\w.-]+)?#\d+\b/i;
 
 function finding(rule, field, message) {
   return { rule, field, message };
@@ -212,6 +223,24 @@ function buildNoIssuePattern(markers) {
   return new RegExp(`\\b(?:${escaped.join("|")})\\b`, "iu");
 }
 
+function buildClosingKeywordPattern(keywords) {
+  const alternatives = keywords.map((keyword) => {
+    const lower = keyword.toLowerCase();
+    const escapeRegex = (value) => value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (lower.endsWith("es")) {
+      return `${escapeRegex(lower.slice(0, -2))}(?:e[sd]?|es)`;
+    }
+    if (lower.endsWith("s")) {
+      return `${escapeRegex(lower.slice(0, -1))}[sd]?`;
+    }
+    return `${escapeRegex(lower)}(?:e[sd]?|s)?`;
+  });
+  return new RegExp(
+    `\\b(?:${alternatives.join("|")})\\s*:?\\s*(?:[\\w.-]+\\/[\\w.-]+)?#\\d+\\b`,
+    "iu",
+  );
+}
+
 export function validateBody(body, policy) {
   const findings = [];
   const rendered = stripRenderedHtmlComments(body ?? "");
@@ -231,8 +260,9 @@ export function validateBody(body, policy) {
     }
   }
 
+  const closingKeywordPattern = buildClosingKeywordPattern(policy.body.closingKeywords);
   const noIssuePattern = buildNoIssuePattern(policy.body.noIssueMarkers);
-  if (!CLOSING_KEYWORD_BODY.test(rendered) && !noIssuePattern.test(rendered)) {
+  if (!closingKeywordPattern.test(rendered) && !noIssuePattern.test(rendered)) {
     const keywords = policy.body.closingKeywords.join("/");
     findings.push(
       finding(
