@@ -70,18 +70,62 @@ run_engine() {
   "$engine" "$@" --source-root "$source" --manifest manifest.yml
 }
 
+# Fixture-agreement contract (schema ∩ engine on fixtures).
+# validate-sync-manifest.mjs checks an overlapping structural subset of the
+# Bash engine's rules. Where both validators apply on a fixture manifest they
+# must agree; the engine alone gates distribution/sync-manifest.yml in CI.
+schema_rc_for_yaml() {
+  local yaml="$1" stderr_file="${2:-/dev/null}"
+  { printf '%s\n' "$yaml" | yq eval -o=json -I=0 '.' -; } |
+    node "$root/distribution/validate-sync-manifest.mjs" 2>"$stderr_file"
+}
+
+invalid_case() {
+  local label="$1" bad_manifest="$2" needle="$3"
+  local agreement="${4:-structural}"
+  local schema_needle="${5:-}"
+  local slug dir output status schema_status schema_err
+  slug="${label//[^A-Za-z0-9]/-}"
+  dir="$tmp_root/invalid-$slug"
+  make_source "$dir" "$bad_manifest"
+  if [[ "$agreement" == structural ]]; then
+    schema_err="$tmp_root/schema-err-$slug"
+    schema_rc_for_yaml "$bad_manifest" "$schema_err"
+    schema_status=$?
+    assert_nonzero "fixture-agreement: $label rejected by schema" "$schema_status"
+    if [[ -n "$schema_needle" ]]; then
+      assert_contains "$label schema diagnostic" "$(<"$schema_err")" "$schema_needle"
+    fi
+  fi
+  output="$(run_engine "$dir" validate 2>&1)"
+  status=$?
+  assert_nonzero "fixture-agreement: $label rejected by engine" "$status"
+  assert_contains "$label has a useful diagnostic" "$output" "$needle"
+}
+
+valid_case() {
+  local label="$1" good_manifest="$2"
+  local slug dir
+  slug="${label//[^A-Za-z0-9]/-}"
+  dir="$tmp_root/valid-$slug"
+  make_source "$dir" "$good_manifest"
+  schema_rc_for_yaml "$good_manifest" >/dev/null
+  assert_exit "fixture-agreement: $label accepted by schema" 0 "$?"
+  run_engine "$dir" validate >/dev/null 2>&1
+  assert_exit "fixture-agreement: $label accepted by engine" 0 "$?"
+}
+
 manifest="$(valid_manifest)"
 source_repo="$tmp_root/valid-source"
 make_source "$source_repo" "$manifest"
 
-out="$({ printf '%s\n' "$manifest" | yq eval -o=json -I=0 '.' -; } |
-  node "$root/distribution/validate-sync-manifest.mjs" 2>&1)"
+schema_rc_for_yaml "$manifest" >/dev/null
 rc=$?
-assert_exit 'schema and Bash entrypoint agree that the fixture structure is valid' 0 "$rc"
+assert_exit 'fixture-agreement: canonical fixture accepted by schema' 0 "$rc"
 
 out="$(run_engine "$source_repo" validate 2>&1)"
 rc=$?
-assert_exit 'valid multi-file manifest validates' 0 "$rc"
+assert_exit 'fixture-agreement: canonical fixture accepted by engine' 0 "$rc"
 assert_contains 'validation reports catalog size' "$out" '2 components, 2 targets'
 
 out="$(run_engine "$source_repo" matrix --targets ' beta/two , alpha/one ' 2>&1)"
@@ -267,18 +311,6 @@ for filter in 'unknown/repo' 'alpha/one,alpha/one' 'alpha/one,,beta/two' ',alpha
   assert_nonzero "invalid target filter fails: $filter" "$rc"
 done
 
-invalid_case() {
-  local label="$1" bad_manifest="$2" needle="$3"
-  local slug dir output status
-  slug="${label//[^A-Za-z0-9]/-}"
-  dir="$tmp_root/invalid-$slug"
-  make_source "$dir" "$bad_manifest"
-  output="$(run_engine "$dir" validate 2>&1)"
-  status=$?
-  assert_nonzero "$label is rejected" "$status"
-  assert_contains "$label has a useful diagnostic" "$output" "$needle"
-}
-
 bad="${manifest/version: 2/version: 1}"
 invalid_case 'wrong version' "$bad" 'manifest version must be the integer 2'
 
@@ -295,45 +327,35 @@ bad="${manifest/$'    files:\n      consumer.txt: consumer.txt'/'    files: {}'}
 invalid_case 'empty component files' "$bad" "component 'consumer' files must be a non-empty mapping"
 
 bad="version: 2"$'\n'"version: 2"$'\n'"${manifest#*$'\n'}"
-invalid_case 'duplicate YAML key' "$bad" 'duplicate mapping key'
+invalid_case 'duplicate YAML key' "$bad" 'duplicate mapping key' engine-only
 
 bad="${manifest/policy.txt: .policy/policy\/..\/policy.txt: .policy}"
-invalid_case 'unsafe traversal source' "$bad" 'unsafe source path'
+invalid_case 'unsafe traversal source' "$bad" 'unsafe source path' engine-only
 
 bad="${manifest/consumer.txt: consumer.txt/consumer.txt: .policy}"
-invalid_case 'destination ownership collision' "$bad" 'owned by both'
+invalid_case 'destination ownership collision' "$bad" 'owned by both' engine-only
 
 # One canonical source MAY back multiple components (per-destination fan-out);
 # only destinations are single-owner.
 shared="${manifest/consumer.txt: consumer.txt/policy.txt: consumer-policy.txt}"
-shared_dir="$tmp_root/valid-shared-source"
-make_source "$shared_dir" "$shared"
-run_engine "$shared_dir" validate >/dev/null 2>&1
-assert_exit 'shared source across components validates' 0 "$?"
+valid_case 'shared source across components' "$shared"
 
 bad="${manifest/policy.txt: .policy/policy.txt: path}"
 bad="${bad/consumer.txt: consumer.txt/consumer.txt: path\/child}"
-invalid_case 'destination file before child collision' "$bad" 'file/directory conflict'
+invalid_case 'destination file before child collision' "$bad" 'file/directory conflict' engine-only
 
 bad="${manifest/policy.txt: .policy/policy.txt: path\/child}"
 bad="${bad/consumer.txt: consumer.txt/consumer.txt: path}"
-invalid_case 'destination child before file collision' "$bad" 'file/directory conflict'
+invalid_case 'destination child before file collision' "$bad" 'file/directory conflict' engine-only
 
 bad="${manifest/policy.txt: .policy/policy.txt: bad\"name}"
-invalid_case 'destination outside portable path alphabet' "$bad" 'unsafe destination path'
+invalid_case 'destination outside portable path alphabet' "$bad" 'unsafe destination path' engine-only
 
 # An escaped NUL must fail both authoring-schema and production Bash validation,
 # and apply must not reach target mutation.
 bad_control="${manifest/policy.txt: .policy/policy.txt: \".policy\\u0000managed\\u0000consumer\"}"
-invalid_case 'control-character mapping injection' "$bad_control" 'may not contain control characters'
-
-control_error="$tmp_root/control-records.err"
-{ printf '%s\n' "$bad_control" | yq eval -o=json -I=0 '.' -; } |
-  node "$root/distribution/validate-sync-manifest.mjs" 2>"$control_error"
-rc=$?
-assert_nonzero 'control-character mapping fails authoring schema validation' "$rc"
-assert_contains 'control-character mapping reports schema rejection' \
-  "$(cat "$control_error")" 'must match pattern'
+invalid_case 'control-character mapping injection' "$bad_control" \
+  'may not contain control characters' structural 'must match pattern'
 
 control_source="$tmp_root/control-source"
 control_target="$tmp_root/control-target"
@@ -357,12 +379,12 @@ bad="$(printf '%s\n' "$manifest" |
        /^  alpha\/one:$/ { in_alpha = 1 }
        /^  beta\/two:$/ { in_alpha = 0 }
        !(in_alpha && $0 == "      - base") { print }')"
-invalid_case 'missing target dependency' "$bad" "does not select required 'base'"
+invalid_case 'missing target dependency' "$bad" "does not select required 'base'" engine-only
 
 # Make base depend on consumer, completing a two-node cycle.
 bad="$(printf '%s\n' "$manifest" |
   sed '/^  base:$/a\    requires:\n      - consumer')"
-invalid_case 'dependency cycle' "$bad" 'dependency cycle'
+invalid_case 'dependency cycle' "$bad" 'dependency cycle' engine-only
 
 # The source must be tracked even if a same-named worktree file exists.
 source_repo="$tmp_root/untracked-source"
@@ -599,6 +621,8 @@ done
 automerge_manifest="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: false'$'\n''    managed:'}"
 automerge_dir="$tmp_root/automerge-source"
 make_source "$automerge_dir" "$automerge_manifest"
+schema_rc_for_yaml "$automerge_manifest" >/dev/null
+assert_exit 'fixture-agreement: explicit automerge manifest accepted by schema' 0 "$?"
 out="$(run_engine "$automerge_dir" matrix 2>&1)"
 rc=$?
 assert_exit 'manifest with an explicit automerge value validates' 0 "$rc"
@@ -607,21 +631,11 @@ assert_eq 'matrix emits the explicit false and the default-true for the other ta
   "$out"
 
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: yes-please'$'\n''    managed:'}"
-invalid_case 'non-boolean automerge value' "$bad" "target 'alpha/one' automerge must be a boolean"
+invalid_case 'non-boolean automerge value' "$bad" \
+  "target 'alpha/one' automerge must be a boolean" structural automerge
 
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    unknown: true'$'\n''    managed:'}"
 invalid_case 'unknown target key' "$bad" "target 'alpha/one' contains unknown key 'unknown'"
-
-if [[ -f "$root/distribution/node_modules/ajv/package.json" ]]; then
-  bad_automerge="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: not-a-bool'$'\n''    managed:'}"
-  automerge_schema_error="$tmp_root/automerge-schema.err"
-  { printf '%s\n' "$bad_automerge" | yq eval -o=json -I=0 '.' -; } |
-    node "$root/distribution/validate-sync-manifest.mjs" 2>"$automerge_schema_error"
-  rc=$?
-  assert_nonzero 'non-boolean automerge fails authoring schema validation' "$rc"
-  assert_contains 'authoring schema reports the boolean type mismatch' \
-    "$(cat "$automerge_schema_error")" 'automerge'
-fi
 
 # Malformed-shape coverage for the consolidated structural pass. Validation reads
 # the whole manifest in one yq pass per section, so a record whose shape cannot be
@@ -716,15 +730,8 @@ invalid_case 'file destination is the empty string' "$bad" \
   "component 'base' has unsafe destination path ''"
 
 bad="${manifest/policy.txt: .policy/\"\": .policy}"
-empty_source_dir="$tmp_root/empty-file-source"
-make_source "$empty_source_dir" "$bad"
-out="$(run_engine "$empty_source_dir" validate 2>&1)"
-rc=$?
-assert_nonzero 'file source is the empty string is rejected' "$rc"
-assert_contains 'empty file source reports the unsafe source' "$out" \
-  "component 'base' has unsafe source path ''"
-assert_not_contains 'empty file source never reports a valid manifest' \
-  "$out" 'Manifest valid'
+invalid_case 'file source is the empty string' "$bad" \
+  "component 'base' has unsafe source path ''" structural 'must match pattern'
 
 # Every remaining list a manifest can drive into `assert_sorted_unique`. Bash
 # refuses an empty associative-array subscript rather than treating it as a key,
@@ -804,24 +811,17 @@ invalid_case 'target key is a mapping' "$bad" \
 
 bad="${manifest/"$requires_block"/'    <<: &defaults'$'\n''      extra: true'}"
 invalid_case 'component merge key is not supported' "$bad" \
-  "component 'consumer' merge keys are not supported"
+  "component 'consumer' merge keys are not supported" engine-only
 
 bad="${manifest/'    locally-owned:'$'\n''      - base'/'    <<: &defaults'$'\n''      extra: true'}"
 invalid_case 'target merge key is not supported' "$bad" \
-  "target 'beta/two' merge keys are not supported"
+  "target 'beta/two' merge keys are not supported" engine-only
 
 # A bare newline with no forged continuation used to surface as a malformed-row
 # internal error; it now reports the offending record like every other key.
 bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
-control_key_dir="$tmp_root/control-char-component-key"
-make_source "$control_key_dir" "$bad"
-out="$(run_engine "$control_key_dir" validate 2>&1)"
-rc=$?
-assert_nonzero 'component key with a bare newline is rejected' "$rc"
-assert_contains 'bare-newline key names the offending component' "$out" \
+invalid_case 'component key with a bare newline' "$bad" \
   "component 'consumer' keys may not contain control characters"
-assert_not_contains 'control-character key never degrades to a malformed row' \
-  "$out" 'malformed manifest row'
 
 bash "$root/distribution/control-char-equivalence.sh" ||
   { echo 'control-character equivalence test failed' >&2; exit 1; }

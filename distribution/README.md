@@ -10,11 +10,18 @@ GitHub authentication and opens one reviewed reconciliation pull request per
 target.
 
 The production Bash entrypoint uses Mike Farah `yq` v4 and requires no Node
-runtime. Standards authoring CI independently converts the YAML and checks the
-Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with pinned Node
-dependencies. The Bash path retains equivalent structural checks plus the
-repository path, Git-index, ownership, dependency-graph, target-identity, and
-apply safety checks that JSON Schema cannot express.
+runtime. Standards authoring CI independently converts fixture YAML and checks
+the Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with pinned Node
+dependencies (`validate-sync-manifest.mjs`). That schema is an overlapping
+structural subset of the engine's rules: it expresses shape, naming, and
+typing constraints the engine also enforces, but not Git-index state, tracked-file
+contracts, path-safety beyond the schema, dependency closure, or apply-time
+checks. Where both validators apply on a fixture manifest, the contract suite
+in `sync-manifest.test.sh` requires them to agree; the Bash engine alone gates
+`distribution/sync-manifest.yml` in CI (`sync-manifest.sh validate`). The Bash
+path retains equivalent structural checks plus the repository path, Git-index,
+ownership, dependency-graph, target-identity, and apply safety checks that JSON
+Schema cannot express.
 
 The distribution [threat model](THREAT-MODEL.md) records trust boundaries,
 fail-closed guarantees, residual risks, and security review triggers for the
