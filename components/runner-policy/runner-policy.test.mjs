@@ -7504,9 +7504,7 @@ ${SELECTOR}  reject-route:
 `,
     },
   });
-  assert.ok(
-    (await audit(root)).some(({ message }) => message.includes("pin shell: bash")),
-  );
+  assert.ok((await audit(root)).some(({ message }) => message.includes("pin shell: bash")));
 });
 
 test("policy schema fixes the hosted sentinel label and declared marker", async () => {
