@@ -69,10 +69,12 @@ git -C "$tmpdir/path-clean" commit -qm 'portable path'
 assert_exit 'machine-specific-paths passes a portable placeholder' 0 "$?"
 
 make_repo "$tmpdir/path-bad"
-# Build the planted path at runtime so this source file never contains a
-# contiguous machine-specific absolute path (the repo-wide gate would flag it).
+# Build the planted path at runtime without a contiguous `/home/<user>/`
+# literal in this source — the repo-wide gate (and older action-bundled
+# patterns that still admit `%` in the user segment) would flag it.
 user=alice
-printf 'root = /home/%s/project/src\n' "$user" >"$tmpdir/path-bad/config.ini"
+home_root="/ho"'me'"/$user"
+printf 'root = %s/project/src\n' "$home_root" >"$tmpdir/path-bad/config.ini"
 git -C "$tmpdir/path-bad" add config.ini
 git -C "$tmpdir/path-bad" commit -qm 'machine path'
 (
