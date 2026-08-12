@@ -651,6 +651,34 @@ self-merge. `ci-workflows`, which hosts the engine, is itself a target.
 The policy records each complete path@SHA, fixed runner label, caller-input
 allowlist, and exact secret map; changing any field requires another review.
 
+## Visibility-scoped reusable contracts (Claude lanes)
+
+`approvedReusableWorkflowContracts` entries are keyed by `path@SHA` and are
+**shared by every governed consumer repository**. The schema has no way to scope
+a contract to a repository or to a visibility class: listing an input or secret
+in `allowedInputs` or `allowedSecrets` enables **every** governed caller at that
+SHA to pass it; omitting it forbids every caller.
+
+Two public repositories execute this gate today: `standards` and
+`claude-code-plugins`. (`ci-workflows` is public but does not manage the
+`runner-policy` component, so the gate never evaluates it there.)
+
+> **Invariant:** No `claude-review` or `claude-security-review` contract may list
+> `standards-ref` or the `STANDARDS_REVIEW_APP_*` secrets while **any**
+> repository that executes the runner-policy gate is public — unless the
+> contract schema first grows repository- or visibility-scoped entries.
+
+The gate enforces this invariant at audit time by scanning each reviewed
+`claude-review` / `claude-security-review` contract's own `allowedInputs` and
+`allowedSecrets` listing (not merely what a caller's `with:` block passes).
+When such a contract lists a denylisted surface, the audit requires
+`CI_REPOSITORY_VISIBILITY` and fails closed if it is absent; when present, it
+must agree with `.github/runner-policy.json`'s `visibility`, and a `public`
+inventory rejects the contract. Private repositories may carry the surface once
+visibility evidence is supplied. This closes the gap where a well-intentioned
+`policy.json` edit could enable a sensitive mount for private consumers while
+simultaneously enabling it for public ones.
+
 ## Selector revision lockstep
 
 A selector or approved-contract revision is never a one-repository change.

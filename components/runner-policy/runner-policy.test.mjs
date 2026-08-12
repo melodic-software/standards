@@ -1052,6 +1052,152 @@ test("GitHub visibility evidence must agree with governed inventory", async () =
   );
 });
 
+const CLAUDE_REVIEW_PATH = "melodic-software/ci-workflows/.github/workflows/claude-review.yml";
+const CLAUDE_REVIEW_SENSITIVE_REFERENCE = `${CLAUDE_REVIEW_PATH}@${SHA}`;
+
+function claudeReviewSensitiveContract(overrides = {}) {
+  return {
+    [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner", "standards-ref"],
+      allowedSecrets: {
+        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+        STANDARDS_REVIEW_APP_ID: `\${{ secrets.STANDARDS_REVIEW_APP_ID }}`,
+      },
+      allowedCallerPermissions: {
+        contents: "read",
+        "pull-requests": "write",
+        "id-token": "write",
+      },
+      ...overrides,
+    },
+  };
+}
+
+test("public repository rejects claude-review contracts listing visibility-scoped surface", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
+    },
+    workflows: {
+      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    },
+  });
+  const findings = await audit(root, { repositoryVisibility: "public" });
+  assert.deepEqual(findings, [
+    {
+      rule: "visibility-scoped-reusable-contract",
+      file: "runner-policy-policy.json",
+      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+    },
+  ]);
+});
+
+test("private repository permits claude-review contracts listing visibility-scoped surface with evidence", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
+    },
+    workflows: {
+      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    },
+  });
+  assert.deepEqual(await audit(root, { repositoryVisibility: "private" }), []);
+});
+
+test("visibility-scoped reusable contract surface fails closed without CI_REPOSITORY_VISIBILITY", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
+    },
+    workflows: {
+      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(findings, [
+    {
+      rule: "visibility-evidence-required",
+      file: "runner-policy-policy.json",
+      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref); CI_REPOSITORY_VISIBILITY is required`,
+    },
+  ]);
+});
+
+test("missing CI_REPOSITORY_VISIBILITY stays harmless when no visibility-scoped contract surface is listed", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("visibility-scoped reusable contract surface is rejected even when no caller passes it", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  review:
+    uses: ${REUSABLE_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  assert.ok(
+    (await audit(root, { repositoryVisibility: "public" })).some(
+      ({ rule }) => rule === "visibility-scoped-reusable-contract",
+    ),
+  );
+});
+
+test("production policy and claude-review callers stay green under visibility evidence", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "runner-policy-production-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "runner-policy.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        repositoryOwner: "melodic-software",
+        visibility: "public",
+        selfHostedCi: false,
+        exceptions: {},
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await writeFile(path.join(root, "policy.json"), `${JSON.stringify(BASE_POLICY, null, 2)}\n`);
+  await writeFile(
+    path.join(root, ".github", "workflows", "ci.yml"),
+    "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+  );
+  assert.deepEqual(
+    await auditRepository({
+      root,
+      policyPath: path.join(root, "policy.json"),
+      repositoryVisibility: "public",
+      fetchImpl: HERMETIC_FETCH_STUB,
+    }),
+    [],
+  );
+});
+
 test("public repository cannot target a raw self-hosted label", async () => {
   const root = await repository({
     visibility: "public",
