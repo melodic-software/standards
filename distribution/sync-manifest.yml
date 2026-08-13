@@ -127,8 +127,8 @@ components:
   # (3) claude-code-plugins' repo-owned `security-review-evidence` job and
   # ADR-required local `skip-actors` cannot be sync-managed as written —
   # absorb the evidence guard into the reusable, or keep that one caller
-  # `locally-owned`. The same trigger the claude-code-plugins
-  # `locally-owned` note records stays live until those land.
+  # `locally-owned`. The claude-code-plugins `locally-owned` note below
+  # records this same three-part trigger.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
@@ -357,10 +357,15 @@ targets:
     # referencing at all (`routingEnabled` is private-and-self-hosted only, and
     # the ban consults neither `exceptions` nor `localRoutingGrants`). This is
     # the org's one public caller target, so it owns hosted-only callers that
-    # pass `runner: ubuntu-24.04` directly. Removal trigger: a caller shape that
-    # resolves the runner without a caller-side selector reference (e.g. the
-    # indirection moving inside the ci-workflows reusable) makes one managed
-    # component serve both visibilities again.
+    # pass `runner: ubuntu-24.04` directly. Removal trigger (necessary but not
+    # sufficient — see the `claude-security-review-caller` public/shared-shape
+    # blockers above / #377): (1) runner indirection moves inside the
+    # ci-workflows reusable, (2) runner-policy gains a cross-repo routing kind
+    # and the blanket public-target claude-lanes test is narrowed, and
+    # (3) this repo's `security-review-evidence` job plus ADR-required local
+    # `skip-actors` are absorbed into the reusable (or this caller stays
+    # `locally-owned`). Only then does one managed component serve both
+    # visibilities without deleting the evidence guard.
     #
     # `ruff`: the canonical policy reports 385 findings against that tree
     # against 166 under upstream's bare defaults, so adoption is a migration
