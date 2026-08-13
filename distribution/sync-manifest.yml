@@ -58,8 +58,9 @@ components:
   #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
   #   ci-runner is PUBLIC, and a selector-routed caller is rejected outright
   #   on a public repository (see PARKED below). Removal trigger: the one the
-  #   parked security caller carries — the runner indirection moving inside
-  #   the ci-workflows reusable. STILL LIVE when that fires, and not rebutted
+  #   parked security caller carries — and see that note, which now records
+  #   that moving the runner indirection is NOT sufficient on its own for a
+  #   PUBLIC target like this one. STILL LIVE when that fires, and not rebutted
   #   by the reversal: the original exemption reason, that ci-runner is runner
   #   infrastructure where a wedged lane job could block its own substrate.
   #   Visibility became the nearer blocker; it did not answer that concern, so
@@ -115,11 +116,44 @@ components:
   # self-hosted consumer, consulting neither `exceptions` nor
   # `localRoutingGrants`. The component is kept, not deleted: its bytes are
   # the reviewed shape, and the security lane is the one whose check can be a
-  # required context, so it must not be re-derived by hand later. Unparks when
-  # EITHER a private repo adopts the security lane, OR the runner indirection
-  # moves inside the ci-workflows reusable so one component serves both
-  # visibilities (the same trigger the claude-code-plugins `locally-owned`
-  # note records).
+  # required context, so it must not be re-derived by hand later.
+  #
+  # UNPARKS WHEN A PRIVATE REPOSITORY ADOPTS THE SECURITY LANE. That trigger is
+  # sound and was verified rather than assumed: this component's bytes, dropped
+  # into a consumer declaring `visibility: private` / `selfHostedCi: true`,
+  # audit CLEAN against the shipped policy.json. Nothing further is needed for
+  # that door. One decision comes due at the same moment, and it is the one the
+  # component's own header records rather than a new one: its deliberate
+  # `cancel-in-progress: false` conflicts with the `concurrency-policy`
+  # component, which a repository exception does not resolve.
+  #
+  # THE SECOND TRIGGER THIS NOTE USED TO NAME — "the runner indirection moves
+  # inside the ci-workflows reusable so one component serves both
+  # visibilities" — IS NOT SUFFICIENT, and saying so is the point of this
+  # amendment: someone doing that work would finish it and find the component
+  # still unable to take a public target. Two reasons, neither removed by
+  # moving the indirection:
+  #
+  #   1. `runner-policy.test.mjs`'s "every managed target of a claude lane
+  #      caller admits that caller" asserts `!isPublicTarget(target)` for EVERY
+  #      component sourced from `components/claude-lanes/`, whether or not it
+  #      references the selector. The neighbouring test that keys on
+  #      `/select-runner.yml@` is the narrow one; this one is blanket, so a
+  #      selector-free caller in that directory still fails the build. Widening
+  #      it is a deliberate change to what that test protects.
+  #   2. For claude-code-plugins specifically, `.github/workflows/
+  #      claude-security-review.yml` also carries a repo-owned second job — the
+  #      #2337 evidence guard — which reads `needs.security-review.outputs.*`
+  #      and therefore cannot be split into its own file. Sync-managing that
+  #      caller deletes the guard. The same file carries that repo's ADR 0002
+  #      `skip-actors` exception, which it requires to stay repo-owned.
+  #
+  # A cross-repo reusable that routes internally also has no contract kind to
+  # be described by: `policy.schema.json` offers `runner-input` and
+  # `hosted-only`, and `internal-routing` is gated to repository-LOCAL
+  # reusables. That is a prerequisite of the move, not a consequence of it.
+  #
+  # Scoped in melodic-software/standards#377.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
@@ -352,6 +386,18 @@ targets:
     # resolves the runner without a caller-side selector reference (e.g. the
     # indirection moving inside the ci-workflows reusable) makes one managed
     # component serve both visibilities again.
+    #
+    # THAT TRIGGER IS NECESSARY AND NOT SUFFICIENT HERE, for two reasons the
+    # PARKED note above now records in full. The blanket public-target
+    # assertion in `runner-policy.test.mjs` is the first. The second is
+    # specific to the security caller in THIS repository:
+    # `.github/workflows/claude-security-review.yml` carries a repo-owned
+    # second job, the #2337 evidence guard, which reads
+    # `needs.security-review.outputs.*` and so cannot move to a file of its
+    # own. Sync-managing that caller deletes the guard, and the same file
+    # carries this repo's ADR 0002 `skip-actors` exception, which it requires
+    # to stay readable and reviewable here. The code-review caller carries
+    # neither and is not blocked on this second reason.
     #
     # `ruff`: the canonical policy reports 385 findings against that tree
     # against 166 under upstream's bare defaults, so adoption is a migration
