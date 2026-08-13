@@ -553,9 +553,22 @@ lanes (ci-workflows#442), the security lane's incremental relevance gating on
 (ci-workflows#435), the approval agent behind opt-in guardrails
 (ci-workflows#436), and absorbed runtime and tool pins. No privilege widens:
 no lane adds a secret, a caller permission, or a routing surface.
-Sixteen selector revisions remain approved for an ordered consumer rollout.
+The revision at `7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2) is
+approved on the byte-identical-selector basis: `select-runner.yml` matches
+`62bef7bab01e8532fedfa739879034a210e9e67d` exactly, and both lane reusable
+security surfaces (inputs, secrets, caller permissions, routing) are unchanged,
+so the selector input contract and both lane contracts copy forward. The
+caller-visible payload since v0.14.0 is the security lane declaring its
+execution verdict as `workflow_call` outputs (ci-workflows#460 / #461) so
+consumers stop grepping job logs; the bot-actor association guard on both
+Claude lanes (ci-workflows#443); fail-closed discrimination of timed-out
+prerequisites from true cancels (ci-workflows#458); and the Option-2 docs
+alignment for the disabled org security-review gate (ci-workflows#448). No
+privilege widens: no lane adds a secret, a caller permission, or a routing
+surface.
+Seventeen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these thirteen strict-scheduling
+owned by a different repository owner, so these fourteen strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.

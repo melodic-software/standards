@@ -141,6 +141,17 @@ async function updatePolicyJson(oldSha, newSha, selectorUnchanged, laneUnchanged
       ownerList.push(selectorRef);
       changed = true;
     }
+    // Allowlist membership is not enough: validatePolicy requires every approved
+    // selector reference to carry an approvedSelectorInputContracts entry.
+    const oldSelectorKey = `${SELECTOR_PATH}@${oldSha}`;
+    const contract = policy.approvedSelectorInputContracts?.[oldSelectorKey];
+    if (!contract) {
+      throw new Error(`policy.json has no selector input contract for ${oldSelectorKey}`);
+    }
+    if (!policy.approvedSelectorInputContracts[selectorRef]) {
+      policy.approvedSelectorInputContracts[selectorRef] = structuredClone(contract);
+      changed = true;
+    }
   }
 
   if (laneUnchanged) {
