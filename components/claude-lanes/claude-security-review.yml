@@ -45,37 +45,18 @@ on:
 permissions:
   contents: read
 
-# cancel-in-progress: false is DELIBERATE, not an omission: a cancelled run
-# of a REQUIRED check is not a skip and does not read success, so cancelling
-# an in-flight review can wedge the merge behind a void check. And NO
-# job-level queue group: a full queue CANCELS new arrivals, which is the same
-# wedge; a queue is added only if overflow smoke-testing proves otherwise.
-# These are per-LANE values, deliberately different from the code-review
-# caller's (which cancels superseded runs and queues repo-wide) — do not
-# normalize the two.
-#
-# KNOWN CONFLICT with the standards `concurrency-policy` component, which
-# requires a `${{ github.workflow }}`-prefixed group and a literal
-# `cancel-in-progress: true`. This lane's `false` is deliberate and
-# load-bearing (above), and no group name reconciles it — unlike the
-# code-review caller, which ships the canonical group and conflicts with
-# nothing.
-#
-# A repository exception does NOT resolve this, and an adopter should not
-# reach for one: an exception waives only a MISSING top-level block, so a
-# block that is present is validated anyway and the exception is itself
-# reported as `exception-inventory-drift`
-# (`components/concurrency-policy/concurrency-policy.mjs`). Adopting both as
-# written therefore fails the gate. Closing it needs a decision this file
-# cannot make for the adopter — express this lane's concurrency at the job
-# level, which is the shape the exception mechanism does waive, or widen the
-# policy to admit a required check's `cancel-in-progress: false`.
-#
-# Nothing fails today: this component is parked with no managed target, and
-# that decision is due when it unparks.
-concurrency:
-  group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: false
+# No top-level concurrency block: the standards `concurrency-policy` component
+# requires a `${{ github.workflow }}`-prefixed group and literal
+# `cancel-in-progress: true`, which this lane cannot ship — a cancelled run of
+# a REQUIRED check is not a skip and does not read success, so cancelling an
+# in-flight review can wedge the merge behind a void check. Concurrency lives
+# on the `security-review` job below (`cancel-in-progress: false`, no queue),
+# which is the shape a `delegated-job-level` concurrency-policy exception
+# waives. And NO job-level queue group: a full queue CANCELS new arrivals,
+# which is the same wedge; a queue is added only if overflow smoke-testing
+# proves otherwise. These are per-LANE values, deliberately different from the
+# code-review caller's (which cancels superseded runs and queues repo-wide) —
+# do not normalize the two.
 
 jobs:
   # Resolves the review tier's runner label through the governed selector. On
@@ -112,6 +93,12 @@ jobs:
       pull-requests: write   # post the security review + tracking comment
       id-token: write        # OIDC — mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
+    # Per-PR serialization without cancellation — see the workflow header.
+    # Kept off `select-security` so the two jobs do not share a concurrency
+    # group (which would queue the review behind its own selector).
+    concurrency:
+      group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: false
     uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@7107b34832a7b6db5d08d3b132621c599fbe5e50 # v0.14.2
     with:
       # Hosted fallback per the runner-policy recovery contract (never a

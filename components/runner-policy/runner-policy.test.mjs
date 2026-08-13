@@ -8742,11 +8742,10 @@ async function consumerCarrying({ body, visibility, selfHostedCi }) {
   return root;
 }
 
-// The parked security caller is otherwise doc-only: nothing fails if a later
-// change quietly gives it a managed target. Any target it gains must be one
-// runner-policy actually admits, so this asserts the property (every managed
-// target audits clean) rather than the current count — unparking legitimately,
-// by adding a PRIVATE consumer, passes; adding a public one does not.
+// Any managed target of a claude lane caller must be one runner-policy
+// actually admits. Assert the property (every managed target audits clean)
+// rather than a fixed count — adding a PRIVATE consumer passes; adding a
+// public one does not.
 test("every managed target of a claude lane caller admits that caller", async () => {
   for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
     for (const [target, definition] of Object.entries(manifest.targets)) {
