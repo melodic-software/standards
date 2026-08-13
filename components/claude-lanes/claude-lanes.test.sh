@@ -37,9 +37,9 @@ consumer_checkout() {
 
 # component<TAB>source<TAB>destination for every lane caller, and the targets
 # that manage one. Filtering happens in bash so the yq expressions stay plain
-# traversal. Derived from the manifest rather than hardcoded: the security
-# caller is parked with no managed target today and is meant to gain one, so
-# a fixed count would have to be edited to keep passing.
+# traversal. Derived from the manifest rather than hardcoded: managed-target
+# membership can grow (private security-lane adopters) without editing a
+# fixed count here.
 #
 # shellcheck disable=SC2016  # yq expressions; $c/$t are yq variables, not shell
 mapfile -t lane_files < <(
@@ -71,10 +71,9 @@ done
 assert_nonzero 'at least one target manages a lane caller' "${#lane_targets[@]}"
 
 # Every lane caller's bytes at the destination path they take in a consumer,
-# whether or not a target manages the component today. The target loop below
-# cannot reach a PARKED component — `claude-security-review-caller` has no
-# managed target and is kept precisely so its reviewed shape survives until it
-# unparks — and bytes nothing lints are bytes nothing protects.
+# whether or not a given target manages the component. Standalone lint covers
+# components the per-target loop would otherwise miss when membership is
+# sparse — bytes nothing lints are bytes nothing protects.
 for entry in "${lane_files[@]}"; do
   IFS=$'\t' read -r component source destination <<<"$entry"
   standalone="$scratch/component-$component"

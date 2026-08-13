@@ -281,13 +281,10 @@ differently for each lane:
 
 - `claude-review-caller` is `managed` for the four private targets that run
   the code-review lane (dotfiles, github-iac, medley, provisioning).
-- `claude-security-review-caller` is **parked: it has no managed target.** Both
-  repos running a security lane today — `claude-code-plugins` and
-  `ci-workflows` — are public, so there is no eligible consumer for the
-  selector-routed shape. The component is retained rather than deleted because
-  its bytes are the reviewed shape for the one lane whose check can be a
-  required context. It unparks when either a private repo adopts the security
-  lane or the removal trigger below fires.
+- `claude-security-review-caller` is `managed` for private adopters
+  (`provisioning` first). Public repos running a security lane today —
+  `claude-code-plugins` and `ci-workflows` — remain ineligible for the
+  selector-routed shape.
 
 `melodic-software/claude-code-plugins`, the org's one public caller target and
 the only repo whose ruleset requires `security-review / security-review`, is
@@ -302,10 +299,13 @@ public target, every caller component must audit clean for a private
 self-hosted consumer, and a selector-routed caller is expected to be rejected
 outright on a public one.
 
-Removal trigger: a caller shape that resolves the runner without a caller-side
-selector reference — the indirection moving inside the `ci-workflows` reusable
-— lets one managed component serve both visibilities again, unparks the
-security caller, and re-absorbs `claude-code-plugins`.
+Public/shared-shape removal trigger: moving the runner indirection inside the
+`ci-workflows` reusable is necessary but not sufficient for one managed
+component across both visibilities (#377). That path also needs a cross-repo
+reusable routing kind in runner-policy, a deliberate narrowing of the blanket
+public-target test for `components/claude-lanes/`, and either absorbing
+claude-code-plugins' repo-owned `security-review-evidence` guard into the
+reusable or accepting that caller stays `locally-owned`.
 
 ## Review-instructions reconciliation (medley)
 

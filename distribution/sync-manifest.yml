@@ -57,9 +57,10 @@ components:
   #   adds no repository to the installation's attested set and needs no App
   #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
   #   ci-runner is PUBLIC, and a selector-routed caller is rejected outright
-  #   on a public repository (see PARKED below). Removal trigger: the one the
-  #   parked security caller carries — the runner indirection moving inside
-  #   the ci-workflows reusable. STILL LIVE when that fires, and not rebutted
+  #   on a public repository (see the security-caller public/shared-shape
+  #   blockers below). Removal trigger: the runner indirection moving inside
+  #   the ci-workflows reusable, plus those remaining blockers. STILL LIVE
+  #   when that fires, and not rebutted
   #   by the reversal: the original exemption reason, that ci-runner is runner
   #   infrastructure where a wedged lane job could block its own substrate.
   #   Visibility became the nearer blocker; it did not answer that concern, so
@@ -107,19 +108,27 @@ components:
   # mechanism, so a new adopter commits its starter list via a repo-local PR
   # at adoption time.
   #
-  # PARKED: `claude-security-review-caller` has NO managed target and cannot
-  # gain one as written. Both repos running a security lane today
-  # (claude-code-plugins, ci-workflows) are PUBLIC, and a caller that resolves
-  # its runner through the governed selector is rejected outright on a public
-  # repository — runner-policy admits the selector only for a private
-  # self-hosted consumer, consulting neither `exceptions` nor
-  # `localRoutingGrants`. The component is kept, not deleted: its bytes are
-  # the reviewed shape, and the security lane is the one whose check can be a
-  # required context, so it must not be re-derived by hand later. Unparks when
-  # EITHER a private repo adopts the security lane, OR the runner indirection
-  # moves inside the ci-workflows reusable so one component serves both
-  # visibilities (the same trigger the claude-code-plugins `locally-owned`
-  # note records).
+  # `claude-security-review-caller` is managed for private adopters (see
+  # `provisioning` below). Public/shared-shape unpark is still blocked: a
+  # caller that resolves its runner through the governed selector is rejected
+  # outright on a public repository — runner-policy admits the selector only
+  # for a private self-hosted consumer, consulting neither `exceptions` nor
+  # `localRoutingGrants`. Moving the runner indirection inside the
+  # ci-workflows reusable is necessary but NOT sufficient for one caller
+  # shape across both visibilities (#377). Remaining blockers:
+  # (1) a new cross-repo reusable routing kind in runner-policy (schema,
+  # analyzer, tests, schemaVersion, contract entries, fleet re-pin) —
+  # `internal-routing` today is repository-local only; the caller must still
+  # pass `secrets: observer-private-key`;
+  # (2) narrow `runner-policy.test.mjs`'s blanket
+  # "every managed target of a claude lane caller admits that caller" rule,
+  # which rejects EVERY `components/claude-lanes/` public managed target
+  # whether or not the caller references select-runner;
+  # (3) claude-code-plugins' repo-owned `security-review-evidence` job and
+  # ADR-required local `skip-actors` cannot be sync-managed as written —
+  # absorb the evidence guard into the reusable, or keep that one caller
+  # `locally-owned`. The same trigger the claude-code-plugins
+  # `locally-owned` note records stays live until those land.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
@@ -451,6 +460,7 @@ targets:
       - actionlint
       - agent-orientation
       - claude-review-caller
+      - claude-security-review-caller
       - editorconfig-checker
       - gitleaks
       - lefthook-base
