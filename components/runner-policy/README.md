@@ -219,6 +219,40 @@ unknown secret names, and alternate expressions:
   `id-token`-capable job — or `publication` when the caller's only write
   scope is `packages` and it carries no other privileged surface, per the
   packages-only rule below.
+  A contract may separately name a `minimumCallerPermissions` mapping: the
+  floor a caller must clear, where `allowedCallerPermissions` is the ceiling it
+  must not exceed. The two answer different questions and neither implies the
+  other. `allowedCallerPermissions` waives the ordinary read-only caller
+  boundary so a reviewed workflow may hold a privileged grant, which is why the
+  validator refuses it unless it carries at least one `write`;
+  `minimumCallerPermissions` grants nothing and waives nothing. It records what
+  the called workflow's own `permissions:` block requests, because a called
+  workflow can only narrow the caller's `GITHUB_TOKEN` and never widen it, so a
+  caller granting less than the callee asks for cannot do the work the contract
+  was reviewed for. That obligation is most often entirely read — the case no
+  write-requiring waiver can express at all — so the two fields are separate
+  rather than one field doing both jobs. **A floor may only require `read`,**
+  and the validator rejects any other value: GitHub downgrades a caller's
+  write grants to read (and write-only scopes to none) on forked and
+  Dependabot pull requests unless repository settings permit otherwise, so a
+  caller's declared `write` is not the access the callee receives, and a write
+  floor checked against the declaration would admit exactly the callers it
+  exists to catch. A write obligation belongs in `allowedCallerPermissions`,
+  which is reviewed against the calling job rather than inferred from it. The
+  restriction is on what a contract may *require*, not on how grants compare:
+  access stays ordered (`none` < `read` < `write`) and the check stays a
+  floor, not a match, so a caller granting `write` where the contract requires
+  `read` passes, extra scopes the contract does not name pass, and `read-all`
+  or `write-all` clears a read floor — each of those still clears the floor
+  after an event-time downgrade lands at `read`. A scope the caller does not
+  name is granted nothing and fails, and a caller whose effective job
+  permissions are omitted fails closed — omitted permissions resolve to
+  repository- or organization-defined defaults this policy cannot read, so
+  they can never prove the floor. A contract naming both fields must be
+  satisfiable: because the waiver is the only mapping such a caller may
+  present, a waiver falling short of the floor is rejected when the policy
+  loads. Because the floor waives nothing, a `write-all` caller that clears it
+  still meets the ordinary `privileged-control-plane` rules below.
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
   exactly that named secret mapping while selector-routed, because the
@@ -335,7 +369,12 @@ contract carrying `allowedCallerPermissions`, and likewise any secret-capable
 runner-input contract (one whose reviewed `allowedSecrets` mapping is
 nonempty), declines unconditionally: each is trusted for what the called
 workflow's steps do with a privileged caller grant or a forwarded caller
-secret, content the compared surface never inspects. Fourth, a called
+secret, content the compared surface never inspects. `minimumCallerPermissions`
+deliberately does not join those categories: it says nothing about what the
+called workflow's steps do, only what its `permissions:` block requests, and
+that block is itself part of the compared surface — a bump that changes it is
+already declined by the diff, and one that does not carries the same floor.
+Fourth, a called
 workflow containing any commit-relative `uses:` reference — a job-level
 `./.github/workflows/<file>.yml` nested reusable workflow or a step-level
 `./…` local action — declines auto-approval on both the candidate and every
@@ -580,12 +619,14 @@ credential-bearing step surface while its `workflow_call` declaration stays
 byte-identical; and `zizmor` adds an `upload-sarif` input. That input is
 deliberately absent from `allowedInputs`: uploading SARIF needs a caller
 `security-events: write` grant, which is a write-capable waiver owing its own
-review. The three `actions: read` additions are a caller-side obligation, not
-a contract term — a called workflow can only downgrade the caller's
-`GITHUB_TOKEN` permissions, never elevate them, so each caller adds
-`actions: read` to its own job in the same change as the pin, and the
-contracts stay on the ordinary read-only boundary because every scope those
-three request is read.
+review. A called workflow can only downgrade the caller's `GITHUB_TOKEN`
+permissions and never elevate them, so `do-not-merge-gate`, `semantic-pr`, and
+`pr-issue-linkage` each carry a `minimumCallerPermissions` floor of
+`pull-requests: read` and `actions: read` — the whole of what each declares at
+this revision — and a caller repinning here without granting both fails policy
+instead of failing inside the callee. The three stay on the ordinary read-only
+boundary: the floor grants nothing and every scope they request is read, so
+none names `allowedCallerPermissions`.
 Seventeen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these fourteen strict-scheduling
