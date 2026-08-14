@@ -270,6 +270,28 @@ export function validatePolicy(value) {
           `reusable workflow contract ${reference}.allowedCallerPermissions must include at least one write permission`,
         );
       }
+      // A floor may only require read. GitHub downgrades write grants to read
+      // (and write-only scopes to none) on forked and Dependabot pull requests
+      // unless repository settings permit otherwise, so a caller's declared
+      // write is not the access the callee receives -- a statically checked
+      // write floor would pass exactly the callers it exists to catch. A write
+      // obligation belongs in allowedCallerPermissions, whose waiver is
+      // reviewed against the calling job rather than inferred from a
+      // declaration. The schema keeps the value domain (a floor names a real
+      // grant); this rule lives here so the author of a rejected contract is
+      // told why, the same split allowedCallerPermissions' write requirement
+      // already uses in the opposite direction.
+      if (Object.hasOwn(contract, "minimumCallerPermissions")) {
+        const writeScopes = Object.entries(contract.minimumCallerPermissions)
+          .filter(([, access]) => access !== "read")
+          .map(([scope]) => scope)
+          .sort((left, right) => left.localeCompare(right));
+        if (writeScopes.length > 0) {
+          throw new ConfigurationError(
+            `reusable workflow contract ${reference}.minimumCallerPermissions must require read access only (${writeScopes.join(", ")}); GitHub downgrades caller write grants on forked and Dependabot pull requests, so a write floor cannot be proven from the caller's declaration — use allowedCallerPermissions for a write obligation`,
+          );
+        }
+      }
       // The two caller-permission terms are independent — a ceiling and a
       // floor — but a contract naming both must be satisfiable: the exact
       // waiver is the only mapping any caller may present, so a waiver that
@@ -968,11 +990,13 @@ function grantedPermissionAccess(permissions, scope) {
 
 // A called workflow can only narrow the caller's token, never widen it, so a
 // caller granting less than the callee requests cannot do the work the
-// reviewed contract was approved for. Omitted permissions resolve to
-// repository- or organization-defined defaults this surface cannot read, so
-// they can never prove the floor and fail closed. Scopes are reported in
-// sorted order so the message does not depend on how the contract was
-// authored.
+// reviewed contract was approved for. The comparison stays ordered even
+// though a floor may only require read: a caller granting write clears a read
+// floor, because GitHub's event-time downgrade lands on read at worst.
+// Omitted permissions resolve to repository- or organization-defined defaults
+// this surface cannot read, so they can never prove the floor and fail
+// closed. Scopes are reported in sorted order so the message does not depend
+// on how the contract was authored.
 function minimumPermissionShortfall(permissions, minimum, location) {
   if (permissions !== "read-all" && permissions !== "write-all" && !isMapping(permissions)) {
     return `${location} must be an explicit mapping, read-all, or write-all to prove the reviewed minimum ${JSON.stringify(minimum)}`;

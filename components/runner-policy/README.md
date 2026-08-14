@@ -231,19 +231,28 @@ unknown secret names, and alternate expressions:
   caller granting less than the callee asks for cannot do the work the contract
   was reviewed for. That obligation is most often entirely read — the case no
   write-requiring waiver can express at all — so the two fields are separate
-  rather than one field doing both jobs. Access is ordered
-  (`none` < `read` < `write`) and the check is a floor, not a match: a caller
-  granting `write` where the contract requires `read` passes, extra scopes the
-  contract does not name pass, `read-all` clears an all-read floor and
-  `write-all` clears any floor. A scope the caller does not name is granted
-  nothing and fails, and a caller whose effective job permissions are omitted
-  fails closed — omitted permissions resolve to repository- or
-  organization-defined defaults this policy cannot read, so they can never
-  prove the floor. A contract naming both fields must be satisfiable: because
-  the waiver is the only mapping such a caller may present, a waiver falling
-  short of the floor is rejected when the policy loads. Because `write-all`
-  clears every floor without waiving anything, a `write-all` caller still meets
-  the ordinary `privileged-control-plane` rules below.
+  rather than one field doing both jobs. **A floor may only require `read`,**
+  and the validator rejects any other value: GitHub downgrades a caller's
+  write grants to read (and write-only scopes to none) on forked and
+  Dependabot pull requests unless repository settings permit otherwise, so a
+  caller's declared `write` is not the access the callee receives, and a write
+  floor checked against the declaration would admit exactly the callers it
+  exists to catch. A write obligation belongs in `allowedCallerPermissions`,
+  which is reviewed against the calling job rather than inferred from it. The
+  restriction is on what a contract may *require*, not on how grants compare:
+  access stays ordered (`none` < `read` < `write`) and the check stays a
+  floor, not a match, so a caller granting `write` where the contract requires
+  `read` passes, extra scopes the contract does not name pass, and `read-all`
+  or `write-all` clears a read floor — each of those still clears the floor
+  after an event-time downgrade lands at `read`. A scope the caller does not
+  name is granted nothing and fails, and a caller whose effective job
+  permissions are omitted fails closed — omitted permissions resolve to
+  repository- or organization-defined defaults this policy cannot read, so
+  they can never prove the floor. A contract naming both fields must be
+  satisfiable: because the waiver is the only mapping such a caller may
+  present, a waiver falling short of the floor is rejected when the policy
+  loads. Because the floor waives nothing, a `write-all` caller that clears it
+  still meets the ordinary `privileged-control-plane` rules below.
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
   exactly that named secret mapping while selector-routed, because the

@@ -4693,12 +4693,12 @@ test("a caller granting less than the minimum is rejected", async () => {
       `reusable workflow caller permissions.actions must grant at least "read"; the grant is "none"`,
     ],
     [
-      "read where write is required",
-      { "pull-requests": "write" },
+      "an unrelated scope granted instead",
+      { actions: "read" },
       `    permissions:
-      pull-requests: read
+      contents: read
 `,
-      `reusable workflow caller permissions.pull-requests must grant at least "write"; the grant is "read"`,
+      `reusable workflow caller permissions.actions must grant at least "read"; the grant is "none"`,
     ],
   ]) {
     const root = await minimumPermissionRepository(minimum, minimumPermissionCaller(granted));
@@ -4711,7 +4711,7 @@ test("a caller granting less than the minimum is rejected", async () => {
   }
 });
 
-test("read-all clears an all-read minimum and write-all clears any minimum", async () => {
+test("read-all and write-all callers both clear a read floor", async () => {
   const readAllRoot = await minimumPermissionRepository(
     { "pull-requests": "read", actions: "read" },
     minimumPermissionCaller("    permissions: read-all\n"),
@@ -4745,8 +4745,13 @@ test("a caller with no explicit permissions cannot prove a minimum", async () =>
   );
 });
 
-test("a minimum caller permission scope must name a real grant", async () => {
-  for (const minimumCallerPermissions of [{ actions: "none" }, { "future-scope": "read" }, {}]) {
+test("a minimum caller permission scope must name a real read grant", async () => {
+  for (const minimumCallerPermissions of [
+    { actions: "none" },
+    { "future-scope": "read" },
+    {},
+    { models: "write" },
+  ]) {
     const root = await minimumPermissionRepository(
       minimumCallerPermissions,
       minimumPermissionCaller("    permissions: read-all\n"),
@@ -4759,15 +4764,37 @@ test("a minimum caller permission scope must name a real grant", async () => {
   }
 });
 
+// GitHub downgrades a caller's write grants on forked and Dependabot pull
+// requests, so a write floor would admit exactly the callers it exists to
+// catch. Restricting the term to read disposes of that by construction; a
+// write obligation belongs in allowedCallerPermissions.
+test("a minimum caller permission floor cannot require write access", async () => {
+  for (const minimumCallerPermissions of [
+    { actions: "write" },
+    { "id-token": "write" },
+    { "pull-requests": "read", contents: "write" },
+  ]) {
+    const root = await minimumPermissionRepository(
+      minimumCallerPermissions,
+      minimumPermissionCaller("    permissions: write-all\n"),
+    );
+    await assert.rejects(
+      () => audit(root),
+      (error) => error instanceof ConfigurationError,
+      JSON.stringify(minimumCallerPermissions),
+    );
+  }
+});
+
 test("a contract naming both caller-permission terms must be satisfiable", async () => {
   const root = await minimumPermissionRepository(
-    { contents: "write" },
+    { contents: "read" },
     minimumPermissionCaller("    permissions: read-all\n"),
-    { allowedCallerPermissions: { contents: "read", issues: "write" } },
+    { allowedCallerPermissions: { issues: "write" } },
   );
   await assert.rejects(
     () => audit(root),
-    /allowedCallerPermissions\.contents must grant at least "write"; the grant is "read", which its own minimumCallerPermissions requires/,
+    /allowedCallerPermissions\.contents must grant at least "read"; the grant is "none", which its own minimumCallerPermissions requires/,
   );
 });
 
