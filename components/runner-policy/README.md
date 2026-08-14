@@ -566,6 +566,26 @@ prerequisites from true cancels (ci-workflows#458); and the Option-2 docs
 alignment for the disabled org security-review gate (ci-workflows#448). No
 privilege widens: no lane adds a secret, a caller permission, or a routing
 surface.
+Five further reusable contracts are registered at this revision so consumers
+still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
+`do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
+forward from that workflow's newest previously approved SHA — the first four
+term-for-term, `zizmor` from `31a5b76c` — so none widens its input, secret,
+routing, or caller-permission surface. The callee-side changes the surface
+diff declined to carry are: `do-not-merge-gate`, `semantic-pr`, and
+`pr-issue-linkage` add `actions: read` for the timed-out-prerequisite
+resolver (ci-workflows#458); `link-check` reimplements its rolling-issue
+steps on `actions/github-script` in place of the `gh` CLI, changing only its
+credential-bearing step surface while its `workflow_call` declaration stays
+byte-identical; and `zizmor` adds an `upload-sarif` input. That input is
+deliberately absent from `allowedInputs`: uploading SARIF needs a caller
+`security-events: write` grant, which is a write-capable waiver owing its own
+review. The three `actions: read` additions are a caller-side obligation, not
+a contract term — a called workflow can only downgrade the caller's
+`GITHUB_TOKEN` permissions, never elevate them, so each caller adds
+`actions: read` to its own job in the same change as the pin, and the
+contracts stay on the ordinary read-only boundary because every scope those
+three request is read.
 Seventeen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these fourteen strict-scheduling
