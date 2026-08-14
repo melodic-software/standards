@@ -4617,6 +4617,160 @@ test("local permission contract must authorize at least one exact write scope", 
   );
 });
 
+// minimumCallerPermissions is the floor a caller must clear, the complement of
+// the allowedCallerPermissions ceiling. A called workflow can only narrow the
+// caller's GITHUB_TOKEN, so a callee whose whole requested set is read has an
+// obligation no exact write-capable waiver can express.
+const MINIMUM_PERMISSION_CONTRACT = (minimumCallerPermissions, overrides = {}) => ({
+  routing: "runner-input",
+  runnerInput: "runner",
+  allowedInputs: ["runner"],
+  allowedSecrets: {},
+  minimumCallerPermissions,
+  ...overrides,
+});
+
+function minimumPermissionCaller(jobPermissions, { workflowPermissions = "read-all" } = {}) {
+  return `${workflowPermissions === null ? "" : `permissions: ${workflowPermissions}\n`}jobs:
+  choose:
+${SELECTOR}  gate:
+    needs: choose
+    if: \${{ !cancelled() }}
+${jobPermissions}    uses: ${REUSABLE_REFERENCE}
+    with:
+      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+`;
+}
+
+async function minimumPermissionRepository(minimumCallerPermissions, caller, overrides) {
+  return repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: MINIMUM_PERMISSION_CONTRACT(minimumCallerPermissions, overrides),
+      },
+    },
+    workflows: { "ci.yml": caller },
+  });
+}
+
+test("an all-read minimum admits a caller granting exactly it", async () => {
+  const root = await minimumPermissionRepository(
+    { "pull-requests": "read", actions: "read" },
+    minimumPermissionCaller(`    permissions:
+      pull-requests: read
+      actions: read
+`),
+  );
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a caller granting more than the minimum clears it", async () => {
+  const root = await minimumPermissionRepository(
+    { "pull-requests": "read" },
+    minimumPermissionCaller(`    permissions:
+      contents: read
+      pull-requests: write
+`),
+    { allowedCallerPermissions: { contents: "read", "pull-requests": "write" } },
+  );
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a caller granting less than the minimum is rejected", async () => {
+  for (const [label, minimum, granted, expected] of [
+    [
+      "omitted scope",
+      { "pull-requests": "read", actions: "read" },
+      `    permissions:
+      pull-requests: read
+`,
+      `reusable workflow caller permissions.actions must grant at least "read"; the grant is "none"`,
+    ],
+    [
+      "explicitly empty mapping",
+      { actions: "read" },
+      "    permissions: {}\n",
+      `reusable workflow caller permissions.actions must grant at least "read"; the grant is "none"`,
+    ],
+    [
+      "read where write is required",
+      { "pull-requests": "write" },
+      `    permissions:
+      pull-requests: read
+`,
+      `reusable workflow caller permissions.pull-requests must grant at least "write"; the grant is "read"`,
+    ],
+  ]) {
+    const root = await minimumPermissionRepository(minimum, minimumPermissionCaller(granted));
+    assert.ok(
+      (await audit(root)).some(
+        ({ rule, message }) => rule === "runner-target-contract" && message.includes(expected),
+      ),
+      label,
+    );
+  }
+});
+
+test("read-all clears an all-read minimum and write-all clears any minimum", async () => {
+  const readAllRoot = await minimumPermissionRepository(
+    { "pull-requests": "read", actions: "read" },
+    minimumPermissionCaller("    permissions: read-all\n"),
+  );
+  assert.deepEqual(await audit(readAllRoot), []);
+
+  // write-all satisfies the floor arithmetically, but the floor is not a
+  // waiver: the ordinary privileged-control-plane rules still reject it.
+  const writeAllRoot = await minimumPermissionRepository(
+    { actions: "read" },
+    minimumPermissionCaller("    permissions: write-all\n"),
+  );
+  const writeAllFindings = await audit(writeAllRoot);
+  assert.ok(!writeAllFindings.some(({ message }) => message.includes("must grant at least")));
+  assert.ok(writeAllFindings.some(({ message }) => message.includes("write-all")));
+});
+
+test("a caller with no explicit permissions cannot prove a minimum", async () => {
+  const root = await minimumPermissionRepository(
+    { actions: "read" },
+    minimumPermissionCaller("", { workflowPermissions: null }),
+  );
+  assert.ok(
+    (await audit(root)).some(
+      ({ rule, message }) =>
+        rule === "runner-target-contract" &&
+        message.includes(
+          `reusable workflow caller permissions must be an explicit mapping, read-all, or write-all to prove the reviewed minimum {"actions":"read"}`,
+        ),
+    ),
+  );
+});
+
+test("a minimum caller permission scope must name a real grant", async () => {
+  for (const minimumCallerPermissions of [{ actions: "none" }, { "future-scope": "read" }, {}]) {
+    const root = await minimumPermissionRepository(
+      minimumCallerPermissions,
+      minimumPermissionCaller("    permissions: read-all\n"),
+    );
+    await assert.rejects(
+      () => audit(root),
+      (error) => error instanceof ConfigurationError,
+      JSON.stringify(minimumCallerPermissions),
+    );
+  }
+});
+
+test("a contract naming both caller-permission terms must be satisfiable", async () => {
+  const root = await minimumPermissionRepository(
+    { contents: "write" },
+    minimumPermissionCaller("    permissions: read-all\n"),
+    { allowedCallerPermissions: { contents: "read", issues: "write" } },
+  );
+  await assert.rejects(
+    () => audit(root),
+    /allowedCallerPermissions\.contents must grant at least "write"; the grant is "read", which its own minimumCallerPermissions requires/,
+  );
+});
+
 test("a secret-capable runner-input contract admits a statically read-only selector-routed caller", async () => {
   const root = await repository({
     policyOverrides: {
@@ -5082,11 +5236,13 @@ test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts
     runnerInput = "runner",
     allowedInputs = [runnerInput],
     allowedSecrets = {},
+    ...reviewedTerms
   } = {}) => ({
     routing: "runner-input",
     runnerInput,
     allowedInputs,
     allowedSecrets,
+    ...reviewedTerms,
   });
   const hostedContract = (fixedRunsOn) => ({
     routing: "hosted-only",
@@ -5120,6 +5276,12 @@ test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts
       hostedContract(["ubuntu-24.04"]),
       hostedContract(["windows-2025"]),
       "fixedRunsOn",
+    ],
+    [
+      "minimum caller permissions",
+      runnerContract({ minimumCallerPermissions: { contents: "read" } }),
+      runnerContract(),
+      "minimumCallerPermissions",
     ],
   ];
 

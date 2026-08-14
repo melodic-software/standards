@@ -270,6 +270,25 @@ export function validatePolicy(value) {
           `reusable workflow contract ${reference}.allowedCallerPermissions must include at least one write permission`,
         );
       }
+      // The two caller-permission terms are independent — a ceiling and a
+      // floor — but a contract naming both must be satisfiable: the exact
+      // waiver is the only mapping any caller may present, so a waiver that
+      // falls short of the floor admits nothing at all.
+      if (
+        Object.hasOwn(contract, "minimumCallerPermissions") &&
+        Object.hasOwn(contract, "allowedCallerPermissions")
+      ) {
+        const shortfall = minimumPermissionShortfall(
+          contract.allowedCallerPermissions,
+          contract.minimumCallerPermissions,
+          `reusable workflow contract ${reference}.allowedCallerPermissions`,
+        );
+        if (shortfall) {
+          throw new ConfigurationError(
+            `${shortfall}, which its own minimumCallerPermissions requires`,
+          );
+        }
+      }
       if (Object.hasOwn(contract, "allowedCallerPermissions")) {
         for (const [name, expression] of Object.entries(contract.allowedSecrets)) {
           const expected = `\${{ secrets.${name} }}`;
@@ -318,6 +337,13 @@ export function validatePolicy(value) {
               ...contract.allowedCallerPermissions,
             }),
             allowedCallerPermissionNames: new Set(Object.keys(contract.allowedCallerPermissions)),
+          }
+        : {}),
+      ...(contract.minimumCallerPermissions
+        ? {
+            minimumCallerPermissions: Object.freeze({
+              ...contract.minimumCallerPermissions,
+            }),
           }
         : {}),
       ...(contract.fixedRunsOn ? { fixedRunsOn: new Set(contract.fixedRunsOn) } : {}),
@@ -923,6 +949,43 @@ function exactCanonicalMap(actual, required, optional, allowedNames, location) {
   return undefined;
 }
 
+const PERMISSION_ACCESS_RANK = { none: 0, read: 1, write: 2 };
+
+// GITHUB_TOKEN access is ordered (none < read < write), so a caller granting
+// more than a reviewed floor still satisfies it. A scope the caller does not
+// name is granted nothing; read-all and write-all grant every scope at that
+// level.
+function grantedPermissionAccess(permissions, scope) {
+  if (permissions === "write-all") {
+    return "write";
+  }
+  if (permissions === "read-all") {
+    return "read";
+  }
+  const access = permissions[scope];
+  return Object.hasOwn(PERMISSION_ACCESS_RANK, access) ? access : "none";
+}
+
+// A called workflow can only narrow the caller's token, never widen it, so a
+// caller granting less than the callee requests cannot do the work the
+// reviewed contract was approved for. Omitted permissions resolve to
+// repository- or organization-defined defaults this surface cannot read, so
+// they can never prove the floor and fail closed. Scopes are reported in
+// sorted order so the message does not depend on how the contract was
+// authored.
+function minimumPermissionShortfall(permissions, minimum, location) {
+  if (permissions !== "read-all" && permissions !== "write-all" && !isMapping(permissions)) {
+    return `${location} must be an explicit mapping, read-all, or write-all to prove the reviewed minimum ${JSON.stringify(minimum)}`;
+  }
+  for (const scope of Object.keys(minimum).sort((left, right) => left.localeCompare(right))) {
+    const granted = grantedPermissionAccess(permissions, scope);
+    if (PERMISSION_ACCESS_RANK[granted] < PERMISSION_ACCESS_RANK[minimum[scope]]) {
+      return `${location}.${scope} must grant at least ${JSON.stringify(minimum[scope])}; the grant is ${JSON.stringify(granted)}`;
+    }
+  }
+  return undefined;
+}
+
 function selectorStatus(job, policy) {
   const reference = parseReusableWorkflowReference(job?.uses);
   if (!reference || !policy.selectorWorkflowPaths.has(reference.workflow)) {
@@ -1091,6 +1154,16 @@ function reusableWorkflowStatus(job, policy, workflow) {
     );
     if (permissionError) {
       return { isReusable: true, approved: false, reason: permissionError };
+    }
+  }
+  if (contract.minimumCallerPermissions) {
+    const shortfall = minimumPermissionShortfall(
+      effectivePermissions(workflow, job),
+      contract.minimumCallerPermissions,
+      "reusable workflow caller permissions",
+    );
+    if (shortfall) {
+      return { isReusable: true, approved: false, reason: shortfall };
     }
   }
   return { isReusable: true, approved: true, contract };
@@ -1664,7 +1737,10 @@ export function reusableWorkflowSecuritySurfacesMatch({
 // caller-side permission grant a human approved for a specific reviewed
 // SHA, not something the diffed callee surface encodes -- so it must be
 // compared here on the same basis as allowedInputs, allowedSecrets, and
-// fixedRunsOn.
+// fixedRunsOn. minimumCallerPermissions belongs here for the same reason:
+// although a reviewer derives the floor from the callee's own permissions
+// block, the value recorded in the contract is never read back from the
+// candidate's bytes, so two bases could hold different floors.
 function reviewedContractSurface(contract) {
   return normalizeStructuralValue({
     routing: contract.routing,
@@ -1679,6 +1755,9 @@ function reviewedContractSurface(contract) {
       : {}),
     ...(contract.allowedCallerPermissions
       ? { allowedCallerPermissions: contract.allowedCallerPermissions }
+      : {}),
+    ...(contract.minimumCallerPermissions
+      ? { minimumCallerPermissions: contract.minimumCallerPermissions }
       : {}),
   });
 }
