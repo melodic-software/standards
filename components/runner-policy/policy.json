@@ -831,7 +831,11 @@
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner", "paths", "fail-on-severity"],
-      "allowedSecrets": {}
+      "allowedSecrets": {},
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "security-events": "write"
+      }
     }
   },
   "canonicalSelectorInputs": {
