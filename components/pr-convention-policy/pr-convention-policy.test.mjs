@@ -35,6 +35,14 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
   );
 });
 
+test("canonical requiredSections mirror the enforced pr-issue-linkage contract", () => {
+  // Lockstep pin against the authoritative gate: ci-workflows'
+  // pr-issue-linkage.yml reusable (v0.14.2, 7107b34) enforces exactly these
+  // four sections. When the reusable's list changes, this policy changes with
+  // it (standards#393).
+  assert.deepEqual(POLICY.body.requiredSections, ["Summary", "Fix", "Verification", "Related"]);
+});
+
 test("command-line parsing requires a title", () => {
   assert.deepEqual(parseArguments(["--title", "feat: add policy", "--json"]), {
     title: "feat: add policy",
@@ -58,29 +66,55 @@ test("title validation rejects empty and non-conforming titles", () => {
   ]);
 });
 
-test("body validation requires Related content and a closing keyword", () => {
-  const good = `Closes #173
+const FULL_SECTIONS = `## Summary
+Aligns the policy with the enforced contract.
+
+## Fix
+Update the section list.
+
+## Verification
+node --test passes.
 
 ## Related
 - standards#171`;
+
+test("body validation requires every policy section and a closing keyword", () => {
+  const good = `Closes #173
+
+${FULL_SECTIONS}`;
   assert.deepEqual(rules(validateBody(good, POLICY)), []);
 
   const noIssue = `No linked issue
 
-## Related
-- exploratory spike`;
+${FULL_SECTIONS}`;
   assert.deepEqual(rules(validateBody(noIssue, POLICY)), []);
 
-  const missingRelated = "Closes #173";
+  const missingAllSections = "Closes #173";
+  assert.deepEqual(rules(validateBody(missingAllSections, POLICY)), [
+    "body:section-missing",
+    "body:section-missing",
+    "body:section-missing",
+    "body:section-missing",
+  ]);
+
+  const missingRelated = `Closes #173
+
+## Summary
+Aligns the policy.
+
+## Fix
+Update the list.
+
+## Verification
+node --test passes.`;
   assert.deepEqual(rules(validateBody(missingRelated, POLICY)), ["body:section-missing"]);
 
   const emptyRelated = `Closes #173
 
-## Related`;
+${FULL_SECTIONS.replace("- standards#171", "")}`;
   assert.deepEqual(rules(validateBody(emptyRelated, POLICY)), ["body:section-empty"]);
 
-  const missingKeyword = `## Related
-- standards#171`;
+  const missingKeyword = FULL_SECTIONS;
   assert.deepEqual(rules(validateBody(missingKeyword, POLICY)), ["body:closing-keyword-missing"]);
 });
 
@@ -89,8 +123,7 @@ test("body validation ignores instructional text inside rendered HTML comments",
 
 No linked issue
 
-## Related
-- standards#173`;
+${FULL_SECTIONS.replace("- standards#171", "- standards#173")}`;
   assert.deepEqual(rules(validateBody(body, POLICY)), []);
 });
 
@@ -100,8 +133,7 @@ test("validatePullRequest aggregates title and body findings", () => {
       title: "feat: land policy",
       body: `Closes #173
 
-## Related
-- ci-workflows thin-runner follow-on`,
+${FULL_SECTIONS.replace("- standards#171", "- ci-workflows thin-runner follow-on")}`,
     },
     POLICY,
   );
