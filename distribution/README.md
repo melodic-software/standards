@@ -85,6 +85,7 @@ committed here.
 | Adopt | Add the component to `managed`, merge upstream, then review the generated materialization PR. |
 | Update | Change the canonical source; reconciliation proposes the complete target delta. |
 | Customize | Move `managed` to `locally-owned` upstream before editing downstream. The existing file is preserved. |
+| Opt out | Same manifest move as Customize — `locally-owned` is the sanctioned per-repository exclusion, recorded and reviewed here rather than fought out against the sync bot downstream. Once it lands, the consuming repository edits or deletes its copy in its own PR; the synchronizer never touches a `locally-owned` file. |
 | Re-adopt | Move `locally-owned` to `managed`; reconciliation restores the canonical payload. |
 | Retire | Remove upstream ownership first, then delete the obsolete downstream payload in a one-time PR. |
 | Relocate | Change the destination and coordinate deletion of the old path in the downstream migration PR. |
