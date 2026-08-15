@@ -118,6 +118,11 @@ if [[ -f .claude/hooks/session-start.sh ]]; then
   else
     log 'WARN repo SessionStart hook failed (see log; sessions re-run it)'
   fi
+else
+  # Logged rather than silent: a missing "baked" line would otherwise be
+  # ambiguous between the expected no-op (repo has no hook) and the CWD not
+  # being the repo checkout, which is a real problem.
+  log 'no repo SessionStart hook at .claude/hooks/session-start.sh (no-op, or CWD is not the repo checkout)'
 fi
 
 log "done version=$SCRIPT_VERSION"
