@@ -40,4 +40,9 @@ for id in "${wanted[@]}"; do
     echo "install-plugins: install failed: $id" >&2
   fi
 done
-echo "install-plugins: ${#wanted[@]} enabled, $installed newly installed"
+echo "install-plugins: ${#wanted[@]} enabled, $installed newly installed" >&2
+
+# Skill discovery runs before SessionStart hooks finish, so anything installed
+# above would otherwise wait for the next session. Ask for the re-scan. Stdout
+# on this event is parsed as hook output, so the summary above goes to stderr.
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'
