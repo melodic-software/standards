@@ -11,13 +11,7 @@ Run the validator locally:
 ```sh
 node components/pr-convention-policy/pr-convention-policy.mjs \
   --title "feat(distribution): add pr-convention-policy component" \
-  --body "$(cat <<'EOF'
-Closes #173
-
-## Related
-- melodic-software/ci-workflows#138
-EOF
-)"
+  --body "$(cat components/pr-convention-policy/fixtures/good/pr-body.md)"
 ```
 
 The distributed component lives at `.github/standards/pr-convention-policy/` and
