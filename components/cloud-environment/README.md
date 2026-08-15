@@ -11,9 +11,9 @@ Design (one paragraph): cloud environments are account-scoped and
 repo-agnostic, and a setup script's result is cached as a filesystem snapshot
 — the warm boot. So one shared environment installs the *union* of static
 toolchains the fleet pins (.NET SDKs, Node 24, `gh`, PowerShell) inside the
-~5-minute cache-build budget, while each repo owns its own dependency
-bootstrap in a committed, idempotent, `CLAUDE_CODE_REMOTE`-guarded
-SessionStart hook. The full fleet plan, per-repo templates, and verification
+~5-minute cache-build budget, while each repo owns its own setup in a
+committed, idempotent `.claude/cloud-bootstrap.sh`.
+The full fleet plan, per-repo templates, and verification
 checklist live in
 [claude-code-plugins `docs/CLOUD-FLEET-SETUP.md`](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/CLOUD-FLEET-SETUP.md).
 
@@ -29,6 +29,21 @@ exit 0
 `raw.githubusercontent.com` is on the platform's default allowlist, and this
 repository is public, so the fetch works from any account's environment with
 no credentials.
+
+## Repo bootstrap handoff
+
+After the parallel toolchain tracks finish, the script runs the checked-out
+repo's committed `.claude/cloud-bootstrap.sh`, best-effort, with
+`CLAUDE_CODE_REMOTE=true` and `CLAUDE_PROJECT_DIR` set to the checkout root.
+One name, no fallbacks: every fleet repo commits its generic repository setup
+— dependencies and plugin installs — at exactly that path, and a repo without
+the file is a logged no-op.
+
+Running the bootstrap at cache build is load-bearing for plugins: the
+session's plugin registry is built at process start and never re-read, so
+plugin installs must already be in the snapshot the session boots from. As
+with every component change, a merged edit here reaches an environment only
+on its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 
 ## Network prerequisite
 
@@ -67,6 +82,6 @@ rebuild by making any edit to the environment's script field.
   instead of `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
-the shared environment baseline only. Repo-specific dependencies belong to
-each repo's committed SessionStart hook (templates in the fleet guide above),
-never to this script.
+the shared environment baseline only. Repo-specific dependencies and plugin
+installs belong to each repo's committed `.claude/cloud-bootstrap.sh`
+(templates in the fleet guide above), never to this script.
