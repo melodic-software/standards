@@ -26,7 +26,7 @@
 # checked plus those four hosts added.
 set -u
 
-SCRIPT_VERSION='2026-08-15.2'
+SCRIPT_VERSION='2026-08-15.3'
 STAMP='/opt/melodic-env-setup.done'
 LOG='/var/log/melodic-env-setup.log'
 if ! touch "$LOG" 2>/dev/null; then
@@ -127,6 +127,57 @@ else
   # ambiguous between the expected no-op (repo has no bootstrap) and the CWD
   # not being the repo checkout, which is a real problem.
   log 'no repo bootstrap at .claude/cloud-bootstrap.sh (no-op, or CWD is not the repo checkout)'
+fi
+
+# Generic plugin install — data-driven from the checkout's .claude/settings.json
+# (extraKnownMarketplaces + enabledPlugins); no repo-specific logic, and a repo
+# that declares nothing gets nothing. This must happen here, at cache build:
+# Claude Code reads its plugin registry at process start and never re-reads it,
+# so only snapshot-baked installs are loaded at a session's first turn.
+# Consumer repos use github-source marketplaces, whose install/update semantics
+# already handle versions — no snapshot-refresh logic here (the commit-drift
+# refresh in claude-code-plugins' own hook is specific to its directory-source
+# dogfooding).
+settings='.claude/settings.json'
+if ! command -v claude >/dev/null 2>&1; then
+  log 'plugins: claude CLI not on PATH; skipping'
+elif ! command -v jq >/dev/null 2>&1; then
+  log 'plugins: jq not available; skipping'
+elif [[ ! -f "$settings" ]]; then
+  log 'plugins: no .claude/settings.json; skipping'
+elif ! jq -e '(.extraKnownMarketplaces // {}) != {} or (.enabledPlugins // {}) != {}' \
+  "$settings" >/dev/null 2>&1; then
+  log 'plugins: settings declare no marketplaces or plugins; skipping'
+else
+  registered="$(claude plugin marketplace list --json 2>/dev/null |
+    jq -r '.[].name' 2>/dev/null)"
+  while IFS=$'\t' read -r mp_name mp_target; do
+    [[ -n "$mp_name" ]] || continue
+    if grep -qxF "$mp_name" <<<"$registered"; then
+      log "plugins: marketplace $mp_name already registered"
+    elif [[ -z "$mp_target" ]]; then
+      log "WARN plugins: marketplace $mp_name declares no repo/path/url source; skipped"
+    elif claude plugin marketplace add "$mp_target" >>"$LOG" 2>&1; then
+      log "plugins: marketplace $mp_name registered ($mp_target)"
+    else
+      log "WARN plugins: marketplace add failed: $mp_name ($mp_target)"
+    fi
+  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
+    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
+    | @tsv' "$settings" 2>/dev/null)
+
+  installed="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null)"
+  while IFS= read -r plugin_id; do
+    [[ -n "$plugin_id" ]] || continue
+    if grep -qxF "$plugin_id" <<<"$installed"; then
+      log "plugins: $plugin_id already installed"
+    elif claude plugin install "$plugin_id" --scope user -y >>"$LOG" 2>&1; then
+      log "plugins: installed $plugin_id"
+    else
+      log "WARN plugins: install failed: $plugin_id"
+    fi
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
+    | select(.value == true) | .key' "$settings" 2>/dev/null)
 fi
 
 log "done version=$SCRIPT_VERSION"

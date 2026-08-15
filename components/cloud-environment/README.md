@@ -36,14 +36,49 @@ After the parallel toolchain tracks finish, the script runs the checked-out
 repo's committed `.claude/cloud-bootstrap.sh`, best-effort, with
 `CLAUDE_CODE_REMOTE=true` and `CLAUDE_PROJECT_DIR` set to the checkout root.
 One name, no fallbacks: every fleet repo commits its generic repository setup
-— dependencies and plugin installs — at exactly that path, and a repo without
-the file is a logged no-op.
+at exactly that path, and a repo without the file is a logged no-op. As with
+every component change, a merged edit here reaches an environment only on
+its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 
-Running the bootstrap at cache build is load-bearing for plugins: the
-session's plugin registry is built at process start and never re-read, so
-plugin installs must already be in the snapshot the session boots from. As
-with every component change, a merged edit here reaches an environment only
-on its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
+## Plugin install
+
+After the repo bootstrap, a generic, data-driven stage installs the plugins
+the checkout declares — nothing more. If `.claude/settings.json` exists, its
+`extraKnownMarketplaces` entries are registered (`claude plugin marketplace
+add`, skipping ones already registered) and every `enabledPlugins` entry set
+to `true` is installed (`claude plugin install <id> --scope user -y`,
+skipping ones already installed). Every step is best-effort with a `WARN`
+line to the log; the whole stage skips cleanly when the `claude` CLI or `jq`
+is unavailable or the file declares no plugin keys. A repo that declares
+nothing gets nothing.
+
+The timing is load-bearing: Claude Code builds its plugin registry at
+process start and never re-reads it, so only installs already in the
+snapshot a session boots from are loaded at the session's first turn.
+Consumer repos declare github-source marketplaces, whose install/update
+semantics already handle versions — the commit-drift refresh logic in
+claude-code-plugins' own hook is deliberately not replicated here; it is
+specific to that repo's directory-source dogfooding.
+
+## Calling contract (frozen)
+
+The interface between this component and consuming repositories:
+
+- The component runs the checked-out repo's `.claude/cloud-bootstrap.sh` —
+  that exact path — with `CLAUDE_CODE_REMOTE=true` and `CLAUDE_PROJECT_DIR`
+  set to the checkout root, best-effort. A missing file is a clean no-op.
+- Every component step is best-effort (`|| true` semantics) and the script
+  always exits 0 — a failed step degrades the snapshot, never the
+  environment build.
+- This interface is **frozen**: future changes may add to the component but
+  never rename the entry-point path, remove or rename the environment
+  variables, or make any step fail-closed.
+- Division of responsibility: the component's installs are a **warm cache**;
+  each repo's bootstrap is the **correctness guarantee**. Repos must not
+  assume the component installed anything. This is what keeps component
+  changes from ever breaking consumers.
+- The component is repo-agnostic and must never contain secrets or
+  repo-specific logic.
 
 ## Network prerequisite
 
