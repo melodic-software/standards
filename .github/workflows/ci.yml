@@ -709,6 +709,19 @@ jobs:
       - name: Harness self-test
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
+  cloud-environment:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Cloud-environment contract test
+        run: bash harness/shell/run-tests.sh components/cloud-environment/setup.test.sh
+
   distribution:
     permissions:
       contents: read
@@ -924,6 +937,7 @@ jobs:
       - dotnet-format
       - dotnet-fixtures
       - harness
+      - cloud-environment
       - distribution
       - lefthook
       - exec-bit
@@ -969,6 +983,7 @@ jobs:
             ${{ needs.dotnet-format.result }}
             ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.cloud-environment.result }}
             ${{ needs.distribution.result }}
             ${{ needs.lefthook.result }}
             ${{ needs.exec-bit.result }}
