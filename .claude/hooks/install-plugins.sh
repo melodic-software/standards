@@ -3,6 +3,11 @@
 # Declaring a marketplace is gated on workspace trust and cloud sessions arrive
 # untrusted, so the declaration alone can load nothing there. Hooks run untrusted.
 # Idempotent and best effort: a failed plugin costs its skills, not the session.
+#
+# The hook entry runs `bash <this script>`, so the interpreter is whatever `bash`
+# resolves to rather than the shebang's. Stock macOS still ships bash 3.2, which
+# has no `mapfile`, and errors on an empty "${array[@]}" under `set -u` before
+# 4.4. Both are avoided here: newline-delimited strings, no arrays.
 set -euo pipefail
 
 repo_root="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
@@ -22,25 +27,30 @@ if ! claude plugin marketplace list --json 2>/dev/null |
   }
 fi
 
-mapfile -t wanted < <(
+wanted=$(
   jq -r --arg n "$marketplace" \
     '.enabledPlugins // {} | to_entries[]
      | select(.value == true and (.key | endswith("@" + $n))) | .key' \
-    .claude/settings.json 2>/dev/null
+    .claude/settings.json 2>/dev/null || true
 )
-mapfile -t have < <(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null)
+have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
 
+enabled=0
 installed=0
-for id in "${wanted[@]}"; do
+while IFS= read -r id; do
   [[ -n "$id" ]] || continue
-  if [[ " ${have[*]} " == *" $id "* ]]; then continue; fi
+  enabled=$((enabled + 1))
+  if [[ $'\n'"$have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
   if claude plugin install "$id" --scope user -y >/dev/null 2>&1; then
     installed=$((installed + 1))
   else
     echo "install-plugins: install failed: $id" >&2
   fi
-done
-echo "install-plugins: ${#wanted[@]} enabled, $installed newly installed" >&2
+done <<EOF
+$wanted
+EOF
+
+echo "install-plugins: $enabled enabled, $installed newly installed" >&2
 
 # Skill discovery runs before SessionStart hooks finish, so anything installed
 # above would otherwise wait for the next session. Ask for the re-scan. Stdout
