@@ -147,8 +147,6 @@ components:
   # - medley: `locally-owned` — its bootstrap and cloud-bootstrap.test.sh carry
   #   repo-specific toolchain steps; converge later by moving those into a
   #   cloud-bootstrap.local.sh, then flip to managed.
-  # - dotfiles: no cloud-bootstrap adoption yet; add the row when its cloud
-  #   story lands.
   cloud-bootstrap:
     files:
       components/cloud-bootstrap/cloud-bootstrap.sh: .claude/cloud-bootstrap.sh
@@ -412,6 +410,7 @@ targets:
       - agent-orientation
       - claude-permissions
       - claude-review-caller
+      - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
       - lefthook-base
