@@ -104,7 +104,11 @@ rebuild by making any edit to the environment's script field.
 - Toolchain pins (the .NET version list, the Node pin) duplicate the fleet's
   manifests by necessity — the script cannot read repos it is not running in.
   When a repo bumps `global.json` or `.node-version`, update the pin here and
-  bump `SCRIPT_VERSION`.
+  bump `SCRIPT_VERSION`. The Node pin is lockstep-tested against this
+  repository's own `.node-version` (the fleet pin) in `setup.test.sh`; the
+  .NET list has no in-repo manifest and stays a manual obligation. Either way
+  the env copy is only a warm cache — each repo's bootstrap installs its exact
+  pins repo-locally, so a stale warm cache costs build time, not correctness.
 - A merged change does **not** reach existing environments on its own: the
   snapshot rebuilds only on an edit to the environment's script/network
   fields or on ~7-day cache expiry. To pick up a new version immediately,

@@ -116,6 +116,24 @@ target checkout, validates every destination before the first write, and
 reconciles bytes plus executable mode. It never commits, pushes, merges, or
 deletes files.
 
+### Plugin-catalog drift report
+
+Each repository's checked-in `.claude/settings.json` is the source of truth
+for the plugins its sessions load (cloud sessions install exactly what it
+declares). This repository's own settings file doubles as the fleet baseline,
+and [`check-plugin-baseline.sh`](check-plugin-baseline.sh) makes divergence
+visible — report-only, never an edit, because a repo may diverge on purpose:
+
+```sh
+distribution/check-plugin-baseline.sh                  # every manifest target
+distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
+```
+
+Fleet mode fetches each target's settings via `gh api`, so it reads private
+repositories with the caller's own auth. To propagate a baseline change, edit
+the diverging repos' `enabledPlugins` in ordinary per-repo pull requests —
+the report tells you exactly which entries moved.
+
 ## Adopting a new repository
 
 1. Inspect the repository's actual tools and distinguish shared policy from
