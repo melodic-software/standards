@@ -135,6 +135,23 @@ components:
   claude-security-review-caller:
     files:
       components/claude-lanes/claude-security-review.yml: .github/workflows/claude-security-review.yml
+  # Canonical per-repo cloud bootstrap (components/cloud-bootstrap/README.md).
+  # Managed targets take the generic, data-driven script byte-exact; a repo
+  # enriches through its own never-synced .claude/cloud-bootstrap.local.sh, or
+  # goes `locally-owned` to customize the whole file. Deliberate exclusions:
+  # - standards: manifest source, not a target — its copy is held byte-identical
+  #   to the component by cloud-bootstrap.test.sh instead.
+  # - claude-code-plugins: `locally-owned` — its bootstrap carries
+  #   directory-source dogfooding (same-version commit-drift repair) that must
+  #   not fan out to github-source consumers.
+  # - medley: `locally-owned` — its bootstrap and cloud-bootstrap.test.sh carry
+  #   repo-specific toolchain steps; converge later by moving those into a
+  #   cloud-bootstrap.local.sh, then flip to managed.
+  # - dotfiles: no cloud-bootstrap adoption yet; add the row when its cloud
+  #   story lands.
+  cloud-bootstrap:
+    files:
+      components/cloud-bootstrap/cloud-bootstrap.sh: .claude/cloud-bootstrap.sh
   comment-hygiene-action:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
@@ -297,6 +314,7 @@ components:
 targets:
   melodic-software/.github:
     managed:
+      - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -306,6 +324,7 @@ targets:
     automerge: false
   melodic-software/ci-runner:
     managed:
+      - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
       - go-analysis
@@ -319,6 +338,7 @@ targets:
     automerge: false
   melodic-software/ci-workflows:
     managed:
+      - cloud-bootstrap
       - comment-hygiene-action
       - editorconfig-checker
       - gitleaks
@@ -381,6 +401,9 @@ targets:
     locally-owned:
       - claude-review-caller
       - claude-security-review-caller
+      # Directory-source dogfooding: this repo's bootstrap carries same-version
+      # commit-drift repair the canonical github-source script must not.
+      - cloud-bootstrap
       - ruff
     automerge: false
   melodic-software/dotfiles:
@@ -414,6 +437,7 @@ targets:
     managed:
       - agent-orientation
       - claude-review-caller
+      - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
       - gitleaks
@@ -447,6 +471,10 @@ targets:
     locally-owned:
       - actionlint
       - agent-orientation
+      # Repo-specific toolchain steps live inside the bootstrap itself (plus a
+      # committed cloud-bootstrap.test.sh over it); converge by moving them
+      # into a cloud-bootstrap.local.sh, then flip to managed.
+      - cloud-bootstrap
       # Monorepo-specific .NET analyzers at the repo root; the canonical managed
       # payloads would overwrite tuned Directory.Build.props, .globalconfig, and
       # per-tree NoWarn/WarningsNotAsErrors carve-outs. Revisit when medley adopts
@@ -466,6 +494,7 @@ targets:
       - agent-orientation
       - claude-review-caller
       - claude-security-review-caller
+      - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
       - lefthook-base

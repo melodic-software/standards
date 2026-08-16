@@ -719,8 +719,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Cloud-environment contract test
-        run: bash harness/shell/run-tests.sh components/cloud-environment/setup.test.sh
+      - name: Cloud contract tests (environment + bootstrap)
+        run: >-
+          bash harness/shell/run-tests.sh
+          components/cloud-environment/setup.test.sh
+          components/cloud-bootstrap/cloud-bootstrap.test.sh
 
   distribution:
     permissions:
@@ -755,6 +758,8 @@ jobs:
         run: bash distribution/sync-manifest.test.sh
       - name: Claude-permissions tombstone contract test
         run: bash harness/shell/run-tests.sh components/claude-permissions/claude-permissions.test.sh
+      - name: Plugin-baseline drift-report contract test
+        run: bash harness/shell/run-tests.sh distribution/check-plugin-baseline.test.sh
       - name: Validate production manifest
         run: bash distribution/sync-manifest.sh validate
 

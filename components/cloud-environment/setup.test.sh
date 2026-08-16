@@ -31,6 +31,22 @@ else
     "wait at line '${wait_ln:-none}', stamp write at line '${stamp_ln:-none}'"
 fi
 
+# Pin lockstep: the warm-cache Node version the script installs must match the
+# fleet pin this repository itself carries in .node-version — the drift the
+# README's update-lifecycle section otherwise leaves to manual diligence. (The
+# .NET version list has no in-repo manifest to check against; it stays a
+# documented manual obligation.)
+node_pin_repo="$(tr -d '[:space:]' <"$root/.node-version")"
+node_pin_script="$(sed -n 's/.*nvm install \([0-9][0-9.]*\).*/\1/p' "$script" | head -n 1)"
+if [[ -n "$node_pin_script" ]]; then
+  pass 'setup.sh declares a Node pin (nvm install <version>)'
+else
+  fail 'setup.sh declares a Node pin (nvm install <version>)' \
+    'no "nvm install <version>" line found'
+fi
+assert_eq 'setup.sh Node pin matches the repo .node-version' \
+  "$node_pin_repo" "$node_pin_script"
+
 # README/script drift guards.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
 if [[ -n "$stamp_path" ]]; then
