@@ -156,23 +156,25 @@ fi
   git fetch --quiet origin "+main:refs/remotes/origin/main" 2>/dev/null ||
     toolchain_warn 'could not fetch origin/main'
 
+  # --- Repo extension (enrich seam) -----------------------------------------
+  # A repo appends its own setup — extra lockfiles, pinned hygiene binaries,
+  # symlinks — in this committed, never-synced sibling. Same contract as this
+  # file: idempotent, best effort, bash-3.2-safe. Deliberately inside this
+  # subshell so it inherits the nvm-selected Node on PATH and the
+  # warn-never-fatal posture, plus this script's environment
+  # (CLAUDE_CODE_REMOTE, CLAUDE_PROJECT_DIR, CLAUDE_ENV_FILE when the
+  # SessionStart hook is the caller). Its failure costs the extension, never
+  # the session.
+  if [[ -f .claude/cloud-bootstrap.local.sh ]]; then
+    if bash .claude/cloud-bootstrap.local.sh >&2; then
+      toolchain_warn 'local extension completed'
+    else
+      toolchain_warn 'WARN local extension failed'
+    fi
+  fi
+
   exit 0
 )
-
-# --- Repo extension (enrich seam) -------------------------------------------
-# A repo appends its own setup — extra lockfiles, pinned hygiene binaries,
-# symlinks — in this committed, never-synced sibling. Same contract as this
-# file: idempotent, best effort, bash-3.2-safe. It runs with this script's
-# environment (CLAUDE_CODE_REMOTE, CLAUDE_PROJECT_DIR, CLAUDE_ENV_FILE when
-# the SessionStart hook is the caller) and its failure costs the extension,
-# never the session.
-if [[ -f .claude/cloud-bootstrap.local.sh ]]; then
-  if bash .claude/cloud-bootstrap.local.sh >&2; then
-    echo 'cloud-bootstrap: local extension completed' >&2
-  else
-    echo 'cloud-bootstrap: WARN local extension failed' >&2
-  fi
-fi
 
 # --- Plugins ----------------------------------------------------------------
 # Data-driven from the repo's committed .claude/settings.json — every declared

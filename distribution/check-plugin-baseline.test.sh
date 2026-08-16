@@ -71,4 +71,12 @@ assert_contains 'a diverging marketplace source is reported' \
 assert_contains 'report lines carry the candidate label' \
   "$out" 'drift.json:'
 
+# An unparsable candidate must be a loud usage error, never an empty diff
+# read as "matches baseline".
+printf 'not json' >"$tmp/broken.json"
+out="$(bash "$script" --compare "$tmp/baseline.json" "$tmp/broken.json" 2>&1)"
+rc=$?
+assert_exit 'malformed candidate exits 2' 2 "$rc"
+assert_contains 'malformed candidate is named' "$out" 'not valid JSON'
+
 [[ $FAILED -eq 0 ]] || exit 1
