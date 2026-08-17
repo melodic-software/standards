@@ -135,12 +135,11 @@ jobs:
             exit 0
           fi
 
-          if ! steps_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${alert_job_id}/steps")"; then
-            echo "::warning::Could not read the alert job's steps; treating failure as infrastructure."
-            echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          notify_conclusion="$(jq -r '.steps[] | select(.name == "Fail so the scheduled run notifies") | .conclusion' <<<"$steps_json" | head -1)"
+          # Steps are read from the jobs listing itself — there is no separate
+          # /actions/jobs/<id>/steps endpoint (the previous URL 404'd on every
+          # call; latent until the Phase 1 proof dispatches first exercised
+          # this path).
+          notify_conclusion="$(jq -r --arg id "$alert_job_id" '.jobs[] | select((.id | tostring) == $id) | .steps[] | select(.name == "Fail so the scheduled run notifies") | .conclusion' <<<"$jobs_json" | head -1)"
           if [[ "$notify_conclusion" == "failure" ]]; then
             echo "infrastructure-failure=false" >> "$GITHUB_OUTPUT"
           else
