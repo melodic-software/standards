@@ -203,7 +203,7 @@ Branch in ci-workflows. Facts verified 2026-08-17 (explorer deep-read of the 651
 - Job/step names byte-identical to v0.14.2 (`diff` of extracted names against the tag).
 - Full ci-workflows CI green on the PR.
 
-### Phase 1.2: standards caller — classifier fix, dispatch threading, re-pin [DOING]
+### Phase 1.2: standards caller — classifier fix, dispatch threading, re-pin [DONE]
 
 Branch in standards, after 1.1 merges.
 
@@ -245,7 +245,7 @@ Record run URLs + issue URL + per-dispatch classifier verdicts as the proof arti
 
 **Sanity Check:** medley test-issue timeline shows create → update → close by melodic-standards-sync[bot]; dispatch-1 concluded failure with `infrastructure-failure=false` and liveness skipped; dispatch-3 concluded success; no open v1:test issue remains; production lookup untouched (no open production-marker issue).
 
-### Phase 1.4: canary — re-arm melodic-software/.github [PENDING]
+### Phase 1.4: canary — re-arm melodic-software/.github [DOING]
 
 Standards manifest PR after 1.3 proof passes.
 
