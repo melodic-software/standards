@@ -2,7 +2,7 @@
 # Local-lane entrypoint for the bespoke CI guards that previously had no
 # non-CI invocation path. Owns one dispatcher over four drivers so consumers
 # invoke the standards-owned source (pointer-not-copy) instead of maintaining
-# a per-repo copy. See README.md and docs/adr/0003-local-lane-guards-via-standards-component.md.
+# a per-repo copy. See README.md and docs/adr/0004-local-lane-guards-via-standards-component.md.
 #
 # Usage:
 #   run-local-lane-guards.sh <guard>|all [env overrides via the environment]

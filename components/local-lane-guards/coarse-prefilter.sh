@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Coarse comment-marker prefilter for the comment-hygiene scan. Sourced by
-# scan-tree.sh (the runtime gate) and superset-test.sh (the invariant check), so
-# the regex has exactly one definition. The gate runs it as a fast
+# scan-comment-hygiene.sh (the runtime gate in this component), so the regex
+# has exactly one definition per checkout. The gate runs it as a fast
 # `git grep -iE` pass to narrow a large tree to candidate comment lines, then
 # hands each hit to the policy library (chp::scan_text) for authoritative
 # validation.
@@ -13,7 +13,9 @@
 # tracker-keyword alternation also admits a BARE number (no `#`): a consumer may
 # flag `fixes 123` / `closes 123` even though the org default requires the `#`.
 # Over-matching here is harmless; the validator is the authority. Comment
-# prefixes: //, #, /*, * and <!--. superset-test.sh enforces this contract.
+# prefixes: //, #, /*, * and <!--. Downstream consumers' contract tests (e.g.
+# medley's scan-tree.test.sh over its fork) enforce this superset contract;
+# this repository ships no local enforcer for it.
 
 # chp::coarse_re — print the coarse prefilter ERE. A function (not a bare
 # variable) so the sourced fragment lints clean standalone.

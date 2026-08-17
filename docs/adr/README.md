@@ -15,7 +15,9 @@ ephemeral.
 - Keep ADRs flat at `docs/adr/NNNN-kebab-case-title.md` so their purpose and
   identity are visible from the path alone.
 - Allocate the next four-digit repository-local number. Never reuse, renumber,
-  or rename an accepted ADR.
+  or rename an accepted ADR. One recorded exception: two ADRs were accepted the
+  same day under 0003 (a numbering collision, not a renumber); the later one
+  (local-lane-guards) moved to 0004 with links updated and content untouched.
 - Use an active decision phrase for the H1; the filename already carries the
   identifier, so do not repeat `NNNN` in the heading.
 - Use [`adr-template.md`](adr-template.md) and exactly one lifecycle status:

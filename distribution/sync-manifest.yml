@@ -31,12 +31,14 @@ components:
     files:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
   # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
-  # 3a): thin sync-managed callers for the ci-workflows reusable review lanes,
-  # pinned at the v0.12.0 release SHA (734158c4; v0.9.0 predates the
-  # `paths-file` input the security caller passes). Managed — a recorded
-  # exception to the workflow-caller exclusion in README.md — because
-  # hand-written lane callers empirically drifted: medley's missing `reopened`
-  # trigger, divergent skip-actors lists, and pin skew (v0.6.1 ↔ e295107).
+  # 3a): thin sync-managed callers for the ci-workflows reusable review lanes.
+  # The live pin is recorded in the component caller files themselves and in
+  # components/runner-policy/policy.json (approvedReusableWorkflowContracts) —
+  # this comment deliberately names no version: pins move via the repin lane
+  # and a version literal here goes stale. Managed — a recorded exception to
+  # the workflow-caller exclusion in README.md — because hand-written lane
+  # callers empirically drifted: medley's missing `reopened` trigger,
+  # divergent skip-actors lists, and pin skew across targets.
   #
   # ACCEPTED LOSS, all targets: the code-review caller drops `synchronize`,
   # which every target's hand-written caller carries today. That is the plan's
@@ -305,10 +307,13 @@ components:
     files:
       _typos.toml: _typos.toml
 
-# Fleet automerge is disarmed so every sync PR takes a human merge: the
-# stuck-automerge watchdog that would catch an armed PR wedging has never once
-# succeeded (standards#273). Restored to the opt-out default when standards#274
-# ships the watchdog fix.
+# Fleet automerge is disarmed so every sync PR takes a human merge. The
+# watchdog fix has shipped, but the watchdog's issue-write path has never
+# executed against a real armed PR — with every target disarmed there is
+# nothing for it to evaluate. Re-arm sequence (standards-sync-audit remediation,
+# docs/topics/standards-sync-audit/): first the melodic-software/.github canary,
+# then a watchdog workflow-dispatch test mode must prove the tracking-issue
+# create/update/close/fail paths; only that proof re-arms the rest of the fleet.
 targets:
   melodic-software/.github:
     managed:
@@ -474,18 +479,54 @@ targets:
       # committed cloud-bootstrap.test.sh over it); converge by moving them
       # into a cloud-bootstrap.local.sh, then flip to managed.
       - cloud-bootstrap
-      # Monorepo-specific .NET analyzers at the repo root; the canonical managed
-      # payloads would overwrite tuned Directory.Build.props, .globalconfig, and
-      # per-tree NoWarn/WarningsNotAsErrors carve-outs. Revisit when medley adopts
-      # the dotfiles extend pattern.
+      # Diverged local copy at the exact canonical destination
+      # (tools/shared/comment-hygiene/comment-hygiene-patterns.sh, 212 lines vs
+      # canonical 133, incl. medley-specific chp::should_skip_path), plus four
+      # sibling files the component does not ship. Recorded 2026-08-16 (audit);
+      # adoption is a staged migration with per-guard parity analysis.
+      - comment-hygiene-tools
+      # The canonical payload lands under eng/dotnet-analysis/ — no collision
+      # with medley's monorepo-tuned root .NET analyzer config is possible.
+      # Locally owned because medley does not consume that destination:
+      # adopting would land unused payloads beside its own tuned config.
+      # Revisit if medley moves to the canonical destination layout.
       - dotnet-analysis
+      # Diverged local copies of both payload files at the canonical
+      # destinations (.editorconfig-checker.json 40 lines vs 33). Recorded
+      # 2026-08-16 (audit). Depends on repository-text staying locally owned.
+      - editorconfig-checker
       - gitleaks
-      # Monorepo-specific Python analyzers at the repo root; the canonical
-      # managed payloads would overwrite tuned `target-version`, `include`, and
-      # per-tree scope. Revisit when medley adopts the dotfiles extend pattern.
+      # Diverged local copy at the canonical destination
+      # (.markdownlint-cli2.jsonc, 74 lines vs 41). Recorded 2026-08-16 (audit).
+      - markdownlint
+      # Slightly stale local copy at the canonical destination
+      # (PSScriptAnalyzerSettings.psd1, 138 lines vs 141 — the one counterpart
+      # SMALLER than canonical). Recorded 2026-08-16 (audit); nearest-parity
+      # adoption candidate of the seven.
+      - psscriptanalyzer
+      # The canonical payload lands under .github/standards/pyright/ — no
+      # overwrite of medley's root Python config is possible. Locally owned
+      # because medley does not consume that destination. (The earlier
+      # rationale here misattributed `target-version` — a ruff key — to
+      # pyright.) Revisit if medley moves to the canonical destination layout.
       - pyright
+      # Substantially diverged local copies of both payload files at the
+      # canonical destinations (.editorconfig 204 lines vs 67, .gitattributes
+      # 290 vs 61 — monorepo expansion). Recorded 2026-08-16 (audit); the
+      # heaviest divergence of the seven counterpart files.
+      - repository-text
       - review-instructions
+      # The ONLY true root-file overwrite among medley's analyzer exclusions:
+      # canonical ruff.toml at the repo root would clobber medley's tuned
+      # `target-version`, `include`, and per-tree scope. Revisit when medley
+      # adopts the dotfiles extend pattern.
       - ruff
+      # Diverged local copy at the canonical destination (.shellcheckrc,
+      # 65 lines vs 63). Recorded 2026-08-16 (audit).
+      - shellcheck
+      # Diverged local copy at the canonical destination (_typos.toml,
+      # 174 lines vs 58). Recorded 2026-08-16 (audit).
+      - typos
     automerge: false
   melodic-software/provisioning:
     managed:
