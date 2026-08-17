@@ -50,15 +50,16 @@ A target may also set `automerge: false` — policy-as-data read by the
 auto-merge arming. Omitting the key defaults to `true` (armed), so the fleet
 default stays terse; only a deliberate opt-out needs an explicit entry.
 
-This repository's own root files — currently just `README.md` — are neither
-`managed` nor `locally-owned` here — those labels describe a *downstream*
-copy's relationship to an upstream source. In `standards` itself a root file
-is simply the canonical source: no manifest entry, because there is no
-synchronization to record. The same holds for any root file `standards`
-adds later, such as `AGENTS.md` or `CLAUDE.md`. Once a downstream target
-gains a manifest component for a root file — for example a future
-`REVIEW.md` or `AGENTS.md` component — that downstream copy is what carries
-the `managed` label; this repository's own originals never carry an
+This repository's own root files (`README.md`, `REVIEW.md`, `AGENTS.md`,
+`CLAUDE.md`) are neither `managed` nor `locally-owned` here — those labels
+describe a *downstream* copy's relationship to an upstream source. In
+`standards` itself a file is simply the canonical source: no ownership label,
+because there is no synchronization to record. Note the canonical source of a
+component is not always the same-named root file — `review-instructions`
+exports root `REVIEW.md`, but `agent-orientation` exports
+`components/agent-orientation/orientation.md` (the root `AGENTS.md` here is an
+empty placeholder). Wherever the source lives, the downstream copy is what
+carries the `managed` label; this repository's own originals never carry an
 ownership label themselves.
 
 There are no layouts, per-target paths, transforms, patches, profiles, receipts,
@@ -337,8 +338,10 @@ dozens of files — a whole-file managed sync would clobber content the
 `managed`/`locally-owned` split exists to protect.
 
 The `Reconcile` lifecycle row above is what keeps this from silently
-blinding medley to canonical drift: when `standards`' `REVIEW.md` or
-`AGENTS.md` gains a criterion, medley's own copy is checked for the
+blinding medley to canonical drift: when a canonical source gains a
+criterion (`REVIEW.md` for review-instructions;
+`components/agent-orientation/orientation.md` for agent-orientation — not
+the empty root `AGENTS.md`), medley's own copy is checked for the
 equivalent content (not a byte match) and updated by a repository-specific
 PR in medley, same as the initial reconciliation pattern
 (`melodic-software/medley#1541`). This is a periodic self-review obligation, not an

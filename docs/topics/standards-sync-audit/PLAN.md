@@ -1,0 +1,245 @@
+# standards-sync-audit
+
+## Brief
+
+### TLDR
+
+Six-lane deep audit of the standards distribution/sync system found the engine byte-perfect but the governance around it stale: fleet automerge disarmed past its recorded restore trigger (~65 human merges/week), an AGENTS.md component that reaches Claude Code in zero repos and clobbered bespoke content four times in six weeks, five fully-built components with zero adopters, a sync caller pinned 123 commits behind, and genuine overengineering rooted in a hollow Bash+yq purity constraint. Sixteen decisions were interviewed, adversarially validated by three fresh-context agents (two same-vendor, one cross-vendor Codex), and locked. Remediation is phased below.
+
+### Goal
+
+Execute the locked decision set: restore automerge safely (canary + proven watchdog), retire the agent-orientation component, clean up zero-adopter components, bring pins current, run the hygiene wave, cut consumer friction, expand the sync fleet by one batched App grant (claude-code-proxy, codex-plugins, cursor-plugins), and later port the engine to Node.
+
+### Constraints
+
+- Exact-set App attestation: any roster change is an atomic two-sided operation (manifest edit + org-owner grant); grant-first per github-iac's documented procedure; a skew window reds out the whole fleet — schedule nothing sync-dependent inside it.
+- Every new target enters with explicit `automerge: false` (omitted defaults to TRUE and would bypass the canary).
+- Re-pinning any ci-workflows reusable caller requires appending the new `path@SHA` to `components/runner-policy/policy.json` in the same PR.
+- The zero-target validator rule (schema + engine + mjs lockstep) lands LAST in the component-cleanup series.
+- Managed-file deselection never deletes downstream: agent-orientation retirement requires explicit per-target PRs (blank, not delete).
+- ADR convention forbids renumbering accepted ADRs — the 0003 dedupe carries an explicit collision carve-out note.
+- No commits to main; all work via branches + PRs per repo convention.
+
+### Acceptance criteria
+
+Phased execution contract — one phase at a time: plan, implement, verify, close.
+
+- **Phase 0 — hygiene + pins (standards repo, one PR series):** stale manifest comments fixed (caller-pin version claim removed or made durable; automerge rationale re-cut to the real gate; medley rationale rewritten — pyright/dotnet overwrite claims are false, ruff is the only true overwrite); distribution/README agent-orientation source claims fixed (sequenced with Phase 1 to avoid double rewrite); medley's 8 diverged counterpart files recorded as commented `locally-owned` entries; ADR 0003→0004 renumber + convention carve-out; 7 missing nested Dependabot entries added fleet-wide; REVIEW-CREDENTIAL.md compressed with `[!CAUTION]` fences preserved + historical note in ci-workflows PLAN.md; coarse-prefilter.sh header fixed without silently retiring the superset contract; ci-workflows actionlint flipped to managed; canonical `.node-version` bumped to 24.19.0 then ci-workflows adopts node-runtime (5 inline pins → `node-version-file`); sync.yml + watchdog caller re-pinned with policy.json SHA appends; repin automation `LANE_PATHS` extended to sync-family callers; songwriting's 2 drifted files hand-fixed once (keep MD024 nested override).
+- **Phase 1 — automerge restore:** `.github` target re-armed; watchdog workflow-dispatch test mode built (synthetic stuck candidate + disposable tracking issue proving create/update/close/fail paths); fleet re-armed only after that proof passes.
+- **Phase 2 — agent-orientation retirement:** component moved to locally-owned everywhere then manifest entry retired; per-target PRs blank AGENTS.md (not delete); claude-code-plugins CLOUD-SESSIONS.md link fixed; opt-out procedure re-homed in the new escape-hatch doc; PR body remains the just-in-time warning.
+- **Phase 3 — component cleanup:** manifest entries deleted for concurrency-policy, dependabot-policy, pin-comment-convention, pr-convention-policy (all stay as producer-internal lint); superseding ADR for pr-convention-policy-as-data; escape-hatch doc shipped (consolidated exception-surface index, `--target`/`--target-root`, `LEFTHOOK=0` incl. PowerShell shape, reconciled with agent deny rules); org-default PULL_REQUEST_TEMPLATE fixed in melodic-software/.github (4 sections, bare-dash hole closed); pr-issue-linkage fleet re-pin to ≥v0.14.x (6/8 repos currently enforce only `## Related`); zero-target validator rule lands last.
+- **Phase 4 — fleet expansion (one grant window):** claude-code-proxy + codex-plugins + cursor-plugins added as targets with explicit `automerge: false`, per-target component sets (ccproxy: ruff locally-owned; hygiene set for the marketplaces), 3 new `TARGET_VISIBILITY` entries, `sync-manifest.test.sh` arity assertions updated, github-iac README roster mirror updated, claude-lane-sandbox rationale mirrored into manifest; knowledge-corpus stays deferred (LFS structural blocker recorded).
+- **Phase 5 — local-lane-guards staged migration:** per-guard parity analysis vs medley/ci-workflows/ccp forks; medley wrappers or locally-owned entries; one guard at a time; comment-hygiene-tools disposition rides this.
+- **Phase 6 — engine Node port:** full 921-line black-box contract suite green against the Node engine; threat-model re-run; explicit disposition of the no-Node control + its test; npm supply-chain assessment.
+
+### Captured assumptions
+
+- User is the org owner and can perform the App grant and secrets actions personally (Q9 — approved without correction; correction invited).
+- No timeline or budget constraint on the remediation phases; no cut candidate is sacred.
+- Repin App secrets are provisioned and working (verified live 2026-08-16: set 2026-08-09, daily green runs).
+
+### Out-of-scope
+
+- songwriting fleet adoption (github-iac ADR-0006 stands; hand-fix only).
+- knowledge-corpus adoption (structural LFS blocker; no extend mechanism exists).
+- runner-policy SHA-allowlist split (deferred; append-only list, premise half-false).
+- Syncing CLAUDE.md anywhere (unhobble rebuild rule governs).
+- SYNC-MANAGED header comments in managed files (infeasible: byte-exact engine, false-at-source, format-hostile destinations).
+- New PULL_REQUEST_TEMPLATE sync component (org-default fix dominates).
+
+### Deferred questions
+
+(none — register clean: 16/16 answered)
+
+## Plan
+
+Phase-tag vocabulary in this file: `[PENDING]` → `[DOING]` → `[DONE]` — PENDING stands in for the planning convention's usual first tag because this repo's comment-hygiene gate rejects warning-marker keywords in tracked files.
+
+Planned 2026-08-16 against standards main @ `4be9696`, ci-workflows main @ `4763713`. Facts verified this session by four read-only explorers (line numbers below are current at these SHAs). Drift since audit: standards gained cloud-bootstrap component (#397-#399) — no Phase 0 impact beyond shifted line numbers; #399 added 12 lines to `components/agent-orientation/orientation.md` (Phase 2 concern, noted for that phase).
+
+Standards grounding: repo's own ADR convention (`docs/adr/README.md:15-24`), pin-comment shape (`# <shortsha> <date>` as in `sync.yml:33`), conventional-commit subjects per git log. Commit convention: branch + PR per repo; no commits to main.
+
+### Phase 0.1: standards hygiene PR (S1 — no behavior change) [PENDING]
+
+Branch `chore/sync-audit-phase0-hygiene` off main. All edits in standards; no sync-behavior change.
+
+1. **Caller-pin comment made durable** — `distribution/sync-manifest.yml:33-39`: remove the stale "pinned at the v0.12.0 release SHA (734158c4 …)" claim (actual pins have moved 4x). Rewrite to a durable form that names no version/SHA literal: pins live in the caller workflows and `components/runner-policy/policy.json`; keep the drift-history rationale (medley `reopened` trigger, skip-actors, pin skew).
+2. **Automerge rationale re-cut** — `distribution/sync-manifest.yml:308-311`: current text cites standards#273/#274 (both closed 2026-08-04) as the restore trigger — stale. Rewrite to the real gate: disarmed pending a watchdog workflow-dispatch test mode proving the tracking-issue create/update/close/fail paths (Phase 1 of `docs/topics/standards-sync-audit/PLAN.md`); `.github` canary re-arms first.
+3. **Medley rationale corrected** — `sync-manifest.yml:477-486`: dotnet-analysis comment claims root overwrite of `Directory.Build.props` — false (payload maps to `eng/dotnet-analysis/…`, manifest:177-180); pyright comment claims `target-version` overwrite — `target-version` is a ruff key, not pyright, and pyright payload lands under `.github/standards/pyright/`. Rewrite both: real rationale is medley doesn't consume those destination paths (no overwrite possible; adopting would land unused payloads); ruff (line 488) is the only true root-file overwrite — give it its own accurate comment.
+4. **Medley diverged counterparts recorded** — add 7 components to medley's `locally-owned:` list (manifest:470-488), each with a comment noting the diverged local copy at the exact canonical destination (recorded 2026-08-16, audit): `repository-text` (.editorconfig 204L vs 67; .gitattributes 290L vs 61), `typos` (_typos.toml 174L vs 58), `markdownlint` (74L vs 41), `editorconfig-checker` (40L vs 33; requires repository-text), `shellcheck` (65L vs 63), `psscriptanalyzer` (138L vs 141 — slightly stale copy), `comment-hygiene-tools` (tools/shared/comment-hygiene/comment-hygiene-patterns.sh 212L vs 133; medley holds 4 additional local files the component doesn't ship). Comment syntax per existing example at manifest:399-405. Keep lists alphabetical.
+5. **distribution/README source claims fixed** — `distribution/README.md:53-62`: "currently just `README.md`" is false (root holds README, REVIEW.md, 0-byte AGENTS.md, 0-byte CLAUDE.md); "a future `REVIEW.md` or `AGENTS.md` component" is DOUBLY false — agent-orientation exists (manifest:23-25, source `components/agent-orientation/orientation.md`) AND review-instructions exists (maps `REVIEW.md: REVIEW.md`, managed in 5 targets). `README.md:339-346`: "when `standards`' … `AGENTS.md` gains a criterion" misdirects — the agent-orientation source is the component file, not root AGENTS.md. Fix all with wording that survives Phase 2 retirement (describe source locations factually; Phase 2 rewrites these sections again).
+6. **ADR renumber + carve-out** — `git mv docs/adr/0003-local-lane-guards-via-standards-component.md docs/adr/0004-local-lane-guards-via-standards-component.md` (0004 verified free). Sweep the 2 standards inbound refs: `components/local-lane-guards/README.md:9`, `components/local-lane-guards/run-local-lane-guards.sh:5`. TWO MORE refs live in ci-workflows (`docs/topics/local-lane-guards.md:6` absolute GitHub URL; `README.md:222` "standards ADR-0003") — those ride the 0.7 ci-workflows PR (after this renumber merges; lychee there is offline so the 404 would rot silently otherwise). Add collision carve-out note to `docs/adr/README.md` beside lines 17-18 ("Never reuse, renumber, or rename an accepted ADR"): one-time exception recorded — two ADRs were accepted the same day under 0003; the later (local-lane-guards) moved to 0004; links updated; content untouched.
+7. **coarse-prefilter header fixed** — `components/local-lane-guards/coarse-prefilter.sh:2-3,16`: cites `scan-tree.sh` and `superset-test.sh`, neither exists in this repo. Real sourcer is `scan-comment-hygiene.sh:30-32`. Rewrite header to name the actual consumer. KEEP the CONTRACT paragraph lines 9-15 verbatim; REWRITE line 16 ("superset-test.sh enforces this contract") to name the real enforcer — downstream consumers' contract tests (e.g. medley's `scan-tree.test.sh` fork).
+8. **REVIEW-CREDENTIAL.md compressed** — `distribution/REVIEW-CREDENTIAL.md`: 274 lines → compress prose outside the `[!CAUTION]` block; the single fence (lines 24-87, 64-line blockquote incl. embedded table with `>` prefixes) is preserved VERBATIM. No semantic loss on directives.
+9. **pr-convention-policy README obligation paragraph: SKIPPED** — the durable-fix candidate (mirror runner-policy README:81-86's Dependabot obligation) is deliberately not added: Phase 3 deletes the component's manifest entry; adding consumer-obligation prose now is churn.
+
+**Comment-prose hazard:** standards CI runs comment-hygiene over `#`-leading lines including sync-manifest.yml (`ci.yml` comment-hygiene job; patterns ban the warning-marker keywords (the to-do/fix-me family) and `owner/repo#N`, `fixes/closes/resolves #N`, bare `issue N` forms — `components/comment-hygiene/comment-hygiene-patterns.sh:56-119`). New comment prose must avoid issue-reference shapes — say "the audit topic (docs/topics/standards-sync-audit/)" not "standards#318".
+
+**Sync-wave note:** `docs/adr/README.md` is a managed payload of `architecture-decisions` (sole target: medley) — a medley sync PR opens after S1 merges; hand-merge it and verify its diff is the carve-out paragraph only.
+
+**Sanity Check:**
+
+- `grep -n "734158c4\|v0.12.0" distribution/sync-manifest.yml` → empty.
+- `grep -n "standards#274\|standards#273" distribution/sync-manifest.yml` → empty.
+- `yq '.targets."melodic-software/medley"' distribution/sync-manifest.yml | grep -c "Directory.Build.props"` → 0 (false overwrite claim gone; the component `files:` mapping at manifest:179 legitimately keeps the string elsewhere).
+- `yq '.targets."melodic-software/medley"."locally-owned" | length' distribution/sync-manifest.yml` → 15 (8 existing + 7 added, sorted — validator enforces sorted-unique).
+- `ls docs/adr/ | grep -c "^0003"` → 1; `ls docs/adr/ | grep -c "^0004"` → 1; `grep -rn "0003-local-lane-guards" --exclude-dir=.git --exclude-dir=.work .` (repo root, all files) → empty; the 2 remaining ci-workflows refs tracked in 0.7.
+- `grep -n "scan-tree.sh\|superset-test.sh" components/local-lane-guards/coarse-prefilter.sh` → only the rewritten line 16-equivalent naming downstream forks (no claim a local file enforces); `grep -c "CONTRACT" components/local-lane-guards/coarse-prefilter.sh` → ≥1.
+- `sed -n '24p' distribution/REVIEW-CREDENTIAL.md` still `> [!CAUTION]`; fence region (old 24-87) byte-identical against pre-edit extract; total line count < 274.
+- Standards CI green — named gates this PR trips: manifest validator (`distribution/sync-manifest.sh`), comment-hygiene, typos, markdown, offline lychee (`include_fragments = "full"` — heading anchors in edited docs must resolve), editorconfig, pin-comment-convention, local-lane-guards.
+
+### Phase 0.2: node pin bump + ci-workflows adoption manifest changes (S2) [PENDING]
+
+Branch `chore/sync-audit-phase0-node-pin` off main, after S1 merges (both touch sync-manifest.yml).
+
+1. **Canonical `.node-version`: 24.18.0 → 24.19.0**, PLUS the four coupled literals in `components/cloud-environment/setup.sh` (lines 91, 99, 100, 101, 103: Track C comment, `nvm install`, `nvm alias`, two log lines) — `components/cloud-environment/setup.test.sh:39-48` hard-asserts the script pin equals `.node-version` and runs in standards CI (cloud-environment job); bumping the root file alone reds the PR. This matches ci-workflows' current inline 24.19.0 (5 sites) and honors ci-workflows' own drift-check doctrine (`tool-version-drift-check.yml:462-472`: raise the fleet pin first; never run past it — ci-workflows is currently past it).
+2. **ci-workflows target: add `node-runtime`** to `managed:` (manifest:337-355, insert between markdownlint and path-detection-action). No App grant needed — target block already exists; attested set unchanged. Sync will land `.node-version` in ci-workflows, which also activates the existing no-op branch in its `.claude/cloud-bootstrap.sh:79-80` (desirable: VM gets the pinned node).
+3. **ci-workflows actionlint flipped to managed** — move `- actionlint` from `locally-owned:` into `managed:` as the FIRST entry (validator enforces sorted lists; it sorts before `cloud-bootstrap`); DELETE the now-empty `locally-owned:` key entirely (validator rejects an empty sequence: `sync-manifest.sh:711` "must be a non-empty sequence when present") and the discharged 2-line comment (manifest:351-352). Verified safe: `diff` of canonical `.github/actionlint.yaml` vs ci-workflows' copy is comment-prose only; nothing in ci-workflows pins the config content (action.yml auto-discovers; no test references it). Also update the component-def exclusion comment (manifest:7-19): drop ONLY the implicit ci-workflows coverage — after the flip, actionlint stays locally-owned in THREE targets (medley, ci-runner, github-iac — github-iac's `GovernanceTopologyTests` rationale is load-bearing, keep its bullet) plus the standards-source and `.github` no-workflows bullets.
+
+**Sync-wave note:** this PR triggers human-merged sync PRs — node bump to the 5 existing node-runtime targets, plus `.node-version` (new) + `actionlint.yaml` (prose overwrite) to ci-workflows. All automerge-disarmed; merge them by hand as they open.
+
+**Sanity Check:**
+
+- `cat .node-version` → `24.19.0`; `grep -rn "24\.18\.0" --exclude-dir=.git --exclude-dir=.work .` → empty.
+- `bash` run of `components/cloud-environment/setup.test.sh` (repo's documented harness) green.
+- `yq '.targets."melodic-software/ci-workflows".managed' distribution/sync-manifest.yml` contains `actionlint` (first) and `node-runtime`; `yq '.targets."melodic-software/ci-workflows" | has("locally-owned")'` → `false`.
+- `yq` extraction: exactly 3 targets still list actionlint locally-owned (medley, ci-runner, github-iac); component-def comment names all three.
+- Standards CI green; subsequent sync PRs show only expected deltas (spot-check ci-workflows sync PR diff: `.node-version` = `24.19.0` new file, `actionlint.yaml` comment prose only).
+
+### Phase 0.3: ci-workflows node-version-file adoption (C1) [PENDING]
+
+In ci-workflows, branch `chore/adopt-node-version-file`, after the S2 sync PR into ci-workflows is merged (needs `.node-version` present).
+
+**Brief deviation (evidence-based, surfaced for approval):** Brief says "5 inline pins → `node-version-file`". Infeasible as written: sites 1-3 (`biome|markdown|tsc/action.yml` `default: 24.19.0`) are composite-action INPUTS consumed by other repos — removing them breaks the cross-repo API — and `tool-version-drift-check.yml:210-217` hard-fails if `markdown/action.yml`'s default vanishes. Revised shape:
+
+1. Convert the 2 direct pins to `node-version-file: .node-version`: `.github/workflows/ci.yml:573`, `.github/workflows/selector-conformance.yml:93` (neither covered by the drift guard today).
+2. Keep the 3 composite input defaults (already 24.19.0 — now matching canonical after S2).
+3. Extend `tool-version-drift-check.yml` with one new assertion: `markdown/action.yml` `node-version` default == repo `.node-version` content — closing the loop so canonical bump + sync + composite-default bump stay lockstep. ALSO add `.node-version` to the workflow's `push.paths:` allowlist (otherwise a future synced bump waits for the daily cron). Note: this workflow is ADVISORY (header: "NOT in any ci-status gate; never blocks a merge") and has NO `pull_request` trigger — it cannot "pass on the PR".
+
+**Sanity Check:**
+
+- `grep -rn "node-version: 24" .github/workflows/` → empty (both direct pins converted).
+- `grep -c "node-version-file" .github/workflows/ci.yml .github/workflows/selector-conformance.yml` → 1 each.
+- `grep -n "24.19.0" .github/actions/*/action.yml` → exactly 3 (defaults intact).
+- New drift assertion verified by a `workflow_dispatch` run of tool-version-drift-check on the merged branch (or executing the assertion's script block locally) — green.
+- Full ci-workflows CI green on the PR.
+
+### Phase 0.4: sync-family caller re-pins + repin-automation extension (S3) [PENDING]
+
+Branch `chore/sync-audit-phase0-repins` in standards, LAST in the series (pins capture post-C1 ci-workflows HEAD, maximizing the hardening picked up — incl. `--retry-all-errors` for the observed 08-12 exit-56 class).
+
+1. **Pre-flight contract diff** (per pre-flight consumer check): for both reusables, diff `on.workflow_call` inputs/secrets between the old pin and the new target SHA — `standards-sync.yml` (`8202e03` → current HEAD) and `standards-sync-stuck-automerge-alert.yml` (`ed6d410` → current HEAD). If the contract changed, the policy.json entry is edited to match, not blind-copied; if caller inputs must change, that edit rides this PR.
+2. **Re-pin callers**: `.github/workflows/sync.yml:33` and `.github/workflows/standards-sync-stuck-automerge-alert.yml:42`. Pin TARGET: prefer the newest ci-workflows RELEASE TAG containing both the retry hardening and C1 — pin-comment convention (`components/pin-comment-convention/README.md:9-15`) makes `# vX.Y.Z` primary and shortsha/date "legal but discouraged", and ci-workflows cuts release tags. If no tag covers C1 yet, either dispatch a ci-workflows release first or pin HEAD with the `# <shortsha> <date>` fallback AND record why in the PR body.
+3. **policy.json appends (SAME PR — hard constraint)**: add the new `path@SHA` keys to `approvedReusableWorkflowContracts` in `components/runner-policy/policy.json` — copy-forward from the existing entries at lines 269-277 (`standards-sync.yml@8202e03…`) and 582-595 (`…alert.yml@ed6d410…`), adjusted per the pre-flight diff. Match `JSON.stringify(policy, null, 2)` formatting of neighbors.
+4. **Repin automation extension — REVISED (naive LANE_PATHS append breaks the scheduled repin run):** `repin-policy-lockstep.mjs:158-166` copy-forwards one `oldSha`→`newSha` pair across ALL `LANE_PATHS` entries and THROWS on a missing `path@oldSha` key; the claude lanes share one pin (`7107b348…`) while the sync family sits at two different SHAs — appending the paths as-is makes the next scheduled `claude-lanes-repin` run throw on `standards-sync.yml@7107b348…`. Also `laneUnchanged` is a single boolean across all paths (`:236-246`), and `repin-callers.sh:159,186-189` only edits `components/claude-lanes/*.yml` and hard-fails on diffs outside `LANE_DIR`. Deliverable: refactor to per-path pin resolution (e.g. `{path, callerFile}` entries, old SHA read from each caller file) as its own commit with `claude-lanes` test updates AND a dry-run proof; FALLBACK if the refactor balloons past a focused commit — drop the extension from this PR entirely (no partial edit; the partial IS the breaking change) and file a tracker work item for it.
+5. **runner-policy README rollout record (repo convention — the lockstep script's own human-checklist names it):** append the rollout-record paragraphs for both bumps to `components/runner-policy/README.md` following the existing narrative at :709/:729/:740 ("The live pin is now …"). Historical paragraphs stay untouched.
+6. **runner-policy tests**: check `runner-policy.test.mjs`/fixtures for old-pin assertions (verified: fixtures use synthetic SHAs, likely no-op — confirm before push).
+
+**Sanity Check:**
+
+- `grep -n "ci-workflows" .github/workflows/sync.yml .github/workflows/standards-sync-stuck-automerge-alert.yml` → both show the new pin; neither shows `8202e03` nor `ed6d410`.
+- `components/runner-policy/README.md` contains the new pin SHA/tag in a dated rollout paragraph; earlier `8202e03`/`ed6d410` paragraphs unchanged.
+- Repo's documented test harness green locally on runner-policy + claude-lanes suites; runner-policy CI lane green on the PR.
+- If extension delivered: dry-run of `repin-policy-lockstep.mjs` with current SHAs exits 0 (no throw); if fallback taken: `git diff` shows zero changes under `components/claude-lanes/` and a tracker item URL is recorded in the PR body.
+- Post-merge: one manually dispatched sync dry-run completes green with the new pin.
+
+### Phase 0.5: Dependabot entries fleet-wide (5 parallel PRs) [PENDING]
+
+Independent of 0.1-0.4; parallel-safe (disjoint repos). Exactly 7 missing entries confirmed by probe (dependabot.yml is NOT sync-managed anywhere — all per-repo PRs):
+
+| Repo | Add | Style notes (match local convention — full templates in probe report) |
+|---|---|---|
+| claude-code-plugins | `/.github/standards/pr-convention-policy` | copy existing runner-policy entry verbatim, swap directory; update header-comment root enumeration |
+| dotfiles | `/.github/standards/pr-convention-policy` | keep `javascript` label (load-bearing: explicit labels replace defaults), `commit-message.prefix: build`, per-root named group |
+| github-iac | `/.github/standards/runner-policy` + `/.github/standards/pr-convention-policy` | flow-seq labels, `prefix: build`; update "Four ecosystems" header prose |
+| medley | `/.github/standards/pr-convention-policy` | quoted scalars, `prefix: "chore"` + `include: "scope"`; ALSO fix pre-existing defect: existing runner-policy entry lacks the required `groups` block (dependabot-policy standard `groups-missing`) — add it in the same PR |
+| provisioning | `/.github/standards/runner-policy` + `/.github/standards/pr-convention-policy` | flow-seq labels, `prefix: build`; update "Two ecosystems" header prose |
+
+Every added entry carries the mandatory field set (dependabot-policy README:31-41): `schedule.interval: weekly`, `cooldown.default-days: 7`, a `groups` block covering version updates, `open-pull-requests-limit` ≤ 5 (or omitted).
+
+Sequencing note (accepted churn, per Brief's locked "7 entries"): 5 of 7 cover pr-convention-policy, whose MANIFEST entry Phase 3 deletes — but deselection never deletes downstream files, so the lockfiles persist and coverage stays live.
+
+**Sanity Check (per repo):** fetch merged `dependabot.yml`, assert the new `directory` strings present; YAML parses (`yq` exit 0); repo CI green (dotfiles/medley run dependabot-policy-style checks where present).
+
+### Phase 0.6: songwriting one-time hand-fix PR [PENDING]
+
+Independent; parallel-safe. songwriting has NO manifest target block (dropped outright, manifest:81-85) — hand-fix, not adoption.
+
+1. Replace `.gitattributes` (2 lines) wholesale with canonical (61 lines) — songwriting's one functional line is byte-identical to canonical line 7; nothing lost.
+2. Replace root `.markdownlint-cli2.jsonc` (32 lines) with canonical (41 lines), THEN re-apply two deliberate local deltas: (a) re-add `"MD055": { "style": "consistent" }` with a one-line comment marking it a repo-local override (canonical lacks it; silent drop would change behavior); (b) re-add a corrected one-line pointer comment naming `songs/.markdownlint-cli2.jsonc` (the current pointer says "songwriting/ subtree" — wrong path).
+3. `songs/.markdownlint-cli2.jsonc` UNTOUCHED — the MD024:false nested override the Brief protects survives by construction (root canonical already carries `MD024: siblings_only` verbatim; no hand-merge exists).
+4. PR body notes: (a) this is a content copy, NOT repository-text conformance — songwriting has no `.editorconfig` (the component is an atomic two-file payload); no future audit may assume the full payload landed. (b) The copied `$schema` pin (markdownlint-cli2 v0.23.2) is authoring-only and enforced by a test only in standards — in songwriting it is a frozen literal with no maintenance obligation.
+
+**Sanity Check:** `gh api` post-merge: `.gitattributes` 61 lines incl. binary patterns; root markdownlint config contains `$schema` pin + `MD055` + `songs/` pointer; `songs/.markdownlint-cli2.jsonc` blob SHA unchanged from pre-PR.
+
+### Phase 0.7: ci-workflows doc corrections (C2) [PENDING]
+
+After S1 merges (cites its PR number; ADR file renamed). Small ci-workflows docs PR, two concerns:
+
+1. **REVIEW-CREDENTIAL historical note** — the stale claim is the Phase 1 evidence in `docs/topics/claude-review-lanes/PLAN.md`: the Sanity Check at :352-354 and its recorded result `grep -ci "public" … == 27` (locate by content — the sole `REVIEW-CREDENTIAL` grep-count line in the Phase 1 evidence block opening at :359; line numbers may drift). Append the correction ADJACENT to that claim (dated note at the end of the Phase 1 evidence block — NOT 1,800 lines away in Phase 5, and Phase 5 is `[DOING]`, an append there can collide with in-flight edits): the count described the file pre-compression; standards PR <S1#> compressed it; the recorded count is verified-at-the-time evidence, not a live invariant.
+2. **ADR-0003 cross-repo refs** (renumber landed in S1): fix `docs/topics/local-lane-guards.md:6` (absolute GitHub URL → `0004-…`) and `README.md:222` ("standards ADR-0003" → "standards ADR-0004"). ci-workflows' lychee is offline-only — these 404s would never be caught by CI.
+
+**Sanity Check:**
+
+- `grep -c "REVIEW-CREDENTIAL" docs/topics/claude-review-lanes/PLAN.md` → exactly +1 vs pre-edit count (count delta, not absolute); the new dated note sits inside the Phase 1 evidence block.
+- `grep -rn "0003-local-lane-guards\|ADR-0003" --exclude-dir=.git .` → empty in ci-workflows.
+- `git diff --stat` = 3 files, additions/substitutions only; ci-workflows CI green.
+
+## Blast radius
+
+MEDIUM. Behavior-changing surfaces: fleet node pin bump (5 targets + ci-workflows), two CI workflow caller re-pins (sync + watchdog — the sync cascade itself), actionlint managed flip (prose-only overwrite, verified), repin-automation code change. Mitigations: pre-flight contract diffs before re-pins; policy.json same-PR constraint honored; sync-wave PRs all human-merged (fleet disarmed); S1 is pure comments/docs; every phase independently revertable. Not HIGH: no schema changes, no engine changes, no App grant, no automerge arming (that is Phase 1).
+
+## Stress-test summary
+
+Fresh-context adversarial review (2026-08-16, execution-scoped — the 16 locked decisions were fenced off, already 3×-validated): 2 CRITICAL, 9 IMPORTANT, 4 SUGGESTION findings; all 15 verified against the repos and folded into the plan above. Headlines: (1) `.node-version` bump would have broken standards CI — `components/cloud-environment/setup.sh` carries 4 coupled literals hard-asserted by `setup.test.sh` (now in 0.2); (2) the briefed `LANE_PATHS` append is itself the breaking change — the lockstep script assumes one shared pin across all paths (0.4 rewritten to per-path refactor-or-defer, no partial edit); (3) two cross-repo ADR-0003 refs in ci-workflows the sweep would have missed (now in 0.7); (4) pr-issue-linkage is a REQUIRED check on standards + ci-workflows PRs — every PR needs a closing keyword + `## Related` body (now in Mechanical work). This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius: it ran fresh-context with an adversarial failure-scenario brief; re-running `/planning:devils-advocate` on the same execution surface would relitigate the fenced decisions.
+
+## Execution shape
+
+Waves (file-overlap + dependency analysis):
+
+- **Wave A (parallel-safe, zero file overlap):** 0.1 (standards), 0.5 (5 downstream repos), 0.6 (songwriting).
+- **Wave B (sequential chain):** 0.2 after 0.1 merges (both edit sync-manifest.yml) → merge ci-workflows sync PR → 0.3 (needs `.node-version` in ci-workflows) → 0.4 (pins capture post-0.3 HEAD). 0.7 after 0.1 (cites S1 PR#).
+
+| Phase | Surface | Basis |
+|---|---|---|
+| 0.1 | main session | judgment-heavy comment/prose rewrites against locked rationale |
+| 0.2 | main session | small, gated on 0.1, manifest edits need care |
+| 0.3 | main session (or worker) | small ci-workflows change + guard extension |
+| 0.4 | main session | contract-diff judgment + policy.json lockstep |
+| 0.5 | sub-agent workers (up to 5 parallel) | mechanical, per-repo templates fully specified, disjoint repos |
+| 0.6 | sub-agent worker | mechanical, fully specified |
+| 0.7 | main session | 5-minute doc append |
+
+Cost note: worker fan-out for 0.5/0.6 ≈ 6 agents vs sequential — material only in wall-clock; token cost modest (small diffs). Sequential fallback: execute 0.5 repos one at a time in main session if a worker misbehaves; scope fence per worker = exactly one repo's `.github/dependabot.yml` (+ header comment) or songwriting's 2 files; FORBIDDEN: PLAN.md, any other repo, any workflow file.
+
+## Open questions
+
+- 0.4 pin form: newest ci-workflows release tag containing C1 + retry hardening, vs HEAD-SHA fallback — resolved at implementation time by tag availability (decision rule in 0.4 item 2).
+- 0.4 repin-automation refactor size: per-path pin resolution deliverable in one focused commit, or deferred to a tracker item (decision rule + fallback in 0.4 item 4 — no partial edit either way).
+
+## Handoff to implementation
+
+### User-approval gates
+
+- Phase 0.3's Brief deviation (2-of-5 pins convert; composites keep defaults; drift-check extension added) — approve or override before C1.
+- Phase 0.6's two local deltas (MD055 re-add, corrected pointer comment) — [FALLBACK — confirm or override].
+- If 0.4's investigation finds the caller-rewrite half non-trivial: scoped-down deliverable + tracker follow-up needs a nod (gate embedded in 0.4 item 4).
+
+### Execution shape ([EXEC-SHAPE] tagged)
+
+- PR series structure S1/S2/C1/S3 + 5 dependabot + songwriting + C2, with Wave A/B ordering above [EXEC-SHAPE].
+- 0.5/0.6 delegated to scope-fenced workers; all standards PRs main-session [EXEC-SHAPE].
+- medley groups-block defect fix folded into medley's 0.5 PR [EXEC-SHAPE].
+- pr-convention-policy README obligation paragraph skipped (Phase 3 deletes the entry) [EXEC-SHAPE].
+- ADR carve-out cascades to medley via architecture-decisions sync — accepted [EXEC-SHAPE].
+- 0.4 pin form: release tag preferred per pin-comment convention; HEAD-SHA fallback with recorded reason [EXEC-SHAPE].
+- 0.4 repin-automation: per-path refactor in one focused commit, else defer whole item to tracker — never the partial LANE_PATHS append [EXEC-SHAPE].
+- 0.7 widened to carry the 2 cross-repo ADR-0003 ref fixes (same repo, same PR) [EXEC-SHAPE].
+
+### Mechanical work
+
+- **PR-body gate (required check, easy to forget):** standards and ci-workflows both run `pr-issue-linkage` as a REQUIRED check (v0.10.2 shape: native closing keyword + non-empty `## Related` section; only `dependabot[bot]` exempt). BEFORE opening each PR, file (or reuse) a tracking issue in that repo and write the body with `Closes #N` + `## Related`. Downstream fleet repos enforce the weaker `## Related`-only variant (6/8 at v0.10.2) — still include the section everywhere. ~9 PRs total across the series.
+- Commit per logical item within each PR; conventional-commit subjects; Co-authored-by trailer per repo convention.
+- Verification checkpoint per phase = its Sanity Check block; standards CI + runner-policy lane are the hard gates for S1-S3.
+- Sequential fallback for worker fan-out documented under Execution shape.
+- PLAN.md status tags advance main-session only; workers report back.

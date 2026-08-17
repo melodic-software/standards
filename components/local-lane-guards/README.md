@@ -6,7 +6,7 @@ Local invocation entrypoint for the four bespoke CI guards that gate in
 `reference-integrity`.
 
 This component is the distribution answer recorded in
-[`docs/adr/0003-local-lane-guards-via-standards-component.md`](../../docs/adr/0003-local-lane-guards-via-standards-component.md)
+[`docs/adr/0004-local-lane-guards-via-standards-component.md`](../../docs/adr/0004-local-lane-guards-via-standards-component.md)
 (ci-workflows#190): one standards-owned bin/script, synced exact-file the same
 way other shared lint primitives are — pointer-not-copy. Consumers invoke
 `run-local-lane-guards.sh`; they do not copy driver logic into a repo-local
