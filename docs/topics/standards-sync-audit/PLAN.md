@@ -59,7 +59,7 @@ Planned 2026-08-16 against standards main @ `4be9696`, ci-workflows main @ `4763
 
 Standards grounding: repo's own ADR convention (`docs/adr/README.md:15-24`), pin-comment shape (`# <shortsha> <date>` as in `sync.yml:33`), conventional-commit subjects per git log. Commit convention: branch + PR per repo; no commits to main.
 
-### Phase 0.1: standards hygiene PR (S1 — no behavior change) [PENDING]
+### Phase 0.1: standards hygiene PR (S1 — no behavior change) [DONE]
 
 Branch `chore/sync-audit-phase0-hygiene` off main. All edits in standards; no sync-behavior change.
 
