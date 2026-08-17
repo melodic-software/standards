@@ -1,1 +1,1 @@
-@AGENTS.md
+@components/agent-orientation/orientation.md
