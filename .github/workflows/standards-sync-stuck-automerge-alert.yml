@@ -17,8 +17,9 @@ name: standards-sync-stuck-automerge-alert
 # `medley` is itself one of the scanned targets, and private; that it may
 # report on its own sync PRs is incidental, not the reason it was chosen.
 #
-# The never-armed half only considers `automerge: true` targets, so it is inert
-# for the duration of a rollout window that opts every target out.
+# The never-armed half only considers `automerge: true` targets, so a
+# per-target `automerge: false` opt-out (a staged-rollout window) keeps that
+# target out of the never-armed scan for exactly as long as the opt-out holds.
 #
 # A mint or infrastructure failure in the reusable leaves the watchdog dark
 # without filing a tracking issue — the same silent-death mode
@@ -29,6 +30,20 @@ name: standards-sync-stuck-automerge-alert
 # deliberate failure after it files on stuck PRs (standards#318).
 on:
   workflow_dispatch:
+    inputs:
+      test-mode:
+        description: >-
+          Fabricate synthetic candidates under a test-only marker/title in
+          medley instead of scanning live targets — proves the tracking-issue
+          create/update/close/fail lifecycle without a real stuck PR.
+        type: boolean
+        default: false
+      test-synthetic-candidates:
+        description: >-
+          Synthetic candidate count as a string ('0', '1', or '2'); ignored
+          unless test-mode. '0' drives the close path.
+        type: string
+        default: "1"
   schedule:
     # Off-minute hourly poll: catches an armed PR stuck behind an unrelated
     # gate failure well within a single working day.
@@ -37,14 +52,29 @@ on:
 permissions:
   contents: read
 
+# A dispatched test run and the hourly poll otherwise race the same rolling
+# issue: two concurrent creates would file two marker-carrying issues, and the
+# reusable's lookup deliberately fails closed on that ambiguity forever after.
+concurrency:
+  group: standards-sync-stuck-automerge-alert
+  cancel-in-progress: false
+
 jobs:
   alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@7107b34832a7b6db5d08d3b132621c599fbe5e50 # v0.14.2
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@01c3295629ab9dea9a602ddb9e2217c83f014a10 # v0.15.0
     with:
       runner: ubuntu-24.04
       # Bare name under this repository's own owner — `owner/repo` is rejected
       # by the reusable's first step.
       tracking-issue-repository: medley
+      # `with:` keys cannot be conditionally omitted, so both test inputs are
+      # passed on every run with schedule-safe defaults: a cron event carries
+      # no inputs, the expressions resolve to false/'1', and the reusable
+      # ignores the count outside test mode. The count fallback is an explicit
+      # empty-string test — a bare `||` would swallow the legal '0' that
+      # drives the close-path proof.
+      test-mode: ${{ github.event.inputs.test-mode == 'true' }}
+      test-synthetic-candidates: ${{ github.event.inputs.test-synthetic-candidates == '' && '1' || github.event.inputs.test-synthetic-candidates }}
     secrets:
       app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
@@ -55,6 +85,13 @@ jobs:
     if: always() && needs.alert.result != 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # actions:read on top of the workflow default: the step-graph inspection
+    # below reads .../actions/runs/<id>/jobs, which 404s under a
+    # contents:read-only token. Latent until the first non-success alert run —
+    # this job had never executed before the Phase 1 proof dispatches.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       infrastructure-failure: ${{ steps.classify.outputs.infrastructure-failure }}
     steps:
@@ -76,16 +113,33 @@ jobs:
 
           # The reusable's final step fails deliberately after filing when stuck
           # PRs are found. Only earlier step failures are infrastructure death.
-          jobs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs")"
-          alert_job_id="$(jq -r '.jobs[] | select(.name == "Detect standards-sync auto-merge PRs that cannot merge themselves") | .id' <<<"$jobs_json" | head -1)"
+          #
+          # Matched by SUFFIX, not equality: the jobs API returns a reusable
+          # workflow's jobs prefixed with the caller job id ("alert / Detect
+          # …"), verified live 2026-08-17 (run 32039984123) — an exact match
+          # never hit, so every deliberate post-filing failure would have been
+          # misclassified as infrastructure death. Both bare and prefixed
+          # forms are accepted in case GitHub ever drops the prefix.
+          # An API failure here must degrade to LOUD (treat as infrastructure,
+          # fire liveness), never to a job error that silently skips the
+          # liveness gate's evaluation.
+          if ! jobs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs")"; then
+            echo "::warning::Could not read the run's job graph; treating failure as infrastructure."
+            echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          alert_job_id="$(jq -r '.jobs[] | select(.name | endswith("Detect standards-sync auto-merge PRs that cannot merge themselves")) | .id' <<<"$jobs_json" | head -1)"
           if [[ -z "$alert_job_id" || "$alert_job_id" == "null" ]]; then
             echo "::warning::Could not locate the alert job; treating failure as infrastructure."
             echo "infrastructure-failure=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          steps_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${alert_job_id}/steps")"
-          notify_conclusion="$(jq -r '.steps[] | select(.name == "Fail so the scheduled run notifies") | .conclusion' <<<"$steps_json" | head -1)"
+          # Steps are read from the jobs listing itself — there is no separate
+          # /actions/jobs/<id>/steps endpoint (the previous URL 404'd on every
+          # call; latent until the Phase 1 proof dispatches first exercised
+          # this path).
+          notify_conclusion="$(jq -r --arg id "$alert_job_id" '.jobs[] | select((.id | tostring) == $id) | .steps[] | select(.name == "Fail so the scheduled run notifies") | .conclusion' <<<"$jobs_json" | head -1)"
           if [[ "$notify_conclusion" == "failure" ]]; then
             echo "infrastructure-failure=false" >> "$GITHUB_OUTPUT"
           else
