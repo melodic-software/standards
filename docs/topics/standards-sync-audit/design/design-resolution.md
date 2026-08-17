@@ -5,8 +5,10 @@ outcome: early-exit
 ## Phase 1 addendum (2026-08-17) — Tier B light design
 
 Contract change: the watchdog reusable gains two `workflow_call` inputs —
-`test-mode` (boolean, default false) and `test-synthetic-candidates` (number,
-default 1, read only when test-mode) — threaded from the standards caller's
+`test-mode` (boolean, default false) and `test-synthetic-candidates` (string,
+default `'1'`, legal set `'0'`/`'1'`/`'2'`, read only when test-mode — a
+string on both sides so the legal `'0'` survives the caller's explicit
+empty-string fallback) — threaded from the standards caller's
 `workflow_dispatch` (which gains the same two inputs). Test-mode runs use a
 divergent marker (`…:v1:test`) and title (`[Test] …`) across all five literal
 sites, so test issues in medley are invisible to the production lookup and the

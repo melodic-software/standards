@@ -310,13 +310,13 @@ components:
     files:
       _typos.toml: _typos.toml
 
-# Fleet automerge is disarmed so every sync PR takes a human merge. The
-# watchdog fix has shipped, but the watchdog's issue-write path has never
-# executed against a real armed PR — with every target disarmed there is
-# nothing for it to evaluate. Re-arm sequence (standards-sync-audit remediation,
-# docs/topics/standards-sync-audit/): first the melodic-software/.github canary,
-# then a watchdog workflow-dispatch test mode must prove the tracking-issue
-# create/update/close/fail paths; only that proof re-arms the rest of the fleet.
+# Automerge restore in progress (standards-sync-audit remediation,
+# docs/topics/standards-sync-audit/): the watchdog's tracking-issue
+# create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
+# (proof artifact in that plan, 2026-08-17), and the melodic-software/.github
+# canary is armed — an absent automerge key is the armed default. The
+# remaining explicit opt-outs come off once the canary's first organic sync
+# PR is observed (time-boxed; the proof, not the canary merge, is the gate).
 targets:
   melodic-software/.github:
     managed:
@@ -327,7 +327,6 @@ targets:
       - markdownlint
       - repository-text
       - typos
-    automerge: false
   melodic-software/ci-runner:
     managed:
       - cloud-bootstrap
