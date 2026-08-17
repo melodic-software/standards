@@ -88,7 +88,7 @@ Branch `chore/sync-audit-phase0-hygiene` off main. All edits in standards; no sy
 - `sed -n '24p' distribution/REVIEW-CREDENTIAL.md` still `> [!CAUTION]`; fence region (old 24-87) byte-identical against pre-edit extract; total line count < 274.
 - Standards CI green — named gates this PR trips: manifest validator (`distribution/sync-manifest.sh`), comment-hygiene, typos, markdown, offline lychee (`include_fragments = "full"` — heading anchors in edited docs must resolve), editorconfig, pin-comment-convention, local-lane-guards.
 
-### Phase 0.2: node pin bump + ci-workflows adoption manifest changes (S2) [PENDING]
+### Phase 0.2: node pin bump + ci-workflows adoption manifest changes (S2) [DONE]
 
 Branch `chore/sync-audit-phase0-node-pin` off main, after S1 merges (both touch sync-manifest.yml).
 
@@ -106,7 +106,7 @@ Branch `chore/sync-audit-phase0-node-pin` off main, after S1 merges (both touch 
 - `yq` extraction: exactly 3 targets still list actionlint locally-owned (medley, ci-runner, github-iac); component-def comment names all three.
 - Standards CI green; subsequent sync PRs show only expected deltas (spot-check ci-workflows sync PR diff: `.node-version` = `24.19.0` new file, `actionlint.yaml` comment prose only).
 
-### Phase 0.3: ci-workflows node-version-file adoption (C1) [PENDING]
+### Phase 0.3: ci-workflows node-version-file adoption (C1) [DONE]
 
 In ci-workflows, branch `chore/adopt-node-version-file`, after the S2 sync PR into ci-workflows is merged (needs `.node-version` present).
 
@@ -124,7 +124,7 @@ In ci-workflows, branch `chore/adopt-node-version-file`, after the S2 sync PR in
 - New drift assertion verified by a `workflow_dispatch` run of tool-version-drift-check on the merged branch (or executing the assertion's script block locally) — green.
 - Full ci-workflows CI green on the PR.
 
-### Phase 0.4: sync-family caller re-pins + repin-automation extension (S3) [PENDING]
+### Phase 0.4: sync-family caller re-pins + repin-automation extension (S3) [DOING]
 
 Branch `chore/sync-audit-phase0-repins` in standards, LAST in the series (pins capture post-C1 ci-workflows HEAD, maximizing the hardening picked up — incl. `--retry-all-errors` for the observed 08-12 exit-56 class).
 
@@ -143,7 +143,7 @@ Branch `chore/sync-audit-phase0-repins` in standards, LAST in the series (pins c
 - If extension delivered: dry-run of `repin-policy-lockstep.mjs` with current SHAs exits 0 (no throw); if fallback taken: `git diff` shows zero changes under `components/claude-lanes/` and a tracker item URL is recorded in the PR body.
 - Post-merge: one manually dispatched sync dry-run completes green with the new pin.
 
-### Phase 0.5: Dependabot entries fleet-wide (5 parallel PRs) [PENDING]
+### Phase 0.5: Dependabot entries fleet-wide (5 parallel PRs) [DOING]
 
 Independent of 0.1-0.4; parallel-safe (disjoint repos). Exactly 7 missing entries confirmed by probe (dependabot.yml is NOT sync-managed anywhere — all per-repo PRs):
 
@@ -161,7 +161,7 @@ Sequencing note (accepted churn, per Brief's locked "7 entries"): 5 of 7 cover p
 
 **Sanity Check (per repo):** fetch merged `dependabot.yml`, assert the new `directory` strings present; YAML parses (`yq` exit 0); repo CI green (dotfiles/medley run dependabot-policy-style checks where present).
 
-### Phase 0.6: songwriting one-time hand-fix PR [PENDING]
+### Phase 0.6: songwriting one-time hand-fix PR [DONE]
 
 Independent; parallel-safe. songwriting has NO manifest target block (dropped outright, manifest:81-85) — hand-fix, not adoption.
 
@@ -172,7 +172,7 @@ Independent; parallel-safe. songwriting has NO manifest target block (dropped ou
 
 **Sanity Check:** `gh api` post-merge: `.gitattributes` 61 lines incl. binary patterns; root markdownlint config contains `$schema` pin + `MD055` + `songs/` pointer; `songs/.markdownlint-cli2.jsonc` blob SHA unchanged from pre-PR.
 
-### Phase 0.7: ci-workflows doc corrections (C2) [PENDING]
+### Phase 0.7: ci-workflows doc corrections (C2) [DONE]
 
 After S1 merges (cites its PR number; ADR file renamed). Small ci-workflows docs PR, two concerns:
 
