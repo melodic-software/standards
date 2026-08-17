@@ -185,7 +185,7 @@ After S1 merges (cites its PR number; ADR file renamed). Small ci-workflows docs
 - `grep -rn "0003-local-lane-guards\|ADR-0003" --exclude-dir=.git .` → empty in ci-workflows.
 - `git diff --stat` = 3 files, additions/substitutions only; ci-workflows CI green.
 
-### Phase 1.1: watchdog test mode — ci-workflows reusable + tests [PENDING]
+### Phase 1.1: watchdog test mode — ci-workflows reusable + tests [DONE]
 
 Branch in ci-workflows. Facts verified 2026-08-17 (explorer deep-read of the 651-line reusable at v0.14.2; suite `.github/scripts/standards-sync-stuck-automerge-alert.test.cjs`, 1326 lines, ~50 cases, extracting inline scripts by exact step name + `^ {10}script: |` indentation — the scan step's block sits at exactly that indent, so a test-mode branch INSIDE it needs no rename/reindent).
 
@@ -203,7 +203,7 @@ Branch in ci-workflows. Facts verified 2026-08-17 (explorer deep-read of the 651
 - Job/step names byte-identical to v0.14.2 (`diff` of extracted names against the tag).
 - Full ci-workflows CI green on the PR.
 
-### Phase 1.2: standards caller — classifier fix, dispatch threading, re-pin [PENDING]
+### Phase 1.2: standards caller — classifier fix, dispatch threading, re-pin [DOING]
 
 Branch in standards, after 1.1 merges.
 
@@ -223,7 +223,7 @@ Branch in standards, after 1.1 merges.
 - Caller grep: new pin present; both dispatch inputs declared; `concurrency` group present; classifier uses suffix/contains match (grep shows no bare exact-equality on the job name).
 - One schedule-shaped invocation proven (per item 3's branch check or the immediate post-merge default dispatch): run completes with production behavior (no test branch taken).
 
-### Phase 1.3: execute the proof (operational — no code) [PENDING]
+### Phase 1.3: execute the proof (operational — no code) [DONE]
 
 Three dispatches of the standards caller, in order (against the 1.2 PR branch if item 3's check holds, else post-merge). PRE-FLIGHT: assert no open issue in medley carries the v1:test marker (a leftover would jam the fail-closed lookup — close it by hand first).
 
@@ -234,6 +234,14 @@ Three dispatches of the standards caller, in order (against the 1.2 PR branch if
 **Abort path:** if the sequence stops before dispatch-3 for any reason, close the test issue BY HAND before any re-run (two open marker-issues = permanent lookup jam). Expected side effect, not a defect: medley's `issue-labeling.yml` fires on the test issue (governed runner run + a no-issue-type nag comment) — identical treatment to the production alert issue.
 
 Record run URLs + issue URL + per-dispatch classifier verdicts as the proof artifact (append here).
+
+**PROOF ARTIFACT (2026-08-17, executed pre-merge against the 1.2 branch — the branch-ref dispatch check held):**
+
+- Test issue: melodic-software/medley#1856 (created → updated → closed `completed` with the recovery comment; timeline authored by melodic-standards-sync[bot]).
+- Dispatch 1 (`candidates=2`, run 32044893913): issue CREATED with 2 SYNTHETIC rows; run failed deliberately; liveness skipped. Exposed latent defect #2 (below).
+- Dispatch 2 (`candidates=1`, run 32045258184): issue UPDATED to 1 row; run failed deliberately; classifier SUCCESS with `infrastructure-failure=false`; liveness SKIPPED — the full deliberate-failure routing proven.
+- Dispatch 3 (`candidates=0`, run 32045329964): run SUCCESS; issue CLOSED `state_reason=completed`.
+- THREE latent classifier defects found and fixed by this proof, each of which would have corrupted the first real alert after re-arm: (1) exact-equality job-name match vs the API's prefixed form (fixed in 1.2's first commit, suffix match); (2) missing `actions: read` permission — the jobs API 404'd under contents:read-only (fixed: job-level permission + loud fallback); (3) the step read targeted a nonexistent `/actions/jobs/<id>/steps` endpoint — steps come embedded in the jobs listing (fixed: extracted from `jobs_json`).
 
 **Sanity Check:** medley test-issue timeline shows create → update → close by melodic-standards-sync[bot]; dispatch-1 concluded failure with `infrastructure-failure=false` and liveness skipped; dispatch-3 concluded success; no open v1:test issue remains; production lookup untouched (no open production-marker issue).
 
