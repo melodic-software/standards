@@ -124,7 +124,7 @@ In ci-workflows, branch `chore/adopt-node-version-file`, after the S2 sync PR in
 - New drift assertion verified by a `workflow_dispatch` run of tool-version-drift-check on the merged branch (or executing the assertion's script block locally) — green.
 - Full ci-workflows CI green on the PR.
 
-### Phase 0.4: sync-family caller re-pins + repin-automation extension (S3) [DOING]
+### Phase 0.4: sync-family caller re-pins + repin-automation extension (S3) [DONE]
 
 Branch `chore/sync-audit-phase0-repins` in standards, LAST in the series (pins capture post-C1 ci-workflows HEAD, maximizing the hardening picked up — incl. `--retry-all-errors` for the observed 08-12 exit-56 class).
 
@@ -143,7 +143,7 @@ Branch `chore/sync-audit-phase0-repins` in standards, LAST in the series (pins c
 - If extension delivered: dry-run of `repin-policy-lockstep.mjs` with current SHAs exits 0 (no throw); if fallback taken: `git diff` shows zero changes under `components/claude-lanes/` and a tracker item URL is recorded in the PR body.
 - Post-merge: one manually dispatched sync dry-run completes green with the new pin.
 
-### Phase 0.5: Dependabot entries fleet-wide (5 parallel PRs) [DOING]
+### Phase 0.5: Dependabot entries fleet-wide (5 parallel PRs) [DONE]
 
 Independent of 0.1-0.4; parallel-safe (disjoint repos). Exactly 7 missing entries confirmed by probe (dependabot.yml is NOT sync-managed anywhere — all per-repo PRs):
 
