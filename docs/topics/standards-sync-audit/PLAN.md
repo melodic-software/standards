@@ -265,7 +265,65 @@ Standards manifest PR, gated on the 1.3 proof (canary-armed observation desirabl
 
 **Sanity Check:** `yq '[.targets[] | select(has("automerge"))] | length' distribution/sync-manifest.yml` → 0 (tests the data, not prose — the re-cut comment may legitimately mention the literal); manifest validator green (absent key = true is schema-optional, verified: schema:64, engine :723-732, engine tests cover both forms); next sync wave's PRs arm (spot-check one private + one public target for `autoMergeRequest.enabledAt`); human sync-merge load trends to zero over the following week.
 
+### Phase 2 — agent-orientation retirement
+
+Planned 2026-08-17 against standards main @ `8fba432`. Manifest facts at this SHA: component def `sync-manifest.yml:26-28`; `managed` in 4 targets — claude-code-plugins (:367), dotfiles (:418), github-iac (:445), provisioning (:537); `locally-owned` in medley (:480). All 4 managed targets carry the current 1552-byte copy (verified live 2026-08-17) — byte-in-sync, so no sync wave is in flight against AGENTS.md. The Brief's locked shape (per the decision ledger Q11): flip to `locally-owned` everywhere FIRST, then blank downstream, then retire the def — the flip closes the overwrite window so a blanked file cannot be resurrected by an in-flight sync.
+
+Non-work discharged by evidence: the "PR body remains the just-in-time warning" criterion is already satisfied — the sync reusable's PR body carries "Do not hand-edit these managed files downstream; change their standards source instead." (ci-workflows `standards-sync.yml:463`); nothing to build. The 12-line "Cloud sessions and plugins" section added to `orientation.md` post-audit duplicates guidance that lives durably in `components/cloud-bootstrap/README.md` (settings.json as plugin source of truth; `cloud-bootstrap.local.sh` pattern) — blanking downstream copies loses nothing not already homed upstream.
+
+### Phase 2.1: standards flip PR — managed → locally-owned [DOING]
+
+Branch `chore/sync-audit-phase2-flip` off main. One standards PR; no downstream effect (the synchronizer never reads, changes, or deletes `locally-owned` files, and no canonical component content changes — no sync PRs fan, canary untouched).
+
+1. **Manifest flip** — move `- agent-orientation` from `managed:` to `locally-owned:` in the 4 targets (claude-code-plugins, dotfiles, github-iac, provisioning). Keep lists alphabetical (validator enforces sorted-unique). One shared comment shape per entry: retirement staging per the audit topic (docs/topics/standards-sync-audit/) — blanking PRs follow, then the def retires. No issue-reference shapes in comment prose (comment-hygiene gate).
+2. **Test tracking** — `distribution/sync-manifest.test.sh`: the expected-managed-targets assertion (~:683) goes to `[]`-equivalent or is replaced by a locally-owned-in-5 staging assertion; the ci-workflows exclusion assertion (~:692) still passes unmodified (asserts 0). The medley loop (~:697) is unaffected. Keep assertions describing the STAGED state; Phase 2.3 deletes them.
+
+**Sanity Check:**
+
+- `yq '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation")] | length' distribution/sync-manifest.yml` → 0.
+- `yq '[.targets | to_entries[] | select(.value["locally-owned"][]? == "agent-orientation")] | length' distribution/sync-manifest.yml` → 5.
+- `distribution/sync-manifest.sh validate` green; full `sync-manifest.test.sh` green; standards CI green.
+- Sync dry-run PLAN output lists no `AGENTS.md` destination for any target (dry-run skips the attest/sync jobs entirely — `standards-sync.yml:149,:374` — so it logs mappings, never diffs); then the post-merge push-triggered REAL sync run completes with zero new PRs opened.
+
+### Phase 2.2: downstream blanking PRs — 4 repos [PENDING]
+
+After 2.1 merges. One PR per target: claude-code-plugins, dotfiles, github-iac, provisioning. Medley is NOT touched (bespoke locally-owned AGENTS.md — the content the split exists to protect). Pre-flight per repo: confirm no open sync PR still carries an AGENTS.md hunk (an in-flight pre-2.1 wave would reintroduce it; merge or close those first).
+
+1. **Blank AGENTS.md** — truncate to 0 bytes (precedent: the org's blank-not-delete convention and standards' own root AGENTS.md placeholder). Never delete: preserves the Cursor surface and the file's slot for future bespoke content.
+2. **Downstream CLAUDE.md imports left intact** — claude-code-plugins, github-iac, and provisioning each have an 11-byte `CLAUDE.md` containing only `@AGENTS.md` (verified live 2026-08-17; dotfiles' is already 0-byte). These imports stay untouched: an import of a blank file resolves to nothing (harmless), and leaving the slot mirrors the blank-not-delete rationale — a future bespoke AGENTS.md re-lights the import with zero plumbing.
+3. **Reference sweep — pre-resolved main-session, executed by workers** — the main session composes each repo's exact edit list BEFORE dispatching workers (stress-test found the sweeps are not trivially empty: claude-code-plugins has ~15 doc hits needing content-bearing-or-not judgment). Known edits: claude-code-plugins `docs/CLOUD-SESSIONS.md:293` cites `[AGENTS.md](../AGENTS.md)` for bootstrap pin-source provenance — rewrite that maintenance-caveat sentence to cite the standards sync manifest (`melodic-software/standards` `distribution/sync-manifest.yml`) directly; dotfiles `docs/whats-tracked.md:308-310` describes root AGENTS.md as content-bearing — reword to reflect the blank placeholder.
+4. **Expected CI lanes** — `.github/claude-security-paths` lists `AGENTS.md` in claude-code-plugins (:19) and provisioning (:21), so the blanking PRs there fire the Claude security-review lane on a trivial truncation — expected, not a failure; leave `claude-security-paths` untouched (blank-not-delete keeps the listed path valid). Worker briefs state this so nobody improvises.
+5. **PR bodies** — each carries a non-empty `## Related` section citing the audit topic; per-repo linkage conventions honored (fleet repos enforce the `## Related`-only variant).
+
+**Sanity Check (per repo):**
+
+- `wc -c AGENTS.md` → 0 on the merged main.
+- `grep -rn "AGENTS.md" --exclude-dir=.git .` → no remaining reference that presents AGENTS.md as content-bearing (bare mentions in changelogs/history acceptable).
+- Repo CI green on each PR.
+- claude-code-plugins only: `grep -n "AGENTS.md" docs/CLOUD-SESSIONS.md` → no `../AGENTS.md` link remains.
+
+### Phase 2.3: standards retirement PR — def, source, docs, escape-hatch home [PENDING]
+
+Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. Def deletion and entry removal are the SAME PR (validator rejects `locally-owned`/`managed` refs to unknown components — sync-manifest.sh:739,745).
+
+1. **Manifest** — delete the `agent-orientation` component def (:26-28) and all 5 target entries (4 staged in 2.1 + medley's) including their comments.
+2. **Source deletion** — delete `components/agent-orientation/` entirely (git history preserves the content).
+3. **standards CLAUDE.md** — the file is a single import line `@components/agent-orientation/orientation.md`; resolve per the approval-gate decision (recommended: blank to 0 bytes — the imported content is self-referentially false for standards itself, and the unhobble posture re-adds instructions only on evidence).
+4. **distribution/README rewrite** — `:53-62`: drop the agent-orientation source-location clause (review-instructions' REVIEW.md contrast stays; the root-AGENTS.md-placeholder note simplifies or goes). `:325-350` "Review-instructions reconciliation (medley)": drop agent-orientation from the section (title, list, and the canonical-source parenthetical) — medley's reconciliation obligation continues for review-instructions only.
+5. **Test retirement** — `sync-manifest.test.sh`: remove the agent-orientation staging assertion (from 2.1), the ci-workflows exclusion assertion, and drop `agent-orientation` from the medley locally-owned loop (review-instructions remains).
+6. **Escape-hatch doc skeleton** — create `distribution/ESCAPE-HATCHES.md` (location per approval-gate decision) holding the re-homed opt-out procedure: how a consuming repo moves a component `managed` → `locally-owned` (or omits it) via a standards manifest PR, rewritten from the retired orientation.md prose. Link it from `distribution/README.md`. Phase 3 expands this file into the consolidated exception-surface index (`--target`/`--target-root`, `LEFTHOOK=0` incl. PowerShell shape, agent deny-rule reconciliation) — the skeleton just gives the opt-out a durable home with no gap.
+
+**Sanity Check:**
+
+- `grep -rnI "agent-orientation" --exclude-dir=.git --exclude-dir=.work --exclude-dir=node_modules .` → hits only under `docs/topics/standards-sync-audit/` (plan/history text is legitimate; `-I` skips untracked binary caches).
+- `test -d components/agent-orientation` → absent; `wc -c CLAUDE.md` matches the approved disposition.
+- `test -f distribution/ESCAPE-HATCHES.md` → present; contains the opt-out procedure (grep `locally-owned`).
+- `distribution/sync-manifest.sh validate` green; full `sync-manifest.test.sh` green; standards CI green incl. offline lychee (README link edits + new doc anchors resolve) and comment-hygiene.
+- Sync dry-run PLAN output lists no `AGENTS.md` destination; post-merge real sync run opens zero new PRs (retirement produces no downstream changes — the engine never deletes).
+
 ## Blast radius
+
+**Phase 2: MEDIUM.** Six PRs across five repos; permanently removes a sync surface (the intended outcome) and blanks four downstream files. Mitigations: flip-first ordering closes the overwrite window; blank-not-delete is reversible (git history holds every copy; re-adding the component is a manifest PR); no engine/schema/automerge changes; no canonical content change touches the `.github` canary's components; each PR independently revertable; guidance content verified re-homed (cloud-bootstrap README; escape-hatch skeleton) before the source dies. Not LOW: cross-repo coordination with ordering constraints and a live canary watch running concurrently.
 
 **Phase 1: MEDIUM-HIGH.** Re-arms fleet automerge (the audit's biggest live behavior change) and modifies the watchdog that guards it. Mitigations: proof-gated sequencing (test mode proves create/update/close/fail before any re-arm), canary-first, marker/title isolation for test issues, frozen job/step names (classifier string coupling), policy.json same-PR lockstep, per-target opt-out retained. Verified safe-canary evidence recorded in 1.4.
 
@@ -274,6 +332,8 @@ Standards manifest PR, gated on the 1.3 proof (canary-armed observation desirabl
 ## Stress-test summary
 
 Fresh-context adversarial review (2026-08-16, execution-scoped — the 16 locked decisions were fenced off, already 3×-validated): 2 CRITICAL, 9 IMPORTANT, 4 SUGGESTION findings; all 15 verified against the repos and folded into the plan above. Headlines: (1) `.node-version` bump would have broken standards CI — `components/cloud-environment/setup.sh` carries 4 coupled literals hard-asserted by `setup.test.sh` (now in 0.2); (2) the briefed `LANE_PATHS` append is itself the breaking change — the lockstep script assumes one shared pin across all paths (0.4 rewritten to per-path refactor-or-defer, no partial edit); (3) two cross-repo ADR-0003 refs in ci-workflows the sweep would have missed (now in 0.7); (4) pr-issue-linkage is a REQUIRED check on standards + ci-workflows PRs — every PR needs a closing keyword + `## Related` body (now in Mechanical work). This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius: it ran fresh-context with an adversarial failure-scenario brief; re-running `/planning:devils-advocate` on the same execution surface would relitigate the fenced decisions.
+
+**Phase 2 stress-test (2026-08-17, fresh-context, execution-scoped — the locked decisions fenced off):** 0 CRITICAL, 2 IMPORTANT, 2 SUGGESTION; all four verified against live origin/main state (local clones were stale) and folded in. Headlines: (1) three of the four blanking targets have an `@AGENTS.md`-only CLAUDE.md — disposition decided (left intact), and the 2.2 sweeps are NOT trivially empty (ccp ~15 doc hits; dotfiles whats-tracked.md) — edit lists now composed main-session pre-dispatch; (2) the planned "dry-run shows empty diff set" evidence was non-producible — dry-run skips the attest/sync jobs (`standards-sync.yml:149,:374`) — replaced with mapping-output + real-run-zero-PRs checks; (3) claude-security-paths fires the security-review lane on the ccp/provisioning truncation PRs — expected, briefed; (4) residual grep hardened with `-I`. Reviewer also confirmed: all four downstream AGENTS.md blobs hash-identical to canonical, 0-byte lint safety (standards' own root AGENTS.md passes the same canonical lint set), no `AGENTS.md#fragment` inbound links (lychee-safe), dotfiles root AGENTS.md in `.chezmoiignore`, and no schema/mjs/baseline hardcoding of the component. This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius, same pattern as Phases 0-1.
 
 ## Execution shape
 
@@ -294,6 +354,16 @@ Waves (file-overlap + dependency analysis):
 
 Cost note: worker fan-out for 0.5/0.6 ≈ 6 agents vs sequential — material only in wall-clock; token cost modest (small diffs). Sequential fallback: execute 0.5 repos one at a time in main session if a worker misbehaves; scope fence per worker = exactly one repo's `.github/dependabot.yml` (+ header comment) or songwriting's 2 files; FORBIDDEN: PLAN.md, any other repo, any workflow file.
 
+Phase 2 shape: strictly 2.1 → 2.2 → 2.3 across sub-phases (each gates the next); WITHIN 2.2 the four repo PRs are parallel-safe (disjoint repos, zero file overlap).
+
+| Phase | Surface | Basis |
+|---|---|---|
+| 2.1 | main session | manifest + test edits need staged-state care |
+| 2.2 | sub-agent workers (up to 4 parallel) or sequential main | blanking + pre-resolved edit lists, disjoint repos; main session composes each repo's reference-sweep edits BEFORE dispatch (sweeps are not trivially empty) |
+| 2.3 | main session | judgment-heavy README rewrites + escape-hatch doc authoring |
+
+Phase 2 scope fence per 2.2 worker: exactly one repo — `AGENTS.md` (truncate) + any files its reference sweep flags; FORBIDDEN: PLAN.md, sync-manifest.yml, any other repo, deleting AGENTS.md. Sequential fallback: run the four repos one at a time in main session.
+
 ## Open questions
 
 - 0.4 pin form: newest ci-workflows release tag containing C1 + retry hardening, vs HEAD-SHA fallback — resolved at implementation time by tag availability (decision rule in 0.4 item 2).
@@ -303,6 +373,8 @@ Cost note: worker fan-out for 0.5/0.6 ≈ 6 agents vs sequential — material on
 
 ### User-approval gates
 
+- Phase 2 decision A — escape-hatch sequencing: APPROVED 2026-08-17 as recommended — 2.3 ships a SKELETON `distribution/ESCAPE-HATCHES.md` holding just the opt-out procedure; Phase 3 expands it (no homeless gap, no double move).
+- Phase 2 decision B — standards CLAUDE.md fate: APPROVED 2026-08-17 as recommended — blank CLAUDE.md to 0 bytes (imported prose self-referentially false for standards; unhobble posture re-adds instructions only on evidence).
 - Phase 0.3's Brief deviation (2-of-5 pins convert; composites keep defaults; drift-check extension added) — approve or override before C1.
 - Phase 0.6's two local deltas (MD055 re-add, corrected pointer comment) — [FALLBACK — confirm or override].
 - If 0.4's investigation finds the caller-rewrite half non-trivial: scoped-down deliverable + tracker follow-up needs a nod (gate embedded in 0.4 item 4).
@@ -317,6 +389,13 @@ Cost note: worker fan-out for 0.5/0.6 ≈ 6 agents vs sequential — material on
 - 0.4 pin form: release tag preferred per pin-comment convention; HEAD-SHA fallback with recorded reason [EXEC-SHAPE].
 - 0.4 repin-automation: per-path refactor in one focused commit, else defer whole item to tracker — never the partial LANE_PATHS append [EXEC-SHAPE].
 - 0.7 widened to carry the 2 cross-repo ADR-0003 ref fixes (same repo, same PR) [EXEC-SHAPE].
+- Phase 2 PR series 2.1 flip → 2.2 ×4 blanking → 2.3 retire, with 2.2 worker fan-out and the scope fence above [EXEC-SHAPE].
+- 2.2 blanks to exactly 0 bytes, matching standards' own root AGENTS.md placeholder [EXEC-SHAPE].
+- 2.3 deletes `components/agent-orientation/` outright (git history is the archive) [EXEC-SHAPE].
+- ccp CLOUD-SESSIONS.md fix re-points the pin-source provenance sentence at the standards sync manifest rather than deleting the caveat [EXEC-SHAPE].
+- Test assertions track the staged state in 2.1 and retire in 2.3 — never deleted early [EXEC-SHAPE].
+- Downstream `@AGENTS.md` CLAUDE.md imports (ccp, github-iac, provisioning) left intact — import of a blank file is inert; slot preserved [EXEC-SHAPE].
+- 2.2 reference-sweep edit lists composed main-session pre-dispatch; workers execute, never judge content-bearing status [EXEC-SHAPE].
 
 ### Mechanical work
 
