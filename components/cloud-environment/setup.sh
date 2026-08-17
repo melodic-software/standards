@@ -88,7 +88,7 @@ log "start version=$SCRIPT_VERSION"
   fi
 ) &
 
-# Track C: Node 24.18.0 — the fleet .node-version pin; the VM image ships
+# Track C: Node 24.19.0 — the fleet .node-version pin; the VM image ships
 # Node 20/21/22 only, so this is always an install.
 (
   export NVM_DIR="${NVM_DIR:-/opt/nvm}"
@@ -96,11 +96,11 @@ log "start version=$SCRIPT_VERSION"
     set +u # nvm.sh reads unset vars; subshell-local, tracks A/B keep nounset
     # shellcheck disable=SC1091
     if . "$NVM_DIR/nvm.sh" &&
-      nvm install 24.18.0 >>"$LOG" 2>&1 &&
-      nvm alias default 24.18.0 >>"$LOG" 2>&1; then
-      log 'node 24.18.0 installed'
+      nvm install 24.19.0 >>"$LOG" 2>&1 &&
+      nvm alias default 24.19.0 >>"$LOG" 2>&1; then
+      log 'node 24.19.0 installed'
     else
-      log 'WARN node 24.18.0 install failed'
+      log 'WARN node 24.19.0 install failed'
     fi
   else
     log 'WARN nvm not found; node pin unavailable'

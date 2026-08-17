@@ -5,8 +5,11 @@ version: 2
 
 components:
   # actionlint queue-suppression config (ci-workflows claude-review-lanes plan,
-  # Phase 3c0). Targets ONLY repos with no pre-existing actionlint config; the
-  # source doubles as this repository's own live config. Deliberate exclusions:
+  # Phase 3c0). Targets repos where the canonical file can own the config
+  # outright — either no pre-existing actionlint config, or (ci-workflows) a
+  # pre-existing copy whose only divergence from canonical was comment prose.
+  # The source doubles as this repository's own live config. Deliberate
+  # exclusions:
   # - medley: keeps its locally-owned config — repo-specific `self-hosted-runner`
   #   labels, including the deliberate `ci-runner-selection-failed` sentinel
   #   load-bearing in 12 workflows; a whole-file sync would overwrite them
@@ -341,22 +344,23 @@ targets:
     automerge: false
   melodic-software/ci-workflows:
     managed:
+      # Flipped to managed after byte-parity held: the pre-existing local copy
+      # (the file this component's content was derived from) differed from
+      # canonical only in comment prose.
+      - actionlint
       - cloud-bootstrap
       - comment-hygiene-action
       - editorconfig-checker
       - gitleaks
       - lychee
       - markdownlint
+      - node-runtime
       - path-detection-action
       - psscriptanalyzer
       - repository-text
       - review-instructions
       - shellcheck
       - typos
-    # Pre-existing locally-owned copy the component's content was derived from;
-    # the removal trigger fires there too.
-    locally-owned:
-      - actionlint
     automerge: false
   melodic-software/claude-code-plugins:
     managed:
