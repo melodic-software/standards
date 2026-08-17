@@ -760,6 +760,19 @@ carry over unmodified: `runner`, `manifest`, `standards-ref`, `dry-run`,
 `targets` for the sync; the five-input watchdog surface including
 `tracking-issue-repository`; the same two App secrets on each.
 
+The watchdog contract was bumped to
+`01c3295629ab9dea9a602ddb9e2217c83f014a10` (`v0.15.0`, standards-sync-audit
+Phase 1), the first contract in this family to grow by two inputs at once:
+`test-mode` (boolean) and `test-synthetic-candidates` (string — a string so
+the legal `'0'`, which drives the close-path proof, survives the caller's
+empty-string fallback). Both exist for the dispatched proof runs that gate
+fleet re-arm: test mode fabricates synthetic candidates under a test-only
+marker and title, exercising the tracking-issue create/update/close/fail
+lifecycle without a real stuck PR and without touching the production
+rolling issue. Routing, the remaining five inputs, and both App secrets are
+unchanged; the sync contract stays at `v0.14.2` (the release only changed
+the watchdog reusable and repository-internal CI).
+
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the
 manifest marks `automerge: true`, so it reports nothing while a rollout window

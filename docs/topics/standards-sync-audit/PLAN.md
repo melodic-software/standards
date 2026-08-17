@@ -185,9 +185,83 @@ After S1 merges (cites its PR number; ADR file renamed). Small ci-workflows docs
 - `grep -rn "0003-local-lane-guards\|ADR-0003" --exclude-dir=.git .` → empty in ci-workflows.
 - `git diff --stat` = 3 files, additions/substitutions only; ci-workflows CI green.
 
+### Phase 1.1: watchdog test mode — ci-workflows reusable + tests [PENDING]
+
+Branch in ci-workflows. Facts verified 2026-08-17 (explorer deep-read of the 651-line reusable at v0.14.2; suite `.github/scripts/standards-sync-stuck-automerge-alert.test.cjs`, 1326 lines, ~50 cases, extracting inline scripts by exact step name + `^ {10}script: |` indentation — the scan step's block sits at exactly that indent, so a test-mode branch INSIDE it needs no rename/reindent).
+
+1. **Two new `workflow_call` inputs**: `test-mode` (boolean, default false) and `test-synthetic-candidates` (**type: string**, default `'1'` — string on BOTH sides deliberately: dispatch inputs arrive as strings, and a number type would meet an empty string on cron runs; `Number()` it inside the scan script; `0` stays expressible because the fallback is an explicit empty-string test, never `|| 1`, which would swallow the falsy `0` that drives the close-path proof). Document both in the reusable's input comments and extend the watchdog bullet's description in ci-workflows README (~:329-356; narrative only — no test gates input↔README agreement).
+2. **Scan step test branch**: when test-mode, SKIP real target probing and fabricate `Number(test-synthetic-candidates)` candidates (fixed fake repo/PR URLs, above-threshold ages, bodies clearly labeled SYNTHETIC + run URL): 2 → one armed-stuck + one unarmed; 1 → armed-stuck only; 0 → all-clear (drives the close path). Everything downstream (report file, outputs, issue write, deliberate fail) runs UNCHANGED. The branch must be off when the env var is **undefined** — every existing test case runs without it.
+3. **Marker/title divergence in test mode across ALL FIVE literal sites** (scan:429 marker; lookup:532-533 marker+title; create:594 title; close:604 marker) via env computed from the input: test marker `<!-- ci-workflows:standards-sync-stuck-automerge-alert:v1:test -->`, test title `[Test] standards-sync auto-merge PR(s) needing attention`. Production values byte-unchanged when test-mode false. Makes medley test issues invisible to the production lookup — the hourly cron and a dispatched test cannot collide.
+4. **Names frozen**: job name (reusable:118) and step name "Fail so the scheduled run notifies" (reusable:643) stay byte-identical (the standards caller's classifier reads them — its own matcher bug is fixed in 1.2).
+5. **Tests — four structural pins + new coverage**: (a) the scan-script env allowlist at test.cjs:79-87 fixes exactly seven env keys and restores only those in `finally` — the new env var(s) must join both lists or they leak across ~48 cases; (b) `network-timeout-policy.test.cjs:32-36` asserts curl-budget literals occur exactly once in this workflow file (edits near the yq install must not duplicate them); (c) keep the three named structural pins green (required tracking-issue input; guard-first; unconditional issue-token mint); (d) NEW: raw-YAML-text assertions over the workflow string (already read at test.cjs:17) that production and test marker/title agree across all five sites and lookup-title ≡ create-title in both modes — the harness's script-extraction cannot see the YAML `env:`/`with:` sites, and its own `ISSUE_TITLE` constant at test.cjs:763 is STALE (never matched the workflow's real title) — fix/re-anchor it; (e) test-mode branch cases per candidate count incl. off-on-undefined.
+6. **Stale comment re-cut** (rides this PR): reusable :192-193 claims "`automerge: false` is a deliberate opt-out (the Phase 3d rollout window sets it fleet-wide)" — false once 1.5 lands; reword to the durable form (per-target opt-out; fleet default armed).
+
+**Sanity Check:**
+
+- `node --test .github/scripts/standards-sync-stuck-automerge-alert.test.cjs` green (old + new cases); `node --test .github/scripts/network-timeout-policy.test.cjs` green.
+- `yq '.on.workflow_call.inputs | keys'` includes test-mode + test-synthetic-candidates; `yq '.on.workflow_call.inputs.test-synthetic-candidates.type'` → `string`.
+- Job/step names byte-identical to v0.14.2 (`diff` of extracted names against the tag).
+- Full ci-workflows CI green on the PR.
+
+### Phase 1.2: standards caller — classifier fix, dispatch threading, re-pin [PENDING]
+
+Branch in standards, after 1.1 merges.
+
+1. **FIX the classify-alert-failure matcher (live defect, empirically proven 2026-08-17):** caller:80 matches the alert job name by exact equality, but the jobs API returns reusable jobs PREFIXED — `"alert / Detect standards-sync auto-merge PRs that cannot merge themselves"` (verified live, run 32039984123). The match has never hit; every non-success alert run would misroute to `infrastructure-failure=true` and fire liveness falsely. Fix: match by suffix/contains on `"/ Detect standards-sync auto-merge PRs that cannot merge themselves"` (accept both bare and prefixed forms). Caller-local job — no policy entry, no contract cost. The step-name match at caller:88 is correct as-is (steps API names are unprefixed).
+2. **Dispatch threading — real shape**: `workflow_dispatch.inputs`: `test-mode` (boolean, default false) + `test-synthetic-candidates` (string, default `'1'`). `with:` keys CANNOT be conditionally omitted — pass defaulted expressions on EVERY run (cron included): `test-mode: ${{ github.event.inputs.test-mode == 'true' }}` and `test-synthetic-candidates: ${{ github.event.inputs.test-synthetic-candidates == '' && '1' || github.event.inputs.test-synthetic-candidates }}` (explicit empty test — `||` alone would swallow `'0'`). A schedule event has no inputs → expressions resolve to false/'1' → production behavior byte-equivalent.
+3. **Pre-merge proof (de-risking, verify then use):** `workflow_dispatch` can target a non-default ref (`gh workflow run … --ref <branch> -f …`) since the workflow exists on main. FIRST STEP of this phase: verify GitHub validates `-f` inputs against the branch's definition. If yes → run ALL THREE 1.3 dispatches against the PR branch BEFORE merging; main's hourly cron is never exposed to an unproven passthrough. If no → merge, then an immediate default-input dispatch is the first post-merge action (proves the cron shape before the next `17 * * *` tick).
+4. **Add a `concurrency:` group to the caller** (`group: standards-sync-stuck-automerge-alert`, `cancel-in-progress: false`) — today a dispatched test and the hourly cron can run concurrently; two same-marker creates would permanently jam the fail-closed lookup.
+5. **Re-pin** the caller to the post-1.1 ci-workflows ref (release tag preferred; else HEAD SHA + recorded reason). **policy.json SAME-PR**: new `path@SHA` entry, `allowedInputs` = existing five + the two new inputs (runner-policy.mjs:1153 rejects any `with:` key absent from the contract — confirmed the same-PR need is real). runner-policy README rollout paragraph per convention.
+6. **Stale comment re-cut**: caller :20-21 ("inert for the duration of a rollout window that opts every target out") — false once 1.5 lands; reword durable.
+7. Preserve: `tracking-issue-repository: medley` (private-name republication rationale), runner, both secrets, `permissions: contents: read`, the `17 * * * *` cron.
+
+**Sync-wave note:** policy.json is a synced payload — this PR opens human-merged sync PRs in the 5 runner-policy targets (claude-code-plugins, dotfiles, github-iac, medley, provisioning). Fleet still disarmed; merge by hand.
+
+**Sanity Check:**
+
+- `node --test components/runner-policy/runner-policy.test.mjs` green; manifest validator green; runner-policy CI lane green on the PR.
+- Caller grep: new pin present; both dispatch inputs declared; `concurrency` group present; classifier uses suffix/contains match (grep shows no bare exact-equality on the job name).
+- One schedule-shaped invocation proven (per item 3's branch check or the immediate post-merge default dispatch): run completes with production behavior (no test branch taken).
+
+### Phase 1.3: execute the proof (operational — no code) [PENDING]
+
+Three dispatches of the standards caller, in order (against the 1.2 PR branch if item 3's check holds, else post-merge). PRE-FLIGHT: assert no open issue in medley carries the v1:test marker (a leftover would jam the fail-closed lookup — close it by hand first).
+
+1. `test-mode=true, candidates=2` → run FAILS deliberately; test issue CREATED in medley (v1:test marker, `[Test]` title, 2 synthetic rows); `classify-alert-failure` → `infrastructure-failure=false` and `liveness` skipped — now a real assertion (the 1.2 matcher fix makes it reachable); if it still misroutes, STOP: one re-run after diagnosis, then escalate.
+2. `test-mode=true, candidates=1` → same issue UPDATED (1 row).
+3. `test-mode=true, candidates=0` → issue CLOSED with the recovery comment; run succeeds.
+
+**Abort path:** if the sequence stops before dispatch-3 for any reason, close the test issue BY HAND before any re-run (two open marker-issues = permanent lookup jam). Expected side effect, not a defect: medley's `issue-labeling.yml` fires on the test issue (governed runner run + a no-issue-type nag comment) — identical treatment to the production alert issue.
+
+Record run URLs + issue URL + per-dispatch classifier verdicts as the proof artifact (append here).
+
+**Sanity Check:** medley test-issue timeline shows create → update → close by melodic-standards-sync[bot]; dispatch-1 concluded failure with `infrastructure-failure=false` and liveness skipped; dispatch-3 concluded success; no open v1:test issue remains; production lookup untouched (no open production-marker issue).
+
+### Phase 1.4: canary — re-arm melodic-software/.github [PENDING]
+
+Standards manifest PR after 1.3 proof passes.
+
+1. Remove `automerge: false` from the `.github` target (restores the opt-out default = armed). Verified safe 2026-08-17: all four required contexts fire on every PR (bare `pull_request`, no paths filters), `strict_required_status_checks_policy: false`, squash triple-aligned, arming mutation + Workflows grant proven live under v0.14.2. Thread-resolution rule is ACTIVE but no automated lane opens threads there — a human comment-as-review would block an armed PR, which is precisely the armed-BLOCKED condition the now-proven watchdog reports.
+2. Re-cut the fleet-automerge header comment (manifest:313-319): canary armed; fleet pending the recorded proof (cite 1.3 evidence).
+3. **Trigger (decision D-P1-1):** `.github` is byte-in-sync — the flip alone opens no PR, and 1.2's policy.json wave does NOT reach it (runner-policy is not in its component set). Default: wait for the next organic canonical change to any of its 7 components (recent cadence: 5 sync PRs/week there), TIME-BOXED at 7 days — if no organic trigger lands, proceed to 1.5 on the 1.3 proof alone (the Brief's gate is the proof, not the canary merge). Do NOT manufacture a canonical change (it would fan PRs fleet-wide).
+4. Observe the first armed PR end-to-end: arms on open, merges itself when the four contexts pass. Known flake mode (watchdog-owned): a concurrency-cancelled `do-not-merge` landing last leaves the PR armed-BLOCKED — reported within the hour.
+
+**Sanity Check:** `yq '.targets."melodic-software/.github" | has("automerge")'` → false; next `.github` sync PR shows `autoMergeRequest.enabledAt` set within its run; PR merges without human action OR a watchdog issue appears (both = canary working).
+
+### Phase 1.5: fleet re-arm [PENDING]
+
+Standards manifest PR, gated on the 1.3 proof (canary-armed observation desirable; 1.4's 7-day box governs).
+
+1. Remove `automerge: false` from the remaining 7 targets (restore the opt-out default fleet-wide).
+2. Final header re-cut: armed fleet-wide; watchdog proven (cite proof); per-target opt-out remains available for staged rollout windows.
+
+**Sanity Check:** `yq '[.targets[] | select(has("automerge"))] | length' distribution/sync-manifest.yml` → 0 (tests the data, not prose — the re-cut comment may legitimately mention the literal); manifest validator green (absent key = true is schema-optional, verified: schema:64, engine :723-732, engine tests cover both forms); next sync wave's PRs arm (spot-check one private + one public target for `autoMergeRequest.enabledAt`); human sync-merge load trends to zero over the following week.
+
 ## Blast radius
 
-MEDIUM. Behavior-changing surfaces: fleet node pin bump (5 targets + ci-workflows), two CI workflow caller re-pins (sync + watchdog — the sync cascade itself), actionlint managed flip (prose-only overwrite, verified), repin-automation code change. Mitigations: pre-flight contract diffs before re-pins; policy.json same-PR constraint honored; sync-wave PRs all human-merged (fleet disarmed); S1 is pure comments/docs; every phase independently revertable. Not HIGH: no schema changes, no engine changes, no App grant, no automerge arming (that is Phase 1).
+**Phase 1: MEDIUM-HIGH.** Re-arms fleet automerge (the audit's biggest live behavior change) and modifies the watchdog that guards it. Mitigations: proof-gated sequencing (test mode proves create/update/close/fail before any re-arm), canary-first, marker/title isolation for test issues, frozen job/step names (classifier string coupling), policy.json same-PR lockstep, per-target opt-out retained. Verified safe-canary evidence recorded in 1.4.
+
+**Phase 0: MEDIUM** (complete). Behavior-changing surfaces: fleet node pin bump (5 targets + ci-workflows), two CI workflow caller re-pins (sync + watchdog — the sync cascade itself), actionlint managed flip (prose-only overwrite, verified), repin-automation code change. Mitigations: pre-flight contract diffs before re-pins; policy.json same-PR constraint honored; sync-wave PRs all human-merged (fleet disarmed); S1 is pure comments/docs; every phase independently revertable. Not HIGH: no schema changes, no engine changes, no App grant, no automerge arming (that is Phase 1).
 
 ## Stress-test summary
 
