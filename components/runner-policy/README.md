@@ -747,6 +747,19 @@ job-level `permissions` are unchanged: the reusable mints its own issue-scoped
 token, so the caller's ambient token still needs only `contents: read`. The
 caller now passes `runner` and `tracking-issue-repository`.
 
+Both sync-family contracts were bumped to
+`7107b34832a7b6db5d08d3b132621c599fbe5e50` (`v0.14.2`, standards-sync-audit
+Phase 0.4), converging them on the same release SHA the claude-lane callers
+pin. The sync caller moves off `8202e03f` — 123 commits behind and missing the
+`--retry-all-errors` curl hardening for the transient exit-56 failure class
+observed 2026-08-12 — and the watchdog moves off `ed6d410c`. Both reusables
+are byte-identical between `v0.14.2` and the ci-workflows HEAD verified at
+re-pin time, and both `on.workflow_call` contracts are identical to their
+predecessors' (verified by API diff), so the reviewed `runner-input` shapes
+carry over unmodified: `runner`, `manifest`, `standards-ref`, `dry-run`,
+`targets` for the sync; the five-input watchdog surface including
+`tracking-issue-repository`; the same two App secrets on each.
+
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the
 manifest marks `automerge: true`, so it reports nothing while a rollout window
