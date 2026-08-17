@@ -680,14 +680,21 @@ actual_review_instructions_targets="$(
 assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
   "$expected_review_instructions_targets" "$actual_review_instructions_targets"
 
-expected_agent_orientation_targets='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
-actual_agent_orientation_targets="$(
-  yq -o=json -I=0 \
+# Retirement staging (audit topic docs/topics/standards-sync-audit/, Phase 2):
+# no target whole-file-manages agent-orientation anymore; the four former
+# consumers hold it locally-owned until their AGENTS.md blanking PRs merge and
+# the component def retires.
+assert_eq 'no target whole-file-manages agent-orientation (retirement staging)' '[]' \
+  "$(yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation") | .key]' \
-    "$actual_manifest"
-)"
-assert_eq 'AGENTS.md reaches exactly the four whole-file-managed consumers (medley reconciles locally instead; ci-workflows gets REVIEW.md only)' \
-  "$expected_agent_orientation_targets" "$actual_agent_orientation_targets"
+    "$actual_manifest")"
+
+expected_agent_orientation_holders='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
+assert_eq 'the four former consumers plus medley hold agent-orientation locally-owned during retirement staging' \
+  "$expected_agent_orientation_holders" \
+  "$(yq -o=json -I=0 \
+    '[.targets | to_entries[] | select(.value["locally-owned"][]? == "agent-orientation") | .key]' \
+    "$actual_manifest")"
 
 assert_eq 'ci-workflows does not whole-file-manage agent-orientation (public repo; AGENTS.md excluded)' '0' \
   "$(yq -r \
