@@ -46,16 +46,17 @@ filters at all. The filters below narrow which targets a run then acts on:
   lefthook-base component documents. Durable exceptions belong in the
   committed config where review sees them.
 - **One-off, human-only:** the `LEFTHOOK=0` environment variable skips every
-  hook for a single command — `LEFTHOOK=0 git commit …` in a POSIX shell, or
-  in PowerShell:
+  hook for a single command — `LEFTHOOK=0 git commit …` in a POSIX shell. In
+  PowerShell the assignment is session-scoped, not command-scoped, so unset it
+  immediately after:
 
   ```powershell
-  $env:LEFTHOOK = '0'; git commit …
+  $env:LEFTHOOK = '0'; git commit …; Remove-Item Env:LEFTHOOK
   ```
 
   Agent sessions are deny-floored out of this bypass in both shells by the
-  claude-permissions component (the inline-env Bash forms and every
-  `env:LEFTHOOK` reference in PowerShell), and that deny floor is not
+  claude-permissions component (the inline-env Bash forms and the
+  `LEFTHOOK` env-var references in PowerShell), and that deny floor is not
   relaxable downstream — an agent that believes a hook is wrong fixes the
   hook's cause or asks a human, never bypasses it. The `--no-verify` git
   flag is likewise denied to agents in both shells; humans remain trusted

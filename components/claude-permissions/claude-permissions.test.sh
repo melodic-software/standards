@@ -57,13 +57,19 @@ done
 #   $env:LEFTHOOK = '0'; git commit …
 #   Set-Item env:LEFTHOOK 0; git commit …
 #   ${env:LEFTHOOK} = "false"; git commit …
-# One substring-anchored glob covers every shape (rules are whole-string globs
-# with `*` as the only metacharacter, so precision would cost coverage).
+# PowerShell's Env: drive is case-insensitive while these rules are literal
+# whole-string globs (`*` is the only metacharacter), so two anchors cover the
+# realistic spellings: `*LEFTHOOK*` catches every uppercase-name reference
+# whatever the drive-prefix casing ($env:/$Env:/$ENV:/Set-Item env:), and
+# `*:lefthook*` catches the lowercase-name drive-qualified forms without
+# denying a bare `lefthook run …` invocation. Exotic mixed-case names
+# (LeftHook) remain out of glob reach — accepted residual, recorded here.
 required_lefthook_denies=(
   'Bash(LEFTHOOK*=0 *)'
   'Bash(LEFTHOOK*=FALSE *)'
   'Bash(LEFTHOOK*=false *)'
-  'PowerShell(*env:LEFTHOOK*)'
+  'PowerShell(*:lefthook*)'
+  'PowerShell(*LEFTHOOK*)'
 )
 for pattern in "${required_lefthook_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \
