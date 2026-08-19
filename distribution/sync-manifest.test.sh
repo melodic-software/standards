@@ -496,7 +496,7 @@ assert_eq 'production validate batches tracked-source ls-files calls' '1' \
   "$(cat "$spawn_count_dir/ls-files")"
 assert_eq 'production validate batches tracked-source hash-object calls' '1' \
   "$(cat "$spawn_count_dir/hash-object")"
-assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 8 targets'
+assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 11 targets'
 
 if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   rm "$tmp_root/symlink-probe"

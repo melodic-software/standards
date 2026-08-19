@@ -408,6 +408,55 @@ targets:
       - cloud-bootstrap
       - ruff
     automerge: false
+  # Phase 4 fleet expansion (standards-sync-audit plan, Brief line "Phase 4"):
+  # claude-code-proxy, codex-plugins, and cursor-plugins enter with the
+  # hygiene set plus cloud-bootstrap (each held an unmanaged, drifting copy of
+  # .claude/cloud-bootstrap.sh — 2026-08-16 fleet audit). The sync App's
+  # selected-repo grant covers them as of 2026-08-19 (grant-first per the
+  # plan's exact-set attestation constraint). Deliberate NON-adoptions, per
+  # the same locked plan:
+  # - knowledge-corpus: deferred — structural LFS blocker recorded; no extend
+  #   mechanism exists.
+  # - songwriting: dropped outright (github-iac ADR-0006); its two drifted
+  #   files were hand-fixed once (plan Phase 0.6), not adopted.
+  # - claude-lane-sandbox: a disposable lane-testing sandbox, not a
+  #   convergence target — sync PRs there are churn against throwaway state.
+  #   Rationale mirrored here per the plan so the manifest, not only the
+  #   plan file, records why it is absent.
+  melodic-software/claude-code-proxy:
+    managed:
+      - cloud-bootstrap
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - repository-text
+      - typos
+    # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
+    # locally-owned) — same shape as claude-code-plugins' entry above.
+    locally-owned:
+      - ruff
+    automerge: false
+  melodic-software/codex-plugins:
+    managed:
+      - cloud-bootstrap
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - repository-text
+      - typos
+    automerge: false
+  melodic-software/cursor-plugins:
+    managed:
+      - cloud-bootstrap
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - markdownlint
+      - repository-text
+      - typos
+    automerge: false
   melodic-software/dotfiles:
     managed:
       - actionlint
