@@ -408,6 +408,30 @@ targets:
       - cloud-bootstrap
       - ruff
     automerge: false
+  # The six 2026-08-19 additions (claude-code-proxy, claude-lane-sandbox,
+  # codex-plugins, cursor-plugins, knowledge-corpus, songwriting) carry
+  # cloud-bootstrap only: each already holds an unmanaged copy of
+  # .claude/cloud-bootstrap.sh (2026-08-16 fleet audit) that would otherwise
+  # drift. The sync App's selected-repo grant was extended to all six on
+  # 2026-08-19 BEFORE these rows landed (attest requires the installation's
+  # selected set to equal the target set). No other component has been
+  # audited for them; adopt more per-component, deliberately.
+  melodic-software/claude-code-proxy:
+    managed:
+      - cloud-bootstrap
+    automerge: false
+  melodic-software/claude-lane-sandbox:
+    managed:
+      - cloud-bootstrap
+    automerge: false
+  melodic-software/codex-plugins:
+    managed:
+      - cloud-bootstrap
+    automerge: false
+  melodic-software/cursor-plugins:
+    managed:
+      - cloud-bootstrap
+    automerge: false
   melodic-software/dotfiles:
     managed:
       - actionlint
@@ -454,6 +478,10 @@ targets:
       - typos
     locally-owned:
       - actionlint
+    automerge: false
+  melodic-software/knowledge-corpus:
+    managed:
+      - cloud-bootstrap
     automerge: false
   melodic-software/medley:
     managed:
@@ -545,4 +573,8 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+    automerge: false
+  melodic-software/songwriting:
+    managed:
+      - cloud-bootstrap
     automerge: false
