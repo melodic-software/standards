@@ -386,6 +386,29 @@ bad="$(printf '%s\n' "$manifest" |
   sed '/^  base:$/a\    requires:\n      - consumer')"
 invalid_case 'dependency cycle' "$bad" 'dependency cycle' engine-only
 
+# Reachability is a whole-manifest property JSON Schema cannot express: a
+# defined component no target selects (directly or through a selected
+# component's dependency closure) is rejected by the engine alone.
+bad="$(printf '%s\n' "$manifest" |
+  sed '/^targets:$/i\  orphan:\n    files:\n      policy.txt: .orphan\n')"
+invalid_case 'unreferenced component' "$bad" \
+  "component 'orphan' is referenced by no target" engine-only
+
+# Closure credit: 'extra-dep' is selected by no target, but 'helper' —
+# locally-owned by beta/two — requires it, and a locally-owned selection
+# credits its dependency closure (the per-target managed check deliberately
+# does not reach locally-owned internals).
+good="$(printf '%s\n' "$manifest" |
+  sed '/^targets:$/i\  extra-dep:\n    files:\n      policy.txt: .extra-dep\n  helper:\n    files:\n      consumer.txt: .helper\n    requires:\n      - extra-dep\n' |
+  sed '$a\      - helper')"
+valid_case 'dependency-closure reachability' "$good"
+
+# The recorded local-lane-guards exemption: a zero-reference definition under
+# exactly that name passes while its staged per-guard migration is pending.
+good="$(printf '%s\n' "$manifest" |
+  sed '/^targets:$/i\  local-lane-guards:\n    files:\n      policy.txt: .local-lane-guards\n')"
+valid_case 'zero-target exemption for local-lane-guards' "$good"
+
 # The source must be tracked even if a same-named worktree file exists.
 source_repo="$tmp_root/untracked-source"
 make_source "$source_repo" "$manifest"

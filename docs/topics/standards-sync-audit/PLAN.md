@@ -375,7 +375,9 @@ Branch `chore/sync-audit-phase3-pr-convention-retire` off main, after 3.1 merges
 - `grep -n "Status" docs/adr/0003-pr-convention-policy-as-data.md` → the superseded-by line; `ls docs/adr/ | grep -c 0005` → 1; lychee + markdownlint green.
 - Post-merge sync run: zero new PRs (deselection never deletes downstream).
 
-### Phase 3.3: five downstream payload-deletion PRs [DOING]
+### Phase 3.3: five downstream payload-deletion PRs [DONE]
+
+All five merged 2026-08-19 (ccp 3025, dotfiles 528, github-iac 338, medley 1864, provisioning 313): payload dirs deleted, Dependabot roots removed, header comments reworded (one review nit — provisioning's stale three-roots count — fixed in-flight). Zero pr-convention-policy references remain in any consumer.
 
 After 3.2 merges. One PR per repo (ccp, dotfiles, github-iac, medley, provisioning), Retire-lifecycle one-time deletions, main session pre-resolving exact edits before dispatching workers:
 
@@ -418,7 +420,7 @@ After 3.5 merges (the stricter gate must meet a compliant default template). Six
 
 **Sanity Check (per repo):** `grep -c "7107b348" .github/workflows/<caller>.yml` → 1 and no `e9443874` remains; job-level permissions block reads `pull-requests: read` + `actions: read` (not `{}`); runner-policy lane green (SHA already allowlisted); post-merge, the strict gate is proven by the FIRST subsequent PR event in that repo (or a body-edit re-trigger on any open PR) passing/failing per the four-section contract; open-PR sweep recorded in the PR body.
 
-### Phase 3.7: zero-target validator rule — lands LAST [PENDING]
+### Phase 3.7: zero-target validator rule — lands LAST [DOING]
 
 Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 merge (manifest stable at 33 components).
 
