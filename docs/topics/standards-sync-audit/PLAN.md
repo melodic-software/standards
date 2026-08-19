@@ -409,7 +409,9 @@ Merged: melodic-software/.github PR 52 (four contract headers, all guidance in s
 
 **Sanity Check:** template contains all four `##`-level contract headers and zero non-comment placeholder lines under them (`awk` over the merged file); a scratch PR against a template-inheriting repo (or the next real PR) passes the linkage gate with the template filled normally.
 
-### Phase 3.6: pr-issue-linkage fleet re-pin to v0.14.2 [DOING]
+### Phase 3.6: pr-issue-linkage fleet re-pin to v0.14.2 [DONE]
+
+All six callers converged on v0.14.2 and merged 2026-08-19: standards PR 436 (header contract prose also refreshed per review), ci-workflows PR 496 (pin-only), ccp PR 3026, dotfiles PR 529, github-iac PR 339, medley PR 1865 (its select-runner v0.8.0 lag filed as medley issue 1863). Permissions replaced per the pre-resolved edit lists; policy.json untouched (entry pre-existed). Open-PR sweep at close: dependabot PRs exempt everywhere; the one flagged non-conforming open body is standards PR 422 (repin-App claude-lanes re-pin — carries Summary + no-issue marker but not Fix/Verification/Related; will need a body edit before its next gate event). The strict gate's live proof is the next human PR per repo — the Phase 3 close-out PR itself in standards.
 
 After 3.5 merges (the stricter gate must meet a compliant default template). Six caller PRs — standards, ci-workflows (self-caller `pr-issue-linkage-self.yml`), ccp, dotfiles, github-iac, medley:
 
@@ -420,7 +422,9 @@ After 3.5 merges (the stricter gate must meet a compliant default template). Six
 
 **Sanity Check (per repo):** `grep -c "7107b348" .github/workflows/<caller>.yml` → 1 and no `e9443874` remains; job-level permissions block reads `pull-requests: read` + `actions: read` (not `{}`); runner-policy lane green (SHA already allowlisted); post-merge, the strict gate is proven by the FIRST subsequent PR event in that repo (or a body-edit re-trigger on any open PR) passing/failing per the four-section contract; open-PR sweep recorded in the PR body.
 
-### Phase 3.7: zero-target validator rule — lands LAST [DOING]
+### Phase 3.7: zero-target validator rule — lands LAST [DONE]
+
+Merged as standards PR 438 (squash aed54b5, 2026-08-19). Engine-only reachability rule with closure credit and the conditional local-lane-guards exemption (review hardened the seed to be conditional so a stale exemption reads as dead code); three fixture cases green; live manifest validates at 33 components. Phase 3 COMPLETE — deferred evidence items (post-merge zero-new-PRs sync runs; the dotfiles claude-permissions sync wave) remain parked on the App-attestation outage (installation 14 vs manifest 11) and discharge automatically once the org owner trims the installation.
 
 Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 merge (manifest stable at 33 components).
 
