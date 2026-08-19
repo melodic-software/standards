@@ -493,9 +493,9 @@ After 5.1/5.2, the drivers (dispatcher, scan-comment-hygiene, coarse-prefilter, 
 2. Remove the reachability exemption block from `sync-manifest.sh` (visibly dead code by 3.7's conditional-seed design).
 3. Retire the `valid_case 'zero-target exemption for local-lane-guards'` fixture case in `sync-manifest.test.sh` (it fails the moment the exemption goes — the planted fixture component becomes unreferenced); the unreferenced-component and closure fixtures survive untouched.
 4. **ADR-0006** SUPERSEDES ADR-0004 (status-line edit on 0004 per the 0003→0005 precedent), scoped as a PARTIAL supersession: the drivers' distribution ends (adoption never happened; the enforcement surface consolidated in the ci-workflows actions and repo-local wrappers); `comment-hygiene-tools`/`path-detection-tools` distribution CONTINUES. The ADR carries the 5.2 dispositions.
-5. Component DIRECTORY stays as producer-internal source + contract test, same treatment as the Phase 3.1 trio.
+5. Component DIRECTORY stays as producer-internal source + contract test, same treatment as the Phase 3.1 trio — with a same-PR re-cut of the retained files that still document the retired distribution path: `components/local-lane-guards/README.md` (drop the "distribution answer" framing and ADR-0004 pointer in favor of ADR-0006, delete the "Sync destinations" section naming `tools/shared/local-lane-guards/` and the manifest component/`requires` claims, reframe producer-internal) and the `run-local-lane-guards.sh` header comment (stop instructing consumers to invoke the distributed source; point at ADR-0006).
 
-**Sanity Check:** `grep -c "local-lane-guards" distribution/sync-manifest.yml` → 0; the exemption block gone from `sync-manifest.sh` (grep → 0); validator green at 32 components with the rule unexempted; full test suite green with the retired fixture case removed; ADR-0004 status line reads superseded-by; `ls docs/adr/ | grep -c 0006` → 1.
+**Sanity Check:** `grep -c "local-lane-guards" distribution/sync-manifest.yml` → 0; the exemption block gone from `sync-manifest.sh` (grep → 0); validator green at 32 components with the rule unexempted; full test suite green with the retired fixture case removed; ADR-0004 status line reads superseded-by; `ls docs/adr/ | grep -c 0006` → 1; `grep -c "Sync destinations\|distribution answer" components/local-lane-guards/README.md` → 0.
 
 ## Blast radius
 
@@ -619,7 +619,7 @@ Phase 3 scope fence per 3.3 worker: one repo — `.github/standards/pr-conventio
 
 ### Mechanical work
 
-- **PR-body gate (required check, easy to forget):** standards and ci-workflows both run `pr-issue-linkage` as a REQUIRED check (v0.10.2 shape: native closing keyword + non-empty `## Related` section; only `dependabot[bot]` exempt). BEFORE opening each PR, file (or reuse) a tracking issue in that repo and write the body with `Closes #N` + `## Related`. Downstream fleet repos enforce the weaker `## Related`-only variant (6/8 at v0.10.2) — still include the section everywhere. ~9 PRs total across the series.
+- **PR-body gate (required check, easy to forget):** `pr-issue-linkage` runs as a REQUIRED check in standards and ci-workflows, and since Phase 3.6 the v0.14.2 four-section contract is enforced across the fleet (standards, ci-workflows, ccp, dotfiles, github-iac, medley, ci-runner, provisioning): every PR body needs non-empty `## Summary`, `## Fix`, `## Verification`, and `## Related` sections plus a native closing keyword (or "No linked issue"); only `dependabot[bot]` exempt. BEFORE opening each PR, file (or reuse) a tracking issue in that repo and write the body to that contract — the older v0.10.2 keyword+Related shape no longer passes. Applies to every PR in the remaining series (4R.3, the two 5.1 PRs, the shared 5.2/5.3 PR, 1.5).
 - Commit per logical item within each PR; conventional-commit subjects; Co-authored-by trailer per repo convention.
 - Verification checkpoint per phase = its Sanity Check block; standards CI + runner-policy lane are the hard gates for S1-S3.
 - Sequential fallback for worker fan-out documented under Execution shape.
