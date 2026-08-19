@@ -483,7 +483,8 @@ validate_manifest() {
   local managed_tag managed_nonempty managed_strings managed_control
   local local_tag local_nonempty local_strings local_control automerge_tag
   local -a root_keys component_keys file_sources file_rows dependencies target_keys managed locally_owned
-  local -A destination_owner=() selected=()
+  local -A destination_owner=() selected=() reachable=()
+  local -a reachable_queue
 
   # Reject FIFO/symlink manifest worktree paths before yq opens MANIFEST_ABS.
   [[ -f "$SOURCE_ROOT/$MANIFEST" && ! -L "$SOURCE_ROOT/$MANIFEST" ]] ||
@@ -758,6 +759,47 @@ validate_manifest() {
           die "target '$target' manages '$selected_component' but does not select required '$dependency'"
       done <<<"${REQUIRES_BY_COMPONENT[$selected_component]-}"
     done
+  done
+
+  # Every component must be reachable from at least one target selection —
+  # directly managed or locally-owned, or inside the dependency closure of a
+  # selected component. An unreferenced definition is dead weight the catalog
+  # silently carries; delete it or adopt it. One recorded exemption:
+  # local-lane-guards stays defined with zero references while the audit's
+  # staged per-guard migration (docs/topics/standards-sync-audit/, Phase 5)
+  # decides each guard's destination; that phase removes this exemption and
+  # its closure credit.
+  reachable=()
+  reachable_queue=()
+  # Seed only when the exempted name is actually defined: fixture manifests
+  # (and, after Phase 5, this manifest) carry no such component, and an
+  # unconditional seed would let a stale or misspelled exemption sit inert
+  # instead of being visibly dead code to delete.
+  if [[ -n "${COMPONENT_EXISTS['local-lane-guards']+present}" ]]; then
+    reachable['local-lane-guards']=1
+    reachable_queue+=('local-lane-guards')
+  fi
+  for target in "${TARGET_NAMES[@]}"; do
+    while IFS= read -r selected_component; do
+      [[ -n "$selected_component" ]] || continue
+      [[ -z "${reachable[$selected_component]+present}" ]] || continue
+      reachable["$selected_component"]=1
+      reachable_queue+=("$selected_component")
+    done <<<"${MANAGED_BY_TARGET[$target]-}"$'\n'"${LOCAL_BY_TARGET[$target]-}"
+  done
+  while ((${#reachable_queue[@]} > 0)); do
+    selected_component="${reachable_queue[${#reachable_queue[@]} - 1]}"
+    unset 'reachable_queue[${#reachable_queue[@]}-1]'
+    while IFS= read -r dependency; do
+      [[ -n "$dependency" ]] || continue
+      [[ -z "${reachable[$dependency]+present}" ]] || continue
+      reachable["$dependency"]=1
+      reachable_queue+=("$dependency")
+    done <<<"${REQUIRES_BY_COMPONENT[$selected_component]-}"
+  done
+  for component in "${COMPONENT_NAMES[@]}"; do
+    [[ -n "${reachable[$component]+present}" ]] ||
+      die "component '$component' is referenced by no target, directly or through a selected component's dependency closure"
   done
 }
 
