@@ -67,25 +67,28 @@ components:
   #   infrastructure where a wedged lane job could block its own substrate.
   #   Visibility became the nearer blocker; it did not answer that concern, so
   #   adoption must clear it on the merits rather than inherit a pass.
-  # - cursor-plugins: adopted by the same retarget, and blocked TWICE over. It
-  #   is PUBLIC, so the removal trigger above gates it; and it is not a target
-  #   at all, so adopting it is a NEW target and also needs the App grant
-  #   below, plus its own `TARGET_VISIBILITY` entry — exactly like
-  #   claude-code-proxy on both counts.
-  # - claude-code-proxy: adopted by the same retarget and admissible on
-  #   visibility (private), but BLOCKED on the org owner extending the sync
-  #   App's selected access. The attest step derives its expected set from the
-  #   target repositories alone and requires the installation's selected set
-  #   to EQUAL it, so ANY new target added before the grant fails the sync for
-  #   every target, not just the new one. Add it only with that grant
-  #   recorded, alongside its `TARGET_VISIBILITY` entry in
-  #   `components/runner-policy/runner-policy.test.mjs`.
+  # - cursor-plugins: adopted by the same retarget and now a sync TARGET
+  #   (Phase 4 fleet expansion, PR 428 — target block, App grant, and
+  #   `TARGET_VISIBILITY` entry all shipped), but NOT yet a review-lane
+  #   adopter: it is PUBLIC, and a selector-routed caller is rejected
+  #   outright on a public repository, so the removal trigger above still
+  #   gates adding it to this component's `managed:` lists.
+  # - claude-code-proxy: adopted by the same retarget and now a sync TARGET
+  #   (same Phase 4 expansion — target block, App grant, and
+  #   `TARGET_VISIBILITY` entry shipped), admissible on visibility (private),
+  #   but not yet a review-lane adopter: it runs no claude lane today, so
+  #   adding it to this component's `managed:` lists waits on deliberate lane
+  #   adoption, not on any grant.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
   #   the same retarget. Neither ever held a target block, so nothing left
   #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
-  #   entries. Neither is a code repo, so a code-review lane has near-zero
-  #   signal. songwriting (lyric files) is dropped outright. knowledge-corpus
-  #   is DEFERRED rather than dropped: its scraped third-party HTML is content
+  #   entries. This bullet answers the review-LANE question only — whether
+  #   either joins the sync-target ROSTER is a separate question, answered at
+  #   the Phase 4 fleet-expansion comment near `targets:` (knowledge-corpus
+  #   deferred on a structural LFS blocker; songwriting dropped). On the lane:
+  #   neither is a code repo, so a code-review lane has near-zero signal.
+  #   songwriting (lyric files) is dropped outright. knowledge-corpus is
+  #   DEFERRED rather than dropped: its scraped third-party HTML is content
   #   an agent later reads, which is a prompt-injection surface rather than a
   #   code-quality one. Removal trigger: prompt-injection hardening for a
   #   review lane over untrusted third-party content — and then for a security
@@ -399,8 +402,9 @@ targets:
   # selected-repo grant covers them as of 2026-08-19 (grant-first per the
   # plan's exact-set attestation constraint). Deliberate NON-adoptions, per
   # the same locked plan:
-  # - knowledge-corpus: deferred — structural LFS blocker recorded; no extend
-  #   mechanism exists.
+  # - knowledge-corpus: deferred from the sync-target ROSTER — structural LFS
+  #   blocker recorded; no extend mechanism exists. The separate review-LANE
+  #   question is answered at the claude-review caller comment above.
   # - songwriting: dropped outright (github-iac ADR-0006); its two drifted
   #   files were hand-fixed once (plan Phase 0.6), not adopted.
   # - claude-lane-sandbox: a disposable lane-testing sandbox, not a
