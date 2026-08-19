@@ -1,6 +1,6 @@
 # Distribute local-lane guards via a standards component
 
-- Status: accepted
+- Status: superseded (partially) by [ADR-0006](0006-retire-local-lane-guards-distribution.md) — driver distribution retired; the pattern-library components continue
 - Date: 2026-08-12
 
 ## Context

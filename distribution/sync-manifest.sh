@@ -764,21 +764,9 @@ validate_manifest() {
   # Every component must be reachable from at least one target selection —
   # directly managed or locally-owned, or inside the dependency closure of a
   # selected component. An unreferenced definition is dead weight the catalog
-  # silently carries; delete it or adopt it. One recorded exemption:
-  # local-lane-guards stays defined with zero references while the audit's
-  # staged per-guard migration (docs/topics/standards-sync-audit/, Phase 5)
-  # decides each guard's destination; that phase removes this exemption and
-  # its closure credit.
+  # silently carries; delete it or adopt it.
   reachable=()
   reachable_queue=()
-  # Seed only when the exempted name is actually defined: fixture manifests
-  # (and, after Phase 5, this manifest) carry no such component, and an
-  # unconditional seed would let a stale or misspelled exemption sit inert
-  # instead of being visibly dead code to delete.
-  if [[ -n "${COMPONENT_EXISTS['local-lane-guards']+present}" ]]; then
-    reachable['local-lane-guards']=1
-    reachable_queue+=('local-lane-guards')
-  fi
   for target in "${TARGET_NAMES[@]}"; do
     while IFS= read -r selected_component; do
       [[ -n "$selected_component" ]] || continue

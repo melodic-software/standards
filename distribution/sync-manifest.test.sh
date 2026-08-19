@@ -403,12 +403,6 @@ good="$(printf '%s\n' "$manifest" |
   sed '$a\      - helper')"
 valid_case 'dependency-closure reachability' "$good"
 
-# The recorded local-lane-guards exemption: a zero-reference definition under
-# exactly that name passes while its staged per-guard migration is pending.
-good="$(printf '%s\n' "$manifest" |
-  sed '/^targets:$/i\  local-lane-guards:\n    files:\n      policy.txt: .local-lane-guards\n')"
-valid_case 'zero-target exemption for local-lane-guards' "$good"
-
 # The source must be tracked even if a same-named worktree file exists.
 source_repo="$tmp_root/untracked-source"
 make_source "$source_repo" "$manifest"

@@ -5,12 +5,14 @@ Local invocation entrypoint for the four bespoke CI guards that gate in
 `comment-hygiene`, `exec-bit`, `machine-specific-paths`, and
 `reference-integrity`.
 
-This component is the distribution answer recorded in
-[`docs/adr/0004-local-lane-guards-via-standards-component.md`](../../docs/adr/0004-local-lane-guards-via-standards-component.md)
-(ci-workflows#190): one standards-owned bin/script, synced exact-file the same
-way other shared lint primitives are — pointer-not-copy. Consumers invoke
-`run-local-lane-guards.sh`; they do not copy driver logic into a repo-local
-bin or a second composite-action runner.
+This directory is PRODUCER-INTERNAL source plus its contract test — it is not
+distributed. The original sync-component distribution (ADR-0004) was retired
+by
+[`docs/adr/0006-retire-local-lane-guards-distribution.md`](../../docs/adr/0006-retire-local-lane-guards-distribution.md):
+adoption never happened, the enforcement surface consolidated in the
+ci-workflows composite actions and repo-local wrappers, and the manifest
+definition was removed. The drivers remain here as the standards-owned
+reference implementation behind the ci-workflows action copies.
 
 ## Layout
 
@@ -25,39 +27,24 @@ bin or a second composite-action runner.
 
 Pattern **bodies** stay in their existing components — this driver sources
 `../comment-hygiene/comment-hygiene-patterns.sh` and
-`../path-detection/machine-path-patterns.sh`. That relative path is identical
-in-source under `components/` and when materialized under `tools/shared/`
-beside `comment-hygiene-tools` / `path-detection-tools`.
-
-## Sync destinations
-
-Stable downstream path (exact materialization):
-
-`tools/shared/local-lane-guards/<file>`
-
-Manifest component name: `local-lane-guards`. It `requires`
-`comment-hygiene-tools` and `path-detection-tools` so the sibling pattern
-libraries land before the drivers. Target adoption is a separate change —
-this slice admits the component and sync metadata without rewriting
-consumers.
+`../path-detection/machine-path-patterns.sh`.
 
 ## Ownership boundary
 
-- **standards** owns the local-lane entrypoint and these drivers.
-- **ci-workflows** owns the composite-action wrappers that gate CI today.
-  A follow-up may re-point those actions at the synced drivers (or keep thin
-  action wrappers that exec the same bytes); until then the action-bundled
-  copies remain the CI path and must not diverge in behavior from this
-  component.
+- **standards** owns the local-lane entrypoint and these drivers as
+  producer-internal reference source.
+- **ci-workflows** owns the composite-action wrappers that gate CI. The
+  action-bundled copies are the CI path and must not diverge in behavior
+  from this component.
 - Policy libraries for comment markers and path bodies remain the
   `comment-hygiene` and `path-detection` components.
 
 ## Local use
 
 ```sh
-bash tools/shared/local-lane-guards/run-local-lane-guards.sh --help
-bash tools/shared/local-lane-guards/run-local-lane-guards.sh exec-bit
-bash tools/shared/local-lane-guards/run-local-lane-guards.sh all
+bash components/local-lane-guards/run-local-lane-guards.sh --help
+bash components/local-lane-guards/run-local-lane-guards.sh exec-bit
+bash components/local-lane-guards/run-local-lane-guards.sh all
 ```
 
 Optional environment knobs mirror the composite actions (`PATHS`,
