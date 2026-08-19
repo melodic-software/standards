@@ -327,7 +327,103 @@ Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. 
 - `distribution/sync-manifest.sh validate` green; full `sync-manifest.test.sh` green; standards CI green incl. offline lychee (README link edits + new doc anchors resolve) and comment-hygiene.
 - Sync dry-run PLAN output lists no `AGENTS.md` destination; post-merge real sync run opens zero new PRs (retirement produces no downstream changes — the engine never deletes).
 
+### Phase 3 — component cleanup
+
+Planned 2026-08-19 against standards main @ `ae35486` (ci-workflows @ `01c3295` = v0.15.0). Facts verified by two fresh-context explorers reading live origin/main fleet-wide, plus main-session probes. Key facts the sub-phases build on:
+
+- concurrency-policy, dependabot-policy, pin-comment-convention are already zero-target (defs at manifest :161, :169, :264; no target references, no downstream payloads anywhere in the fleet, no rationale comments adjacent). Their standards-internal enforcement (ci.yml jobs :204-225, :227-248, :839-873, npm scripts, dependabot entries, repin-caller test fixtures) all STAYS — Q3's "keep dirs as producer-internal lint".
+- pr-convention-policy (def :268-276, `requires: node-runtime`) is `managed` in 5 targets (ccp :370, dotfiles :427, github-iac :450, medley :470, provisioning :541 at `ae35486` — all managed, none locally-owned; deletions are name-based, numbers informational). Payloads exist in all 5 at `.github/standards/pr-convention-policy/` (5 files each) but are INVOKED nowhere — the only live coupling is a Dependabot npm root entry per repo's `.github/dependabot.yml`. Retirement follows the README Retire lifecycle row: upstream first, then one-time downstream deletion PRs.
+- ADR ledger: next number 0005; README convention = new superseding ADR + old ADR's Status line becomes `superseded by [ADR-0005](...)` (exactly-one-lifecycle-status vocabulary; body untouched). No supersede precedent exists yet — 0003's status edit is the first.
+- pr-issue-linkage pins: 6 of 8 callers at v0.10.2 (`e9443874`) — standards, ci-workflows self-caller, ccp, dotfiles, github-iac, medley; ci-runner + provisioning already at v0.14.2 (`7107b348`). The reusable is byte-identical v0.14.2 → v0.15.0 → main. Strictness is version-inherent (no inputs control it): v0.10.2 = closing keyword + `## Related`; v0.14.2 = that plus non-empty `## Summary`/`## Fix`/`## Verification`. runner-policy `policy.json` ALREADY carries the v0.14.2 SHA entry (line ~872) incl. `minimumCallerPermissions: pull-requests: read, actions: read`; the v0.15.0 SHA is NOT listed for this reusable.
+- Org-default PR template (`melodic-software/.github` `.github/PULL_REQUEST_TEMPLATE.md`, 870 bytes): fails BOTH gate versions as shipped — `## Summary` holds a bare `-` (passes vacuously = the bare-dash hole), `## Related` is comment-only (stripped → empty → fails), no `## Fix`/`## Verification`, `Closes #` digit-less. ccp's repo-local template already has the 4 headers; provisioning's local template has its own stray bare dash under `## Related`.
+- Escape-hatch sources: engine per-command filter matrix (parsed/enforced sync-manifest.sh :1020-1085) — `validate` accepts NO filter flags; `matrix`/`plan` accept `--targets` (exact CSV allowlist) only; `mappings`/`dest-paths` require `--target OWNER/REPO` and reject the others; `apply` requires `--target` AND `--target-root DIR` and rejects `--targets`. None of `--target`/`--target-root` documented in distribution/README (Commands section documents only validate/plan). Lefthook skip surfaces: native `skip: true` (lefthook-base README:11); `LEFTHOOK=0` appears nowhere in docs but is DENIED to agents by claude-permissions (Bash globs :88-90) with NO PowerShell twins — while the `--no-verify` denies DO have PowerShell twins (:280, :309-310). claude-permissions syncs to exactly one target (dotfiles).
+- Zero-target validator rule: engine-only (schema cannot express cross-object reachability; validate-sync-manifest.mjs is a fixture-agreement subset by design). Landing zone: after the target loop in `validate_manifest` (sync-manifest.sh :761-762); closure expansion must be written (REQUIRES_BY_COMPONENT holds direct deps only). Fixture precedent for engine-only FAIL cases: sync-manifest.test.sh :374-382. CRITICAL interaction: after this phase's deletions, `local-lane-guards` (refs=0, requires=2) remains legitimately zero-target until Phase 5's staged migration — the rule needs a named temporary exemption (decision C below).
+
+Approval-gate decisions (resolved at plan approval):
+
+- **Decision 3-A — re-pin version: v0.14.2, not v0.15.0.** The reusable is byte-identical across the two tags; the v0.14.2 SHA already has the policy.json contract entry, so pinning v0.14.2 needs ZERO policy.json change and ZERO fleet sync wave, and converges all 8 repos on one SHA (ci-runner + provisioning are already there). Pinning v0.15.0 would force a policy.json append + 7 hand-merged sync PRs (fleet still disarmed) for no content difference.
+- **Decision 3-B — zero-target rule ships WITH a named temporary exemption** for `local-lane-guards` (and its dependency closure), carrying a rationale comment pointing at the Phase 5 staged migration; Phase 5 removes the exemption. Alternative (deferring the whole rule to Phase 5) abandons the Brief's "lands LAST in the component-cleanup series" sequencing.
+- **Decision 3-C — provisioning's local-template stray-dash fix rides Phase 3** as a one-line PR beside the org-default fix (same defect class, found during fact-gathering) [EXEC-SHAPE].
+- Medley's `select-runner` sibling pin at v0.8.0 is OUT of scope (not pr-issue-linkage) — recorded as a follow-up tracker item in 3.6.
+
+### Phase 3.1: standards PR — delete the zero-target trio defs [DOING]
+
+Branch `chore/sync-audit-phase3-zero-target-defs` off main. Delete the manifest component defs for concurrency-policy (:161-168), dependabot-policy (:169-178), pin-comment-convention (:264-267). Nothing else changes: no target rows exist, no downstream payloads exist, no adjacent comments are lost, and every standards-internal consumer (CI jobs, npm scripts, dependabot entries, `repin-callers.test.sh` fixture corpus, runner-policy README citation, claude-lanes comments) references the component DIRECTORIES, which stay.
+
+**Sanity Check:**
+
+- `distribution/sync-manifest.sh validate` → "Manifest valid: 34 components, 11 targets" (11 since the Phase 4 fleet-expansion PR landed out of band); mjs validator green.
+- `grep -c "concurrency-policy\|dependabot-policy\|pin-comment-convention" distribution/sync-manifest.yml` → 0.
+- Full `sync-manifest.test.sh` green (Linux CI; local Windows symlink cases environmental); standards CI green — the four component jobs still run and pass (producer-internal lint untouched).
+- Post-merge push sync run completes with zero new PRs.
+
+### Phase 3.2: standards PR — pr-convention-policy retirement + ADR-0005 [PENDING]
+
+Branch `chore/sync-audit-phase3-pr-convention-retire` off main, after 3.1 merges (same file).
+
+1. Delete the pr-convention-policy def (:268-276) and its 5 managed rows (ccp, dotfiles, github-iac, medley, provisioning).
+2. **ADR-0005** `docs/adr/0005-retire-pr-convention-policy-distribution.md`: supersedes ADR-0003's distribution claim — the analyzer stays standards-internal (policy.json remains the machine-readable convention record per `conventions/process/issue-tracker.md:66`); enforcement lives in the ci-workflows pr-issue-linkage reusable, which consumers pin directly; distributing a second vendored analyzer to consumers added payloads nobody invoked (verified fleet-wide: zero invocations, Dependabot-root coupling only). ADR-0003's Status line becomes `superseded by [ADR-0005](0005-retire-pr-convention-policy-distribution.md)`; its body is not rewritten.
+3. Grep-check `sync-manifest.test.sh` for pr-convention-policy assertions and retire any found (explorers surfaced none; verify at implementation).
+
+**Sanity Check:**
+
+- Validator → 33 components; `grep -c "pr-convention-policy" distribution/sync-manifest.yml` → 0.
+- `grep -n "Status" docs/adr/0003-pr-convention-policy-as-data.md` → the superseded-by line; `ls docs/adr/ | grep -c 0005` → 1; lychee + markdownlint green.
+- Post-merge sync run: zero new PRs (deselection never deletes downstream).
+
+### Phase 3.3: five downstream payload-deletion PRs [PENDING]
+
+After 3.2 merges. One PR per repo (ccp, dotfiles, github-iac, medley, provisioning), Retire-lifecycle one-time deletions, main session pre-resolving exact edits before dispatching workers:
+
+0. Pre-flight per repo (Phase 2.2 pattern): no open sync PR carries `.github/standards/pr-convention-policy/` hunks (a pre-3.2 wave merged after this PR would resurrect the payload), and any open Dependabot PRs against that npm root are closed first (they would conflict against the deletion).
+1. Delete `.github/standards/pr-convention-policy/` (5 files).
+2. Remove the repo's `.github/dependabot.yml` pr-convention-policy entry/group (fact-sheet locations: ccp :90-95 + header mention :3-4; dotfiles :84-99; github-iac :92-104 + header :6-7; medley :92-110 + comment :92-96; provisioning :73-85 + header :9-10) — rewording headers that name it alongside runner-policy.
+3. PR bodies conform to each repo's live linkage contract (provisioning: Summary/Fix/Verification/Related; others: `## Related` + "No linked issue" escape).
+
+**Sanity Check (per repo):** `test -d .github/standards/pr-convention-policy` → absent on merged main; `git grep -c "pr-convention-policy"` → 0; repo CI green (dependabot.yml schema lint included).
+
+### Phase 3.4: standards PR — escape-hatch expansion + deny-rule reconciliation [PENDING]
+
+Branch `chore/sync-audit-phase3-escape-hatches` off main (no dependency on 3.1-3.3).
+
+1. **ESCAPE-HATCHES.md expansion** — add sections: (a) *Engine target filters* per the exact per-command matrix above (`--targets` matrix/plan only; `--target` for mappings/dest-paths/apply; `--target-root` apply only, incl. the origin-identity check), sourced from sync-manifest.sh :1020-1085; (b) *Skipping Lefthook lanes* — native per-repo `skip: true` (the lefthook-base documented opt-out), and the `LEFTHOOK=0` environment variable for a one-off human bypass, with the PowerShell shape (`$env:LEFTHOOK = '0'`) spelled out; states plainly that AGENT sessions are deny-floored from this bypass by claude-permissions and that the deny floor is not relaxable (README :149-151, :195).
+2. **distribution/README Commands section** gains the `--target`/`--target-root` documentation (or a pointer to the new section).
+3. **claude-permissions reconciliation** — the Bash LEFTHOOK denies (:88-90) anchor on the inline-env spelling `LEFTHOOK…=0 cmd`, which has no PowerShell equivalent — a literal twin would never match (stress-test CRITICAL finding). PowerShell's bypass shapes are `$env:LEFTHOOK = '0'`, `Set-Item env:LEFTHOOK …`, `${env:LEFTHOOK} = …`. Add an env-var-reference-anchored deny (`PowerShell(*env:LEFTHOOK*)` shape — deliberately broad: agents have no legitimate reason to touch that variable, and deny rules are whole-string globs with `*` as the only metacharacter, so precision costs coverage). Extend `claude-permissions.test.sh` to assert the exact new deny rows' membership. ESCAPE-HATCHES.md's deny-floor sentence is written AFTER this lands so the claim is true for both shells.
+
+**Sanity Check:** lychee (`include_fragments = "full"`) green over new anchors; `grep -c "target-root" distribution/README.md distribution/ESCAPE-HATCHES.md` ≥ 1 each; `grep -n "env:LEFTHOOK" components/claude-permissions/claude-permissions.json` → the new PowerShell row(s) present alongside the 3 Bash rows; claude-permissions test green asserting the new rows; a manual glob walk confirms `PowerShell(*env:LEFTHOOK*)` matches each of the three PowerShell bypass shapes above (write the three sample strings into the test as membership-adjacent comments); the post-merge sync PR to dotfiles (sole claude-permissions target) shows a claude-permissions.json-only diff and is merged (hand-merge if the fleet is still disarmed).
+
+### Phase 3.5: org-default PR template fix + provisioning rider [PENDING]
+
+1. PR to `melodic-software/.github`: rewrite `.github/PULL_REQUEST_TEMPLATE.md` to carry the four contract headers (`## Summary`, `## Fix`, `## Verification`, `## Related`) plus the `Closes #` line, with ALL guidance inside HTML comments (the gate strips them — no bare-dash placeholder content under any header, closing the vacuous-pass hole; an unfilled template now fails cleanly on every section instead of passing Summary). Content-only change to a repo file — the github-iac Pulumi rule governs settings, not community-health files. No canary interaction (human PR; sync uninvolved).
+2. Rider PR to provisioning: remove the stray bare `-` under `## Related` in its local template [EXEC-SHAPE, decision 3-C].
+
+**Sanity Check:** template contains all four `##`-level contract headers and zero non-comment placeholder lines under them (`awk` over the merged file); a scratch PR against a template-inheriting repo (or the next real PR) passes the linkage gate with the template filled normally.
+
+### Phase 3.6: pr-issue-linkage fleet re-pin to v0.14.2 [PENDING]
+
+After 3.5 merges (the stricter gate must meet a compliant default template). Six caller PRs — standards, ci-workflows (self-caller `pr-issue-linkage-self.yml`), ccp, dotfiles, github-iac, medley:
+
+1. Bump the `uses:` pin `e9443874… # v0.10.2` → `7107b348… # v0.14.2` (pin-comment shape per repo convention).
+2. Permissions: **replace, not insert** — five callers (standards, ccp, dotfiles, github-iac, medley) declare job-level `permissions: {}` today; replace that with `pull-requests: read` + `actions: read` (workflow-level `{}` stays, matching ci-runner/provisioning's verified shape). The sixth (ci-workflows `pr-issue-linkage-self.yml`) already grants both — pin-only edit there. policy.json's `minimumCallerPermissions` for this SHA enforces the contract loudly if an edit is missed; NO policy.json change needed (entry exists).
+3. Callers trigger on `pull_request_target` — each re-pin PR is gated by the OLD base-branch pin (a four-section body satisfies both contracts, so no breakage; but the strict gate cannot be observed on the re-pin PR itself). At each merge, sweep that repo's OPEN PRs: they re-validate under the strict contract on their next event — human-authored Related-only bodies need a body update (sync-bot bodies already emit all four sections by construction, standards-sync.yml :449-464; dependabot exempt everywhere).
+4. File the out-of-scope observation as a tracker item: medley's select-runner caller pin lags at v0.8.0 (search-before-create in medley's tracker; pivot to comment on an existing item if one matches).
+
+**Sanity Check (per repo):** `grep -c "7107b348" .github/workflows/<caller>.yml` → 1 and no `e9443874` remains; job-level permissions block reads `pull-requests: read` + `actions: read` (not `{}`); runner-policy lane green (SHA already allowlisted); post-merge, the strict gate is proven by the FIRST subsequent PR event in that repo (or a body-edit re-trigger on any open PR) passing/failing per the four-section contract; open-PR sweep recorded in the PR body.
+
+### Phase 3.7: zero-target validator rule — lands LAST [PENDING]
+
+Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 merge (manifest stable at 33 components).
+
+1. **Engine rule** in `validate_manifest` after the target loop (:761-762): every component must be referenced by ≥1 target (`managed` or `locally-owned`, accumulating across the loop) OR sit in the dependency closure of a referenced component. Closure expansion written over `REQUIRES_BY_COMPONENT` (direct-deps-only today; `visit_component` :454-475 is cycle-detection only — extend or add a helper).
+2. **Named temporary exemption** for `local-lane-guards` and its dependency closure, with a rationale comment citing the Phase 5 staged migration (decision 3-B); Phase 5 removes it.
+3. **Fixtures**: engine-only `invalid_case` per the :374-382 precedent (a def with no target reference and no closure path dies with a named diagnostic); a valid case proving the exemption; a valid case proving closure counting (a component referenced only via `requires` of a targeted component passes).
+4. **Schema/mjs lockstep** = documented non-expressibility: one line in the schema's description noting the reachability rule is engine-only; mjs untouched (fixture-agreement cases for this rule run engine-only, per existing precedent).
+
+**Sanity Check:** full `sync-manifest.test.sh` green incl. the three new cases; `distribution/sync-manifest.sh validate` green on the real manifest (exemption honored); a scratch manifest with an unreferenced component fails with the new diagnostic; grep confirms the exemption names exactly `local-lane-guards` + its closure and the rationale comment cites Phase 5.
+
 ## Blast radius
+
+**Phase 3: MEDIUM.** Thirteen-ish PRs across seven repos, a validator behavior change, and a fleet-wide gate strictness increase (v0.10.2 → v0.14.2 linkage in 6 repos — every future PR in those repos meets the four-section contract). Mitigations: the re-pin targets a SHA two repos already run in production with the policy entry pre-existing (zero sync waves); the org template lands BEFORE the stricter gate; upstream-before-downstream ordering per the Retire lifecycle row; the validator rule lands last against a stable manifest with fixture coverage; every PR independently revertable; no engine apply-path changes, no automerge changes, no App-grant/roster changes. Not LOW: the gate tightening changes day-to-day contributor experience fleet-wide and the validator rule can brick manifest CI if the exemption closure is wrong.
 
 **Phase 2: MEDIUM.** Six PRs across five repos; permanently removes a sync surface (the intended outcome) and blanks four downstream files. Mitigations: flip-first ordering closes the overwrite window; blank-not-delete is reversible (git history holds every copy; re-adding the component is a manifest PR); no engine/schema/automerge changes; no canonical content change touches the `.github` canary's components; each PR independently revertable; guidance content verified re-homed (cloud-bootstrap README; escape-hatch skeleton) before the source dies. Not LOW: cross-repo coordination with ordering constraints and a live canary watch running concurrently.
 
@@ -338,6 +434,8 @@ Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. 
 ## Stress-test summary
 
 Fresh-context adversarial review (2026-08-16, execution-scoped — the 16 locked decisions were fenced off, already 3×-validated): 2 CRITICAL, 9 IMPORTANT, 4 SUGGESTION findings; all 15 verified against the repos and folded into the plan above. Headlines: (1) `.node-version` bump would have broken standards CI — `components/cloud-environment/setup.sh` carries 4 coupled literals hard-asserted by `setup.test.sh` (now in 0.2); (2) the briefed `LANE_PATHS` append is itself the breaking change — the lockstep script assumes one shared pin across all paths (0.4 rewritten to per-path refactor-or-defer, no partial edit); (3) two cross-repo ADR-0003 refs in ci-workflows the sweep would have missed (now in 0.7); (4) pr-issue-linkage is a REQUIRED check on standards + ci-workflows PRs — every PR needs a closing keyword + `## Related` body (now in Mechanical work). This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius: it ran fresh-context with an adversarial failure-scenario brief; re-running `/planning:devils-advocate` on the same execution surface would relitigate the fenced decisions.
+
+**Phase 3 stress-test (2026-08-19, fresh-context, execution-scoped — the locked decisions fenced off):** 1 CRITICAL, 3 IMPORTANT, 3 SUGGESTION; all verified against live origin/main fleet-wide and folded in. Headlines: (1) CRITICAL — the planned "PowerShell LEFTHOOK deny twins" could never match (the Bash rules anchor on an inline-env spelling PowerShell lacks; deny globs are whole-string with `*` only) while every planned sanity check stayed green — respecified as an env-var-reference-anchored `PowerShell(*env:LEFTHOOK*)` deny with shape-aware tests; (2) `--targets` is matrix/plan-only — `validate` hard-rejects all filter flags (doc claim corrected before authoring); (3) 3.6's "self-demonstrating" gate proof was impossible under `pull_request_target` (base-branch pin gates the PR) — replaced with post-merge proof + an open-PR sweep, since merged re-pins re-gate every open PR on its next event; (4) the permissions edit is replace-`{}`-not-insert in five callers, pin-only in ci-workflows. Reviewer also confirmed decision 3-A end-to-end (byte-identical reusable both hops; policy entry with minimumCallerPermissions present in all four checked fleet policy copies — zero sync wave), that local-lane-guards is the ONLY post-deletion zero-target component (its two requires are independently targeted via medley — the closure clause of the exemption is redundant-but-harmless), that no test/schema/mjs hardcodes component names or counts, and that the org-template rewrite is regression-free for the v0.10.2 window. This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius, same pattern as Phases 0-2.
 
 **Phase 2 stress-test (2026-08-17, fresh-context, execution-scoped — the locked decisions fenced off):** 0 CRITICAL, 2 IMPORTANT, 2 SUGGESTION; all four verified against live origin/main state (local clones were stale) and folded in. Headlines: (1) three of the four blanking targets have an `@AGENTS.md`-only CLAUDE.md — disposition decided (left intact), and the 2.2 sweeps are NOT trivially empty (ccp ~15 doc hits; dotfiles whats-tracked.md) — edit lists now composed main-session pre-dispatch; (2) the planned "dry-run shows empty diff set" evidence was non-producible — dry-run skips the attest/sync jobs (`standards-sync.yml:149,:374`) — replaced with mapping-output + real-run-zero-PRs checks; (3) claude-security-paths fires the security-review lane on the ccp/provisioning truncation PRs — expected, briefed; (4) residual grep hardened with `-I`. Reviewer also confirmed: all four downstream AGENTS.md blobs hash-identical to canonical, 0-byte lint safety (standards' own root AGENTS.md passes the same canonical lint set), no `AGENTS.md#fragment` inbound links (lychee-safe), dotfiles root AGENTS.md in `.chezmoiignore`, and no schema/mjs/baseline hardcoding of the component. This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius, same pattern as Phases 0-1.
 
@@ -370,6 +468,19 @@ Phase 2 shape: strictly 2.1 → 2.2 → 2.3 across sub-phases (each gates the ne
 
 Phase 2 scope fence per 2.2 worker: exactly one repo — `AGENTS.md` (truncate) + any files its reference sweep flags; FORBIDDEN: PLAN.md, sync-manifest.yml, any other repo, deleting AGENTS.md. Sequential fallback: run the four repos one at a time in main session.
 
+Phase 3 shape: Wave A (parallel-safe, zero file overlap): 3.1→3.2 chain, 3.4, 3.5 — three independent standards/.github tracks. Wave B: 3.3 (×5 workers) after 3.2; 3.6 (×6 workers) after 3.5; 3.7 after 3.1+3.2, deliberately last.
+
+| Phase | Surface | Basis |
+|---|---|---|
+| 3.1, 3.2 | main session | manifest + ADR judgment |
+| 3.3 | sub-agent workers (up to 5) | mechanical deletions, pre-resolved dependabot.yml edits, disjoint repos |
+| 3.4 | main session | doc authoring + deny-rule shape judgment |
+| 3.5 | main session | two small template PRs |
+| 3.6 | sub-agent workers (up to 6) or sequential main | mechanical pin+permissions edits, pre-resolved per repo; each PR body must self-satisfy the new gate |
+| 3.7 | main session | validator logic + closure algorithm |
+
+Phase 3 scope fence per 3.3 worker: one repo — `.github/standards/pr-convention-policy/` (delete) + `.github/dependabot.yml` (listed lines); FORBIDDEN: PLAN.md, any workflow file, any other repo. Per 3.6 worker: one repo — the linkage caller workflow file only. Sequential fallback both waves: main session, one repo at a time.
+
 ## Open questions
 
 - 0.4 pin form: newest ci-workflows release tag containing C1 + retry hardening, vs HEAD-SHA fallback — resolved at implementation time by tag availability (decision rule in 0.4 item 2).
@@ -379,6 +490,9 @@ Phase 2 scope fence per 2.2 worker: exactly one repo — `AGENTS.md` (truncate) 
 
 ### User-approval gates
 
+- Phase 3 decision 3-A: APPROVED 2026-08-19 as recommended — linkage re-pin to v0.14.2 (byte-identical reusable; policy.json entry pre-exists; zero sync waves; fleet SHA convergence).
+- Phase 3 decision 3-B: APPROVED 2026-08-19 as recommended — zero-target rule ships with a named temporary exemption for local-lane-guards, removed in Phase 5.
+- Phase 3 gate-tightening: APPROVED 2026-08-19 — after 3.6, six more repos enforce Summary/Fix/Verification/Related on every PR body.
 - Phase 2 decision A — escape-hatch sequencing: APPROVED 2026-08-17 as recommended — 2.3 ships a SKELETON `distribution/ESCAPE-HATCHES.md` holding just the opt-out procedure; Phase 3 expands it (no homeless gap, no double move).
 - Phase 2 decision B — standards CLAUDE.md fate: APPROVED 2026-08-17 as recommended — blank CLAUDE.md to 0 bytes (imported prose self-referentially false for standards; unhobble posture re-adds instructions only on evidence).
 - Phase 0.3's Brief deviation (2-of-5 pins convert; composites keep defaults; drift-check extension added) — approve or override before C1.
@@ -402,6 +516,11 @@ Phase 2 scope fence per 2.2 worker: exactly one repo — `AGENTS.md` (truncate) 
 - Test assertions track the staged state in 2.1 and retire in 2.3 — never deleted early [EXEC-SHAPE].
 - Downstream `@AGENTS.md` CLAUDE.md imports (ccp, github-iac, provisioning) left intact — import of a blank file is inert; slot preserved [EXEC-SHAPE].
 - 2.2 reference-sweep edit lists composed main-session pre-dispatch; workers execute, never judge content-bearing status [EXEC-SHAPE].
+- Phase 3 PR series 3.1→3.2 / 3.4 / 3.5 parallel tracks, then 3.3 ×5, 3.6 ×6, 3.7 last, with the scope fences above [EXEC-SHAPE].
+- 3.1 and 3.2 split into two PRs (zero-effect trio vs downstream-implicating retirement + ADR) [EXEC-SHAPE].
+- 3.5 rider: provisioning local-template stray-dash fix as its own one-line PR (decision 3-C) [EXEC-SHAPE].
+- 3.6 workers' edit lists (pin line + permissions block per repo) pre-resolved main-session [EXEC-SHAPE].
+- Medley select-runner v0.8.0 pin drift filed as a tracker item, not fixed in Phase 3 [EXEC-SHAPE].
 
 ### Mechanical work
 
