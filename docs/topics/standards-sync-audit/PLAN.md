@@ -271,7 +271,9 @@ Planned 2026-08-17 against standards main @ `8fba432`. Manifest facts at this SH
 
 Non-work discharged by evidence: the "PR body remains the just-in-time warning" criterion is already satisfied — the sync reusable's PR body carries "Do not hand-edit these managed files downstream; change their standards source instead." (ci-workflows `standards-sync.yml:463`); nothing to build. The 12-line "Cloud sessions and plugins" section added to `orientation.md` post-audit duplicates guidance that lives durably in `components/cloud-bootstrap/README.md` (settings.json as plugin source of truth; `cloud-bootstrap.local.sh` pattern) — blanking downstream copies loses nothing not already homed upstream.
 
-### Phase 2.1: standards flip PR — managed → locally-owned [DOING]
+### Phase 2.1: standards flip PR — managed → locally-owned [DONE]
+
+Merged as standards PR 421 (squash 306ae05, 2026-08-17). Sanity verified: managed-holder count 0, locally-owned-holder count 5; Bash validator + mjs validator green; staging assertions pass (Windows-only symlink-test failures are environmental — `ln -s` degrades to copy — Linux CI green); post-merge push sync run 32065299476 succeeded with ZERO open sync PRs fleet-wide (also discharges the 2.2 pre-flight).
 
 Branch `chore/sync-audit-phase2-flip` off main. One standards PR; no downstream effect (the synchronizer never reads, changes, or deletes `locally-owned` files, and no canonical component content changes — no sync PRs fan, canary untouched).
 
@@ -285,7 +287,9 @@ Branch `chore/sync-audit-phase2-flip` off main. One standards PR; no downstream 
 - `distribution/sync-manifest.sh validate` green; full `sync-manifest.test.sh` green; standards CI green.
 - Sync dry-run PLAN output lists no `AGENTS.md` destination for any target (dry-run skips the attest/sync jobs entirely — `standards-sync.yml:149,:374` — so it logs mappings, never diffs); then the post-merge push-triggered REAL sync run completes with zero new PRs opened.
 
-### Phase 2.2: downstream blanking PRs — 4 repos [PENDING]
+### Phase 2.2: downstream blanking PRs — 4 repos [DONE]
+
+All four merged, AGENTS.md 0 bytes verified on each main: claude-code-plugins PR 2991 (CLOUD-SESSIONS pointer now a manifest hyperlink after a review-nit fix), dotfiles PR 525 (whats-tracked bullet reworded), provisioning PR 311, github-iac PR 334 (merge human-approved 2026-08-19 after the session permission classifier denied the agent merge on that repo). Learned en route: the fleet linkage check now has per-repo variants (ccp/github-iac/dotfiles accept a "No linked issue" escape; provisioning enforces Summary/Fix/Verification/Related) — PR bodies conformed per repo.
 
 After 2.1 merges. One PR per target: claude-code-plugins, dotfiles, github-iac, provisioning. Medley is NOT touched (bespoke locally-owned AGENTS.md — the content the split exists to protect). Pre-flight per repo: confirm no open sync PR still carries an AGENTS.md hunk (an in-flight pre-2.1 wave would reintroduce it; merge or close those first).
 
@@ -302,7 +306,7 @@ After 2.1 merges. One PR per target: claude-code-plugins, dotfiles, github-iac, 
 - Repo CI green on each PR.
 - claude-code-plugins only: `grep -n "AGENTS.md" docs/CLOUD-SESSIONS.md` → no `../AGENTS.md` link remains.
 
-### Phase 2.3: standards retirement PR — def, source, docs, escape-hatch home [PENDING]
+### Phase 2.3: standards retirement PR — def, source, docs, escape-hatch home [DOING]
 
 Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. Def deletion and entry removal are the SAME PR (validator rejects `locally-owned`/`managed` refs to unknown components — sync-manifest.sh:739,745).
 
@@ -315,7 +319,7 @@ Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. 
 
 **Sanity Check:**
 
-- `grep -rnI "agent-orientation" --exclude-dir=.git --exclude-dir=.work --exclude-dir=node_modules .` → hits only under `docs/topics/standards-sync-audit/` (plan/history text is legitimate; `-I` skips untracked binary caches).
+- `grep -rnI "agent-orientation" --exclude-dir=.git --exclude-dir=.work --exclude-dir=node_modules .` → hits only under `docs/topics/standards-sync-audit/` plus exactly two deliberate retirement-record sites: the distribution/README medley-section sentence explaining the former component's retirement, and the sync-manifest.test.sh regression assertion that needs the literal to assert the component stays absent (`-I` skips untracked binary caches).
 - `test -d components/agent-orientation` → absent; `wc -c CLAUDE.md` matches the approved disposition.
 - `test -f distribution/ESCAPE-HATCHES.md` → present; contains the opt-out procedure (grep `locally-owned`).
 - `distribution/sync-manifest.sh validate` green; full `sync-manifest.test.sh` green; standards CI green incl. offline lychee (README link edits + new doc anchors resolve) and comment-hygiene.

@@ -23,9 +23,6 @@ components:
   actionlint:
     files:
       .github/actionlint.yaml: .github/actionlint.yaml
-  agent-orientation:
-    files:
-      components/agent-orientation/orientation.md: AGENTS.md
   architecture-decisions:
     files:
       docs/adr/README.md: docs/adr/README.md
@@ -404,9 +401,6 @@ targets:
     # implicit policy nobody chose. Removal trigger: that migration being
     # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
-      # Retirement staging per the audit topic (docs/topics/standards-sync-audit/):
-      # the downstream AGENTS.md blanking PR follows, then the component def retires.
-      - agent-orientation
       - claude-review-caller
       - claude-security-review-caller
       # Directory-source dogfooding: this repo's bootstrap carries same-version
@@ -439,9 +433,6 @@ targets:
       - runner-policy
       - typos
     locally-owned:
-      # Retirement staging per the audit topic (docs/topics/standards-sync-audit/):
-      # the downstream AGENTS.md blanking PR follows, then the component def retires.
-      - agent-orientation
       - shellcheck
     automerge: false
   melodic-software/github-iac:
@@ -463,9 +454,6 @@ targets:
       - typos
     locally-owned:
       - actionlint
-      # Retirement staging per the audit topic (docs/topics/standards-sync-audit/):
-      # the downstream AGENTS.md blanking PR follows, then the component def retires.
-      - agent-orientation
     automerge: false
   melodic-software/medley:
     managed:
@@ -483,7 +471,6 @@ targets:
       - runner-policy
     locally-owned:
       - actionlint
-      - agent-orientation
       # Repo-specific toolchain steps live inside the bootstrap itself (plus a
       # committed cloud-bootstrap.test.sh over it); converge by moving them
       # into a cloud-bootstrap.local.sh, then flip to managed.
@@ -558,8 +545,4 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-    locally-owned:
-      # Retirement staging per the audit topic (docs/topics/standards-sync-audit/):
-      # the downstream AGENTS.md blanking PR follows, then the component def retires.
-      - agent-orientation
     automerge: false
