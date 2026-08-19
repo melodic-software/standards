@@ -467,9 +467,9 @@ Planned 2026-08-19 from a fresh-context guard-by-guard inventory (live origin/ma
 
 Approval-gate decisions (5-A/5-B/5-C below in User-approval gates).
 
-### Phase 5.1: Guard A — medley comment-hygiene wrapper refactor [DOING]
+### Phase 5.1: Guard A — medley comment-hygiene wrapper refactor [DONE]
 
-Medley side executed 2026-08-19 as medley PR 1868 (wrapper `comment-hygiene-local.sh` with the scan_text override; all consumers re-pointed; positive and negative fixtures; medley ADR-0023). The standards flip PR is this plan-edit's own PR, gated on 1868 merging first.
+Executed 2026-08-19, medley-first as specified. Medley PR 1868 merged: wrapper `comment-hygiene-local.sh` (all 7 medley functions + the `chp::scan_text` override), patterns file reduced to byte-canonical (git blob hash equals canonical `f0e37659`), every consumer re-pointed (lefthook hook, scan-tree, ci-status `patterns-file:`, scan-tree.test.sh fixture copy), positive AND negative fixtures green, medley ADR-0023 records the honesty caveat. Standards PR 448 merged: comment-hygiene-tools flipped to managed for medley with the comment re-cut. Final proof: post-merge sync run 32291418474 — attest plus all 12 target jobs green, NO medley PR opened (zero-delta apply). Follow-up filed in medley for the lowercase-XXX backport (a deliberate later policy change, kept out of the behavior-preserving refactor).
 
 The one guard with a live break-hazard and a repo-local precedent to follow (ADR-0019: share bodies, not wrapping). Two-sided, medley-first:
 
@@ -480,7 +480,9 @@ CRITICAL respec from the stress-test: medley's fork is a POLICY REWRITE, not an 
 
 **Sanity Check:** medley: `cmp tools/shared/comment-hygiene/comment-hygiene-patterns.sh <canonical>` → identical; `git grep -l "chp::scan_file\|chp::scan_text"` consumers resolve through the wrapper only; POSITIVE fixture (planted violation) fails both lanes; NEGATIVE fixture (an external owner-slash-repo citation line and a phase-token line, matching existing tracked content) passes both lanes post-refactor; medley CI comment-hygiene gate green on the unmodified tree. Standards: `yq` shows medley manages comment-hygiene-tools; the post-merge sync run opens NO medley PR.
 
-### Phase 5.2: record dispositions — exec-bit, heading-cites, machine-paths [PENDING]
+### Phase 5.2: record dispositions — exec-bit, heading-cites, machine-paths [DONE]
+
+Executed 2026-08-19 on PR 450: the three dispositions are recorded verbatim in ADR-0006 (the 5.3 ADR, per the stress-test re-homing). The manifest-side record landed as specified: the comment-hygiene-tools comment re-cut rode PR 448, and medley's remaining `locally-owned` audit comments were reviewed and remain present-tense accurate (still diverged, still locally owned) — no refresh needed.
 
 No code migration; make the deliberate states legible where the audit found them unrecorded (the Phase 0 medley-counterpart pattern):
 
@@ -489,7 +491,9 @@ No code migration; make the deliberate states legible where the audit found them
 
 **Sanity Check:** the three dispositions appear verbatim in the 5.3 ADR; comment-hygiene gate green (no issue-ref shapes); validator green.
 
-### Phase 5.3: component endgame — local-lane-guards def + exemption [PENDING]
+### Phase 5.3: component endgame — local-lane-guards def + exemption [DONE]
+
+Executed 2026-08-19 on PR 450: def deleted (validator green at 32 components, rule unexempted), exemption block + conditional seed removed from the engine, exemption fixture case retired, ADR-0006 created (partial supersession + dispositions), ADR-0004 status line updated, and the retained component README + dispatcher header re-cut per the folded review finding (sanity grep on the README → 0).
 
 After 5.1/5.2, the drivers (dispatcher, scan-comment-hygiene, coarse-prefilter, canonical exec-bit/heading-cites/machine-paths scripts) still have ZERO consumers of the materialized form — medley kept its own drivers by design and every other repo gates via the ci-workflows actions. Execute decision 5-B (default: retire), one standards PR:
 

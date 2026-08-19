@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Local-lane entrypoint for the bespoke CI guards that previously had no
-# non-CI invocation path. Owns one dispatcher over four drivers so consumers
-# invoke the standards-owned source (pointer-not-copy) instead of maintaining
-# a per-repo copy. See README.md and docs/adr/0004-local-lane-guards-via-standards-component.md.
+# Local-lane entrypoint for the bespoke CI guards. Producer-internal
+# reference source: one dispatcher over four drivers, kept behavior-identical
+# to the ci-workflows action copies that gate CI. Not distributed — the sync
+# component was retired. See README.md and
+# docs/adr/0006-retire-local-lane-guards-distribution.md.
 #
 # Usage:
 #   run-local-lane-guards.sh <guard>|all [env overrides via the environment]
