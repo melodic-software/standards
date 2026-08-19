@@ -447,7 +447,9 @@ Executed by the operator before this plan's approval round: sync run 32278759065
 
 Executed by the operator as github-iac PR 341 (merged): README roster lists exactly the 12 manifest targets including agent-plugins.
 
-### Phase 4R.3: standards PR — reconcile stale manifest comment prose [PENDING]
+### Phase 4R.3: standards PR — reconcile stale manifest comment prose [DONE]
+
+Executed 2026-08-19: PR 446 merged (manifest comment re-cut; sanity grep empty on main; validator green at 33 components, 12 targets). PR 422's body gained the missing Fix and Verification sections (Test plan folded into Verification) and its linkage check re-ran green on the edited event.
 
 The claude-review-caller comment block (:70-90) still claims cursor-plugins "is not a target at all … needs the App grant below, plus its own TARGET_VISIBILITY entry — exactly like claude-code-proxy on both counts" and claude-code-proxy is "BLOCKED on the org owner extending the sync App's selected access … Add it only with that grant recorded" — all false since PR 428 (targets exist, grant landed, TARGET_VISIBILITY entries shipped). Re-cut to present-tense truth, which requires SUPPLYING a new rationale for ccp-proxy/cursor-plugins' continued exclusion from the claude-review-caller component (verified honest answer: they are sync targets now but have not adopted the review lane — "not yet adopted", with the public-shape blocker still governing cursor-plugins). The ci-runner bullet remains accurate and survives. Keep both knowledge-corpus deferral rationales (lane adoption = prompt-injection surface at :83-90; sync-target roster = LFS blocker at :402-403) but make each name its own question so they read as complementary. New prose must avoid comment-hygiene trip shapes (`owner/repo#N`, `PR #N`, `issue N`, `GH-N` — bare "PR 428" is safe). Also fix standards PR 422's body (repin App PR: add the missing `## Fix` and `## Verification` sections — Summary and a content-bearing Related already exist; fold the legacy Test plan into Verification) so its next gate event passes under the v0.14.2 contract.
 
@@ -465,7 +467,9 @@ Planned 2026-08-19 from a fresh-context guard-by-guard inventory (live origin/ma
 
 Approval-gate decisions (5-A/5-B/5-C below in User-approval gates).
 
-### Phase 5.1: Guard A — medley comment-hygiene wrapper refactor [PENDING]
+### Phase 5.1: Guard A — medley comment-hygiene wrapper refactor [DOING]
+
+Medley side executed 2026-08-19 as medley PR 1868 (wrapper `comment-hygiene-local.sh` with the scan_text override; all consumers re-pointed; positive and negative fixtures; medley ADR-0023). The standards flip PR is this plan-edit's own PR, gated on 1868 merging first.
 
 The one guard with a live break-hazard and a repo-local precedent to follow (ADR-0019: share bodies, not wrapping). Two-sided, medley-first:
 
