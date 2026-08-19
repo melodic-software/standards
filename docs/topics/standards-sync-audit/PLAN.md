@@ -359,7 +359,9 @@ Branch `chore/sync-audit-phase3-zero-target-defs` off main. Delete the manifest 
 - Full `sync-manifest.test.sh` green (Linux CI; local Windows symlink cases environmental); standards CI green — the four component jobs still run and pass (producer-internal lint untouched).
 - Post-merge push sync run completes with zero new PRs.
 
-### Phase 3.2: standards PR — pr-convention-policy retirement + ADR-0005 [DOING]
+### Phase 3.2: standards PR — pr-convention-policy retirement + ADR-0005 [DONE]
+
+Merged as standards PR 434 (2026-08-19). Validator 33 components, 11 targets; ADR-0005 accepted, ADR-0003 status superseded-by; review folded a retained-README rewrite (component described post-retirement, thin-runner follow-on retired).
 
 Branch `chore/sync-audit-phase3-pr-convention-retire` off main, after 3.1 merges (same file).
 
@@ -373,7 +375,7 @@ Branch `chore/sync-audit-phase3-pr-convention-retire` off main, after 3.1 merges
 - `grep -n "Status" docs/adr/0003-pr-convention-policy-as-data.md` → the superseded-by line; `ls docs/adr/ | grep -c 0005` → 1; lychee + markdownlint green.
 - Post-merge sync run: zero new PRs (deselection never deletes downstream).
 
-### Phase 3.3: five downstream payload-deletion PRs [PENDING]
+### Phase 3.3: five downstream payload-deletion PRs [DOING]
 
 After 3.2 merges. One PR per repo (ccp, dotfiles, github-iac, medley, provisioning), Retire-lifecycle one-time deletions, main session pre-resolving exact edits before dispatching workers:
 
@@ -405,7 +407,7 @@ Merged: melodic-software/.github PR 52 (four contract headers, all guidance in s
 
 **Sanity Check:** template contains all four `##`-level contract headers and zero non-comment placeholder lines under them (`awk` over the merged file); a scratch PR against a template-inheriting repo (or the next real PR) passes the linkage gate with the template filled normally.
 
-### Phase 3.6: pr-issue-linkage fleet re-pin to v0.14.2 [PENDING]
+### Phase 3.6: pr-issue-linkage fleet re-pin to v0.14.2 [DOING]
 
 After 3.5 merges (the stricter gate must meet a compliant default template). Six caller PRs — standards, ci-workflows (self-caller `pr-issue-linkage-self.yml`), ccp, dotfiles, github-iac, medley:
 
