@@ -435,7 +435,71 @@ Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 me
 
 **Sanity Check:** full `sync-manifest.test.sh` green incl. the three new cases; `distribution/sync-manifest.sh validate` green on the real manifest (exemption honored); a scratch manifest with an unreferenced component fails with the new diagnostic; grep confirms the exemption names exactly `local-lane-guards` + its closure and the rationale comment cites Phase 5.
 
+### Phase 4R — fleet-expansion reconciliation (operator-executed Phase 4 vs the Brief)
+
+Planned 2026-08-19. Phase 4 was executed out-of-band by the operator: standards PR 428 (three targets: claude-code-proxy, codex-plugins, cursor-plugins) and PR 440 (a fourth, agent-plugins, postdating the audit roster), plus github-iac PR 337 (roster mirror at 11). A fresh-context reconciliation audit verified every Brief item DONE except the follow-ups below. The manifest stands at 33 components, 12 targets.
+
+### Phase 4R.1: operator — trim the App installation to the 12 targets [DONE]
+
+Executed by the operator before this plan's approval round: sync run 32278759065 (2026-08-19T16:56Z) shows `sync / attest` SUCCESS with all 12 target jobs green — the installation's selected set equals the manifest roster. The attest outage is OVER: the deferred sync-run evidence from Phases 3.1-3.4 is discharged (the parked dotfiles claude-permissions sync PR materialized as dotfiles PR 530), and the Phase 1.4/1.5 canary observation path is unblocked (`.github` rides the matrix with automerge true).
+
+### Phase 4R.2: github-iac PR — roster mirror 11 → 12 [DONE]
+
+Executed by the operator as github-iac PR 341 (merged): README roster lists exactly the 12 manifest targets including agent-plugins.
+
+### Phase 4R.3: standards PR — reconcile stale manifest comment prose [PENDING]
+
+The claude-review-caller comment block (:70-90) still claims cursor-plugins "is not a target at all … needs the App grant below, plus its own TARGET_VISIBILITY entry — exactly like claude-code-proxy on both counts" and claude-code-proxy is "BLOCKED on the org owner extending the sync App's selected access … Add it only with that grant recorded" — all false since PR 428 (targets exist, grant landed, TARGET_VISIBILITY entries shipped). Re-cut to present-tense truth, which requires SUPPLYING a new rationale for ccp-proxy/cursor-plugins' continued exclusion from the claude-review-caller component (verified honest answer: they are sync targets now but have not adopted the review lane — "not yet adopted", with the public-shape blocker still governing cursor-plugins). The ci-runner bullet remains accurate and survives. Keep both knowledge-corpus deferral rationales (lane adoption = prompt-injection surface at :83-90; sync-target roster = LFS blocker at :402-403) but make each name its own question so they read as complementary. New prose must avoid comment-hygiene trip shapes (`owner/repo#N`, `PR #N`, `issue N`, `GH-N` — bare "PR 428" is safe). Also fix standards PR 422's body (repin App PR: add the missing `## Fix` and `## Verification` sections — Summary and a content-bearing Related already exist; fold the legacy Test plan into Verification) so its next gate event passes under the v0.14.2 contract.
+
+**Sanity Check:** `grep -n "not a target at all\|BLOCKED on the org owner\|needs the App grant\|alongside its .TARGET_VISIBILITY" distribution/sync-manifest.yml` → empty; comment-hygiene + validator green; PR 422's linkage check green on its next event.
+
+### Phase 5 — local-lane-guards staged migration
+
+Planned 2026-08-19 from a fresh-context guard-by-guard inventory (live origin/main fleet-wide). The audit's finding stands: ADR-0004 built the component, adoption never happened, and the drift it exists to prevent is live. But the inventory sharpened WHO diverged and HOW:
+
+- **comment-hygiene policy library** — the real hazard. Medley's `tools/shared/comment-hygiene/comment-hygiene-patterns.sh` is a 212-line fork AT the canonical `comment-hygiene-tools` destination (canonical: 133). It adds 6 functions its lefthook hook, its scan-tree fork, AND its CI (which passes the fork as `patterns-file` to the ci-workflows action) all call — a managed sync would silently replace a tracked file and break every consumer (`preflight_destination` only protects UNTRACKED destinations). Asymmetry: the canonical driver runs fine against the fork; medley's consumers cannot run against canonical.
+- **machine-specific-paths** — already at the target state in medley: ADR-0019's two-driver/one-SSOT pattern has the managed `path-detection-tools` body sourced by a medley-owned wrapper ("share bodies, NOT wrapping"). Nothing to migrate.
+- **exec-bit** — three INDEPENDENT implementations, not forks: canonical 80L full-tree, medley 184L staged + 96L push-range, ccp 411L new-index-entry (a different rule for the commit skill). Legitimate diversity of scope.
+- **heading-cites (reference-integrity)** — medley's 333L copy diverged ~106 lines at a NON-canonical path (`tools/markdown-coupling/`); ci-workflows' action copy is byte-identical to canonical. Working, diverged, unrecorded.
+- **The dispatcher** (`run-local-lane-guards.sh`) and `coarse-prefilter.sh` — consumed by NOBODY: standards runs only the component's contract test in CI and gates itself via the ci-workflows actions; medley has its own lane wrappers; every other repo uses the CI actions with zero local lanes. ci-workflows' action copies of the patterns/exec-bit/heading-cites files are byte-identical (comment-hygiene-action is already a managed component there); its scan-tree.sh diverges ~20 lines (required PATTERNS_FILE, no default).
+
+Approval-gate decisions (5-A/5-B/5-C below in User-approval gates).
+
+### Phase 5.1: Guard A — medley comment-hygiene wrapper refactor [PENDING]
+
+The one guard with a live break-hazard and a repo-local precedent to follow (ADR-0019: share bodies, not wrapping). Two-sided, medley-first:
+
+CRITICAL respec from the stress-test: medley's fork is a POLICY REWRITE, not an additive extension. It carries 7 extra functions (`chp::should_skip_path`, `chp::is_scannable_extension`, `chp::scan_file`, plus 4 internal helpers `chp::_is_work_artifact_phase_token_line`, `chp::_is_internal_repo_issue_ref`, `chp::_match_warning_marker`, `chp::_emit_scan_matches`), it LACKS canonical's `chp::_record_violation`, and its `chp::scan_text` is a divergent rewrite: it permits external owner-slash-repo issue citations, phase-token grammar, and encapsulation-audit markers that canonical flags, and bans only medley-internal issue refs. Rebinding `scan_text` to canonical would red medley CI on currently-allowed tracked content (three named files carry external citations).
+
+1. **Medley PR** — the wrapper (e.g. `tools/shared/comment-hygiene/comment-hygiene-local.sh`) carries ALL 7 medley functions AND explicitly overrides `chp::scan_text` with medley's policy after sourcing the canonical patterns file beside it; the patterns file reduces to canonical 133L bytes (sourced-but-shadowed — see decision 5-A's honesty note). ALL consumers re-point to the wrapper — `.lefthook/pre-commit/comment-hygiene-check.sh`, `tools/shared/comment-hygiene/scan-tree.sh`, `ci-status.yml` `patterns-file:` input (decided, not open: the ci-workflows action takes its scan entrypoint from `PATTERNS_FILE`, so it MUST point at the wrapper to keep medley policy), and `scan-tree.test.sh`'s fixture copy (it copies the patterns file — it must copy the wrapper too). `comment-hygiene-patterns.test.sh` re-targets the wrapper for medley functions and adds a canonical-parity assertion (`cmp`) on the base file. A short medley ADR (or ADR-0019 amendment) records the shape honestly: this contains the sync-clobber hazard (a managed overwrite of the base file breaks nothing) — it does NOT converge enforcement policy, which stays medley's own in the wrapper.
+2. **Standards PR (after the medley PR merges and the destination is byte-canonical)** — flip `comment-hygiene-tools` from `locally-owned` to `managed` for medley; re-cut the :508-512 audit comment. Verified safe: the def has no `requires`, no test asserts the membership, and the sync reusable opens NO PR on a zero-delta apply (create-pull-request detects no diff).
+
+**Sanity Check:** medley: `cmp tools/shared/comment-hygiene/comment-hygiene-patterns.sh <canonical>` → identical; `git grep -l "chp::scan_file\|chp::scan_text"` consumers resolve through the wrapper only; POSITIVE fixture (planted violation) fails both lanes; NEGATIVE fixture (an external owner-slash-repo citation line and a phase-token line, matching existing tracked content) passes both lanes post-refactor; medley CI comment-hygiene gate green on the unmodified tree. Standards: `yq` shows medley manages comment-hygiene-tools; the post-merge sync run opens NO medley PR.
+
+### Phase 5.2: record dispositions — exec-bit, heading-cites, machine-paths [PENDING]
+
+No code migration; make the deliberate states legible where the audit found them unrecorded (the Phase 0 medley-counterpart pattern):
+
+1. The dispositions live in the 5.3 ADR (stress-test finding: exec-bit and heading-cites have NO manifest entries — they are files inside the local-lane-guards def that 5.3 deletes, so manifest comments have no durable home and would collide with 5.3's zero-references sanity): machine-specific-paths = ADR-0019 wrapper state, migration complete by prior art; exec-bit = three independent scope-differentiated implementations (canonical full-tree, medley staged/push-range, ccp new-index-entry), deliberately not unified; heading-cites = medley's diverged copy at a non-canonical path, migration deferred with a named revisit trigger (the next behavioral change to the canonical checker).
+2. The only manifest-side record: the re-cut `comment-hygiene-tools` comment from 5.1 and, where medley's `locally-owned` entries already carry audit comments, present-tense refreshes.
+
+**Sanity Check:** the three dispositions appear verbatim in the 5.3 ADR; comment-hygiene gate green (no issue-ref shapes); validator green.
+
+### Phase 5.3: component endgame — local-lane-guards def + exemption [PENDING]
+
+After 5.1/5.2, the drivers (dispatcher, scan-comment-hygiene, coarse-prefilter, canonical exec-bit/heading-cites/machine-paths scripts) still have ZERO consumers of the materialized form — medley kept its own drivers by design and every other repo gates via the ci-workflows actions. Execute decision 5-B (default: retire), one standards PR:
+
+1. Delete the `local-lane-guards` manifest def (:214-224).
+2. Remove the reachability exemption block from `sync-manifest.sh` (visibly dead code by 3.7's conditional-seed design).
+3. Retire the `valid_case 'zero-target exemption for local-lane-guards'` fixture case in `sync-manifest.test.sh` (it fails the moment the exemption goes — the planted fixture component becomes unreferenced); the unreferenced-component and closure fixtures survive untouched.
+4. **ADR-0006** SUPERSEDES ADR-0004 (status-line edit on 0004 per the 0003→0005 precedent), scoped as a PARTIAL supersession: the drivers' distribution ends (adoption never happened; the enforcement surface consolidated in the ci-workflows actions and repo-local wrappers); `comment-hygiene-tools`/`path-detection-tools` distribution CONTINUES. The ADR carries the 5.2 dispositions.
+5. Component DIRECTORY stays as producer-internal source + contract test, same treatment as the Phase 3.1 trio — with a same-PR re-cut of the retained files that still document the retired distribution path: `components/local-lane-guards/README.md` (drop the "distribution answer" framing and ADR-0004 pointer in favor of ADR-0006, delete the "Sync destinations" section naming `tools/shared/local-lane-guards/` and the manifest component/`requires` claims, reframe producer-internal) and the `run-local-lane-guards.sh` header comment (stop instructing consumers to invoke the distributed source; point at ADR-0006).
+
+**Sanity Check:** `grep -c "local-lane-guards" distribution/sync-manifest.yml` → 0; the exemption block gone from `sync-manifest.sh` (grep → 0); validator green at 32 components with the rule unexempted; full test suite green with the retired fixture case removed; ADR-0004 status line reads superseded-by; `ls docs/adr/ | grep -c 0006` → 1; `grep -c "Sync destinations\|distribution answer" components/local-lane-guards/README.md` → 0.
+
 ## Blast radius
+
+**Phases 4R + 5: MEDIUM.** 4R is docs/comments plus one operator action, but that action (the installation trim) is the single switch un-redding every sync run — getting the removal list wrong extends the outage. 5.1 refactors a live medley pre-commit hook and CI gate input (mitigations: ADR-0019 precedent is the exact shape; the asymmetry means each intermediate state keeps the canonical driver runnable; planted-violation fixture proof before merge; medley-first ordering so the manifest flip only lands against a byte-canonical destination). 5.3 removes a validator exemption and a component def (mitigation: 3.7's conditional seed makes the leftover exemption visibly dead; the deletion follows the proven 3.1 treatment). Not LOW: a botched 5.1 breaks medley commits repo-wide until reverted.
 
 **Phase 3: MEDIUM.** Thirteen-ish PRs across seven repos, a validator behavior change, and a fleet-wide gate strictness increase (v0.10.2 → v0.14.2 linkage in 6 repos — every future PR in those repos meets the four-section contract). Mitigations: the re-pin targets a SHA two repos already run in production with the policy entry pre-existing (zero sync waves); the org template lands BEFORE the stricter gate; upstream-before-downstream ordering per the Retire lifecycle row; the validator rule lands last against a stable manifest with fixture coverage; every PR independently revertable; no engine apply-path changes, no automerge changes, no App-grant/roster changes. Not LOW: the gate tightening changes day-to-day contributor experience fleet-wide and the validator rule can brick manifest CI if the exemption closure is wrong.
 
@@ -448,6 +512,8 @@ Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 me
 ## Stress-test summary
 
 Fresh-context adversarial review (2026-08-16, execution-scoped — the 16 locked decisions were fenced off, already 3×-validated): 2 CRITICAL, 9 IMPORTANT, 4 SUGGESTION findings; all 15 verified against the repos and folded into the plan above. Headlines: (1) `.node-version` bump would have broken standards CI — `components/cloud-environment/setup.sh` carries 4 coupled literals hard-asserted by `setup.test.sh` (now in 0.2); (2) the briefed `LANE_PATHS` append is itself the breaking change — the lockstep script assumes one shared pin across all paths (0.4 rewritten to per-path refactor-or-defer, no partial edit); (3) two cross-repo ADR-0003 refs in ci-workflows the sweep would have missed (now in 0.7); (4) pr-issue-linkage is a REQUIRED check on standards + ci-workflows PRs — every PR needs a closing keyword + `## Related` body (now in Mechanical work). This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius: it ran fresh-context with an adversarial failure-scenario brief; re-running `/planning:devils-advocate` on the same execution surface would relitigate the fenced decisions.
+
+**Phase 4R + 5 stress-test (2026-08-19, fresh-context, execution-scoped — Q3's locked mechanism fenced off):** 1 CRITICAL, 4 IMPORTANT, 4 SUGGESTION; all verified live and folded in. Headlines: (1) CRITICAL — the medley patterns fork is a POLICY REWRITE (divergent `chp::scan_text`, 7 extras, missing `_record_violation`), so the wrapper must override `scan_text` and every consumer must point at the wrapper — the original spec would have redded medley CI on currently-allowed external citations while all planned sanity checks stayed green; a negative fixture check was added. (2) The post-flip canonical file is sourced-but-shadowed — 5-A now states honestly that 5.1 buys clobber containment, not policy convergence. (3) 4R.1/4R.2 turned out ALREADY DONE on live state (operator trimmed the installation — attest green run 32278759065 — and merged the github-iac roster bump PR 341); tags corrected before execution, deferred Phase 3 evidence discharged. (4) The 5.2 dispositions re-homed into the 5.3 ADR (two guards have no manifest entries, and the comments would break 5.3's zero-references sanity). Also pinned: ADR-0006 partial supersession of 0004; the exemption fixture case retires explicitly; PR 422 needs exactly Fix + Verification; the 5.1 sync-wave proof sharpened to "opens NO PR" (create-pull-request skips zero-delta); scan-tree.test.sh's fixture copy joins the 5.1 edit list. This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius, same pattern as Phases 0-3.
 
 **Phase 3 stress-test (2026-08-19, fresh-context, execution-scoped — the locked decisions fenced off):** 1 CRITICAL, 3 IMPORTANT, 3 SUGGESTION; all verified against live origin/main fleet-wide and folded in. Headlines: (1) CRITICAL — the planned "PowerShell LEFTHOOK deny twins" could never match (the Bash rules anchor on an inline-env spelling PowerShell lacks; deny globs are whole-string with `*` only) while every planned sanity check stayed green — respecified as an env-var-reference-anchored `PowerShell(*env:LEFTHOOK*)` deny with shape-aware tests; (2) `--targets` is matrix/plan-only — `validate` hard-rejects all filter flags (doc claim corrected before authoring); (3) 3.6's "self-demonstrating" gate proof was impossible under `pull_request_target` (base-branch pin gates the PR) — replaced with post-merge proof + an open-PR sweep, since merged re-pins re-gate every open PR on its next event; (4) the permissions edit is replace-`{}`-not-insert in five callers, pin-only in ci-workflows. Reviewer also confirmed decision 3-A end-to-end (byte-identical reusable both hops; policy entry with minimumCallerPermissions present in all four checked fleet policy copies — zero sync wave), that local-lane-guards is the ONLY post-deletion zero-target component (its two requires are independently targeted via medley — the closure clause of the exemption is redundant-but-harmless), that no test/schema/mjs hardcodes component names or counts, and that the org-template rewrite is regression-free for the v0.10.2 window. This review doubles as the Step-4 formal stress-test for the MEDIUM blast radius, same pattern as Phases 0-2.
 
@@ -482,6 +548,17 @@ Phase 2 shape: strictly 2.1 → 2.2 → 2.3 across sub-phases (each gates the ne
 
 Phase 2 scope fence per 2.2 worker: exactly one repo — `AGENTS.md` (truncate) + any files its reference sweep flags; FORBIDDEN: PLAN.md, sync-manifest.yml, any other repo, deleting AGENTS.md. Sequential fallback: run the four repos one at a time in main session.
 
+Phase 4R + 5 shape: 4R.1 (operator) is the global unblocker and runs first/anytime; 4R.2 and 4R.3 are independent small PRs (parallel-safe, different repos). 5.1's two PRs are strictly medley-then-standards; 5.2 follows 5.1's manifest edit (same file); 5.3 last (after both, removing the exemption against the final state).
+
+| Phase | Surface | Basis |
+|---|---|---|
+| 4R.1 | operator | App-installation management is org-owner-only |
+| 4R.2, 4R.3 | main session | small judgment edits (roster list; comment prose re-cut) |
+| 5.1 medley PR | main session | live-hook refactor with parity proof — judgment-heavy |
+| 5.1 standards PR, 5.2, 5.3 | main session | manifest/comment/ADR edits + validator/exemption removal |
+
+No worker fan-out this phase — every step is either sequential-gated or judgment-heavy; the standards clone's checkout belongs to the user, so all standards work rides worktrees.
+
 Phase 3 shape: Wave A (parallel-safe, zero file overlap): 3.1→3.2 chain, 3.4, 3.5 — three independent standards/.github tracks. Wave B: 3.3 (×5 workers) after 3.2; 3.6 (×6 workers) after 3.5; 3.7 after 3.1+3.2, deliberately last.
 
 | Phase | Surface | Basis |
@@ -504,6 +581,10 @@ Phase 3 scope fence per 3.3 worker: one repo — `.github/standards/pr-conventio
 
 ### User-approval gates
 
+- Phase 5 decision 5-A: APPROVED 2026-08-19 as recommended — shadow-wholesale wrapper, honestly documented (all 7 medley functions + a `chp::scan_text` override in a medley-owned wrapper sourcing the canonical file; every consumer re-points to the wrapper; the outcome is clobber containment, not policy convergence, and the medley ADR note says so).
+- Phase 5 decision 5-B: APPROVED 2026-08-19 as recommended — retire the local-lane-guards def + the reachability exemption in 5.3; ADR-0006 partially supersedes ADR-0004; directory stays producer-internal.
+- Phase 5 decision 5-C: APPROVED 2026-08-19 as recommended — exec-bit and heading-cites record-not-migrate, dispositions carried in ADR-0006.
+- Phase 4R.1/4R.2 were executed by the operator before this approval round (attest green; roster at 12) — recorded DONE, nothing to approve there.
 - Phase 3 decision 3-A: APPROVED 2026-08-19 as recommended — linkage re-pin to v0.14.2 (byte-identical reusable; policy.json entry pre-exists; zero sync waves; fleet SHA convergence).
 - Phase 3 decision 3-B: APPROVED 2026-08-19 as recommended — zero-target rule ships with a named temporary exemption for local-lane-guards, removed in Phase 5.
 - Phase 3 gate-tightening: APPROVED 2026-08-19 — after 3.6, six more repos enforce Summary/Fix/Verification/Related on every PR body.
@@ -538,7 +619,7 @@ Phase 3 scope fence per 3.3 worker: one repo — `.github/standards/pr-conventio
 
 ### Mechanical work
 
-- **PR-body gate (required check, easy to forget):** standards and ci-workflows both run `pr-issue-linkage` as a REQUIRED check (v0.10.2 shape: native closing keyword + non-empty `## Related` section; only `dependabot[bot]` exempt). BEFORE opening each PR, file (or reuse) a tracking issue in that repo and write the body with `Closes #N` + `## Related`. Downstream fleet repos enforce the weaker `## Related`-only variant (6/8 at v0.10.2) — still include the section everywhere. ~9 PRs total across the series.
+- **PR-body gate (required check, easy to forget):** `pr-issue-linkage` runs as a REQUIRED check in standards and ci-workflows, and since Phase 3.6 the v0.14.2 four-section contract is enforced across the fleet (standards, ci-workflows, ccp, dotfiles, github-iac, medley, ci-runner, provisioning): every PR body needs non-empty `## Summary`, `## Fix`, `## Verification`, and `## Related` sections plus a native closing keyword (or "No linked issue"); only `dependabot[bot]` exempt. BEFORE opening each PR, file (or reuse) a tracking issue in that repo and write the body to that contract — the older v0.10.2 keyword+Related shape no longer passes. Applies to every PR in the remaining series (4R.3, the two 5.1 PRs, the shared 5.2/5.3 PR, 1.5).
 - Commit per logical item within each PR; conventional-commit subjects; Co-authored-by trailer per repo convention.
 - Verification checkpoint per phase = its Sanity Check block; standards CI + runner-policy lane are the hard gates for S1-S3.
 - Sequential fallback for worker fan-out documented under Execution shape.
