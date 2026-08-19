@@ -499,6 +499,14 @@ targets:
       # no workflow-level path filtering), so medley's review volume rises
       # slightly.
       - claude-review-caller
+      # The destination file is byte-canonical since medley's wrapper refactor
+      # (medley ADR-0023, the ADR-0019 "share bodies, NOT wrapping" shape):
+      # medley policy lives in a repo-owned comment-hygiene-local.sh that
+      # sources this managed file and overrides chp::scan_text, so a managed
+      # overwrite here breaks nothing. Managed = clobber containment, NOT
+      # policy convergence — medley's enforcement policy stays its own in the
+      # wrapper.
+      - comment-hygiene-tools
       - lychee
       - node-runtime
       - path-detection-tools
@@ -509,12 +517,6 @@ targets:
       # committed cloud-bootstrap.test.sh over it); converge by moving them
       # into a cloud-bootstrap.local.sh, then flip to managed.
       - cloud-bootstrap
-      # Diverged local copy at the exact canonical destination
-      # (tools/shared/comment-hygiene/comment-hygiene-patterns.sh, 212 lines vs
-      # canonical 133, incl. medley-specific chp::should_skip_path), plus four
-      # sibling files the component does not ship. Recorded 2026-08-16 (audit);
-      # adoption is a staged migration with per-guard parity analysis.
-      - comment-hygiene-tools
       # The canonical payload lands under eng/dotnet-analysis/ — no collision
       # with medley's monorepo-tuned root .NET analyzer config is possible.
       # Locally owned because medley does not consume that destination:
