@@ -52,4 +52,32 @@ for pattern in "${required_restore_denies[@]}"; do
   fi
 done
 
+# The Bash LEFTHOOK denies anchor on the inline-env spelling (`LEFTHOOK=0 cmd`),
+# which PowerShell lacks — its bypass shapes all reference the env var by name:
+#   $env:LEFTHOOK = '0'; git commit …
+#   Set-Item env:LEFTHOOK 0; git commit …
+#   ${env:LEFTHOOK} = "false"; git commit …
+# PowerShell's Env: drive is case-insensitive while these rules are literal
+# whole-string globs (`*` is the only metacharacter), so two anchors cover the
+# realistic spellings: `*LEFTHOOK*` catches every uppercase-name reference
+# whatever the drive-prefix casing ($env:/$Env:/$ENV:/Set-Item env:), and
+# `*:lefthook*` catches the lowercase-name drive-qualified forms without
+# denying a bare `lefthook run …` invocation. Exotic mixed-case names
+# (LeftHook) remain out of glob reach — accepted residual, recorded here.
+required_lefthook_denies=(
+  'Bash(LEFTHOOK*=0 *)'
+  'Bash(LEFTHOOK*=FALSE *)'
+  'Bash(LEFTHOOK*=false *)'
+  'PowerShell(*:lefthook*)'
+  'PowerShell(*LEFTHOOK*)'
+)
+for pattern in "${required_lefthook_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required lefthook bypass rule"
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1

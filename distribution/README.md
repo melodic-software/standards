@@ -118,7 +118,10 @@ distribution/sync-manifest.sh plan \
 match their indexed Git blobs exactly. `apply` operates on one clean, disposable
 target checkout, validates every destination before the first write, and
 reconciles bytes plus executable mode. It never commits, pushes, merges, or
-deletes files.
+deletes files. The single-target commands (`mappings`, `dest-paths`, `apply`)
+take `--target OWNER/REPO`, and `apply` additionally takes `--target-root DIR`
+for the disposable checkout — the consumer-facing summary of every target
+filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 
 ### Plugin-catalog drift report
 
