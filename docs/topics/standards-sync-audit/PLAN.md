@@ -306,7 +306,9 @@ After 2.1 merges. One PR per target: claude-code-plugins, dotfiles, github-iac, 
 - Repo CI green on each PR.
 - claude-code-plugins only: `grep -n "AGENTS.md" docs/CLOUD-SESSIONS.md` → no `../AGENTS.md` link remains.
 
-### Phase 2.3: standards retirement PR — def, source, docs, escape-hatch home [DOING]
+### Phase 2.3: standards retirement PR — def, source, docs, escape-hatch home [DONE]
+
+Merged as standards PR 424 (squash 7798d92, 2026-08-19). Sanity verified: manifest at 37 components with zero agent-orientation refs (Bash + mjs validators green); component dir gone; CLAUDE.md 0 bytes; ESCAPE-HATCHES.md present with the opt-out procedure; residual grep hits only the audit topic plus the two deliberate retirement-record sites; full test suite green on CI (local Windows symlink cases environmental); post-merge push sync run 32256390285 succeeded with zero open sync PRs fleet-wide. Phase 2 COMPLETE.
 
 Branch `chore/sync-audit-phase2-retire` off main, after all four 2.2 PRs merge. Def deletion and entry removal are the SAME PR (validator rejects `locally-owned`/`managed` refs to unknown components — sync-manifest.sh:739,745).
 
