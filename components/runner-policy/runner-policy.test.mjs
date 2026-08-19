@@ -8884,17 +8884,14 @@ const TARGET_VISIBILITY = new Map([
   ["melodic-software/ci-runner", "public"],
   ["melodic-software/ci-workflows", "public"],
   ["melodic-software/claude-code-plugins", "public"],
-  ["melodic-software/claude-lane-sandbox", "public"],
   ["melodic-software/codex-plugins", "public"],
   ["melodic-software/cursor-plugins", "public"],
   ["melodic-software/standards", "public"],
   ["melodic-software/claude-code-proxy", "private"],
   ["melodic-software/dotfiles", "private"],
   ["melodic-software/github-iac", "private"],
-  ["melodic-software/knowledge-corpus", "private"],
   ["melodic-software/medley", "private"],
   ["melodic-software/provisioning", "private"],
-  ["melodic-software/songwriting", "private"],
 ]);
 
 function isPublicTarget(target) {
