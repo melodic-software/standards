@@ -770,8 +770,15 @@ validate_manifest() {
   # decides each guard's destination; that phase removes this exemption and
   # its closure credit.
   reachable=()
-  reachable_queue=('local-lane-guards')
-  reachable['local-lane-guards']=1
+  reachable_queue=()
+  # Seed only when the exempted name is actually defined: fixture manifests
+  # (and, after Phase 5, this manifest) carry no such component, and an
+  # unconditional seed would let a stale or misspelled exemption sit inert
+  # instead of being visibly dead code to delete.
+  if [[ -n "${COMPONENT_EXISTS['local-lane-guards']+present}" ]]; then
+    reachable['local-lane-guards']=1
+    reachable_queue+=('local-lane-guards')
+  fi
   for target in "${TARGET_NAMES[@]}"; do
     while IFS= read -r selected_component; do
       [[ -n "$selected_component" ]] || continue
