@@ -2,9 +2,11 @@
 
 Machine-readable policy and validator for fleet-wide pull-request conventions:
 Conventional Commits titles, required body sections, and native closing
-keywords (or an explicit no-issue marker). The policy file is the single
-source of truth; `ci-workflows` thin runners and the source-control plugin read
-the materialized copy from `.github/standards/pr-convention-policy/`.
+keywords (or an explicit no-issue marker). This is a standards-internal record
+and self-test — it is not distributed to consumers
+([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md));
+the gate consumers actually run is the `ci-workflows` `pr-issue-linkage.yml`
+reusable, which each repository pins directly.
 
 Run the validator locally:
 
@@ -14,10 +16,9 @@ node components/pr-convention-policy/pr-convention-policy.mjs \
   --body "$(cat components/pr-convention-policy/fixtures/good/pr-body.md)"
 ```
 
-The distributed component lives at `.github/standards/pr-convention-policy/` and
-owns its own `package.json` and lockfile with an exact `ajv` runtime pin.
-`policy.json` carries the canonical values; `policy.schema.json` is the Draft
-2020-12 structural authority.
+The component owns its own `package.json` and lockfile with an exact `ajv`
+runtime pin. `policy.json` carries the canonical values; `policy.schema.json`
+is the Draft 2020-12 structural authority.
 
 ## The standard
 
@@ -42,21 +43,20 @@ Every pull request carries:
   entries the PR does not close).
 
 The `## Related` section is fleet-wide house style (reconciled in #247); this
-component encodes the rule the `pr-issue-linkage` gate enforces. Until the
-thin-runner conversion below lands, the authoritative gate is the
-`ci-workflows` `pr-issue-linkage.yml` reusable, which hardcodes its own copy
-of the section list (four sections as of v0.14.2, `7107b34`). The two lists
-must change in lockstep; letting them drift is exactly the failure #393
-recorded.
+component encodes the rule the `pr-issue-linkage` gate enforces. The
+authoritative gate is the `ci-workflows` `pr-issue-linkage.yml` reusable,
+which hardcodes its own copy of the section list (four sections as of
+v0.14.2, `7107b34`). The two lists must change in lockstep; letting them
+drift is exactly the failure #393 recorded.
 
 ## Security
 
-`pull_request_target` callers execute the base-ref copy of this policy only.
 See [`THREAT-MODEL.md`](THREAT-MODEL.md).
 
 ## Follow-on
 
-`ci-workflows` `semantic-pr` and `pr-issue-linkage` reusables become thin
-runners that read the materialized policy instead of embedding the rules inline.
-That conversion is tracked in the same program (#173) and is intentionally out
-of scope for the standards-owned slice.
+The thin-runner conversion this component once anticipated — `ci-workflows`
+reusables reading a materialized policy copy — is retired with the
+distribution ([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md)).
+A future consumer-side analyzer is a new adoption decision, not a revival of
+the old entry.

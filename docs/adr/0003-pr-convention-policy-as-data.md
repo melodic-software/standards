@@ -1,6 +1,6 @@
 # Own PR convention policy as data
 
-- Status: accepted
+- Status: superseded by [ADR-0005](0005-retire-pr-convention-policy-distribution.md)
 - Date: 2026-08-12
 
 ## Context
