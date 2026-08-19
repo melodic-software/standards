@@ -8881,6 +8881,7 @@ test("anchored uses scalars retain provenance enforcement", async () => {
 // failing test naming the gap.
 const TARGET_VISIBILITY = new Map([
   ["melodic-software/.github", "public"],
+  ["melodic-software/agent-plugins", "public"],
   ["melodic-software/ci-runner", "public"],
   ["melodic-software/ci-workflows", "public"],
   ["melodic-software/claude-code-plugins", "public"],
