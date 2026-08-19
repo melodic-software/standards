@@ -52,4 +52,26 @@ for pattern in "${required_restore_denies[@]}"; do
   fi
 done
 
+# The Bash LEFTHOOK denies anchor on the inline-env spelling (`LEFTHOOK=0 cmd`),
+# which PowerShell lacks — its bypass shapes all reference the env var by name:
+#   $env:LEFTHOOK = '0'; git commit …
+#   Set-Item env:LEFTHOOK 0; git commit …
+#   ${env:LEFTHOOK} = "false"; git commit …
+# One substring-anchored glob covers every shape (rules are whole-string globs
+# with `*` as the only metacharacter, so precision would cost coverage).
+required_lefthook_denies=(
+  'Bash(LEFTHOOK*=0 *)'
+  'Bash(LEFTHOOK*=FALSE *)'
+  'Bash(LEFTHOOK*=false *)'
+  'PowerShell(*env:LEFTHOOK*)'
+)
+for pattern in "${required_lefthook_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required lefthook bypass rule"
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1

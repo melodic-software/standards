@@ -221,6 +221,7 @@
       "Bash(ruff check --add-noqa*)",
       "Bash(ruff check --fix*)",
       "Bash(ruff check --fix-only*)",
+      "PowerShell(*env:LEFTHOOK*)",
       "PowerShell(git * clean --force)",
       "PowerShell(git * clean -df)",
       "PowerShell(git * clean -dfx)",
