@@ -346,7 +346,9 @@ Approval-gate decisions (resolved at plan approval):
 - **Decision 3-C — provisioning's local-template stray-dash fix rides Phase 3** as a one-line PR beside the org-default fix (same defect class, found during fact-gathering) [EXEC-SHAPE].
 - Medley's `select-runner` sibling pin at v0.8.0 is OUT of scope (not pr-issue-linkage) — recorded as a follow-up tracker item in 3.6.
 
-### Phase 3.1: standards PR — delete the zero-target trio defs [DOING]
+### Phase 3.1: standards PR — delete the zero-target trio defs [DONE]
+
+Merged as standards PR 430 (squash 68e4a96, 2026-08-19). Validator 34 components, 11 targets; both validators green; review threads (stale target count, filter-flag matrix) fixed and resolved. Post-merge zero-new-PRs evidence DEFERRED — sync runs red at attest (App installation 14 vs manifest 11) pending the org-owner installation trim.
 
 Branch `chore/sync-audit-phase3-zero-target-defs` off main. Delete the manifest component defs for concurrency-policy (:161-168), dependabot-policy (:169-178), pin-comment-convention (:264-267). Nothing else changes: no target rows exist, no downstream payloads exist, no adjacent comments are lost, and every standards-internal consumer (CI jobs, npm scripts, dependabot entries, `repin-callers.test.sh` fixture corpus, runner-policy README citation, claude-lanes comments) references the component DIRECTORIES, which stay.
 
@@ -357,7 +359,7 @@ Branch `chore/sync-audit-phase3-zero-target-defs` off main. Delete the manifest 
 - Full `sync-manifest.test.sh` green (Linux CI; local Windows symlink cases environmental); standards CI green — the four component jobs still run and pass (producer-internal lint untouched).
 - Post-merge push sync run completes with zero new PRs.
 
-### Phase 3.2: standards PR — pr-convention-policy retirement + ADR-0005 [PENDING]
+### Phase 3.2: standards PR — pr-convention-policy retirement + ADR-0005 [DOING]
 
 Branch `chore/sync-audit-phase3-pr-convention-retire` off main, after 3.1 merges (same file).
 
@@ -382,7 +384,9 @@ After 3.2 merges. One PR per repo (ccp, dotfiles, github-iac, medley, provisioni
 
 **Sanity Check (per repo):** `test -d .github/standards/pr-convention-policy` → absent on merged main; `git grep -c "pr-convention-policy"` → 0; repo CI green (dependabot.yml schema lint included).
 
-### Phase 3.4: standards PR — escape-hatch expansion + deny-rule reconciliation [PENDING]
+### Phase 3.4: standards PR — escape-hatch expansion + deny-rule reconciliation [DONE]
+
+Merged as standards PR 432 (squash 5a93a99, 2026-08-19). Review hardened the deny shape further: PowerShell's Env: drive is case-insensitive, so the single `*env:LEFTHOOK*` anchor became two — `PowerShell(*LEFTHOOK*)` (any uppercase-name reference, any drive casing) + `PowerShell(*:lefthook*)` (drive-qualified lowercase, bare `lefthook run` untouched), mixed-case residual recorded in the test; the doc example now unsets the session-scoped variable. Dotfiles sync-wave evidence DEFERRED on the attest outage.
 
 Branch `chore/sync-audit-phase3-escape-hatches` off main (no dependency on 3.1-3.3).
 
@@ -392,7 +396,9 @@ Branch `chore/sync-audit-phase3-escape-hatches` off main (no dependency on 3.1-3
 
 **Sanity Check:** lychee (`include_fragments = "full"`) green over new anchors; `grep -c "target-root" distribution/README.md distribution/ESCAPE-HATCHES.md` ≥ 1 each; `grep -n "env:LEFTHOOK" components/claude-permissions/claude-permissions.json` → the new PowerShell row(s) present alongside the 3 Bash rows; claude-permissions test green asserting the new rows; a manual glob walk confirms `PowerShell(*env:LEFTHOOK*)` matches each of the three PowerShell bypass shapes above (write the three sample strings into the test as membership-adjacent comments); the post-merge sync PR to dotfiles (sole claude-permissions target) shows a claude-permissions.json-only diff and is merged (hand-merge if the fleet is still disarmed).
 
-### Phase 3.5: org-default PR template fix + provisioning rider [PENDING]
+### Phase 3.5: org-default PR template fix + provisioning rider [DONE]
+
+Merged: melodic-software/.github PR 52 (four contract headers, all guidance in stripped HTML comments; review also caught the repo's `.claude/source-control.md` pr_body_required_sections still on the old Summary/Test plan/Related contract — aligned in the same PR) and provisioning PR 312 (stray dash dropped).
 
 1. PR to `melodic-software/.github`: rewrite `.github/PULL_REQUEST_TEMPLATE.md` to carry the four contract headers (`## Summary`, `## Fix`, `## Verification`, `## Related`) plus the `Closes #` line, with ALL guidance inside HTML comments (the gate strips them — no bare-dash placeholder content under any header, closing the vacuous-pass hole; an unfilled template now fails cleanly on every section instead of passing Summary). Content-only change to a repo file — the github-iac Pulumi rule governs settings, not community-health files. No canary interaction (human PR; sync uninvolved).
 2. Rider PR to provisioning: remove the stray bare `-` under `## Related` in its local template [EXEC-SHAPE, decision 3-C].
