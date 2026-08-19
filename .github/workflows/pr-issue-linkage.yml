@@ -1,7 +1,8 @@
 name: pr-issue-linkage
 
 # Standalone required check that validates the PR body carries a native closing
-# keyword and a non-empty Related section. It runs on pull_request_target so the
+# keyword (or an explicit no-issue marker) and non-empty Summary, Fix,
+# Verification, and Related sections. It runs on pull_request_target so the
 # base-branch definition gates and a head-branch edit cannot bypass it; it reads
 # body metadata from the event payload only and checks out no head code. The
 # emitted required-check context is `pr-issue-linkage / pr-issue-linkage`.
@@ -20,10 +21,13 @@ concurrency:
 
 jobs:
   pr-issue-linkage:
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@e94438746c300b02385a7f8a2a2dcd19a7f4ad4a # v0.10.2
+    permissions:
+      pull-requests: read
+      actions: read
+    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@7107b34832a7b6db5d08d3b132621c599fbe5e50 # v0.14.2
     with:
       runner: ubuntu-24.04
       # Dependabot owns its generated body and cannot add this repository's
-      # closing-keyword + Related markers. Keep the exemption exact-login only.
+      # closing-keyword or contract-section markers. Keep the exemption
+      # exact-login only.
       exempt-authors: 'dependabot[bot]'
