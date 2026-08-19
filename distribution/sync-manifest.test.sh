@@ -680,37 +680,21 @@ actual_review_instructions_targets="$(
 assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
   "$expected_review_instructions_targets" "$actual_review_instructions_targets"
 
-# Retirement staging (audit topic docs/topics/standards-sync-audit/, Phase 2):
-# no target whole-file-manages agent-orientation anymore; the four former
-# consumers hold it locally-owned until their AGENTS.md blanking PRs merge and
-# the component def retires.
-assert_eq 'no target whole-file-manages agent-orientation (retirement staging)' '[]' \
-  "$(yq -o=json -I=0 \
-    '[.targets | to_entries[] | select(.value.managed[]? == "agent-orientation") | .key]' \
+# agent-orientation was retired by the standards sync audit (audit topic
+# docs/topics/standards-sync-audit/, Phase 2): no component ships AGENTS.md
+# anywhere anymore.
+assert_eq 'no component named agent-orientation exists (retired)' '0' \
+  "$(yq -r '[.components | keys[] | select(. == "agent-orientation")] | length' \
     "$actual_manifest")"
 
-expected_agent_orientation_holders='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
-assert_eq 'the four former consumers plus medley hold agent-orientation locally-owned during retirement staging' \
-  "$expected_agent_orientation_holders" \
-  "$(yq -o=json -I=0 \
-    '[.targets | to_entries[] | select(.value["locally-owned"][]? == "agent-orientation") | .key]' \
-    "$actual_manifest")"
-
-assert_eq 'ci-workflows does not whole-file-manage agent-orientation (public repo; AGENTS.md excluded)' '0' \
+assert_eq 'medley locally-owns review-instructions rather than whole-file-managing it' '1' \
   "$(yq -r \
-    '[.targets."melodic-software/ci-workflows".managed[] | select(. == "agent-orientation")] | length' \
+    '[.targets."melodic-software/medley".locally-owned[] | select(. == "review-instructions")] | length' \
     "$actual_manifest")"
-
-for component in agent-orientation review-instructions; do
-  assert_eq "medley locally-owns $component rather than whole-file-managing it" '1' \
-    "$(COMPONENT="$component" yq -r \
-      '[.targets."melodic-software/medley".locally-owned[] | select(. == strenv(COMPONENT))] | length' \
-      "$actual_manifest")"
-  assert_eq "medley's managed list does not also claim $component" '0' \
-    "$(COMPONENT="$component" yq -r \
-      '[.targets."melodic-software/medley".managed[] | select(. == strenv(COMPONENT))] | length' \
-      "$actual_manifest")"
-done
+assert_eq "medley's managed list does not also claim review-instructions" '0' \
+  "$(yq -r \
+    '[.targets."melodic-software/medley".managed[] | select(. == "review-instructions")] | length' \
+    "$actual_manifest")"
 
 # automerge is optional policy-as-data: absent means true (exercised by every
 # prior matrix assertion above), an explicit value is emitted verbatim, and a
