@@ -374,6 +374,14 @@ done
 bad="${manifest/version: 2/version: 1}"
 invalid_case 'wrong version' "$bad" 'manifest version must be the integer 2'
 
+# An explicit core tag must win over the resolved value's shape: `!!float 2`
+# resolves to numeric 2 in both engines but is tagged !!float, not !!int.
+# The authoring schema sees only the converted JSON (an integer), hence
+# engine-only.
+bad="${manifest/version: 2/version: !!float 2}"
+invalid_case 'explicitly tagged float version' "$bad" \
+  'manifest version must be the integer 2' engine-only
+
 bad="$manifest"$'\n''unexpected: true'
 invalid_case 'unknown root key' "$bad" "manifest root contains unknown key 'unexpected'"
 

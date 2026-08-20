@@ -283,6 +283,11 @@ function rawScalarText(node) {
 function tagOf(node) {
   const n = deref(node);
   if (n === null || n === undefined) return "!!null";
+  // An explicit core tag wins over value-shape heuristics (e.g. `!!float 2`
+  // resolves to numeric 2 but must classify as !!float, exactly as yq does).
+  if (typeof n.tag === "string" && n.tag.startsWith("tag:yaml.org,2002:")) {
+    return `!!${n.tag.slice("tag:yaml.org,2002:".length)}`;
+  }
   if (isMap(n)) return "!!map";
   if (isSeq(n)) return "!!seq";
   if (!isScalar(n)) return "!!null";
