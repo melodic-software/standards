@@ -668,8 +668,8 @@ Phase 3 scope fence per 3.3 worker: one repo — `.github/standards/pr-conventio
 
 ### User-approval gates
 
-- Phase 6 decisions 6-A (yaml dependency + split + pinned parser config), 6-B (exec-wrapper entrypoint continuity), 6-C (staged dual-gate cutover), 6-D (no-Node control inversion + control-char-equivalence disposition): PENDING USER APPROVAL — the implementation of any Phase 6 sub-phase starts only after these are approved or amended.
-- Phase 6 sub-topic promotion considered and declined: the phase exceeds the promotion thresholds, but the audit's one-file phase contract (Phases 0-5 precedent) wins for continuity [EXEC-SHAPE — confirm or override at approval].
+- Phase 6 decisions 6-A (yaml dependency + split + pinned parser config), 6-B (exec-wrapper entrypoint continuity), 6-C (staged dual-gate cutover), 6-D (no-Node control inversion + control-char-equivalence disposition): APPROVED 2026-08-20 as recommended (plan PR 452 merged on explicit user approval; all four executed through 6.1-6.5).
+- Phase 6 sub-topic promotion considered and declined: the phase exceeds the promotion thresholds, but the audit's one-file phase contract (Phases 0-5 precedent) wins for continuity [EXEC-SHAPE — carried through unchallenged at approval].
 - Phase 5 decision 5-A: APPROVED 2026-08-19 as recommended — shadow-wholesale wrapper, honestly documented (all 7 medley functions + a `chp::scan_text` override in a medley-owned wrapper sourcing the canonical file; every consumer re-points to the wrapper; the outcome is clobber containment, not policy convergence, and the medley ADR note says so).
 - Phase 5 decision 5-B: APPROVED 2026-08-19 as recommended — retire the local-lane-guards def + the reachability exemption in 5.3; ADR-0006 partially supersedes ADR-0004; directory stays producer-internal.
 - Phase 5 decision 5-C: APPROVED 2026-08-19 as recommended — exec-bit and heading-cites record-not-migrate, dispositions carried in ADR-0006.
