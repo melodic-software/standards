@@ -773,6 +773,19 @@ rolling issue. Routing, the remaining five inputs, and both App secrets are
 unchanged; the sync contract stays at `v0.14.2` (the release only changed
 the watchdog reusable and repository-internal CI).
 
+Both sync-family contracts were bumped to
+`a7742cb347f18650eebcfb66e608185f66ea5758` (`v0.16.0`, standards-sync-audit
+Phase 6.3), converging the sync caller (off `7107b348`) and the watchdog (off
+`01c32956`) on one release SHA again. The release adds only engine-flavor-gated
+Node prep steps inside the reusables and the managed-files-guard action —
+SHA-pinned setup-node plus a locked `npm ci --omit=dev --ignore-scripts`
+install, skipped entirely when the pinned standards ref predates the Node
+engine — ahead of the engine cutover. Both `on.workflow_call` contracts are
+identical to their predecessors' (no input, secret, or routing change), so the
+reviewed `runner-input` shapes carry over unmodified: the five-input sync
+surface and the seven-input watchdog surface including the test-mode pair,
+with the same two App secrets on each.
+
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the
 manifest marks `automerge: true`, so it reports nothing while a rollout window
