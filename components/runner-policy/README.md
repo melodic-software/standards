@@ -786,6 +786,15 @@ reviewed `runner-input` shapes carry over unmodified: the five-input sync
 surface and the seven-input watchdog surface including the test-mode pair,
 with the same two App secrets on each.
 
+Both sync-family contracts were bumped to
+`d26c750691b5498fab529d115b63f84aa7aecebe` (`v0.17.0`, standards-sync-audit
+Phase 6.4 close-out). The release retires the reusables' checksum-verified yq
+installs — yq left the production sync path when the engine cut over to Node —
+and advances the managed-files-guard caller's standards ref onto the Node
+engine. Both `on.workflow_call` contracts are identical to their `v0.16.0`
+predecessors' (no input, secret, or routing change), so the reviewed
+`runner-input` shapes carry over unmodified once more.
+
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the
 manifest marks `automerge: true`, so it reports nothing while a rollout window
