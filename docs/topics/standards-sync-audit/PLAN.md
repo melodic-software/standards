@@ -549,7 +549,9 @@ Executed 2026-08-20: ci-workflows PRs 500 (per-job prep) and 502 (engine-flavor 
 
 **Sanity Check:** next organic sync run green at the new pin with the Bash engine still active (prep behavior-inert); policy.json carries the new SHA entries (grep); managed-files-guard consumer job green in ci-workflows CI; the alert reusable's hourly cron green at the new pin.
 
-### Phase 6.4: cutover + Bash retirement + control inversion (standards PR series) [DOING]
+### Phase 6.4: cutover + Bash retirement + control inversion (standards PR series) [DONE]
+
+Executed 2026-08-20. Cutover PR 462 (one-file wrapper swap) merged; its organic sync run 32345715813 ran the full cascade — plan, attest, all 12 targets — green on the Node engine. Retirement PR 464 merged: single suite run, node-only control (6-D inversion) green, hard-fail node_modules gate, Node control-char equivalence proof over the 256-byte fixture, docs sweep. ci-workflows PR 504 + release v0.17.0 dropped the reusables' yq installs and advanced the managed-files-guard ref onto the Node engine; standards re-pin PR 466 (policy entries + README review note in lockstep) merged, and its organic sync run 32349013117 came back 14/14 green with ZERO yq steps anywhere on the production path.
 
 1. Cutover PR: `sync-manifest.sh` body → exec wrapper (per 6-B). One file, one commit, instantly revertable — genuinely, because 6.1 already provisioned the actionlint job and made the yq-only control's gate content-based (the two surfaces that would otherwise red this PR's own CI). Watch the next organic sync run end-to-end (matrix byte-shape, attest, per-target apply, mappings in PR bodies).
 2. Retirement PR (after that green run): suite drops the dual-run + `SYNC_ENGINE_PATH` default flips inert (wrapper IS the engine path now); no-Node control replaced by the 6-D inversion (no-yq shim + reshaped scratch-copy runtime proof incl. `node_modules`); `control-char-equivalence.sh` retired per 6-D with the JS-side equivalence fixture over the same TSV; the suite's absent-`node_modules` skip-gate flips to a HARD FAILURE (stress-test finding: `skip_suite` exits 0, so a forgotten install would turn the 929-line production gate into a false green — post-port the deps are the engine's own runtime, not an environment nicety); docs sweep — `distribution/README.md` engine-language claims, `sync-manifest.schema.json` description's "Bash engine" sentence, `components/pin-comment-convention/README.md` + `pin-comment-patterns.sh` yq-precedent anchor re-cut (yq stays that component's tool on its own merits), `claude-lanes.test.sh` comment, ESCAPE-HATCHES flag doc verified unchanged (CLI surface identical).
@@ -557,11 +559,16 @@ Executed 2026-08-20: ci-workflows PRs 500 (per-job prep) and 502 (engine-flavor 
 
 **Sanity Check:** organic sync run green with the wrapper live BEFORE the retirement PR merges; `grep -c "no Node" distribution/README.md` → 0 (wrap-safe — the current phrase line-wraps and a naive needle passes vacuously); suite green with the inverted control (job log shows the yq-shim case passing); `grep -c "SYNC_ENGINE_PATH" .github/workflows/ci.yml` → 0 after retirement; guard consumer job green at the bumped standards-ref; one full sync cron tick green after the ci-workflows yq-drop re-pin.
 
-### Phase 6.5: close-out [PENDING]
+### Phase 6.5: close-out [DONE]
 
-Advance tags with merge evidence; verify the Brief acceptance line item-by-item (suite green on Node engine — cite the CI run; threat-model re-run — cite the dated row; no-Node control disposition — cite the inverted control case; supply-chain assessment — cite the subsection); watch one further organic sync cron tick.
+Executed 2026-08-20 (this PR carries the tags and the threat-model tense sweep from the retirement PR's review thread). Brief acceptance, item by item:
 
-**Sanity Check:** all four Brief acceptance items cite merged evidence in this file; no [PENDING] tags remain under Phase 6.
+1. **Black-box contract suite green against the Node engine** — PR 454's dual-gate `distribution` job (both suite runs + cross-engine parity) and every post-cutover CI run of the single-invocation suite; the two post-cutover organic sync runs (32345715813 at cutover, 32349013117 at v0.17.0, 14/14 jobs each) are the production proof.
+2. **Threat-model re-run** — the dated 2026-08-20 discharge line in `distribution/THREAT-MODEL.md` (PR 456; tense sweep here).
+3. **Explicit disposition of the no-Node control + its test** — decision 6-D executed: content-gated skip through the window (PR 454), inverted at retirement into the node-only yq-shim control plus the Node control-char equivalence proof (PR 464).
+4. **npm supply-chain assessment** — the "npm supply chain (production engine)" standing-controls section in THREAT-MODEL (PR 456), enforced in the reusables by `--omit=dev --ignore-scripts` plus retry hardening (ci-workflows PRs 500/502/504) and the policy test's npm retry-budget contract.
+
+**Sanity Check:** all four Brief acceptance items cite merged evidence in this file; no [PENDING] or [DOING] tags remain under Phase 6.
 
 ## Blast radius
 
