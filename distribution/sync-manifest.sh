@@ -729,6 +729,12 @@ validate_manifest() {
       [[ "$automerge_tag" == '!!bool' ]] ||
         die "target '$target' automerge must be a boolean"
       automerge_value="${TARGET_AUTOMERGE_VALUE[$target]-}"
+      # Literal spellings only (Phase 6 dual-gate hardening): @tsv passes a
+      # capitalized boolean through verbatim, which would emit invalid matrix
+      # JSON here while a YAML-1.2 parser normalizes it — the two engines must
+      # produce identical bytes for the same manifest.
+      [[ "$automerge_value" == true || "$automerge_value" == false ]] ||
+        die "target '$target' automerge must be the literal true or false"
     fi
     AUTOMERGE_BY_TARGET["$target"]="$automerge_value"
 
