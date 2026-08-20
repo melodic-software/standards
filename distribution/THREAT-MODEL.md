@@ -1,10 +1,14 @@
 # Exact-materialization threat model
 
 This model covers the desired-state manifest, its schema and validator, and the
-read-only or file-copy operations in [`sync-manifest.sh`](sync-manifest.sh).
-Authentication, target checkout creation, commit creation, push, and pull-
-request creation belong to the reusable workflow in `ci-workflows`; this engine
-deliberately performs none of those actions.
+read-only or file-copy operations in the distribution engine — the Node
+implementation in [`sync-manifest.mjs`](sync-manifest.mjs) and, for the
+remainder of the Phase 6 dual-gate window, the Bash implementation in
+[`sync-manifest.sh`](sync-manifest.sh) it replaces (that file becomes the
+stable exec-wrapper entrypoint at cutover). Authentication, target checkout
+creation, commit creation, push, and pull-request creation belong to the
+reusable workflow in `ci-workflows`; this engine deliberately performs none of
+those actions.
 
 The model follows OWASP's maintained threat-modeling loop and NIST SSDF's
 requirements to protect source integrity, provenance, and release inputs.
@@ -35,9 +39,16 @@ target Git history, and the reviewed pull-request boundary that follows apply.
   ambiguous YAML, ownership collision, or an unsafe target overwrite.
 - The `ci-workflows` automation and its GitHub App cross an external
   authentication boundary after this engine returns.
-- Mike Farah `yq` v4, Git, and core file utilities are trusted production
-  tooling at their installed revisions. Exact Node dependencies are an
-  authoring-CI boundary for independent JSON Schema validation only.
+- Git and core file utilities are trusted production tooling at their
+  installed revisions. The Node runtime (pinned by the repository's
+  `.node-version`, installed by SHA-pinned setup-node) and the exact-locked
+  `yaml` parser are production tooling for the Node engine. Mike Farah `yq` v4
+  is production tooling only while the Bash engine remains live in the
+  dual-gate window; at cutover it leaves the production trust set and stays
+  authoring-CI tooling (suite fixture conversion, sibling lint jobs). The
+  exact-locked Ajv tree is an authoring-CI boundary for independent JSON
+  Schema validation only (`devDependencies`, excluded from production installs
+  by `--omit=dev`).
 
 The source worktree and target checkout are separate trust domains. The Git
 index is the reviewed identity for source files and modes. The target index is
@@ -48,10 +59,14 @@ it does not authorize publication.
 
 1. The caller selects a command, canonical source root, tracked manifest, and
    optional exact target filter or target checkout.
-2. Production `yq` and Bash establish single-document YAML, duplicate-key,
+2. The production engine establishes single-document YAML, duplicate-key,
    structural, path, ownership, dependency, ordering, and source-index
-   constraints. Standards authoring CI independently checks the same manifest
-   against the Draft 2020-12 schema with Ajv.
+   constraints — the Node engine through a pinned YAML-1.2 core parser
+   configuration, the Bash engine (dual-gate window) through `yq`. Standards
+   authoring CI independently checks the same manifest against the Draft
+   2020-12 schema with Ajv, runs the black-box contract suite against BOTH
+   engines, and byte-compares every emitter's output on the real manifest
+   across the two.
 3. `validate`, `matrix`, `plan`, and `mappings` emit diagnostics or derived
    output without changing either repository.
 4. `apply` resolves the target to its physical Git root, requires one approved
@@ -73,7 +88,7 @@ it does not authorize publication.
 | A valid target is applied to the wrong checkout, or unavailable index evidence is treated as absence. | Apply requires exactly one strictly parsed normal GitHub `origin` whose normalized owner/repository matches the manifest target. Every `git ls-files` status is propagated before evidence is consumed. Origin identity detects accidental checkout mismatch; it does not authenticate the remote. | Missing/mismatched-origin and injected index-inspection-failure cases prove nonzero exit before any write. |
 | A later invalid destination leaves an apparently complete partial update. | Apply gathers and preflights every destination before the first mutation. Any later copy failure stops the caller before pull-request creation. | The preflight-collision fixture asserts that none of the earlier destinations are created. |
 | A filter broadens reconciliation to an unintended target. | Filters accept only exact known owner/repository names, reject empty and duplicate entries, and retain manifest order. Apply accepts exactly one known target. | Exact-filter, unknown, duplicate, empty-token, and earlier-target regression cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
-| Tool substitution changes parsing or validation. | The production engine requires Bash, Git, and Mike Farah `yq` major version 4; it has no Node dependency. CI downloads its reviewed `yq` version with a SHA-256 check. Separate authoring CI uses exact locked Ajv for independent schema parity. | Yq-only runtime tests with an exiting Node shim and absent `node_modules`, [`package-lock.json`](package-lock.json), command/version checks in [`sync-manifest.sh`](sync-manifest.sh), and the `distribution` CI job. |
+| Tool substitution changes parsing or validation. | The Node engine requires Git and the Node runtime pinned by `.node-version` and installed by SHA-pinned setup-node, with its single exact-locked production dependency (`yaml`) installed by `npm ci` under `--omit=dev --ignore-scripts`. The Bash engine (dual-gate window only) requires Bash, Git, and `yq` v4 downloaded with a SHA-256 check. Explicit-tag classification, merge-key rejection, and duplicate-key rejection are pinned parser configuration, not defaults. Separate authoring CI uses exact locked Ajv for an independent parse of the same manifest (yq/Go converts the schema-path input; the `yaml` parser reads the engine-path input — two parser families). | Dual-engine contract-suite runs, the cross-engine output-parity step, and the automerge literal-spelling fixture in the `distribution` CI job; [`package-lock.json`](package-lock.json) SRI; command/version checks in both engines. The Bash-era yq-only runtime control is positively gated to the legacy engine and inverts at retirement into a yq-shim control proving the Node path never invokes `yq`. |
 
 The current ownership and operating commands live in the
 [distribution README](README.md) and [`sync-manifest.yml`](sync-manifest.yml).
@@ -102,13 +117,42 @@ They are not duplicated here.
   authorized for publication.
   Checkout revision, credentials, commit, push, and pull-request review remain
   controls in `ci-workflows` and GitHub governance.
-- The production engine trusts installed Git, `yq`, shell, and file utilities;
-  authoring CI additionally trusts locked Node/Ajv. Locks and checksums reduce
-  substitution risk but do not attest the runner host or every transitive input.
+- The production engine trusts installed Git, the pinned Node runtime, and its
+  exact-locked `yaml` dependency (plus `yq`, shell, and file utilities while
+  the Bash engine remains live); authoring CI additionally trusts locked
+  Node/Ajv. Locks, checksums, and `--ignore-scripts` reduce substitution risk
+  but do not attest the runner host or every transitive input.
+- The managed-files-guard PR check runs the engine from a SHA-pinned standards
+  checkout against the yq preinstalled on the runner image — an unpinned-yq
+  gap this re-run records rather than introduces. The gap closes with the
+  Bash engine: post-cutover the guard's pinned ref advances and its engine
+  path runs Node under the same locked install as the reusables.
 
 No manifest classification accepts these model-level risks. Deviations from
 the disposable-checkout and reviewed-PR contract require a separate design and
 threat review.
+
+## npm supply chain (production engine)
+
+The Node engine puts npm on the production sync path; these are standing
+controls, never derived from the current dependency tree's shape:
+
+- **Production tree:** exactly one direct dependency — `yaml`, exact-pinned,
+  zero transitive dependencies. The Ajv tree is authoring-only
+  (`devDependencies`); production installs run `npm ci --omit=dev`.
+- **Lifecycle scripts never execute:** every production `npm ci` passes
+  `--ignore-scripts`. The sync job installs after App-token mint and beside
+  the checkout it later applies from, so a dependency postinstall would
+  otherwise run inside the credentialed job — the flag is load-bearing even
+  while the tree has no scripts.
+- **Integrity and provenance:** the committed lockfile (v3, SRI integrity
+  hashes) ships in the reviewed standards checkout the reusable clones;
+  `npm ci` refuses drift from it, bounding registry-substitution risk.
+- **Runtime pin:** `engines` requires Node 24+; workflows install via
+  SHA-pinned setup-node reading the repository's `.node-version`.
+- **Update policy:** the nested Dependabot root covers `distribution/`, but a
+  `yaml` bump is a production-parser change requiring human review — excluded
+  from any current or future automerge policy.
 
 ## Review triggers
 
@@ -123,6 +167,11 @@ changes also trigger review. Each new boundary has a fail fixture, and every
 new mutation retains complete preflight or documents a transactional
 replacement.
 
+Re-run 2026-08-20 (standards-sync-audit Phase 6.2): the parser and `yq`
+trigger rows fired for the engine Node port; this revision records the
+outcome — the trust-set change, the dual-gate evidence, and the npm
+supply-chain controls above.
+
 ## External authorities
 
 - [OWASP Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html)
@@ -130,3 +179,4 @@ replacement.
 - [Git `ls-files` documentation](https://git-scm.com/docs/git-ls-files)
 - [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)
 - [Mike Farah `yq` documentation](https://mikefarah.gitbook.io/yq/)
+- [`yaml` package documentation](https://eemeli.org/yaml/)
