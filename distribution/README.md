@@ -4,24 +4,27 @@ This slice owns the standards files that must physically exist in another
 repository and cannot be consumed through a native package, reference, or
 platform control plane.
 
-`sync-manifest.yml` is the desired-state record. `sync-manifest.sh` is its
-deterministic interpreter. The reusable workflow in `ci-workflows` supplies
-GitHub authentication and opens one reviewed reconciliation pull request per
-target.
+`sync-manifest.yml` is the desired-state record. `sync-manifest.mjs` is its
+deterministic interpreter — a Node engine with one exact-locked production
+dependency (the `yaml` parser) — and `sync-manifest.sh` is the stable
+exec-wrapper entrypoint every caller invokes. The reusable workflow in
+`ci-workflows` supplies GitHub authentication and opens one reviewed
+reconciliation pull request per target.
 
-The production Bash entrypoint uses Mike Farah `yq` v4 and requires no Node
-runtime. Standards authoring CI independently converts fixture YAML and checks
-the Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with pinned Node
-dependencies (`validate-sync-manifest.mjs`). That schema is an overlapping
-structural subset of the engine's rules: it expresses shape, naming, and
-typing constraints the engine also enforces, but not Git-index state, tracked-file
-contracts, path-safety beyond the schema, dependency closure, or apply-time
-checks. Where both validators apply on a fixture manifest, the contract suite
-in `sync-manifest.test.sh` requires them to agree; the Bash engine alone gates
-`distribution/sync-manifest.yml` in CI (`sync-manifest.sh validate`). The Bash
-path retains equivalent structural checks plus the repository path, Git-index,
-ownership, dependency-graph, target-identity, and apply safety checks that JSON
-Schema cannot express.
+Standards authoring CI independently converts fixture YAML with `yq` and
+checks the Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with
+pinned Node dependencies (`validate-sync-manifest.mjs`) — a genuinely
+independent parse: yq's Go parser reads the schema-path input while the
+engine's `yaml` parser reads the engine-path input. That schema is an
+overlapping structural subset of the engine's rules: it expresses shape,
+naming, and typing constraints the engine also enforces, but not Git-index
+state, tracked-file contracts, path-safety beyond the schema, dependency
+closure, or apply-time checks. Where both validators apply on a fixture
+manifest, the contract suite in `sync-manifest.test.sh` requires them to
+agree; the engine alone gates `distribution/sync-manifest.yml` in CI
+(`sync-manifest.sh validate`). The engine retains equivalent structural
+checks plus the repository path, Git-index, ownership, dependency-graph,
+target-identity, and apply safety checks that JSON Schema cannot express.
 
 The distribution [threat model](THREAT-MODEL.md) records trust boundaries,
 fail-closed guarantees, residual risks, and security review triggers for the

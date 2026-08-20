@@ -23,8 +23,13 @@ trap 'rm -rf "$tmp_root"' EXIT
 command -v yq >/dev/null 2>&1 || skip_suite 'Mike Farah yq v4 is not installed'
 [[ "$(yq --version 2>/dev/null)" =~ version[[:space:]]+v?4\. ]] ||
   skip_suite 'Mike Farah yq v4 is required'
-[[ -f "$root/distribution/node_modules/ajv/package.json" ]] ||
-  skip_suite 'distribution dependencies are not installed (run npm ci --prefix distribution)'
+# A missing install is a configuration error, not a skippable environment:
+# the Node deps are the production engine's own runtime, and skip_suite exits
+# 0 — a silent skip would turn this whole production gate into a false green.
+[[ -f "$root/distribution/node_modules/ajv/package.json" ]] || {
+  echo 'ERROR: distribution dependencies are not installed (run npm ci --prefix distribution)' >&2
+  exit 1
+}
 
 valid_manifest() {
   cat <<'YAML'
@@ -317,53 +322,50 @@ assert_nonzero 'target index inspection failure is rejected' "$rc"
 assert_contains 'index failure diagnostic is explicit' "$out" 'could not inspect Git index path'
 assert_file_absent 'index inspection failure writes no destination' "$target_repo/.policy"
 
-# The merged distribution workflow installs only yq. Prove the production
-# interpreter does not discover or invoke Node/Ajv after authoring validation.
-# Gated on POSITIVE detection of the legacy Bash engine (Phase 6 decision 6-D):
-# the control is meaningless for the Node engine (its dual-gate run) and for
-# the post-cutover exec wrapper; it retires with the Bash engine, replaced by
-# its inversion (a yq shim proving the Node path never invokes yq).
-if grep -q 'require_command yq' "$engine"; then
-runtime_bin="$tmp_root/yq-only-bin"
+# The production workflows install yq for authoring-side checks only. Prove
+# the production engine path — the exec wrapper plus the Node engine and its
+# locked dependencies, relocated the way the reusables consume them — never
+# discovers or invokes yq (Phase 6 decision 6-D: the inversion of the retired
+# Bash-era no-Node control).
+runtime_bin="$tmp_root/node-only-bin"
 mkdir -p "$runtime_bin"
-cat >"$runtime_bin/node" <<'SH'
+cat >"$runtime_bin/yq" <<'SH'
 #!/usr/bin/env bash
 exit 99
 SH
-chmod +x "$runtime_bin/node"
-runtime_engine_dir="$tmp_root/yq-only-runtime/distribution"
+chmod +x "$runtime_bin/yq"
+runtime_engine_dir="$tmp_root/node-only-runtime/distribution"
 mkdir -p "$runtime_engine_dir"
-cp "$engine" "$runtime_engine_dir/sync-manifest.sh"
+cp "$root/distribution/sync-manifest.sh" "$runtime_engine_dir/sync-manifest.sh"
+cp "$root/distribution/sync-manifest.mjs" "$runtime_engine_dir/sync-manifest.mjs"
+cp -R "$root/distribution/node_modules" "$runtime_engine_dir/node_modules"
 runtime_engine="$runtime_engine_dir/sync-manifest.sh"
 out="$(
-  PATH="$runtime_bin:$PATH" "$runtime_engine" validate \
+  PATH="$runtime_bin:$PATH" bash "$runtime_engine" validate \
     --source-root "$source_repo" --manifest manifest.yml 2>&1
 )"
 validate_rc=$?
 matrix_out="$(
-  PATH="$runtime_bin:$PATH" "$runtime_engine" matrix \
+  PATH="$runtime_bin:$PATH" bash "$runtime_engine" matrix \
     --source-root "$source_repo" --manifest manifest.yml --targets alpha/one 2>&1
 )"
 matrix_rc=$?
-runtime_target="$tmp_root/yq-only-target"
+runtime_target="$tmp_root/node-only-target"
 make_target "$runtime_target"
 apply_out="$(
-  PATH="$runtime_bin:$PATH" "$runtime_engine" apply \
+  PATH="$runtime_bin:$PATH" bash "$runtime_engine" apply \
     --source-root "$source_repo" --manifest manifest.yml \
     --target alpha/one --target-root "$runtime_target" 2>&1
 )"
 apply_rc=$?
-assert_exit 'yq-only production validate succeeds' 0 "$validate_rc"
-assert_exit 'yq-only production matrix succeeds' 0 "$matrix_rc"
-assert_eq 'yq-only matrix remains exact' \
+assert_exit 'node-only production validate succeeds' 0 "$validate_rc"
+assert_exit 'node-only production matrix succeeds' 0 "$matrix_rc"
+assert_eq 'node-only matrix remains exact' \
   '{"include":[{"repo":"alpha/one","repo_owner":"alpha","repo_name":"one","automerge":true}]}' "$matrix_out"
-assert_exit 'yq-only production apply succeeds' 0 "$apply_rc"
-assert_file_exists 'yq-only production apply writes the managed destination' \
+assert_exit 'node-only production apply succeeds' 0 "$apply_rc"
+assert_file_exists 'node-only production apply writes the managed destination' \
   "$runtime_target/.policy"
-assert_not_contains 'yq-only production path never invokes the Node shim' "$out$apply_out" '99'
-else
-  skip_case 'yq-only runtime control requires the legacy Bash engine (Phase 6 disposition: inverts at Bash retirement)'
-fi
+assert_not_contains 'node-only production path never invokes the yq shim' "$out$matrix_out$apply_out" '99'
 
 for filter in 'unknown/repo' 'alpha/one,alpha/one' 'alpha/one,,beta/two' ',alpha/one'; do
   out="$(run_engine "$source_repo" matrix --targets "$filter" 2>&1)"
@@ -1000,7 +1002,7 @@ bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
 invalid_case 'component key with a bare newline' "$bad" \
   "component 'consumer' keys may not contain control characters"
 
-bash "$root/distribution/control-char-equivalence.sh" ||
+node "$root/distribution/control-char-equivalence.mjs" ||
   { echo 'control-character equivalence test failed' >&2; exit 1; }
 
 [[ $FAILED -eq 0 ]] || exit 1

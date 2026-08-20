@@ -2,10 +2,10 @@
 
 This model covers the desired-state manifest, its schema and validator, and the
 read-only or file-copy operations in the distribution engine — the Node
-implementation in [`sync-manifest.mjs`](sync-manifest.mjs) and, for the
-remainder of the Phase 6 dual-gate window, the Bash implementation in
-[`sync-manifest.sh`](sync-manifest.sh) it replaces (that file becomes the
-stable exec-wrapper entrypoint at cutover). Authentication, target checkout
+implementation in [`sync-manifest.mjs`](sync-manifest.mjs), entered through
+the stable exec-wrapper [`sync-manifest.sh`](sync-manifest.sh) (the retired
+Bash implementation's path, kept so every caller's invocation stays
+byte-stable). Authentication, target checkout
 creation, commit creation, push, and pull-request creation belong to the
 reusable workflow in `ci-workflows`; this engine deliberately performs none of
 those actions.
@@ -61,12 +61,16 @@ it does not authorize publication.
    optional exact target filter or target checkout.
 2. The production engine establishes single-document YAML, duplicate-key,
    structural, path, ownership, dependency, ordering, and source-index
-   constraints — the Node engine through a pinned YAML-1.2 core parser
-   configuration, the Bash engine (dual-gate window) through `yq`. Standards
+   constraints through a pinned YAML-1.2 core parser configuration. Standards
    authoring CI independently checks the same manifest against the Draft
-   2020-12 schema with Ajv, runs the black-box contract suite against BOTH
-   engines, and byte-compares every emitter's output on the real manifest
-   across the two.
+   2020-12 schema with Ajv (an independent parse — yq/Go converts the
+   schema-path input; the engine's `yaml` parser reads the engine-path
+   input) and runs the black-box contract suite, whose assert-equal cases
+   pin every emitter's output bytes. (During the retired dual-gate window
+   the suite additionally ran against the Bash engine, with a CI step
+   byte-comparing the four read-only emitters — matrix, plan, mappings,
+   dest-paths — across the two engines on the real manifest; validate and
+   apply bytes were covered by the suite's assert-equal cases.)
 3. `validate`, `matrix`, `plan`, and `mappings` emit diagnostics or derived
    output without changing either repository.
 4. `apply` resolves the target to its physical Git root, requires one approved

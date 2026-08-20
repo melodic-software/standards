@@ -3,8 +3,8 @@
 # for `uses:` references to melodic-software/ci-workflows reusable workflows
 # and composite actions, pinned by 40-character commit SHA.
 #
-# Requires Mike Farah's yq v4 on PATH (this repo's established YAML tool —
-# see distribution/sync-manifest.sh). `scan-workflow-files.sh` in this
+# Requires Mike Farah's yq v4 on PATH (chosen for this component's parsed
+# YAML-tree extraction). `scan-workflow-files.sh` in this
 # component owns file enumeration and exit-code mapping for this
 # repository's own workflows; a ci-workflows-side driver (deferred — no
 # consumer yet) would own full-tree execution for other repositories the
