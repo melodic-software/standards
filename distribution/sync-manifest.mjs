@@ -947,7 +947,7 @@ function main() {
     usage(process.stderr);
     process.exit(2);
   }
-  const command = argv.shift();
+  const command = argv.shift() ?? "";
   if (command === "-h" || command === "--help") {
     usage(process.stdout);
     process.exit(0);
@@ -965,36 +965,30 @@ function main() {
   let targetsFilter = "";
   let target = "";
   let targetRoot = "";
+  // if/else rather than switch: the CI-pinned biome (2.5.1) misinfers every
+  // case label on a switch over an argv-derived string as unreachable.
   while (argv.length > 0) {
-    const argument = argv.shift();
-    switch (argument) {
-      case "--source-root":
-        if (argv.length < 1) die("--source-root requires a value");
-        sourceRoot = argv.shift();
-        break;
-      case "--manifest":
-        if (argv.length < 1) die("--manifest requires a value");
-        manifest = argv.shift();
-        break;
-      case "--targets":
-        if (argv.length < 1) die("--targets requires a value");
-        targetsFilter = argv.shift();
-        break;
-      case "--target":
-        if (argv.length < 1) die("--target requires a value");
-        target = argv.shift();
-        break;
-      case "--target-root":
-        if (argv.length < 1) die("--target-root requires a value");
-        targetRoot = argv.shift();
-        break;
-      case "-h":
-      case "--help":
-        usage(process.stdout);
-        process.exit(0);
-        break;
-      default:
-        die(`unknown argument '${argument}'`);
+    const argument = argv.shift() ?? "";
+    if (argument === "--source-root") {
+      if (argv.length < 1) die("--source-root requires a value");
+      sourceRoot = argv.shift() ?? "";
+    } else if (argument === "--manifest") {
+      if (argv.length < 1) die("--manifest requires a value");
+      manifest = argv.shift() ?? "";
+    } else if (argument === "--targets") {
+      if (argv.length < 1) die("--targets requires a value");
+      targetsFilter = argv.shift() ?? "";
+    } else if (argument === "--target") {
+      if (argv.length < 1) die("--target requires a value");
+      target = argv.shift() ?? "";
+    } else if (argument === "--target-root") {
+      if (argv.length < 1) die("--target-root requires a value");
+      targetRoot = argv.shift() ?? "";
+    } else if (argument === "-h" || argument === "--help") {
+      usage(process.stdout);
+      process.exit(0);
+    } else {
+      die(`unknown argument '${argument}'`);
     }
   }
 
@@ -1003,62 +997,48 @@ function main() {
   if (!isSafeRepoPath(manifest)) die(`unsafe manifest path '${manifest}'`);
   const manifestAbs = path.join(sourceRoot, manifest);
 
-  switch (command) {
-    case "validate":
-      if (targetsFilter || target || targetRoot) {
-        die("validate does not accept --targets, --target, or --target-root");
-      }
-      break;
-    case "matrix":
-    case "plan":
-      if (target || targetRoot) {
-        die(`${command} does not accept --target or --target-root`);
-      }
-      break;
-    case "mappings":
-    case "dest-paths":
-      if (targetsFilter || targetRoot) {
-        die(`${command} does not accept --targets or --target-root`);
-      }
-      if (!target) die(`${command} requires --target OWNER/REPO`);
-      break;
-    case "apply":
-      if (targetsFilter) die("apply does not accept --targets");
-      if (!target) die("apply requires --target OWNER/REPO");
-      if (!targetRoot) die("apply requires --target-root DIR");
-      break;
-    default:
-      die(`internal error: unsupported command '${command}'`);
+  if (command === "validate") {
+    if (targetsFilter || target || targetRoot) {
+      die("validate does not accept --targets, --target, or --target-root");
+    }
+  } else if (command === "matrix" || command === "plan") {
+    if (target || targetRoot) {
+      die(`${command} does not accept --target or --target-root`);
+    }
+  } else if (command === "mappings" || command === "dest-paths") {
+    if (targetsFilter || targetRoot) {
+      die(`${command} does not accept --targets or --target-root`);
+    }
+    if (!target) die(`${command} requires --target OWNER/REPO`);
+  } else if (command === "apply") {
+    if (targetsFilter) die("apply does not accept --targets");
+    if (!target) die("apply requires --target OWNER/REPO");
+    if (!targetRoot) die("apply requires --target-root DIR");
+  } else {
+    die(`internal error: unsupported command '${command}'`);
   }
 
   validateManifest(sourceRoot, manifest, manifestAbs);
-  switch (command) {
-    case "validate":
-      process.stdout.write(
-        `Manifest valid: ${componentNames.length} components, ${targetNames.length} targets\n`,
-      );
-      break;
-    case "matrix":
-      emitMatrix(selectTargets(targetsFilter));
-      break;
-    case "plan":
-      emitPlan(selectTargets(targetsFilter));
-      break;
-    case "mappings":
-      if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
-      emitManagedMappings(target);
-      break;
-    case "dest-paths":
-      // Unknown targets are a successful empty result so shared PR checks can
-      // no-op outside the manifest. mappings/apply keep the hard error.
-      if (targetExists.has(target)) emitManagedDestPaths(target);
-      break;
-    case "apply":
-      if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
-      applyTarget(sourceRoot, target, targetRoot);
-      break;
-    default:
-      die(`internal error: unsupported command '${command}'`);
+  if (command === "validate") {
+    process.stdout.write(
+      `Manifest valid: ${componentNames.length} components, ${targetNames.length} targets\n`,
+    );
+  } else if (command === "matrix") {
+    emitMatrix(selectTargets(targetsFilter));
+  } else if (command === "plan") {
+    emitPlan(selectTargets(targetsFilter));
+  } else if (command === "mappings") {
+    if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
+    emitManagedMappings(target);
+  } else if (command === "dest-paths") {
+    // Unknown targets are a successful empty result so shared PR checks can
+    // no-op outside the manifest. mappings/apply keep the hard error.
+    if (targetExists.has(target)) emitManagedDestPaths(target);
+  } else if (command === "apply") {
+    if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
+    applyTarget(sourceRoot, target, targetRoot);
+  } else {
+    die(`internal error: unsupported command '${command}'`);
   }
 }
 
