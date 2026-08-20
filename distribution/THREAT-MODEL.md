@@ -43,9 +43,8 @@ target Git history, and the reviewed pull-request boundary that follows apply.
   installed revisions. The Node runtime (pinned by the repository's
   `.node-version`, installed by SHA-pinned setup-node) and the exact-locked
   `yaml` parser are production tooling for the Node engine. Mike Farah `yq` v4
-  is production tooling only while the Bash engine remains live in the
-  dual-gate window; at cutover it leaves the production trust set and stays
-  authoring-CI tooling (suite fixture conversion, sibling lint jobs). The
+  left the production trust set at the Bash engine's retirement and is
+  authoring-CI tooling only (suite fixture conversion, sibling lint jobs). The
   exact-locked Ajv tree is an authoring-CI boundary for independent JSON
   Schema validation only (`devDependencies`, excluded from production installs
   by `--omit=dev`).
@@ -84,7 +83,7 @@ it does not authorize publication.
 
 | Threat | Control | Executable evidence |
 | --- | --- | --- |
-| A path escapes the repository, writes Git metadata, or contains control characters. | Both the authoring schema and production yq/Bash validator reject C0 and DEL controls. Bash restricts source and destination paths to safe relative segments free of `.`/`..`, backslashes, drive roots, controls, and `.git`; destination prefix collisions are rejected. | Control-injection no-write, unsafe traversal, invalid path, and file/directory collision cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
+| A path escapes the repository, writes Git metadata, or contains control characters. | Both the authoring schema and the production engine reject C0 and DEL controls. The engine restricts source and destination paths to safe relative segments free of `.`/`..`, backslashes, drive roots, controls, and `.git`; destination prefix collisions are rejected. | Control-injection no-write, unsafe traversal, invalid path, and file/directory collision cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
 | Ambiguous YAML changes ownership or selection. | The manifest must be one YAML document with unique mapping keys and must satisfy a closed Draft 2020-12 schema. Names and selections are sorted and unique. | Duplicate-key, unknown-key, version, duplicate-selection, and uppercase-target cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
 | Two components claim one source or destination, or a target omits a dependency. | Validation enforces unique source and destination ownership, rejects destination prefix conflicts and dependency cycles, and requires each managed component's direct capabilities to be managed or locally owned. | Collision, missing-dependency, and dependency-cycle cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
 | Unreviewed or special source bytes are materialized. | Every manifest and source is exactly one tracked stage-zero regular Git file. Its worktree hash must equal the indexed object, and only regular or executable Git modes are accepted. | Untracked-source, dirty-source, index-mode, and production-target materialization cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
@@ -92,7 +91,7 @@ it does not authorize publication.
 | A valid target is applied to the wrong checkout, or unavailable index evidence is treated as absence. | Apply requires exactly one strictly parsed normal GitHub `origin` whose normalized owner/repository matches the manifest target. Every `git ls-files` status is propagated before evidence is consumed. Origin identity detects accidental checkout mismatch; it does not authenticate the remote. | Missing/mismatched-origin and injected index-inspection-failure cases prove nonzero exit before any write. |
 | A later invalid destination leaves an apparently complete partial update. | Apply gathers and preflights every destination before the first mutation. Any later copy failure stops the caller before pull-request creation. | The preflight-collision fixture asserts that none of the earlier destinations are created. |
 | A filter broadens reconciliation to an unintended target. | Filters accept only exact known owner/repository names, reject empty and duplicate entries, and retain manifest order. Apply accepts exactly one known target. | Exact-filter, unknown, duplicate, empty-token, and earlier-target regression cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
-| Tool substitution changes parsing or validation. | The Node engine requires Git and the Node runtime pinned by `.node-version` and installed by SHA-pinned setup-node, with its single exact-locked production dependency (`yaml`) installed by `npm ci` under `--omit=dev --ignore-scripts`. The Bash engine (dual-gate window only) requires Bash, Git, and `yq` v4 downloaded with a SHA-256 check. Explicit-tag classification, merge-key rejection, and duplicate-key rejection are pinned parser configuration, not defaults. Separate authoring CI uses exact locked Ajv for an independent parse of the same manifest (yq/Go converts the schema-path input; the `yaml` parser reads the engine-path input — two parser families). | Dual-engine contract-suite runs, the cross-engine output-parity step, and the automerge literal-spelling fixture in the `distribution` CI job; [`package-lock.json`](package-lock.json) SRI; command/version checks in both engines. The Bash-era yq-only runtime control is positively gated to the legacy engine and inverts at retirement into a yq-shim control proving the Node path never invokes `yq`. |
+| Tool substitution changes parsing or validation. | The Node engine requires Git and the Node runtime pinned by `.node-version` and installed by SHA-pinned setup-node, with its single exact-locked production dependency (`yaml`) installed by `npm ci` under `--omit=dev --ignore-scripts`. Explicit-tag classification, merge-key rejection, and duplicate-key rejection are pinned parser configuration, not defaults. Separate authoring CI uses exact locked Ajv for an independent parse of the same manifest (yq/Go converts the schema-path input; the `yaml` parser reads the engine-path input — two parser families). | The contract suite and the automerge literal-spelling fixture in the `distribution` CI job; [`package-lock.json`](package-lock.json) SRI; the engine's command checks. The node-only runtime control relocates the production trio (wrapper, engine, locked deps) and proves the path never invokes a planted `yq` shim — the inversion of the retired Bash-era no-Node control. |
 
 The current ownership and operating commands live in the
 [distribution README](README.md) and [`sync-manifest.yml`](sync-manifest.yml).
@@ -122,15 +121,14 @@ They are not duplicated here.
   Checkout revision, credentials, commit, push, and pull-request review remain
   controls in `ci-workflows` and GitHub governance.
 - The production engine trusts installed Git, the pinned Node runtime, and its
-  exact-locked `yaml` dependency (plus `yq`, shell, and file utilities while
-  the Bash engine remains live); authoring CI additionally trusts locked
+  exact-locked `yaml` dependency; authoring CI additionally trusts locked
   Node/Ajv. Locks, checksums, and `--ignore-scripts` reduce substitution risk
   but do not attest the runner host or every transitive input.
-- The managed-files-guard PR check runs the engine from a SHA-pinned standards
-  checkout against the yq preinstalled on the runner image — an unpinned-yq
-  gap this re-run records rather than introduces. The gap closes with the
-  Bash engine: post-cutover the guard's pinned ref advances and its engine
-  path runs Node under the same locked install as the reusables.
+- The managed-files-guard PR check formerly ran the Bash engine against the
+  yq preinstalled on the runner image — an unpinned-yq gap the Phase 6.2
+  re-run recorded rather than introduced. The gap closed at the Bash engine's
+  retirement: the guard's pinned ref advanced and its engine path runs Node
+  under the same locked, script-suppressed install as the reusables.
 
 No manifest classification accepts these model-level risks. Deviations from
 the disposable-checkout and reviewed-PR contract require a separate design and
