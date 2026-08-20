@@ -56,8 +56,10 @@ alignment across consumers stays routed to the deferred mechanism in
 ## Library, driver, and what is deferred
 
 `pin-comment-patterns.sh` exposes `pcc::scan_text`, which requires Mike
-Farah's yq v4 on PATH (this repo's established YAML tool — see
-`distribution/sync-manifest.sh`). Extraction walks the parsed YAML tree —
+Farah's yq v4 on PATH — chosen on its own merits for this component's parsed
+YAML-tree extraction (the distribution engine moved to Node, so yq is
+authoring-CI tooling here, not a repo-wide engine precedent). Extraction
+walks the parsed YAML tree —
 `explode(.)` first to resolve anchors and aliases, then only
 `jobs.<id>.uses` and `jobs.<id>.steps[*].uses`, the two positions GitHub
 Actions actually executes a `uses:` value from — rather than matching text
