@@ -5,7 +5,18 @@ set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
 source "$root/harness/shell/lib.sh"
-engine="$root/distribution/sync-manifest.sh"
+# SYNC_ENGINE_PATH selects the engine under test (Phase 6 dual-gate): default
+# is the Bash engine; the Node engine run sets it to distribution/sync-manifest.mjs.
+# A relative value resolves against the repo root so the suite stays cwd-independent.
+if [[ -n "${SYNC_ENGINE_PATH:-}" ]]; then
+  if [[ "$SYNC_ENGINE_PATH" == /* || "$SYNC_ENGINE_PATH" =~ ^[A-Za-z]: ]]; then
+    engine="$SYNC_ENGINE_PATH"
+  else
+    engine="$root/$SYNC_ENGINE_PATH"
+  fi
+else
+  engine="$root/distribution/sync-manifest.sh"
+fi
 tmp_root="$(mktemp -d)"
 trap 'rm -rf "$tmp_root"' EXIT
 
@@ -181,6 +192,41 @@ rc=$?
 assert_exit 'dest-paths unknown target is a successful no-op' 0 "$rc"
 assert_eq 'dest-paths unknown target emits no paths' '' "$out"
 
+# Full-output byte assertions for the renderers the sync PR bodies and logs
+# consume verbatim (Phase 6 dual-gate hardening: needle checks alone would let
+# an engine drift the arrow glyph, ordering, or field layout while staying
+# green).
+out="$(run_engine "$source_repo" mappings --target alpha/one 2>&1)"
+rc=$?
+assert_exit 'full mappings render succeeds' 0 "$rc"
+# shellcheck disable=SC2016 # the backticks are literal Markdown output bytes
+assert_eq 'mappings output is byte-exact' \
+  '- **base**: `docs/adr/README.md` → `docs/adr/README.md` (mode `100644`)
+- **base**: `policy.txt` → `.policy` (mode `100644`)
+- **base**: `scripts/check.sh` → `tools/check.sh` (mode `100755`)
+- **consumer**: `consumer.txt` → `consumer.txt` (mode `100644`)' \
+  "$out"
+
+out="$(run_engine "$source_repo" plan 2>&1)"
+rc=$?
+assert_exit 'full plan render succeeds' 0 "$rc"
+assert_eq 'plan output is byte-exact' \
+  'Distribution plan:
+## alpha/one
+  automerge: true
+  managed base:
+    100644 docs/adr/README.md -> docs/adr/README.md
+    100644 policy.txt -> .policy
+    100755 scripts/check.sh -> tools/check.sh
+  managed consumer:
+    100644 consumer.txt -> consumer.txt
+## beta/two
+  automerge: true
+  managed consumer:
+    100644 consumer.txt -> consumer.txt
+  locally-owned base (not modified)' \
+  "$out"
+
 target_repo="$tmp_root/target-beta"
 make_target "$target_repo" beta/two
 printf 'local policy\n' >"$target_repo/.policy"
@@ -198,6 +244,12 @@ make_target "$target_repo"
 out="$(run_engine "$source_repo" apply --target alpha/one --target-root "$target_repo" 2>&1)"
 rc=$?
 assert_exit 'multi-file component applies in one operation' 0 "$rc"
+assert_eq 'apply output is byte-exact' \
+  'synced docs/adr/README.md -> docs/adr/README.md (100644)
+synced policy.txt -> .policy (100644)
+synced scripts/check.sh -> tools/check.sh (100755)
+synced consumer.txt -> consumer.txt (100644)' \
+  "$out"
 assert_file_exists 'root destination copied' "$target_repo/.policy"
 assert_file_exists 'nested destination copied' "$target_repo/tools/check.sh"
 assert_file_exists 'dependent component copied' "$target_repo/consumer.txt"
@@ -267,6 +319,11 @@ assert_file_absent 'index inspection failure writes no destination' "$target_rep
 
 # The merged distribution workflow installs only yq. Prove the production
 # interpreter does not discover or invoke Node/Ajv after authoring validation.
+# Gated on POSITIVE detection of the legacy Bash engine (Phase 6 decision 6-D):
+# the control is meaningless for the Node engine (its dual-gate run) and for
+# the post-cutover exec wrapper; it retires with the Bash engine, replaced by
+# its inversion (a yq shim proving the Node path never invokes yq).
+if grep -q 'require_command yq' "$engine"; then
 runtime_bin="$tmp_root/yq-only-bin"
 mkdir -p "$runtime_bin"
 cat >"$runtime_bin/node" <<'SH'
@@ -304,6 +361,9 @@ assert_exit 'yq-only production apply succeeds' 0 "$apply_rc"
 assert_file_exists 'yq-only production apply writes the managed destination' \
   "$runtime_target/.policy"
 assert_not_contains 'yq-only production path never invokes the Node shim' "$out$apply_out" '99'
+else
+  skip_case 'yq-only runtime control requires the legacy Bash engine (Phase 6 disposition: inverts at Bash retirement)'
+fi
 
 for filter in 'unknown/repo' 'alpha/one,alpha/one' 'alpha/one,,beta/two' ',alpha/one'; do
   out="$(run_engine "$source_repo" matrix --targets "$filter" 2>&1)"
@@ -313,6 +373,14 @@ done
 
 bad="${manifest/version: 2/version: 1}"
 invalid_case 'wrong version' "$bad" 'manifest version must be the integer 2'
+
+# An explicit core tag must win over the resolved value's shape: `!!float 2`
+# resolves to numeric 2 in both engines but is tagged !!float, not !!int.
+# The authoring schema sees only the converted JSON (an integer), hence
+# engine-only.
+bad="${manifest/version: 2/version: !!float 2}"
+invalid_case 'explicitly tagged float version' "$bad" \
+  'manifest version must be the integer 2' engine-only
 
 bad="$manifest"$'\n''unexpected: true'
 invalid_case 'unknown root key' "$bad" "manifest root contains unknown key 'unexpected'"
@@ -733,6 +801,15 @@ assert_eq 'matrix emits the explicit false and the default-true for the other ta
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: yes-please'$'\n''    managed:'}"
 invalid_case 'non-boolean automerge value' "$bad" \
   "target 'alpha/one' automerge must be a boolean" structural automerge
+
+# Both engines must emit identical matrix bytes across the Phase 6 dual-gate
+# window: yq's @tsv passes a capitalized boolean through verbatim (producing
+# invalid matrix JSON) while a YAML-1.2 parser normalizes it, so the scalar is
+# restricted to the two literal spellings. The authoring schema cannot see the
+# raw scalar (yq normalizes it during the JSON conversion), hence engine-only.
+bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: False'$'\n''    managed:'}"
+invalid_case 'automerge boolean must be spelled true or false' "$bad" \
+  "target 'alpha/one' automerge must be the literal true or false" engine-only
 
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    unknown: true'$'\n''    managed:'}"
 invalid_case 'unknown target key' "$bad" "target 'alpha/one' contains unknown key 'unknown'"

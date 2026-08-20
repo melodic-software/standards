@@ -503,6 +503,17 @@ jobs:
           sudo install yq /usr/local/bin/yq
           rm yq
           yq --version
+      # Phase 6 cutover prep: once sync-manifest.sh becomes the exec wrapper,
+      # the engine this job runs through claude-lanes.test.sh needs Node and
+      # the distribution dependencies. Inert while the Bash engine is live.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: distribution/package-lock.json
+      - name: Install distribution dependencies
+        run: npm ci --prefix distribution
       # The lint above covers .github/workflows only, so the lane caller
       # components — workflow bytes that live outside it until a sync
       # materializes them — need the consumer entrypoint run over them here,
@@ -754,8 +765,31 @@ jobs:
           sudo install yq /usr/local/bin/yq
           rm yq
           yq --version
-      - name: Test distribution engine
+      - name: Test distribution engine (Bash)
         run: bash distribution/sync-manifest.test.sh
+      # Phase 6 dual gate: the same black-box contract suite runs against the
+      # Node engine until the Bash engine retires at cutover.
+      - name: Test distribution engine (Node)
+        run: SYNC_ENGINE_PATH=distribution/sync-manifest.mjs bash distribution/sync-manifest.test.sh
+      # Window-drift guard: a manifest edit that both engines validate but
+      # render differently must fail loud — every emitter's bytes on the real
+      # manifest must be identical across engines.
+      - name: Cross-engine output parity
+        run: |
+          set -euo pipefail
+          for cmd in matrix plan; do
+            diff <(bash distribution/sync-manifest.sh "$cmd") \
+              <(node distribution/sync-manifest.mjs "$cmd")
+          done
+          bash distribution/sync-manifest.sh matrix |
+            jq -r '.include[].repo' |
+            while IFS= read -r target; do
+              for cmd in mappings dest-paths; do
+                diff <(bash distribution/sync-manifest.sh "$cmd" --target "$target") \
+                  <(node distribution/sync-manifest.mjs "$cmd" --target "$target")
+              done
+            done
+          echo "cross-engine parity: identical"
       - name: Claude-permissions tombstone contract test
         run: bash harness/shell/run-tests.sh components/claude-permissions/claude-permissions.test.sh
       - name: Plugin-baseline drift-report contract test
