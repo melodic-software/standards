@@ -424,7 +424,7 @@ After 3.5 merges (the stricter gate must meet a compliant default template). Six
 
 ### Phase 3.7: zero-target validator rule — lands LAST [DONE]
 
-Merged as standards PR 438 (squash aed54b5, 2026-08-19). Engine-only reachability rule with closure credit and the conditional local-lane-guards exemption (review hardened the seed to be conditional so a stale exemption reads as dead code); three fixture cases green; live manifest validates at 33 components. Phase 3 COMPLETE — deferred evidence items (post-merge zero-new-PRs sync runs; the dotfiles claude-permissions sync wave) remain parked on the App-attestation outage (installation 14 vs manifest 11) and discharge automatically once the org owner trims the installation.
+Merged as standards PR 438 (squash aed54b5, 2026-08-19). Engine-only reachability rule with closure credit and the conditional local-lane-guards exemption (review hardened the seed to be conditional so a stale exemption reads as dead code); three fixture cases green; live manifest validates at 33 components. Phase 3 COMPLETE — deferred evidence items (post-merge zero-new-PRs sync runs; the dotfiles claude-permissions sync wave) were parked on the App-attestation outage (installation 14 vs manifest 11) and discharged when the org owner trimmed the installation (4R.1: attest run 32278759065 at 2026-08-19T16:56Z; the parked dotfiles claude-permissions sync PR materialized as dotfiles PR 530).
 
 Branch `chore/sync-audit-phase3-zero-target-rule` off main, after 3.1 and 3.2 merge (manifest stable at 33 components).
 
