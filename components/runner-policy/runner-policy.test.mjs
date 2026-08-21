@@ -3511,6 +3511,29 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     allowedSecrets: {},
     allowedCallerPermissions: { contents: "read", issues: "write" },
   });
+  for (const sha of [REPINE_LANE_SHA_V0_14_2, REPINE_LANE_SHA_V0_17_0]) {
+    assert.deepEqual(
+      contracts[`melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${sha}`],
+      {
+        routing: "runner-input",
+        runnerInput: "runner",
+        allowedInputs: ["runner", "scan-args", "fail-on-vuln", "allow-no-lockfiles"],
+        allowedSecrets: {},
+      },
+    );
+    assert.deepEqual(
+      contracts[
+        `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${sha}`
+      ],
+      {
+        routing: "runner-input",
+        runnerInput: "runner",
+        allowedInputs: ["runner"],
+        allowedSecrets: {},
+        allowedCallerPermissions: { contents: "read", issues: "write" },
+      },
+    );
+  }
   for (const [workflow, allowedInputs] of [
     ["semantic-pr.yml", ["runner", "prerequisite-result"]],
     ["do-not-merge-gate.yml", ["runner", "prerequisite-result", "label"]],
