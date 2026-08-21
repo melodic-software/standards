@@ -196,6 +196,8 @@ jobs:
             components/runner-policy/policy.json
             components/runner-policy/runner-policy.test.mjs
             .github/workflows/claude-review.yml
+            .github/workflows/sync.yml
+            .github/workflows/standards-sync-stuck-automerge-alert.yml
           commit-message: |
             chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
 

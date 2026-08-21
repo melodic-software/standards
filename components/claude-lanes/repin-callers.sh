@@ -22,6 +22,15 @@ set -euo pipefail
 # asserts against them.
 readonly LANE_DIR='components/claude-lanes'
 
+# Sync-family and repo-local callers live outside LANE_DIR. They may already
+# pin a different SHA than the lane components; apply reads each file's own
+# pin rather than assuming one fleet-wide old SHA.
+readonly -a EXTRA_CALLER_FILES=(
+  '.github/workflows/claude-review.yml'
+  '.github/workflows/sync.yml'
+  '.github/workflows/standards-sync-stuck-automerge-alert.yml'
+)
+
 # Any `uses:` reference to a ci-workflows reusable workflow or composite action
 # pinned by 40-character commit SHA.
 readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
@@ -151,16 +160,35 @@ repin::resolve() {
 repin::apply() {
   local tag="$1" sha="$2"
   local root expected rewritten old_sha old_tags new_major old_major old_tag note delim
-  local -a targets
+  local -a targets excludes
 
   root="$(git rev-parse --show-toplevel)"
   cd "$root"
 
   targets=("$LANE_DIR"/*.yml)
-  local file
+  local file extra_present=0 extra_missing=0
+  for file in "${EXTRA_CALLER_FILES[@]}"; do
+    if [[ -f "$file" ]]; then
+      extra_present=1
+      targets+=("$file")
+    else
+      extra_missing=1
+    fi
+  done
+  # Scratch fixtures may omit every extra. Production has the full set. A
+  # partial set means a required extra was renamed or deleted — fail loud.
+  if [[ "$extra_present" -eq 1 && "$extra_missing" -eq 1 ]]; then
+    echo "::error::Enumerated extra callers must be all present or all absent." >&2
+    for file in "${EXTRA_CALLER_FILES[@]}"; do
+      if [[ ! -f "$file" ]]; then
+        echo "::error::Expected enumerated caller '${file}' does not exist." >&2
+      fi
+    done
+    return 1
+  fi
   for file in "${targets[@]}"; do
     if [[ ! -f "$file" ]]; then
-      echo "::error::Expected lane caller component '${file}' does not exist." >&2
+      echo "::error::Expected enumerated caller '${file}' does not exist." >&2
       return 1
     fi
   done
@@ -168,7 +196,11 @@ repin::apply() {
   # grep exits 1 on no match, which pipefail would turn into a failed
   # assignment under errexit; `|| true` keeps the count (0) and drops the exit.
   expected="$(grep -hoE "$PIN_RE" "${targets[@]}" | wc -l || true)"
-  old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${targets[@]}" | head -1 | tr '[:upper:]' '[:lower:]' | tr -d '@')"
+  # Unique old SHAs across every enumerated file — do not collapse to the
+  # first pin. The workflow passes this unique-set to lockstep, which accepts
+  # one SHA or a comma-separated list and still reads each caller file.
+  old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${targets[@]}" \
+    | tr '[:upper:]' '[:lower:]' | tr -d '@' | sort -u | paste -sd, - || true)"
   old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \
     | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
 
@@ -181,16 +213,21 @@ repin::apply() {
     return 1
   fi
 
-  # Runtime companion to the enumerated glob above: prove the rewrite reached
-  # nothing else, whatever the regex did.
-  if ! git diff --quiet -- . ":(exclude)$LANE_DIR/"; then
-    echo "::error::The re-pin modified files outside ${LANE_DIR}/:" >&2
-    git diff --name-only -- . ":(exclude)$LANE_DIR/" >&2
+  # Runtime companion to the enumerated set: prove the rewrite reached
+  # nothing else, whatever the regex did. Extra callers live outside
+  # LANE_DIR; they are allowlisted, not a hard-fail.
+  excludes=(":(exclude)$LANE_DIR/")
+  for file in "${EXTRA_CALLER_FILES[@]}"; do
+    excludes+=(":(exclude)$file")
+  done
+  if ! git diff --quiet -- . "${excludes[@]}"; then
+    echo "::error::The re-pin modified files outside the enumerated caller set:" >&2
+    git diff --name-only -- . "${excludes[@]}" >&2
     return 1
   fi
 
-  if git diff --quiet -- "$LANE_DIR/"; then
-    echo "::notice::${LANE_DIR}/ already pins ${tag}; nothing to propose."
+  if git diff --quiet -- "${targets[@]}"; then
+    echo "::notice::Enumerated callers already pin ${tag}; nothing to propose."
     echo 'changed=false' >> "$GITHUB_OUTPUT"
     return 0
   fi
