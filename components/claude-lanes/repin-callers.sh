@@ -166,12 +166,26 @@ repin::apply() {
   cd "$root"
 
   targets=("$LANE_DIR"/*.yml)
-  local file
+  local file extra_present=0 extra_missing=0
   for file in "${EXTRA_CALLER_FILES[@]}"; do
-    # Extra callers are optional in a scratch test repo; they are required in
-    # this repository and the existence check below covers production.
-    [[ -f "$file" ]] && targets+=("$file")
+    if [[ -f "$file" ]]; then
+      extra_present=1
+      targets+=("$file")
+    else
+      extra_missing=1
+    fi
   done
+  # Scratch fixtures may omit every extra. Production has the full set. A
+  # partial set means a required extra was renamed or deleted — fail loud.
+  if [[ "$extra_present" -eq 1 && "$extra_missing" -eq 1 ]]; then
+    echo "::error::Enumerated extra callers must be all present or all absent." >&2
+    for file in "${EXTRA_CALLER_FILES[@]}"; do
+      if [[ ! -f "$file" ]]; then
+        echo "::error::Expected enumerated caller '${file}' does not exist." >&2
+      fi
+    done
+    return 1
+  fi
   for file in "${targets[@]}"; do
     if [[ ! -f "$file" ]]; then
       echo "::error::Expected enumerated caller '${file}' does not exist." >&2

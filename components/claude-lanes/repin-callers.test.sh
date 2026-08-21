@@ -383,6 +383,31 @@ assert_contains 'apply: mixed-SHA extras include the alert caller' "$mixed_paths
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
   '.github/workflows/claude-review.yml'
 
+# A production-shaped repo that drops one extra must not silently skip it.
+repo="$scratch/repo-partial-extras"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows"
+cat > "$repo/.github/workflows/claude-review.yml" <<YAML
+name: local-review
+on: pull_request
+jobs:
+  review:
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
+YAML
+cat > "$repo/.github/workflows/standards-sync-stuck-automerge-alert.yml" <<YAML
+name: alert
+on: schedule
+jobs:
+  alert:
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@${old_sha} # v0.9.1
+YAML
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'partial extras'
+out_file="$scratch/out-apply-partial-extras"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_nonzero 'apply: a partial extra-caller set is a hard failure' "$rc"
+assert_contains 'apply: missing extra caller is named' "$out" 'sync.yml'
+
 # A file that is not in the enumerated set must still fail if the rewrite
 # somehow touches it — the extra-caller allowlist is not a blanket LANE_DIR
 # exemption.
