@@ -68,7 +68,16 @@ originals never carry an ownership label themselves.
 There are no layouts, per-target paths, transforms, patches, profiles, receipts,
 or generated downstream metadata. A component that needs a different
 destination or partial ownership is the wrong component boundary and must be
-split first.
+split first. Per-target Claude Code `enabledPlugins` follows that rule:
+each consumer has its own exact source file under
+`components/claude-settings/targets/<repo>/settings.json` (first consumer:
+github-iac via `claude-settings-github-iac`). Shared marketplace registration
+and the SessionStart bootstrap hook are asserted against
+`components/claude-settings/base/settings.json` by
+[`check-claude-settings-targets.sh`](check-claude-settings-targets.sh) —
+authoring-time conformance, not an apply-time merge. Apply copies the
+target file byte-exact. `.claude/settings.local.json` and
+managed-settings-only keys (`strictKnownMarketplaces`) stay repo-owned.
 
 Native adoption remains authoritative where it naturally lives:
 
@@ -140,9 +149,11 @@ distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
 ```
 
 Fleet mode fetches each target's settings via `gh api`, so it reads private
-repositories with the caller's own auth. To propagate a baseline change, edit
-the diverging repos' `enabledPlugins` in ordinary per-repo pull requests —
-the report tells you exactly which entries moved.
+repositories with the caller's own auth. To propagate a baseline change for a
+materialized target, edit that repo's file under
+`components/claude-settings/targets/` in this repository; sync delivers
+exact bytes. Targets not yet materialized still use ordinary per-repo pull
+requests — the report tells you which entries moved.
 
 ## Adopting a new repository
 

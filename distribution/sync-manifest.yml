@@ -140,6 +140,14 @@ components:
   claude-security-review-caller:
     files:
       components/claude-lanes/claude-security-review.yml: .github/workflows/claude-security-review.yml
+  # Per-target exact settings.json (issue 404). Not a transform: each
+  # consumer has its own source file. Shared marketplace + bootstrap hook
+  # are asserted against components/claude-settings/base/settings.json.
+  # First consumer: github-iac. Add targets/<repo>/settings.json + a
+  # dest-mapping component to extend the fleet.
+  claude-settings-github-iac:
+    files:
+      components/claude-settings/targets/github-iac/settings.json: .claude/settings.json
   # Canonical per-repo cloud bootstrap (components/cloud-bootstrap/README.md).
   # Managed targets take the generic, data-driven script byte-exact; a repo
   # enriches through its own never-synced .claude/cloud-bootstrap.local.sh, or
@@ -464,6 +472,7 @@ targets:
     managed:
       - claude-review-caller
       - claude-security-review-caller
+      - claude-settings-github-iac
       - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
