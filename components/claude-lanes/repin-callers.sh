@@ -183,8 +183,8 @@ repin::apply() {
   # assignment under errexit; `|| true` keeps the count (0) and drops the exit.
   expected="$(grep -hoE "$PIN_RE" "${targets[@]}" | wc -l || true)"
   # Unique old SHAs across every enumerated file — do not collapse to the
-  # first pin. The first value stays the legacy `old-sha` field the lockstep
-  # workflow still passes; lockstep now reads each caller file itself.
+  # first pin. The workflow passes this unique-set to lockstep, which accepts
+  # one SHA or a comma-separated list and still reads each caller file.
   old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${targets[@]}" \
     | tr '[:upper:]' '[:lower:]' | tr -d '@' | sort -u | paste -sd, - || true)"
   old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \

@@ -367,6 +367,8 @@ assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
 assert_contains 'apply: mixed-SHA extras report a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: mixed-SHA extras record both old SHAs' "$(cat "$out_file")" "$old_sha"
 assert_contains 'apply: mixed-SHA extras record the sync-family SHA' "$(cat "$out_file")" "$other_sha"
+mixed_old="$(grep '^old-sha=' "$out_file" | cut -d= -f2-)"
+assert_contains 'apply: mixed-SHA old-sha is a comma-separated unique set' "$mixed_old" ','
 assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' "$out" 'outside'
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml \

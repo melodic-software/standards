@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   ConfigurationError,
@@ -77,8 +77,32 @@ function emitNotice(message) {
   process.stdout.write(`${message}\n`);
 }
 
+const SHA_RE = /^[0-9a-f]{40}$/u;
+
 function usage() {
-  emitError("usage: repin-policy-lockstep.mjs <old-sha> <new-sha> <tag>");
+  emitError("usage: repin-policy-lockstep.mjs <old-sha[,old-sha...]> <new-sha> <tag>");
+}
+
+/**
+ * Parse lockstep argv. `old-sha` is the unique-set output from
+ * repin-callers.sh apply: one SHA, or several comma-separated when
+ * enumerated callers already pin different revisions. Each token must be a
+ * 40-character lowercase hex SHA. Lockstep still reads each caller file for
+ * copy-forward; this list only gates the CLI and the all-already-new no-op.
+ */
+export function parseLockstepArgs(argv) {
+  const [oldShaCsv, newSha, tag] = argv;
+  if (!oldShaCsv || !newSha || !tag) {
+    return { error: "usage" };
+  }
+  const oldShas = oldShaCsv.split(",").map((sha) => sha.trim());
+  if (oldShas.length === 0 || oldShas.some((sha) => sha === "" || !SHA_RE.test(sha))) {
+    return { error: "sha" };
+  }
+  if (!SHA_RE.test(newSha)) {
+    return { error: "sha" };
+  }
+  return { oldShas, newSha, tag };
 }
 
 function requireOutputFile() {
@@ -306,16 +330,17 @@ async function updateTestMjs(newSha, tag, selectorUnchanged) {
 }
 
 async function main() {
-  const [oldSha, newSha, tag] = process.argv.slice(2);
-  if (!oldSha || !newSha || !tag) {
+  const parsed = parseLockstepArgs(process.argv.slice(2));
+  if (parsed.error === "usage") {
     usage();
     process.exit(2);
   }
-  if (!/^[0-9a-f]{40}$/u.test(oldSha) || !/^[0-9a-f]{40}$/u.test(newSha)) {
+  if (parsed.error === "sha") {
     emitError("::error::old-sha and new-sha must be 40-character commit SHAs.");
     process.exit(1);
   }
-  if (oldSha === newSha) {
+  const { oldShas, newSha, tag } = parsed;
+  if (oldShas.every((sha) => sha === newSha)) {
     emitNotice("::notice::Old and new SHAs are identical; policy lockstep is a no-op.");
     await appendOutput(requireOutputFile(), [
       ["lockstep", "noop"],
@@ -410,7 +435,9 @@ async function main() {
   ]);
 }
 
-main().catch((error) => {
-  emitError(`::error::${error.message}`);
-  process.exit(1);
-});
+if (import.meta.url === pathToFileURL(path.resolve(process.argv[1] ?? "")).href) {
+  main().catch((error) => {
+    emitError(`::error::${error.message}`);
+    process.exit(1);
+  });
+}

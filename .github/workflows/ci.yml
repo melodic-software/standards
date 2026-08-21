@@ -527,6 +527,8 @@ jobs:
       # for one script.
       - name: Test the lane caller re-pin script
         run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
+      - name: Test lockstep argv accepts a mixed old-sha set
+        run: node --test components/claude-lanes/repin-policy-lockstep.test.mjs
 
   zizmor:
     permissions:
