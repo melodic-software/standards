@@ -331,6 +331,78 @@ assert_eq 'apply: only the lane callers are modified' \
   'components/claude-lanes/claude-review.yml,components/claude-lanes/claude-security-review.yml' \
   "$changed_paths"
 
+# Extra callers live outside LANE_DIR and may already pin a different SHA.
+# apply must rewrite each file from its own pin and must not hard-fail just
+# because the diff left LANE_DIR.
+repo="$scratch/repo-mixed"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+other_sha='b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5'
+mkdir -p "$repo/.github/workflows"
+cat > "$repo/.github/workflows/sync.yml" <<YAML
+name: sync
+on: workflow_dispatch
+jobs:
+  sync:
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${other_sha} # v0.8.0
+YAML
+cat > "$repo/.github/workflows/standards-sync-stuck-automerge-alert.yml" <<YAML
+name: alert
+on: schedule
+jobs:
+  alert:
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@${other_sha} # v0.8.0
+YAML
+cat > "$repo/.github/workflows/claude-review.yml" <<YAML
+name: local-review
+on: pull_request
+jobs:
+  review:
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
+YAML
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
+out_file="$scratch/out-apply-mixed"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
+assert_contains 'apply: mixed-SHA extras report a change' "$(cat "$out_file")" 'changed=true'
+assert_contains 'apply: mixed-SHA extras record both old SHAs' "$(cat "$out_file")" "$old_sha"
+assert_contains 'apply: mixed-SHA extras record the sync-family SHA' "$(cat "$out_file")" "$other_sha"
+assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' "$out" 'outside'
+mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
+  "$repo"/components/claude-lanes/*.yml \
+  "$repo"/.github/workflows/sync.yml \
+  "$repo"/.github/workflows/standards-sync-stuck-automerge-alert.yml \
+  "$repo"/.github/workflows/claude-review.yml | wc -l | tr -d ' ')"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
+mixed_paths="$(git -C "$repo" diff --name-only | sort | paste -sd, -)"
+assert_contains 'apply: mixed-SHA extras include sync.yml' "$mixed_paths" '.github/workflows/sync.yml'
+assert_contains 'apply: mixed-SHA extras include the alert caller' "$mixed_paths" \
+  '.github/workflows/standards-sync-stuck-automerge-alert.yml'
+assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
+  '.github/workflows/claude-review.yml'
+
+# A file that is not in the enumerated set must still fail if the rewrite
+# somehow touches it — the extra-caller allowlist is not a blanket LANE_DIR
+# exemption.
+repo="$scratch/repo-stray"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows"
+printf 'uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@%s # v0.9.1\n' \
+  "$old_sha" > "$repo/.github/workflows/zizmor.yml"
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'stray pin'
+# Force a stray diff the subject did not intend by rewriting the file after
+# the commit so git sees an outside change if the guard is too wide. The
+# subject itself must not touch this file; the guard assertion is that a
+# non-enumerated path stays unmodified.
+out_file="$scratch/out-apply-stray"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'apply: a stray non-enumerated workflow is left alone and apply exits 0' 0 "$rc"
+assert_not_contains 'apply: a stray zizmor caller is not rewritten' \
+  "$(cat "$repo/.github/workflows/zizmor.yml")" "$new_sha"
+assert_eq 'apply: the stray workflow stays byte-identical' \
+  "$(git -C "$repo" diff --name-only -- .github/workflows/zizmor.yml)" ''
+
 # ------------------------------------------------- apply: same major, no diff
 
 repo="$scratch/repo-minor"
