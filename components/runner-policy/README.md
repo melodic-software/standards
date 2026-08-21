@@ -648,6 +648,15 @@ this revision — and a caller repinning here without granting both fails policy
 instead of failing inside the callee. The three stay on the ordinary read-only
 boundary: the floor grants nothing and every scope they request is read, so
 none names `allowedCallerPermissions`.
+Two further reusable contracts are registered at both `7107b348` (v0.14.2)
+and `d26c750` (v0.17.0) so github-iac can leave `90f1c549` (v0.6.1):
+`osv-scanner` and `pulumi-version-drift-check`. Each is derived from that
+workflow's `workflow_call` declaration at the admitted SHA, not copied from
+the v0.6.1 contract. `osv-scanner` now declares `scan-args`, `fail-on-vuln`,
+and `allow-no-lockfiles` in addition to `runner`; `pulumi-version-drift-check`
+keeps `runner` plus the `contents: read` / `issues: write` caller-permission
+waiver the drift job already exercised. Neither SHA adds a secret or a
+routing surface.
 Eighteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these fifteen strict-scheduling
