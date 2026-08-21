@@ -42,8 +42,17 @@ check_one() {
   jq -e --slurpfile b "$base" '
       (.extraKnownMarketplaces.["melodic-software"].source.repo
         == $b[0].extraKnownMarketplaces.["melodic-software"].source.repo)
-      and ([.hooks.SessionStart[]?.hooks[]?.command // empty]
-           | any(test("cloud-bootstrap\\.sh")))
+      and ([.hooks.SessionStart[]?
+            | select(
+                ((.matcher // "") | test("startup"))
+                and ((.matcher // "") | test("resume"))
+                and ([.hooks[]?
+                      | select(
+                          .type == "command"
+                          and ((.command // "")
+                            | test("^bash[[:space:]]+\"\\$CLAUDE_PROJECT_DIR/\\.claude/cloud-bootstrap\\.sh\""))
+                        )] | length > 0)
+              )] | length > 0)
     ' "$cand" >/dev/null || {
     echo "$label: missing shared marketplace or SessionStart bootstrap hook" >&2
     CHECK_RC=1

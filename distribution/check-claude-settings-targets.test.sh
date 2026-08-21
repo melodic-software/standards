@@ -86,6 +86,55 @@ rc=$?
 assert_exit 'diverging marketplace repo exits 1' 1 "$rc"
 assert_contains 'diverging marketplace names the candidate' "$out" 'wrong-mp.json'
 
+cat >"$tmp/echo-hook.json" <<'JSON'
+{
+  "extraKnownMarketplaces": {
+    "melodic-software": {
+      "source": { "source": "github", "repo": "melodic-software/claude-code-plugins" }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "echo cloud-bootstrap.sh" }
+        ]
+      }
+    ]
+  }
+}
+JSON
+
+out="$(bash "$script" --file "$tmp/echo-hook.json" 2>&1)"
+rc=$?
+assert_exit 'echo-only bootstrap mention exits 1' 1 "$rc"
+assert_contains 'echo-only hook names the candidate' "$out" 'echo-hook.json'
+
+cat >"$tmp/wrong-matcher.json" <<'JSON'
+{
+  "extraKnownMarketplaces": {
+    "melodic-software": {
+      "source": { "source": "github", "repo": "melodic-software/claude-code-plugins" }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/cloud-bootstrap.sh\"" }
+        ]
+      }
+    ]
+  }
+}
+JSON
+
+out="$(bash "$script" --file "$tmp/wrong-matcher.json" 2>&1)"
+rc=$?
+assert_exit 'SessionStart matcher without startup/resume exits 1' 1 "$rc"
+
 printf 'not json' >"$tmp/broken.json"
 out="$(bash "$script" --file "$tmp/broken.json" 2>&1)"
 rc=$?
