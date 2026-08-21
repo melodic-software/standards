@@ -78,11 +78,13 @@ private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
 variable independently of the checked-out repository, so owner-scoped selector
 approval remains available without another workflow-controlled input.
 
-Because the distributed lockfile is an independent dependency root, every
-consumer must add an npm Dependabot entry whose `directory` is exactly
-`/.github/standards/runner-policy`. The source repository maintains the
-corresponding `/components/runner-policy` entry. Adding or relocating this
-component without both entries is incomplete dependency coverage.
+Consumers must not add an npm Dependabot entry for
+`/.github/standards/runner-policy`. That lockfile is byte-exact sync-managed
+from `/components/runner-policy`; a downstream version bump is drift the next
+sync reverts (and can silently downgrade). Coverage rides the source
+repository's `/components/runner-policy` Dependabot entry plus standards-sync.
+Dependabot directory entries drive version updates only; security alerts still
+report the nested lockfile without a consumer entry.
 
 Each adopting repository carries `.github/runner-policy.json`:
 
@@ -605,6 +607,27 @@ prerequisites from true cancels (ci-workflows#458); and the Option-2 docs
 alignment for the disabled org security-review gate (ci-workflows#448). No
 privilege widens: no lane adds a secret, a caller permission, or a routing
 surface.
+The revision at `d26c750691b5498fab529d115b63f84aa7aecebe` (v0.17.0) is
+approved the same way: `select-runner.yml` is byte-identical to `7107b348`,
+and both lane `workflow_call` inputs, secrets, caller permissions, and
+routing (`runs-on: ${{ inputs.runner }}`) are unchanged, so the selector
+input contract and both lane contracts copy forward verbatim. Auto-approval
+declined because both lanes bump `anthropics/claude-code-action` from
+`239e3a73` (v1.0.191) to `d40ddef4` (v1.0.195) inside the steps that pass
+`claude_code_oauth_token`; the credential-references surface records those
+steps in full, so an action pin bump on a credential-consuming step is a
+visible `credentialReferences` diff that needs human contract entries rather
+than inheritance. Human review confirms the secret mapping itself is
+unchanged — the action still receives only
+`claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. The other
+caller-visible payload is the review lane declaring `workflow_call` outputs
+(`review-ran`, `review-failed`, `failure-class`) so a machine consumer can
+tell a real review from a skipped or capped run; empty means no verdict,
+never a pass. The security lane's entire reusable diff is the two action pin
+lines. No privilege widens: no lane adds a secret, a caller permission, an
+allowed input, or a routing surface. The shared contracts still omit
+`standards-ref` and the `STANDARDS_REVIEW_APP_*` secrets while public
+repositories execute the gate.
 Five further reusable contracts are registered at this revision so consumers
 still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
 `do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
@@ -627,9 +650,18 @@ this revision — and a caller repinning here without granting both fails policy
 instead of failing inside the callee. The three stay on the ordinary read-only
 boundary: the floor grants nothing and every scope they request is read, so
 none names `allowedCallerPermissions`.
-Seventeen selector revisions remain approved for an ordered consumer rollout.
+Two further reusable contracts are registered at both `7107b348` (v0.14.2)
+and `d26c750` (v0.17.0) so github-iac can leave `90f1c549` (v0.6.1):
+`osv-scanner` and `pulumi-version-drift-check`. Each is derived from that
+workflow's `workflow_call` declaration at the admitted SHA, not copied from
+the v0.6.1 contract. `osv-scanner` now declares `scan-args`, `fail-on-vuln`,
+and `allow-no-lockfiles` in addition to `runner`; `pulumi-version-drift-check`
+keeps `runner` plus the `contents: read` / `issues: write` caller-permission
+waiver the drift job already exercised. Neither SHA adds a secret or a
+routing surface.
+Eighteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these fourteen strict-scheduling
+owned by a different repository owner, so these fifteen strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -878,7 +910,11 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 prefix of the pinned commit. An automated or manual repin that leaves the old
 short SHA behind turns the comment into misinformation for the next reviewer;
 version tags, prose, dates, and hex-only English words are not treated as SHA
-claims. Update the provenance comment in the same change as the pin. The
+claims. Update the provenance comment in the same change as the pin. A Dependabot
+github-actions group bump that rewrites the SHA and leaves a stale short
+SHA in the comment is `pin-provenance-drift` in the consumer, not a missing
+`policy.json` action-SHA contract — composite actions are not
+SHA-allowlisted. The
 dual-form pin-comment shape itself (`# vX.Y.Z` or
 `# <short-sha> <date>[ <note>]`) is documented and detected by the
 `pin-comment-convention` component

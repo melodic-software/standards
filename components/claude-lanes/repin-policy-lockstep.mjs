@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   ConfigurationError,
@@ -20,18 +20,55 @@ import {
   reusableWorkflowSecuritySurfacesMatch,
   validatePolicy,
 } from "../runner-policy/runner-policy.mjs";
+import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
 const UPSTREAM = "melodic-software/ci-workflows";
 const SELECTOR_PATH = `${UPSTREAM}/.github/workflows/select-runner.yml`;
-const LANE_PATHS = [
-  `${UPSTREAM}/.github/workflows/claude-review.yml`,
-  `${UPSTREAM}/.github/workflows/claude-security-review.yml`,
-];
 const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
 const TEST_PATH = path.join(ROOT, "components/runner-policy/runner-policy.test.mjs");
-const LOCAL_CALLER_PATH = path.join(ROOT, ".github/workflows/claude-review.yml");
+
+/**
+ * Each entry is one upstream reusable plus the caller files that pin it.
+ * Old SHAs are read per caller file — do not assume a single-SHA world.
+ * `kind` selects which policy.json map receives a copy-forward.
+ */
+const REPIN_TARGETS = [
+  {
+    workflowPath: `${UPSTREAM}/.github/workflows/select-runner.yml`,
+    callerFiles: [
+      "components/claude-lanes/claude-review.yml",
+      "components/claude-lanes/claude-security-review.yml",
+    ],
+    kind: "selector",
+  },
+  {
+    workflowPath: `${UPSTREAM}/.github/workflows/claude-review.yml`,
+    callerFiles: [
+      "components/claude-lanes/claude-review.yml",
+      ".github/workflows/claude-review.yml",
+    ],
+    kind: "lane",
+  },
+  {
+    workflowPath: `${UPSTREAM}/.github/workflows/claude-security-review.yml`,
+    callerFiles: ["components/claude-lanes/claude-security-review.yml"],
+    kind: "lane",
+  },
+  {
+    workflowPath: `${UPSTREAM}/.github/workflows/standards-sync.yml`,
+    callerFiles: [".github/workflows/sync.yml"],
+    kind: "reusable",
+  },
+  {
+    workflowPath: `${UPSTREAM}/.github/workflows/standards-sync-stuck-automerge-alert.yml`,
+    callerFiles: [".github/workflows/standards-sync-stuck-automerge-alert.yml"],
+    kind: "reusable",
+  },
+];
+
+const PIN_RE = /uses:\s+melodic-software\/ci-workflows\/[^@\s]+@([0-9a-fA-F]{40})/u;
 
 function emitError(message) {
   process.stderr.write(`${message}\n`);
@@ -42,7 +79,7 @@ function emitNotice(message) {
 }
 
 function usage() {
-  emitError("usage: repin-policy-lockstep.mjs <old-sha> <new-sha> <tag>");
+  emitError("usage: repin-policy-lockstep.mjs <old-sha[,old-sha...]> <new-sha> <tag>");
 }
 
 function requireOutputFile() {
@@ -112,59 +149,121 @@ function rewritePinLine(line, newSha, tag) {
   );
 }
 
-async function rewriteLocalCaller(newSha, tag) {
-  const text = await readFile(LOCAL_CALLER_PATH, "utf8");
-  const lines = text.split("\n");
-  let changed = false;
-  const next = lines.map((line) => {
-    if (!line.includes("melodic-software/ci-workflows/.github/workflows/claude-review.yml@")) {
-      return line;
+function pinsInFile(text, workflowPath) {
+  const needle = `${workflowPath}@`;
+  const shas = [];
+  for (const line of text.split("\n")) {
+    if (!line.includes(needle)) continue;
+    const match = line.match(PIN_RE);
+    if (match) shas.push(match[1].toLowerCase());
+  }
+  return shas;
+}
+
+function readHeadFile(rel) {
+  try {
+    return execFileSync("git", ["show", `HEAD:${rel}`], {
+      encoding: "utf8",
+      cwd: ROOT,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+async function readCallerPins(workflowPath, callerFiles) {
+  const found = [];
+  for (const rel of callerFiles) {
+    // apply rewrites the worktree first. Read the committed pin so each
+    // path keeps its own old SHA instead of collapsing to the new one.
+    const text = readHeadFile(rel);
+    if (text === undefined) continue;
+    for (const sha of pinsInFile(text, workflowPath)) {
+      found.push({ callerFile: rel, oldSha: sha });
     }
-    const updated = rewritePinLine(line, newSha, tag);
-    if (updated !== line) changed = true;
-    return updated;
-  });
-  if (!changed) return false;
-  await writeFile(LOCAL_CALLER_PATH, `${next.join("\n")}\n`);
+  }
+  return found;
+}
+
+async function rewriteCallerFiles(newSha, tag) {
+  const uniqueFiles = [...new Set(REPIN_TARGETS.flatMap((target) => target.callerFiles))];
+  let anyChanged = false;
+  for (const rel of uniqueFiles) {
+    const abs = path.join(ROOT, rel);
+    let text;
+    try {
+      text = await readFile(abs, "utf8");
+    } catch (error) {
+      if (error && error.code === "ENOENT") continue;
+      throw error;
+    }
+    const lines = text.split("\n");
+    let changed = false;
+    const next = lines.map((line) => {
+      if (!line.includes("melodic-software/ci-workflows/")) return line;
+      const updated = rewritePinLine(line, newSha, tag);
+      if (updated !== line) changed = true;
+      return updated;
+    });
+    if (!changed) continue;
+    await writeFile(abs, `${next.join("\n")}\n`);
+    anyChanged = true;
+  }
+  return anyChanged;
+}
+
+function copySelectorContract(policy, oldSha, newSha) {
+  const ownerList = policy.approvedSelectorReferencesByRepositoryOwner?.["melodic-software"];
+  assert.ok(Array.isArray(ownerList), "melodic-software selector allowlist is missing");
+  const selectorRef = `${SELECTOR_PATH}@${newSha}`;
+  let changed = false;
+  if (!ownerList.includes(selectorRef)) {
+    ownerList.push(selectorRef);
+    changed = true;
+  }
+  const oldSelectorKey = `${SELECTOR_PATH}@${oldSha}`;
+  const contract = policy.approvedSelectorInputContracts?.[oldSelectorKey];
+  if (!contract) {
+    throw new Error(`policy.json has no selector input contract for ${oldSelectorKey}`);
+  }
+  if (!policy.approvedSelectorInputContracts[selectorRef]) {
+    policy.approvedSelectorInputContracts[selectorRef] = structuredClone(contract);
+    changed = true;
+  }
+  return changed;
+}
+
+function copyReusableContract(policy, workflowPath, oldSha, newSha) {
+  const oldKey = `${workflowPath}@${oldSha}`;
+  const newKey = `${workflowPath}@${newSha}`;
+  const contract = policy.approvedReusableWorkflowContracts?.[oldKey];
+  if (!contract) {
+    throw new Error(`policy.json has no contract entry for ${oldKey}`);
+  }
+  if (policy.approvedReusableWorkflowContracts[newKey]) return false;
+  policy.approvedReusableWorkflowContracts[newKey] = structuredClone(contract);
   return true;
 }
 
-async function updatePolicyJson(oldSha, newSha, selectorUnchanged, laneUnchanged) {
+async function updatePolicyJson(copyForwards) {
   const policy = JSON.parse(await readFile(POLICY_PATH, "utf8"));
   let changed = false;
 
-  if (selectorUnchanged) {
-    const ownerList = policy.approvedSelectorReferencesByRepositoryOwner?.["melodic-software"];
-    assert.ok(Array.isArray(ownerList), "melodic-software selector allowlist is missing");
-    const selectorRef = `${SELECTOR_PATH}@${newSha}`;
-    if (!ownerList.includes(selectorRef)) {
-      ownerList.push(selectorRef);
-      changed = true;
-    }
-    // Allowlist membership is not enough: validatePolicy requires every approved
-    // selector reference to carry an approvedSelectorInputContracts entry.
-    const oldSelectorKey = `${SELECTOR_PATH}@${oldSha}`;
-    const contract = policy.approvedSelectorInputContracts?.[oldSelectorKey];
-    if (!contract) {
-      throw new Error(`policy.json has no selector input contract for ${oldSelectorKey}`);
-    }
-    if (!policy.approvedSelectorInputContracts[selectorRef]) {
-      policy.approvedSelectorInputContracts[selectorRef] = structuredClone(contract);
-      changed = true;
-    }
-  }
-
-  if (laneUnchanged) {
-    for (const lanePath of LANE_PATHS) {
-      const oldKey = `${lanePath}@${oldSha}`;
-      const newKey = `${lanePath}@${newSha}`;
-      const contract = policy.approvedReusableWorkflowContracts?.[oldKey];
-      if (!contract) {
-        throw new Error(`policy.json has no contract entry for ${oldKey}`);
-      }
-      if (!policy.approvedReusableWorkflowContracts[newKey]) {
-        policy.approvedReusableWorkflowContracts[newKey] = structuredClone(contract);
-        changed = true;
+  for (const item of copyForwards) {
+    switch (item.kind) {
+      case "selector":
+        if (copySelectorContract(policy, item.oldSha, item.newSha)) changed = true;
+        break;
+      case "lane":
+      case "reusable":
+        if (copyReusableContract(policy, item.workflowPath, item.oldSha, item.newSha)) {
+          changed = true;
+        }
+        break;
+      default: {
+        const exhaustive = item.kind;
+        throw new Error(`unhandled repin target kind: ${exhaustive}`);
       }
     }
   }
@@ -208,16 +307,17 @@ async function updateTestMjs(newSha, tag, selectorUnchanged) {
 }
 
 async function main() {
-  const [oldSha, newSha, tag] = process.argv.slice(2);
-  if (!oldSha || !newSha || !tag) {
+  const parsed = parseLockstepArgs(process.argv.slice(2));
+  if (parsed.error === "usage") {
     usage();
     process.exit(2);
   }
-  if (!/^[0-9a-f]{40}$/u.test(oldSha) || !/^[0-9a-f]{40}$/u.test(newSha)) {
+  if (parsed.error === "sha") {
     emitError("::error::old-sha and new-sha must be 40-character commit SHAs.");
     process.exit(1);
   }
-  if (oldSha === newSha) {
+  const { oldShas, newSha, tag } = parsed;
+  if (oldShas.every((sha) => sha === newSha)) {
     emitNotice("::notice::Old and new SHAs are identical; policy lockstep is a no-op.");
     await appendOutput(requireOutputFile(), [
       ["lockstep", "noop"],
@@ -228,33 +328,56 @@ async function main() {
 
   const outputFile = requireOutputFile();
   const policy = validatePolicy(parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH));
-  const selectorOld = fetchUpstreamFile(".github/workflows/select-runner.yml", oldSha);
-  const selectorNew = fetchUpstreamFile(".github/workflows/select-runner.yml", newSha);
-  const selectorUnchanged = selectorOld === selectorNew;
+  const newSourceByRepoPath = new Map();
+  const reasons = [];
+  const copyForwards = [];
+  let selectorUnchanged = true;
 
-  let laneUnchanged = true;
-  const laneReasons = [];
-  for (const lanePath of LANE_PATHS) {
-    const repoPath = lanePath.replace(`${UPSTREAM}/`, "");
-    const oldSource = fetchUpstreamFile(repoPath, oldSha);
-    const newSource = fetchUpstreamFile(repoPath, newSha);
-    const laneResult = laneSecuritySurfacesMatch(oldSource, newSource, lanePath, policy);
-    if (!laneResult.unchanged) {
-      laneUnchanged = false;
-      laneReasons.push(laneResult.reason);
+  for (const target of REPIN_TARGETS) {
+    const pins = await readCallerPins(target.workflowPath, target.callerFiles);
+    const oldShas = [...new Set(pins.map((pin) => pin.oldSha).filter((sha) => sha !== newSha))];
+    if (oldShas.length === 0) continue;
+
+    const repoPath = target.workflowPath.replace(`${UPSTREAM}/`, "");
+    let newSource = newSourceByRepoPath.get(repoPath);
+    if (newSource === undefined) {
+      newSource = fetchUpstreamFile(repoPath, newSha);
+      newSourceByRepoPath.set(repoPath, newSource);
+    }
+
+    for (const fromSha of oldShas) {
+      if (target.kind === "selector") {
+        const oldSource = fetchUpstreamFile(repoPath, fromSha);
+        if (oldSource !== newSource) {
+          selectorUnchanged = false;
+          reasons.push(`\`${repoPath}\` changed between ${fromSha.slice(0, 7)} and the new SHA`);
+          continue;
+        }
+        copyForwards.push({
+          kind: "selector",
+          workflowPath: target.workflowPath,
+          oldSha: fromSha,
+          newSha,
+        });
+        continue;
+      }
+
+      const oldSource = fetchUpstreamFile(repoPath, fromSha);
+      const surface = laneSecuritySurfacesMatch(oldSource, newSource, target.workflowPath, policy);
+      if (!surface.unchanged) {
+        reasons.push(`${target.workflowPath} ${surface.reason} (from ${fromSha.slice(0, 7)})`);
+        continue;
+      }
+      copyForwards.push({
+        kind: target.kind,
+        workflowPath: target.workflowPath,
+        oldSha: fromSha,
+        newSha,
+      });
     }
   }
 
-  if (!selectorUnchanged || !laneUnchanged) {
-    const reasons = [];
-    if (!selectorUnchanged) reasons.push("`select-runner.yml` changed between revisions");
-    if (!laneUnchanged) {
-      reasons.push(
-        laneReasons.length > 0
-          ? laneReasons.join("; ")
-          : "a lane reusable-workflow security surface changed between revisions",
-      );
-    }
+  if (reasons.length > 0) {
     const note =
       `> [!WARNING]\n` +
       `> **Runner-policy lockstep requires a human.** ${reasons.join("; ")}. ` +
@@ -269,9 +392,9 @@ async function main() {
     return;
   }
 
-  const policyChanged = await updatePolicyJson(oldSha, newSha, selectorUnchanged, laneUnchanged);
+  const policyChanged = await updatePolicyJson(copyForwards);
   const testChanged = await updateTestMjs(newSha, tag, selectorUnchanged);
-  const callerChanged = await rewriteLocalCaller(newSha, tag);
+  const callerChanged = await rewriteCallerFiles(newSha, tag);
 
   const note =
     "Runner-policy lockstep applied automatically: selector is byte-identical and both lane " +
@@ -289,7 +412,9 @@ async function main() {
   ]);
 }
 
-main().catch((error) => {
-  emitError(`::error::${error.message}`);
-  process.exit(1);
-});
+if (import.meta.url === pathToFileURL(path.resolve(process.argv[1] ?? "")).href) {
+  main().catch((error) => {
+    emitError(`::error::${error.message}`);
+    process.exit(1);
+  });
+}
