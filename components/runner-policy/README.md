@@ -605,6 +605,27 @@ prerequisites from true cancels (ci-workflows#458); and the Option-2 docs
 alignment for the disabled org security-review gate (ci-workflows#448). No
 privilege widens: no lane adds a secret, a caller permission, or a routing
 surface.
+The revision at `d26c750691b5498fab529d115b63f84aa7aecebe` (v0.17.0) is
+approved the same way: `select-runner.yml` is byte-identical to `7107b348`,
+and both lane `workflow_call` inputs, secrets, caller permissions, and
+routing (`runs-on: ${{ inputs.runner }}`) are unchanged, so the selector
+input contract and both lane contracts copy forward verbatim. Auto-approval
+declined because both lanes bump `anthropics/claude-code-action` from
+`239e3a73` (v1.0.191) to `d40ddef4` (v1.0.195) inside the steps that pass
+`claude_code_oauth_token`; the credential-references surface records those
+steps in full, so an action pin bump on a credential-consuming step is a
+visible `credentialReferences` diff that needs human contract entries rather
+than inheritance. Human review confirms the secret mapping itself is
+unchanged — the action still receives only
+`claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. The other
+caller-visible payload is the review lane declaring `workflow_call` outputs
+(`review-ran`, `review-failed`, `failure-class`) so a machine consumer can
+tell a real review from a skipped or capped run; empty means no verdict,
+never a pass. The security lane's entire reusable diff is the two action pin
+lines. No privilege widens: no lane adds a secret, a caller permission, an
+allowed input, or a routing surface. The shared contracts still omit
+`standards-ref` and the `STANDARDS_REVIEW_APP_*` secrets while public
+repositories execute the gate.
 Five further reusable contracts are registered at this revision so consumers
 still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
 `do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
@@ -627,9 +648,9 @@ this revision — and a caller repinning here without granting both fails policy
 instead of failing inside the callee. The three stay on the ordinary read-only
 boundary: the floor grants nothing and every scope they request is read, so
 none names `allowedCallerPermissions`.
-Seventeen selector revisions remain approved for an ordered consumer rollout.
+Eighteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these fourteen strict-scheduling
+owned by a different repository owner, so these fifteen strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
