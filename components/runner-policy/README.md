@@ -878,7 +878,11 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 prefix of the pinned commit. An automated or manual repin that leaves the old
 short SHA behind turns the comment into misinformation for the next reviewer;
 version tags, prose, dates, and hex-only English words are not treated as SHA
-claims. Update the provenance comment in the same change as the pin. The
+claims. Update the provenance comment in the same change as the pin. A Dependabot
+github-actions group bump that rewrites the SHA and leaves a stale short
+SHA in the comment is `pin-provenance-drift` in the consumer, not a missing
+`policy.json` action-SHA contract — composite actions are not
+SHA-allowlisted. The
 dual-form pin-comment shape itself (`# vX.Y.Z` or
 `# <short-sha> <date>[ <note>]`) is documented and detected by the
 `pin-comment-convention` component
