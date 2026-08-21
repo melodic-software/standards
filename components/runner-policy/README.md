@@ -78,11 +78,13 @@ private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
 variable independently of the checked-out repository, so owner-scoped selector
 approval remains available without another workflow-controlled input.
 
-Because the distributed lockfile is an independent dependency root, every
-consumer must add an npm Dependabot entry whose `directory` is exactly
-`/.github/standards/runner-policy`. The source repository maintains the
-corresponding `/components/runner-policy` entry. Adding or relocating this
-component without both entries is incomplete dependency coverage.
+Consumers must not add an npm Dependabot entry for
+`/.github/standards/runner-policy`. That lockfile is byte-exact sync-managed
+from `/components/runner-policy`; a downstream version bump is drift the next
+sync reverts (and can silently downgrade). Coverage rides the source
+repository's `/components/runner-policy` Dependabot entry plus standards-sync.
+Dependabot directory entries drive version updates only; security alerts still
+report the nested lockfile without a consumer entry.
 
 Each adopting repository carries `.github/runner-policy.json`:
 

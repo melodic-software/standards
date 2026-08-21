@@ -216,10 +216,12 @@ must add all of the following in the same integration PR:
    analyzer consumes GitHub's default `GITHUB_REPOSITORY` environment variable
    as trusted owner evidence; `.github/runner-policy.json#repositoryOwner` is
    only inventory and a mismatch tripwire.
-3. An npm Dependabot entry with
-   `directory: /.github/standards/runner-policy` for the distributed lockfile.
-4. Workflow routing, exception, and grant inventory that pass the gate at the
+3. Workflow routing, exception, and grant inventory that pass the gate at the
    reviewed selector/reusable-workflow SHA in the distributed `policy.json`.
+   Do not add a consumer npm Dependabot entry for
+   `/.github/standards/runner-policy`: that lockfile is byte-exact
+   sync-managed, so a downstream bump is drift the next sync reverts.
+   Alerts still report the nested lockfile without a consumer entry.
 
 Selector-dependent direct jobs and ordinary reusable callers use the recovery
 contract: `if: ${{ !cancelled() }}` (safely conjoined with any existing
