@@ -463,6 +463,7 @@ targets:
   melodic-software/github-iac:
     managed:
       - claude-review-caller
+      - claude-security-review-caller
       - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
