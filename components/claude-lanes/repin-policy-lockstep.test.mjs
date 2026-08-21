@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseLockstepArgs } from "./repin-policy-lockstep.mjs";
+import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
 const oldA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const oldB = "d26c750691b5498fab529d115b63f84aa7aecebe";

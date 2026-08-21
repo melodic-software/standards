@@ -20,6 +20,7 @@ import {
   reusableWorkflowSecuritySurfacesMatch,
   validatePolicy,
 } from "../runner-policy/runner-policy.mjs";
+import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -77,32 +78,8 @@ function emitNotice(message) {
   process.stdout.write(`${message}\n`);
 }
 
-const SHA_RE = /^[0-9a-f]{40}$/u;
-
 function usage() {
   emitError("usage: repin-policy-lockstep.mjs <old-sha[,old-sha...]> <new-sha> <tag>");
-}
-
-/**
- * Parse lockstep argv. `old-sha` is the unique-set output from
- * repin-callers.sh apply: one SHA, or several comma-separated when
- * enumerated callers already pin different revisions. Each token must be a
- * 40-character lowercase hex SHA. Lockstep still reads each caller file for
- * copy-forward; this list only gates the CLI and the all-already-new no-op.
- */
-export function parseLockstepArgs(argv) {
-  const [oldShaCsv, newSha, tag] = argv;
-  if (!oldShaCsv || !newSha || !tag) {
-    return { error: "usage" };
-  }
-  const oldShas = oldShaCsv.split(",").map((sha) => sha.trim());
-  if (oldShas.length === 0 || oldShas.some((sha) => sha === "" || !SHA_RE.test(sha))) {
-    return { error: "sha" };
-  }
-  if (!SHA_RE.test(newSha)) {
-    return { error: "sha" };
-  }
-  return { oldShas, newSha, tag };
 }
 
 function requireOutputFile() {
