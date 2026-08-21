@@ -475,6 +475,7 @@ targets:
       - repository-text
       - review-instructions
       - runner-policy
+      - shellcheck
       - typos
     locally-owned:
       - actionlint
