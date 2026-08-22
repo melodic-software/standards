@@ -37,14 +37,29 @@ extend-ignore-re = [
 abd = "abd"
 # Business Associate Agreements (HIPAA) — provisioning.
 BAAs = "BAAs"
+# Python trust-store package (the certifi CA bundle) — claude-code-proxy.
+certifi = "certifi"
 # Scansion vocalization for a stressed syllable ("DUM da DUM da") — songwriting
 # plugin, prosody/meter craft docs. Corrected to "DUMB" by default. Case-sensitive
 # and whole-token, so lowercase "dum" and any word containing it are unaffected.
 DUM = "DUM"
+# schtasks output-format switch (/FO, documented uppercase in
+# `schtasks /query /?`) — claude-code-proxy. Case-sensitive and whole-token, so
+# lowercase "fo" is unaffected.
+FO = "FO"
 # Features on Demand (Windows optional-feature packaging) — provisioning.
 FoD = "FoD"
+# CC BY-ND license abbreviation (NoDerivatives) — claude-code-proxy.
+# Case-sensitive and whole-token, so lowercase "nd" is unaffected.
+ND = "ND"
 # NIC power-management registry value name — provisioning.
 PnPCapabilities = "PnPCapabilities"
+# Win32 WMI device class (Win32_PnPEntity) — claude-code-proxy; same shape as
+# PnPCapabilities above.
+PnPEntity = "PnPEntity"
+# Deliberate word-stem inside a documented grep pattern (matches rotate/rotation
+# variants) — claude-code-proxy. Whole-token, so real "rotate" typos still flag.
+rotat = "rotat"
 # Jasmine/Jest suite-skip global (the x-prefixed describe) — claude-code-plugins
 # testing detector and any consumer with JS tests. Corrected to "describe" by
 # default; whole-token, so prose "describe" is unaffected.

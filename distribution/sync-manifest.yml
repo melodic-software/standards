@@ -408,13 +408,25 @@ targets:
   #   convergence target — sync PRs there are churn against throwaway state.
   #   Rationale mirrored here per the plan so the manifest, not only the
   #   plan file, records why it is absent.
+  # Beyond the Phase 4 hygiene set, claude-code-proxy manages the lefthook
+  # lanes, psscriptanalyzer, and pyright per its own plan's Phase 1 adoption
+  # (docs/topics/claude-code-logging-proxy/PLAN.md, approved 2026-07-26):
+  # lefthook-base + lefthook-powershell + lefthook-python with their closure
+  # (node-runtime, psscriptanalyzer). ruff stays locally-owned (below) and
+  # satisfies lefthook-python's requirement as a repo-owned implementation.
   melodic-software/claude-code-proxy:
     managed:
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
+      - lefthook-base
+      - lefthook-powershell
+      - lefthook-python
       - lychee
       - markdownlint
+      - node-runtime
+      - psscriptanalyzer
+      - pyright
       - repository-text
       - typos
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
