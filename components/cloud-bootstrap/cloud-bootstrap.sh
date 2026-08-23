@@ -243,8 +243,17 @@ echo "cloud-bootstrap: $enabled enabled, $installed newly installed" >&2
 undeclared=$(claude plugin marketplace list --json 2>/dev/null |
   jq -r '.[] | select((.installLocation // "") != "")
     | [.name, .installLocation] | @tsv' 2>/dev/null || true)
+declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$settings" 2>/dev/null || true)
 while IFS=$'\t' read -r mp_name mp_dir; do
   [[ -n "$mp_name" ]] || continue
+  # That listing is machine-global while this question is repo-scoped: the
+  # `marketplace add --scope user` above registers into the user scope, so a
+  # machine that has bootstrapped other repos carries their marketplaces here
+  # too. This repo enables nothing from a marketplace it never declared, so
+  # comparing against one would report its entire catalog as undeclared every
+  # session and bury the real signal. Same scoping the fleet-side check
+  # applies, and the same membership idiom used for `registered` above.
+  [[ $'\n'"$declared_mps"$'\n' == *$'\n'"$mp_name"$'\n'* ]] || continue
   catalog="$mp_dir/.claude-plugin/marketplace.json"
   [[ -f "$catalog" ]] || continue
   # The "@<marketplace>" suffix is stripped by length rather than by sub():
