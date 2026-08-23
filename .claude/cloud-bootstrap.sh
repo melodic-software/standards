@@ -40,8 +40,7 @@ cd -- "$repo_root"
 # Environment-snapshot inventory line: the shared environment's setup script
 # writes its version + build time to this stamp as its last action. Logging it
 # from every session makes "which snapshot is this account booting" visible
-# without a per-account audit; a missing stamp means an unmanaged environment
-# or an interrupted cache build.
+# without a per-account audit.
 if [[ -f /opt/melodic-env-setup.done ]]; then
   echo "cloud-bootstrap: env snapshot $(cat /opt/melodic-env-setup.done)" >&2
 else
@@ -75,7 +74,7 @@ fi
     grep -qxF "$1" "$CLAUDE_ENV_FILE" 2>/dev/null || printf '%s\n' "$1" >>"$CLAUDE_ENV_FILE"
   }
 
-  # Node from .node-version (VM nvm at /opt/nvm; image ships 20/21/22).
+  # Node from .node-version, via the VM's nvm.
   if [[ -f .node-version ]]; then
     node_pin="$(tr -d '[:space:]' <.node-version)"
     if [[ "$(node --version 2>/dev/null)" != "v$node_pin" ]]; then
