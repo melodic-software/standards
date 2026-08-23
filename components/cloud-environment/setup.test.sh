@@ -31,21 +31,41 @@ else
     "wait at line '${wait_ln:-none}', stamp write at line '${stamp_ln:-none}'"
 fi
 
-# Pin lockstep: the warm-cache Node version the script installs must match the
-# fleet pin this repository itself carries in .node-version — the drift the
-# README's update-lifecycle section otherwise leaves to manual diligence. (The
-# .NET version list has no in-repo manifest to check against; it stays a
-# documented manual obligation.)
+# Pin lockstep: the script now reads pins from the resolved checkout's own
+# manifests, but its FALLBACK Node pin (used when a repo declares none) must
+# still match the fleet pin this repository itself carries in .node-version —
+# the drift the README's update-lifecycle section otherwise leaves to manual
+# diligence. (The .NET fallback list has no in-repo manifest to check against;
+# it stays a documented manual obligation.)
 node_pin_repo="$(tr -d '[:space:]' <"$root/.node-version")"
-node_pin_script="$(sed -n 's/.*nvm install \([0-9][0-9.]*\).*/\1/p' "$script" | head -n 1)"
+node_pin_script="$(sed -n "s/^NODE_FALLBACK_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
 if [[ -n "$node_pin_script" ]]; then
-  pass 'setup.sh declares a Node pin (nvm install <version>)'
+  pass "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')"
 else
-  fail 'setup.sh declares a Node pin (nvm install <version>)' \
-    'no "nvm install <version>" line found'
+  fail "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')" \
+    "no NODE_FALLBACK_VERSION='<version>' assignment found"
 fi
-assert_eq 'setup.sh Node pin matches the repo .node-version' \
+assert_eq 'setup.sh Node fallback pin matches the repo .node-version' \
   "$node_pin_repo" "$node_pin_script"
+
+# CWD-independence contract: the bootstrap and plugin steps must key off an
+# explicitly resolved repo root, never a relative path from the build's CWD —
+# the regression a real cache build hit (SW2030, 2026-08-23: CWD was not the
+# checkout, so both steps silently no-opped).
+grep -q 'git rev-parse --show-toplevel' "$script"
+rc=$?
+assert_exit 'setup.sh resolves the repo root explicitly (git rev-parse)' 0 "$rc"
+# shellcheck disable=SC2016 # the $ is a literal in the grep pattern
+grep -q '\$REPO_ROOT/\.claude/cloud-bootstrap\.sh' "$script"
+rc=$?
+assert_exit 'setup.sh addresses the repo bootstrap via REPO_ROOT, not CWD' 0 "$rc"
+
+# Stamp fallback contract: a failed /opt stamp write must fall back (mirroring
+# the LOG fallback) instead of silently presenting as an unfinished build.
+# shellcheck disable=SC2016 # the $ is a literal in the grep pattern
+grep -q '>"\$STAMP_FALLBACK"' "$script"
+rc=$?
+assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
 # README/script drift guards.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
