@@ -42,6 +42,13 @@ assert_contains 'enrich seam runs .claude/cloud-bootstrap.local.sh' \
 assert_contains 'SessionStart hook output JSON is emitted' \
   "$(cat "$script")" 'hookSpecificOutput'
 
+# The catalog inventory line reads a machine-global marketplace listing to
+# answer a repo-scoped question. Without narrowing it to what this repo
+# declares, a machine carrying another repo's user-scoped marketplace reports
+# that whole catalog as undeclared on every session.
+assert_contains 'catalog inventory is scoped to declared marketplaces' \
+  "$(cat "$script")" 'declared_mps'
+
 # Cross-component lockstep: the environment stamp this script reports is the
 # stamp path the cloud-environment component declares and writes.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$env_setup")"

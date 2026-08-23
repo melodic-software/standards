@@ -149,8 +149,27 @@ distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
 ```
 
 Fleet mode fetches each target's settings via `gh api`, so it reads private
-repositories with the caller's own auth. To propagate a baseline change for a
-materialized target, edit that repo's file under
+repositories with the caller's own auth. Before the per-target diffs it reports
+how the baseline itself compares to each marketplace catalog it declares,
+because measuring every repo against the baseline cannot show the baseline
+falling behind: when a plugin is added to the marketplace and no settings file
+learns about it, every repo reports `matches baseline` while none of them
+installs it, and the gap surfaces only as a slash command that does not
+resolve. Coverage is reported for the baseline alone — a target carrying a
+deliberate subset would otherwise emit that subset as drift on every run. The
+same comparison runs offline for a single pair:
+
+```sh
+distribution/check-plugin-baseline.sh --compare-catalog \
+  <marketplace.json> <settings.json> <marketplace-name>
+```
+
+Each repository also names undeclared catalog plugins in its own cloud
+sessions: `cloud-bootstrap.sh` prints them as an inventory line beside its
+install summary, reading the marketplace clone already on disk.
+
+To propagate a baseline change for a materialized target, edit that repo's file
+under
 `components/claude-settings/targets/` in this repository; sync delivers
 exact bytes. Targets not yet materialized still use ordinary per-repo pull
 requests — the report tells you which entries moved.
