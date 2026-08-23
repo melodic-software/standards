@@ -232,6 +232,36 @@ EOF
 
 echo "cloud-bootstrap: $enabled enabled, $installed newly installed" >&2
 
+# Catalog inventory line. Everything above installs strictly what the repo
+# declares, so a plugin added to a marketplace after this settings.json was
+# written is not installed and nothing says so — the gap surfaces only when
+# someone types a slash command that does not resolve, which is exactly how it
+# has surfaced. Each registered marketplace is already cloned to disk by the
+# `marketplace add` above, so naming the difference costs one jq pass and no
+# network. Deliberately an inventory line and not a WARN: a repo may declare a
+# subset on purpose, and this must not read as a defect on every session.
+undeclared=$(claude plugin marketplace list --json 2>/dev/null |
+  jq -r '.[] | select((.installLocation // "") != "")
+    | [.name, .installLocation] | @tsv' 2>/dev/null || true)
+while IFS=$'\t' read -r mp_name mp_dir; do
+  [[ -n "$mp_name" ]] || continue
+  catalog="$mp_dir/.claude-plugin/marketplace.json"
+  [[ -f "$catalog" ]] || continue
+  # The "@<marketplace>" suffix is stripped by length rather than by sub():
+  # the name is interpolated text, and sub() would read any regex
+  # metacharacter in it as syntax.
+  missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$settings" '
+    [.plugins[]?.name] as $names
+    | [$s[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key
+       | select(endswith("@" + $mp)) | .[:length - ($mp | length) - 1]] as $declared
+    | ($names - $declared) | join(", ")' "$catalog" 2>/dev/null || true)
+  if [[ -n "$missing" ]]; then
+    echo "cloud-bootstrap: $mp_name carries plugins this repo does not declare: $missing" >&2
+  fi
+done <<EOF
+$undeclared
+EOF
+
 # When the SessionStart hook is the caller, stdout is parsed as hook output —
 # that is why every summary above goes to stderr — and this line asks for a
 # skills re-scan for whatever the harness can pick up mid-session (the plugin

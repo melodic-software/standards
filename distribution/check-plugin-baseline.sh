@@ -88,6 +88,48 @@ EOF
   return 0
 }
 
+# compare_catalog <catalog.json> <settings.json> <marketplace> <label>
+# Prints what a settings file does not say about a marketplace's catalog:
+# plugins the catalog carries that the file never enables, and entries it
+# enables that the catalog no longer offers. This is the check the per-repo
+# comparison structurally cannot make — every repo is measured against the
+# baseline, so a baseline trailing its catalog reports the whole fleet as
+# matching while none of it declares the newer plugins, and the gap surfaces
+# only when someone types a slash command that does not resolve. Always
+# returns 0 (.shellcheckrc's SC2310); divergence signals through DIVERGED.
+compare_catalog() {
+  local catalog="$1" settings="$2" mp="$3" label="$4" diverged=0 line
+
+  # One jq pass emits both directions, each line tagged, so the catalog is
+  # read and the marketplace's entries projected once rather than twice.
+  # The "@<marketplace>" suffix is stripped by length rather than by sub():
+  # the name is interpolated text, and sub() would read any regex
+  # metacharacter in it as syntax.
+  local diff
+  diff=$(jq -r --arg mp "$mp" --slurpfile c "$catalog" '
+    [$c[0].plugins[]?.name] as $names
+    | [.enabledPlugins // {} | to_entries[] | select(.value == true) | .key
+       | select(endswith("@" + $mp)) | .[:length - ($mp | length) - 1]] as $declared
+    | (($names - $declared) | map("in catalog, not declared: " + . + "@" + $mp))
+      + (($declared - $names) | map("declared, not in catalog: " + . + "@" + $mp))
+    | .[]' "$settings" 2>/dev/null | tr -d '\r' || true)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    printf '%s: %s\n' "$label" "$line"
+    diverged=1
+  done <<EOF
+$diff
+EOF
+
+  if [[ "$diverged" -eq 0 ]]; then
+    printf '%s: covers the catalog\n' "$label"
+  else
+    DIVERGED=1
+  fi
+  return 0
+}
+
 # Both modes judge with jq; a missing jq or an unparsable settings file must
 # be a loud usage error, never an empty diff read as "matches baseline".
 command -v jq >/dev/null 2>&1 || {
@@ -102,6 +144,17 @@ require_parses() {
     exit 2
   }
 }
+
+if [[ "${1:-}" == "--compare-catalog" ]]; then
+  [[ $# -eq 4 ]] || {
+    echo 'usage: check-plugin-baseline.sh --compare-catalog <catalog.json> <settings.json> <marketplace>' >&2
+    exit 2
+  }
+  require_parses "$2" 'catalog'
+  require_parses "$3" 'settings'
+  compare_catalog "$2" "$3" "$4" "$(basename "$3")"
+  exit "$DIVERGED"
+fi
 
 if [[ "${1:-}" == "--compare" ]]; then
   [[ $# -eq 3 ]] || {
@@ -133,6 +186,30 @@ fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+# Catalog coverage first, and for the baseline only: it is the reference every
+# per-repo diff below is taken against, so a baseline that has fallen behind
+# its marketplace makes the whole fleet report "matches baseline" while no repo
+# declares the newer plugins. Per-repo catalog coverage is deliberately not
+# reported — a target that carries a deliberate subset (see the manifest's
+# per-target settings components) would emit that subset as drift on every run.
+# Report-only, like the rest of this script: a plugin left undeclared on
+# purpose is a decision, and the signal is the gap existing, not being wrong.
+mps=$(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
+  | select(.value.source.source == "github" and (.value.source.repo // "") != "")
+  | [.key, .value.source.repo] | @tsv' "$baseline" 2>/dev/null | tr -d '\r' || true)
+while IFS=$'\t' read -r mp_name mp_repo; do
+  [[ -n "$mp_name" ]] || continue
+  if gh api -H 'Accept: application/vnd.github.raw+json' \
+    "repos/$mp_repo/contents/.claude-plugin/marketplace.json" >"$tmp/catalog.json" 2>/dev/null &&
+    jq empty "$tmp/catalog.json" 2>/dev/null; then
+    compare_catalog "$tmp/catalog.json" "$baseline" "$mp_name" "baseline vs $mp_name"
+  else
+    printf 'baseline vs %s: no readable catalog at %s\n' "$mp_name" "$mp_repo"
+  fi
+done <<EOF
+$mps
+EOF
 
 for repo in $repos; do
   # The raw media type returns the file bytes directly — no base64 step, whose
