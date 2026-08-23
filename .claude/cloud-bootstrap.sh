@@ -239,7 +239,7 @@ echo "cloud-bootstrap: $enabled enabled, $installed newly installed" >&2
 # `marketplace add` above, so naming the difference costs one jq pass and no
 # network. Deliberately an inventory line and not a WARN: a repo may declare a
 # subset on purpose, and this must not read as a defect on every session.
-undeclared=$(claude plugin marketplace list --json 2>/dev/null |
+registered_dirs=$(claude plugin marketplace list --json 2>/dev/null |
   jq -r '.[] | select((.installLocation // "") != "")
     | [.name, .installLocation] | @tsv' 2>/dev/null || true)
 declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$settings" 2>/dev/null || true)
@@ -267,7 +267,7 @@ while IFS=$'\t' read -r mp_name mp_dir; do
     echo "cloud-bootstrap: $mp_name carries plugins this repo does not declare: $missing" >&2
   fi
 done <<EOF
-$undeclared
+$registered_dirs
 EOF
 
 # When the SessionStart hook is the caller, stdout is parsed as hook output —
