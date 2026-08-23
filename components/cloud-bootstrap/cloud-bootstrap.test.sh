@@ -60,6 +60,15 @@ else
 fi
 assert_contains 'bootstrap reads the stamp path cloud-environment writes' \
   "$(cat "$script")" "$stamp_path"
+fallback_path="$(sed -n "s/^STAMP_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
+if [[ -n "$fallback_path" ]]; then
+  pass 'cloud-environment setup.sh declares a fallback stamp path'
+else
+  fail 'cloud-environment setup.sh declares a fallback stamp path' \
+    "no STAMP_FALLBACK='...' assignment found"
+fi
+assert_contains 'bootstrap reads the fallback stamp path cloud-environment writes' \
+  "$(cat "$script")" "$fallback_path"
 
 # README/script drift guards.
 assert_contains 'README documents the materialized path' \
