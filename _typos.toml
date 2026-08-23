@@ -52,14 +52,20 @@ FoD = "FoD"
 # CC BY-ND license abbreviation (NoDerivatives) — claude-code-proxy.
 # Case-sensitive and whole-token, so lowercase "nd" is unaffected.
 ND = "ND"
+# Plug and Play, the standard Windows abbreviation in prose ("PnP device
+# enumeration") — claude-code-proxy. The splitter flags the `Pn` segment as
+# "On". Whole-token: the PnP-prefixed identifiers below still need their own
+# entries.
+PnP = "PnP"
 # NIC power-management registry value name — provisioning.
 PnPCapabilities = "PnPCapabilities"
-# Win32 WMI device class (Win32_PnPEntity) — claude-code-proxy; same shape as
-# PnPCapabilities above.
-PnPEntity = "PnPEntity"
 # Deliberate word-stem inside a documented grep pattern (matches rotate/rotation
 # variants) — claude-code-proxy. Whole-token, so real "rotate" typos still flag.
 rotat = "rotat"
+# Win32 WMI device class — claude-code-proxy. The whole identifier is the
+# token typos sees (its splitter flags the `Pn` segment as "On"), so the
+# entry carries the full class name, not the bare PnPEntity suffix.
+Win32_PnPEntity = "Win32_PnPEntity"
 # Jasmine/Jest suite-skip global (the x-prefixed describe) — claude-code-plugins
 # testing detector and any consumer with JS tests. Corrected to "describe" by
 # default; whole-token, so prose "describe" is unaffected.
