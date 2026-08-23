@@ -30,11 +30,27 @@ exit 0
 repository is public, so the fetch works from any account's environment with
 no credentials.
 
+## Repo root resolution
+
+The script resolves the checkout root explicitly instead of trusting the
+cache build's working directory — a real build (SW2030, 2026-08-23, script
+version 2026-08-15.3) ran with a CWD that was *not* the checkout, silently
+no-opping the bootstrap and plugin steps. Resolution is `git rev-parse
+--show-toplevel` from the build's CWD first — trusted only when the root
+lies inside the platform checkout area, so a stray git repo elsewhere can
+never get its bootstrap baked — then a probe for a single git checkout
+under the container-user homes (the platform places it at
+`/home/<container-user>/<repo>`). The log always says which way the root was
+resolved (with the build's `PWD`), and an unresolved, ambiguous, or
+distrusted root is a distinct `WARN`/notice line — never conflated with
+"repo has no bootstrap".
+
 ## Repo bootstrap handoff
 
-After the parallel toolchain tracks finish, the script runs the checked-out
-repo's committed `.claude/cloud-bootstrap.sh`, best-effort, with
-`CLAUDE_CODE_REMOTE=true` and `CLAUDE_PROJECT_DIR` set to the checkout root.
+After the parallel toolchain tracks finish, the script runs the resolved
+checkout's committed `.claude/cloud-bootstrap.sh`, best-effort, with
+`CLAUDE_CODE_REMOTE=true`, `CLAUDE_PROJECT_DIR` set to the checkout root,
+and the checkout root as the working directory.
 One name, no fallbacks: every fleet repo commits its generic repository setup
 at exactly that path, and a repo without the file is a logged no-op. As with
 every component change, a merged edit here reaches an environment only on
@@ -43,7 +59,8 @@ its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 ## Plugin install
 
 After the repo bootstrap, a generic, data-driven stage installs the plugins
-the checkout declares — nothing more. If `.claude/settings.json` exists, its
+the checkout declares — nothing more. If the resolved checkout's
+`.claude/settings.json` exists, its
 `extraKnownMarketplaces` entries are registered (`claude plugin marketplace
 add`, skipping ones already registered) and every `enabledPlugins` entry set
 to `true` is installed (`claude plugin install <id> --scope user -y`,
@@ -93,22 +110,33 @@ Blocker 1).
 ## Verification stamp
 
 The script logs every step with a timestamp to
-`/var/log/melodic-env-setup.log` (falling back to `/tmp`) and writes
-`/opt/melodic-env-setup.done` (version + timestamp) as its **last** action.
-Verification starts there: a missing stamp means the cache build was
-interrupted before completion (claude-code-plugins#2654, Blocker 2) — force a
-rebuild by making any edit to the environment's script field.
+`/var/log/melodic-env-setup.log` (falling back to `/tmp`); the three
+parallel install tracks each write to their own temp log, concatenated into
+the main log under `--- track … ---` headers after the wait barrier so
+concurrent output never interleaves. The completion stamp
+`/opt/melodic-env-setup.done` (version + timestamp) is written as the
+**last** action, falling back to `/tmp/melodic-env-setup.done` with a
+logged `WARN` when `/opt` is unwritable — so an unwritable `/opt` cannot
+masquerade as an unfinished build. Verification starts at the stamp: neither
+file present means the cache build was interrupted before completion
+(claude-code-plugins#2654, Blocker 2) — force a rebuild by making any edit
+to the environment's script field. The script also removes its fetched temp
+files (the installers and its own `/tmp` copy) so they never persist into
+the snapshot.
 
 ## Update lifecycle
 
-- Toolchain pins (the .NET version list, the Node pin) duplicate the fleet's
-  manifests by necessity — the script cannot read repos it is not running in.
-  When a repo bumps `global.json` or `.node-version`, update the pin here and
-  bump `SCRIPT_VERSION`. The Node pin is lockstep-tested against this
-  repository's own `.node-version` (the fleet pin) in `setup.test.sh`; the
-  .NET list has no in-repo manifest and stays a manual obligation. Either way
-  the env copy is only a warm cache — each repo's bootstrap installs its exact
-  pins repo-locally, so a stale warm cache costs build time, not correctness.
+- Toolchain pins are read from the resolved checkout's own manifests when
+  present — `global.json` (`sdk.version`) for .NET, `.node-version` for Node
+  — so a repo's bump reaches its next cache rebuild with no manual sync. The
+  fleet fallback pins in the script cover repos that declare neither (and
+  the unresolved-root case); when the fleet's baseline moves, update the
+  fallbacks and bump `SCRIPT_VERSION`. The Node fallback is lockstep-tested
+  against this repository's own `.node-version` (the fleet pin) in
+  `setup.test.sh`; the .NET fallback list has no in-repo manifest and stays
+  a manual obligation. Either way the env copy is only a warm cache — each
+  repo's bootstrap installs its exact pins repo-locally, so a stale warm
+  cache costs build time, not correctness.
 - A merged change does **not** reach existing environments on its own: the
   snapshot rebuilds only on an edit to the environment's script/network
   fields or on ~7-day cache expiry. To pick up a new version immediately,
