@@ -36,11 +36,14 @@ The script resolves the checkout root explicitly instead of trusting the
 cache build's working directory — a real build (SW2030, 2026-08-23, script
 version 2026-08-15.3) ran with a CWD that was *not* the checkout, silently
 no-opping the bootstrap and plugin steps. Resolution is `git rev-parse
---show-toplevel` from the build's CWD first, then a probe for a single git
-checkout under the container-user homes (the platform places it at
+--show-toplevel` from the build's CWD first — trusted only when the root
+lies inside the platform checkout area, so a stray git repo elsewhere can
+never get its bootstrap baked — then a probe for a single git checkout
+under the container-user homes (the platform places it at
 `/home/<container-user>/<repo>`). The log always says which way the root was
-resolved (with the build's `PWD`), and an unresolved or ambiguous root is a
-distinct `WARN` line — never conflated with "repo has no bootstrap".
+resolved (with the build's `PWD`), and an unresolved, ambiguous, or
+distrusted root is a distinct `WARN`/notice line — never conflated with
+"repo has no bootstrap".
 
 ## Repo bootstrap handoff
 

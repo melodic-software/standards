@@ -54,6 +54,16 @@ log "start version=$SCRIPT_VERSION"
 # Ambiguity or absence is a WARN, never a guess.
 checkout_base='/home'
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || REPO_ROOT=''
+if [[ -n "$REPO_ROOT" && "$REPO_ROOT" != "$checkout_base"/* ]]; then
+  # Sanity constraint: a git root outside the platform checkout area (a stray
+  # dotfiles or tooling repo the build CWD happens to sit in) must not be
+  # trusted — baking some other repo's bootstrap would recreate the silent
+  # wrong-target failure this resolution exists to eliminate. Fall through to
+  # the probe; skipping only costs warm cache (each repo's session bootstrap
+  # stays the correctness guarantee), while a wrong bake is unrecoverable.
+  log "repo root candidate $REPO_ROOT (git rev-parse, PWD=$PWD) is outside $checkout_base; distrusted, probing instead"
+  REPO_ROOT=''
+fi
 if [[ -n "$REPO_ROOT" ]]; then
   log "repo root resolved to $REPO_ROOT (git rev-parse, PWD=$PWD)"
 else
@@ -80,11 +90,17 @@ fi
 DOTNET_FALLBACK_VERSIONS='10.0.302 10.0.400'
 NODE_FALLBACK_VERSION='24.19.0'
 dotnet_versions="$DOTNET_FALLBACK_VERSIONS"
-if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/global.json" ]] && command -v jq >/dev/null 2>&1; then
-  repo_sdk="$(jq -r '.sdk.version // empty' "$REPO_ROOT/global.json" 2>/dev/null)"
-  if [[ -n "$repo_sdk" ]]; then
-    dotnet_versions="$repo_sdk"
-    log "dotnet pin $repo_sdk read from repo global.json"
+if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/global.json" ]]; then
+  if ! command -v jq >/dev/null 2>&1; then
+    log 'dotnet pin: jq unavailable to read repo global.json; using fleet fallback'
+  else
+    repo_sdk="$(jq -r '.sdk.version // empty' "$REPO_ROOT/global.json" 2>/dev/null)"
+    if [[ -n "$repo_sdk" ]]; then
+      dotnet_versions="$repo_sdk"
+      log "dotnet pin $repo_sdk read from repo global.json"
+    else
+      log 'dotnet pin: repo global.json declares no sdk.version; using fleet fallback'
+    fi
   fi
 fi
 node_version="$NODE_FALLBACK_VERSION"
@@ -94,6 +110,8 @@ if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/.node-version" ]]; then
   if [[ -n "$repo_node" ]]; then
     node_version="$repo_node"
     log "node pin $repo_node read from repo .node-version"
+  else
+    log 'node pin: repo .node-version is empty; using fleet fallback'
   fi
 fi
 
