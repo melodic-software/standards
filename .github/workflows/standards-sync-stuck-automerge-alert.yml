@@ -61,7 +61,7 @@ concurrency:
 
 jobs:
   alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@d26c750691b5498fab529d115b63f84aa7aecebe # v0.17.0
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
     with:
       runner: ubuntu-24.04
       # Bare name under this repository's own owner — `owner/repo` is rejected
