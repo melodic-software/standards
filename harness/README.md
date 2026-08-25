@@ -16,7 +16,7 @@ assert_eq "label" expected "$actual"
 [[ $FAILED -eq 0 ]] || exit 1
 ```
 
-Run the whole suite (locally or in CI — same command):
+Run the whole suite, the same command locally and in CI:
 
 ```bash
 bash harness/shell/run-tests.sh
@@ -30,7 +30,7 @@ bash harness/shell/run-tests.sh path/to/a.test.sh
 
 `run-tests.sh` discovers every `*.test.sh` in the repo, runs each, and reports a per-file status plus a summary. A file passes when it exits 0; a file that exits 0 with a `SKIP:` marker and no `PASS:` lines counts as skipped.
 
-`lib.sh` provides the full assertion set — equality, containment, exit code, file presence, line and row counts, command-failure, and `skip_suite`/`skip_case`. Its header documents each and the parameter-order convention.
+`lib.sh` provides the full assertion set: equality, containment, exit code, file presence, line and row counts, command-failure, and `skip_suite`/`skip_case`. Its header documents each and the parameter-order convention.
 
 ## Package lifecycle tests
 

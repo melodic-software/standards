@@ -5,15 +5,15 @@ repository and cannot be consumed through a native package, reference, or
 platform control plane.
 
 `sync-manifest.yml` is the desired-state record. `sync-manifest.mjs` is its
-deterministic interpreter — a Node engine with one exact-locked production
-dependency (the `yaml` parser) — and `sync-manifest.sh` is the stable
+deterministic interpreter, a Node engine with one exact-locked production
+dependency (the `yaml` parser), and `sync-manifest.sh` is the stable
 exec-wrapper entrypoint every caller invokes. The reusable workflow in
 `ci-workflows` supplies GitHub authentication and opens one reviewed
 reconciliation pull request per target.
 
 Standards authoring CI independently converts fixture YAML with `yq` and
 checks the Draft 2020-12 JSON Schema in `sync-manifest.schema.json` with
-pinned Node dependencies (`validate-sync-manifest.mjs`) — a genuinely
+pinned Node dependencies (`validate-sync-manifest.mjs`). This is a genuinely
 independent parse: yq's Go parser reads the schema-path input while the
 engine's `yaml` parser reads the engine-path input. That schema is an
 overlapping structural subset of the engine's rules: it expresses shape,
@@ -34,7 +34,7 @@ separate, read-only credential a private calling repo's review job uses to
 mount `conventions/review` by native reference, and its republication
 limits. The [governance process](governance-process.md) records the
 copy-adoption back-link and drift-check requirement and the cross-doc
-reconciliation step for normative-doc changes — all three outside this
+reconciliation step for normative-doc changes, all three outside this
 manifest's automated reconciliation loop.
 
 ## Ownership model
@@ -48,17 +48,17 @@ in a component move together.
 - Omission means the component is irrelevant or has not been classified for
   that target.
 
-A target may also set `automerge: false` — policy-as-data read by the
-`ci-workflows` reusable that opens sync PRs — to opt that repository out of
-auto-merge arming. Omitting the key defaults to `true` (armed), so the fleet
+A target may also set `automerge: false` to opt that repository out of
+auto-merge arming; the key is policy-as-data read by the `ci-workflows`
+reusable that opens sync PRs. Omitting the key defaults to `true` (armed), so the fleet
 default stays terse; only a deliberate opt-out needs an explicit entry.
 
 This repository's own root files (`README.md`, `REVIEW.md`, `AGENTS.md`,
-`CLAUDE.md`) are neither `managed` nor `locally-owned` here — those labels
+`CLAUDE.md`) are neither `managed` nor `locally-owned` here: those labels
 describe a *downstream* copy's relationship to an upstream source. In
 `standards` itself a file is simply the canonical source: no ownership label,
 because there is no synchronization to record. Note the canonical source of a
-component is not always the same-named root file — `review-instructions`
+component is not always the same-named root file: `review-instructions`
 exports root `REVIEW.md`, while a component may equally export a file that
 lives only under `components/` (the root `AGENTS.md` and `CLAUDE.md` here are
 empty placeholders backing no component). Wherever the source lives, the
@@ -74,7 +74,7 @@ each consumer has its own exact source file under
 github-iac via `claude-settings-github-iac`). Shared marketplace registration
 and the SessionStart bootstrap hook are asserted against
 `components/claude-settings/base/settings.json` by
-[`check-claude-settings-targets.sh`](check-claude-settings-targets.sh) —
+[`check-claude-settings-targets.sh`](check-claude-settings-targets.sh):
 authoring-time conformance, not an apply-time merge. Apply copies the
 target file byte-exact. `.claude/settings.local.json` and
 managed-settings-only keys (`strictKnownMarketplaces`) stay repo-owned.
@@ -82,7 +82,7 @@ managed-settings-only keys (`strictKnownMarketplaces`) stay repo-owned.
 Native adoption remains authoritative where it naturally lives:
 
 - package and `extends` references in consumer manifests;
-- actions and reusable workflows in consumer workflow files — with the
+- actions and reusable workflows in consumer workflow files, with the
   Claude review-lane callers as the recorded exception (see
   [Claude review-lane caller components](#claude-review-lane-caller-components));
 - repository governance in the relevant `github-iac` repository;
@@ -98,11 +98,11 @@ committed here.
 | Adopt | Add the component to `managed`, merge upstream, then review the generated materialization PR. |
 | Update | Change the canonical source; reconciliation proposes the complete target delta. |
 | Customize | Move `managed` to `locally-owned` upstream before editing downstream. The existing file is preserved. |
-| Opt out | Same manifest move as Customize — `locally-owned` is the sanctioned per-repository exclusion, recorded and reviewed here rather than fought out against the sync bot downstream. Once it lands, the consuming repository edits or deletes its copy in its own PR; the synchronizer never touches a `locally-owned` file. |
+| Opt out | Same manifest move as Customize. `locally-owned` is the sanctioned per-repository exclusion, recorded and reviewed here rather than fought out against the sync bot downstream. Once it lands, the consuming repository edits or deletes its copy in its own PR; the synchronizer never touches a `locally-owned` file. |
 | Re-adopt | Move `locally-owned` to `managed`; reconciliation restores the canonical payload. |
 | Retire | Remove upstream ownership first, then delete the obsolete downstream payload in a one-time PR. |
 | Relocate | Change the destination and coordinate deletion of the old path in the downstream migration PR. |
-| Reconcile | For a `locally-owned` target whose file predates and diverges from the canonical shape, a periodic check confirms the canonical minimum content is still present — not a byte diff. Drift opens a review; it is never auto-overwritten. |
+| Reconcile | For a `locally-owned` target whose file predates and diverges from the canonical shape, a periodic check confirms the canonical minimum content is still present, not a byte diff. Drift opens a review; it is never auto-overwritten. |
 
 The consumer-facing index of these moves and the other sanctioned exception
 surfaces lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
@@ -132,7 +132,7 @@ target checkout, validates every destination before the first write, and
 reconciles bytes plus executable mode. It never commits, pushes, merges, or
 deletes files. The single-target commands (`mappings`, `dest-paths`, `apply`)
 take `--target OWNER/REPO`, and `apply` additionally takes `--target-root DIR`
-for the disposable checkout — the consumer-facing summary of every target
+for the disposable checkout. The consumer-facing summary of every target
 filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 
 ### Plugin-catalog drift report
@@ -141,7 +141,7 @@ Each repository's checked-in `.claude/settings.json` is the source of truth
 for the plugins its sessions load (cloud sessions install exactly what it
 declares). This repository's own settings file doubles as the fleet baseline,
 and [`check-plugin-baseline.sh`](check-plugin-baseline.sh) makes divergence
-visible — report-only, never an edit, because a repo may diverge on purpose:
+visible. It is report-only, never an edit, because a repo may diverge on purpose:
 
 ```sh
 distribution/check-plugin-baseline.sh                  # every manifest target
@@ -155,7 +155,7 @@ because measuring every repo against the baseline cannot show the baseline
 falling behind: when a plugin is added to the marketplace and no settings file
 learns about it, every repo reports `matches baseline` while none of them
 installs it, and the gap surfaces only as a slash command that does not
-resolve. Coverage is reported for the baseline alone — a target carrying a
+resolve. Coverage is reported for the baseline alone: a target carrying a
 deliberate subset would otherwise emit that subset as drift on every run. The
 same comparison runs offline for a single pair:
 
@@ -172,7 +172,7 @@ To propagate a baseline change for a materialized target, edit that repo's file
 under
 `components/claude-settings/targets/` in this repository; sync delivers
 exact bytes. Targets not yet materialized still use ordinary per-repo pull
-requests — the report tells you which entries moved.
+requests. The report tells you which entries moved.
 
 ## Adopting a new repository
 
@@ -210,8 +210,8 @@ they are never hand-copied around a failed access check.
 ## Runner-policy consumer handoff
 
 The `runner-policy` component materializes one atomic runtime at
-`.github/standards/runner-policy/` in exactly these enrolled targets — the set
-is an adoption list, not a visibility class, and `claude-code-plugins` is
+`.github/standards/runner-policy/` in exactly these enrolled targets, an
+adoption list rather than a visibility class; note `claude-code-plugins` is
 public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 
 - `melodic-software/claude-code-plugins`
@@ -270,7 +270,7 @@ not a general workload runner or fallback. During migration the legacy unroutabl
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
-each consumer — the
+each consumer. The
 [Claude review-lane callers](#claude-review-lane-caller-components) are the
 one recorded exception to that workflow-shape rule. A materialization PR is
 not an adoption completion signal until its corresponding integration PR
@@ -306,16 +306,16 @@ discovery is not an accepted default.
 thin workflow callers for the `ci-workflows` reusable Claude review lanes at
 `.github/workflows/claude-review.yml` and
 `.github/workflows/claude-security-review.yml`. They are the recorded
-exception to the rule that workflow callers stay consumer-owned: hand-written
-lane callers empirically drifted — a missing `reopened` trigger in medley,
-divergent `skip-actors` lists, and reusable-pin skew (v0.6.1 ↔ e295107) —
-which is exactly the fleet-normalization problem managed materialization
+exception to the rule that workflow callers stay consumer-owned. Hand-written
+lane callers empirically drifted: a missing `reopened` trigger in medley,
+divergent `skip-actors` lists, and reusable-pin skew (v0.6.1 ↔ e295107).
+That is exactly the fleet-normalization problem managed materialization
 exists to solve. The reusable workflows themselves remain native references
 in `ci-workflows`; only the caller files are managed bytes.
 
 What stays consumer-owned:
 
-- `.github/claude-security-paths` — the security lane's pattern file naming
+- `.github/claude-security-paths`: the security lane's pattern file naming
   the repo's security-sensitive surfaces, read by the reusable from the PR's
   base branch. It is repo-specific tuning, so it is deliberately not a
   managed file; an absent file fails open (every PR is security-reviewed).
@@ -330,11 +330,11 @@ The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and
 no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
-inline — do not normalize the two.
+inline. Do not normalize the two.
 
 Both components resolve the runner through the governed `select-runner`
 indirection, and `runner-policy` admits that selector only for a private
-self-hosted consumer — the ban consults neither `exceptions` nor
+self-hosted consumer. The ban consults neither `exceptions` nor
 `localRoutingGrants`, so a PUBLIC target has no configuration escape and would
 fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
@@ -343,8 +343,8 @@ differently for each lane:
 - `claude-review-caller` is `managed` for the four private targets that run
   the code-review lane (dotfiles, github-iac, medley, provisioning).
 - `claude-security-review-caller` is `managed` for private adopters
-  (`provisioning` first). Public repos running a security lane today —
-  `claude-code-plugins` and `ci-workflows` — remain ineligible for the
+  (`provisioning` first). The public repos running a security lane today,
+  `claude-code-plugins` and `ci-workflows`, remain ineligible for the
   selector-routed shape.
 
 `melodic-software/claude-code-plugins`, the org's one public caller target and
@@ -374,10 +374,10 @@ reusable or accepting that caller stays `locally-owned`.
 `managed`: medley's own `REVIEW.md` predates this manifest, is load-bearing
 for medley's own `/quality-gate` automation (a severity vocabulary, a
 tracker-priority axis, and a confidence axis this manifest does not model),
-and is cited from dozens of files — a whole-file managed sync would clobber
+and is cited from dozens of files. A whole-file managed sync would clobber
 content the `managed`/`locally-owned` split exists to protect. (Medley's
 bespoke `AGENTS.md` enjoys the same protection simply by not being any
-component's destination — the former agent-orientation component was retired
+component's destination: the former agent-orientation component was retired
 by the standards sync audit.)
 
 The `Reconcile` lifecycle row above is what keeps this from silently
@@ -386,5 +386,5 @@ criterion, medley's own copy is checked for the equivalent content (not a
 byte match) and updated by a repository-specific PR in medley, same as the
 initial reconciliation pattern (`melodic-software/medley#1541`). This is a
 periodic self-review obligation, not an automated reconciliation PR the
-synchronizer opens — `locally-owned` means exactly that the synchronizer
+synchronizer opens: `locally-owned` means exactly that the synchronizer
 never reads, changes, or deletes the file.

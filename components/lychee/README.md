@@ -14,10 +14,10 @@ prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 The online lane excludes explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes a calling repository's token receive
 a 404. The inventory itself lives in the two `melodic-software/` alternations in
-[`lychee.toml`](../../lychee.toml)'s `exclude` list — read it there rather than
+[`lychee.toml`](../../lychee.toml)'s `exclude` list. Read it there rather than
 from a copy here, and keep it in sync with actual repository visibility. Public
 siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
-exceptions are scoped to the exact URL, not the host — every other URL on
+exceptions are scoped to the exact URL, not the host: every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside
 the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`
 list. Lychee documents `exclude` values as URL regular expressions in its

@@ -1,6 +1,6 @@
 # Clean sample
 
-A conforming GitHub Flavored Markdown document — it must lint clean.
+A conforming GitHub Flavored Markdown document. It must lint clean.
 
 ## Lists
 

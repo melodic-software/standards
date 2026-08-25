@@ -1,13 +1,13 @@
 # Shareable artifact design
 
-An artifact built to be shared — a plugin, a reusable configuration component, a template, a dotfiles module, a workflow, a script — is a product with consumers, not a private convenience with an audience. Design it for a consumer who is not its author: a different machine, user, organization, and repository. The author's environment is one deployment among many, never the assumed one. This is a reasoning-only discipline: whether a value is genuinely universal or consumer-varying is a judgment no tool decides.
+An artifact built to be shared is a product with consumers, not a private convenience with an audience: a plugin, a reusable configuration component, a template, a dotfiles module, a workflow, a script. Design it for a consumer who is not its author: a different machine, user, organization, and repository. The author's environment is one deployment among many, never the assumed one. This is a reasoning-only discipline: whether a value is genuinely universal or consumer-varying is a judgment no tool decides.
 
-It composes with `code-organization.md` (when sharing begins — the second consumer — and which surface is contract versus private), `reference-dont-duplicate.md` (a shared artifact is a single source of truth its consumers cite, not copy), and `engineering-philosophy.md` (the explicit, fail-fast, idempotent posture every artifact carries). Those decide *when* to share and *how* to speak about what is shared; this decides how a shared artifact treats the consumers it then has.
+It composes with `code-organization.md` (when sharing begins, at the second consumer, and which surface is contract versus private), `reference-dont-duplicate.md` (a shared artifact is a single source of truth its consumers cite, not copy), and `engineering-philosophy.md` (the explicit, fail-fast, idempotent posture every artifact carries). Those decide *when* to share and *how* to speak about what is shared; this decides how a shared artifact treats the consumers it then has.
 
 ## Consumer-agnostic by default
 
 - Behavior never depends on the author's machine paths, personal environment, organization names, or repository layout. Publisher metadata may identify the source; runtime behavior must not require it.
-- An artifact genuinely and inherently narrower — one platform, one forge, one ecosystem — declares that boundary explicitly where the coupling lives, rather than shipping the assumption unstated under a neutral name.
+- An artifact genuinely and inherently narrower, limited to one platform, forge, or ecosystem, declares that boundary explicitly where the coupling lives, rather than shipping the assumption unstated under a neutral name.
 
 ## Modular and independently useful
 
@@ -15,7 +15,7 @@ It composes with `code-organization.md` (when sharing begins — the second cons
 
 ## Externalize what a consumer may decide
 
-- A shipped default is legitimate only when it cannot conflict in any consumer's environment. Anything a consumer could reasonably do differently — conventions, paths, tool choices, policies — is an externalized configuration point the artifact discovers or is told, never a baked-in assumption. `architecture-and-design.md` states the same externalization rule for environment-varying values, with the YAGNI counterweight that bounds both: variance a consumer could not realistically have stays inline.
+- A shipped default is legitimate only when it cannot conflict in any consumer's environment. Anything a consumer could reasonably do differently, such as conventions, paths, tool choices, and policies, is an externalized configuration point the artifact discovers or is told, never a baked-in assumption. `architecture-and-design.md` states the same externalization rule for environment-varying values, with the YAGNI counterweight that bounds both: variance a consumer could not realistically have stays inline.
 - Adoption never requires forking the artifact or hand-editing its internals; if consuming demands an edit, the artifact is missing a configuration seam. This is the same strict separation of code from deploy-varying values the twelve-factor config rule mandates, applied to consumer-varying values.
 
 ## Design the consumer tiers
@@ -24,10 +24,10 @@ It composes with `code-organization.md` (when sharing begins — the second cons
 
 ## Adoption is explicit and repeatable
 
-- The setup path is documented, idempotent, transparent about what it inferred and changed, and automatable — a non-interactive route exists for headless use.
-- Every prerequisite — runtime, tool, credential, service — is declared at the point of use. Absence is classified deliberately: required for correctness stops with a remediation message; required for an optional feature warns visibly and continues with the documented reduced result; not applicable exits quietly. A silently skipped feature is a defect.
+- The setup path is documented, idempotent, transparent about what it inferred and changed, and automatable: a non-interactive route exists for headless use.
+- Every prerequisite is declared at the point of use: runtime, tool, credential, service. Absence is classified deliberately: required for correctness stops with a remediation message; required for an optional feature warns visibly and continues with the documented reduced result; not applicable exits quietly. A silently skipped feature is a defect.
 
 ## Sources
 
-- Wiggins, ["The Twelve-Factor App — III. Config"](https://12factor.net/config) — strict separation of config from code because config varies across deployments and code does not; the analogue here is consumer-varying versus universal values.
-- [InnerSource Commons](https://innersourcecommons.org/) — applying open-source collaboration practices to internal shared projects; the inspiration for treating internal consumers and contributors as first-class.
+- Wiggins, ["The Twelve-Factor App, III. Config"](https://12factor.net/config): strict separation of config from code because config varies across deployments and code does not; the analogue here is consumer-varying versus universal values.
+- [InnerSource Commons](https://innersourcecommons.org/): applying open-source collaboration practices to internal shared projects; the inspiration for treating internal consumers and contributors as first-class.

@@ -5,7 +5,7 @@ Local invocation entrypoint for the four bespoke CI guards that gate in
 `comment-hygiene`, `exec-bit`, `machine-specific-paths`, and
 `reference-integrity`.
 
-This directory is PRODUCER-INTERNAL source plus its contract test — it is not
+This directory is PRODUCER-INTERNAL source plus its contract test. It is not
 distributed. The original sync-component distribution (ADR-0004) was retired
 by
 [`docs/adr/0006-retire-local-lane-guards-distribution.md`](../../docs/adr/0006-retire-local-lane-guards-distribution.md):
@@ -25,7 +25,7 @@ reference implementation behind the ci-workflows action copies.
 | `check-machine-specific-paths.sh` | Absolute user-home / checkout-root scan |
 | `check-heading-cites.sh` | `file.md` "Anchor" prose citation resolver |
 
-Pattern **bodies** stay in their existing components — this driver sources
+Pattern **bodies** stay in their existing components: this driver sources
 `../comment-hygiene/comment-hygiene-patterns.sh` and
 `../path-detection/machine-path-patterns.sh`.
 

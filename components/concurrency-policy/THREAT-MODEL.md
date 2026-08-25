@@ -32,7 +32,7 @@ inventory.
 - A repository maintainer changes governed workflows and the exception file and
   reviews findings.
 - A pull-request contributor may control workflow YAML, including the `on:`
-  trigger set and any `concurrency` block, and — on `pull_request_target` — the
+  trigger set and any `concurrency` block, and, on `pull_request_target`, the
   head branch name.
 - Standards maintainers review the analyzer and the exception schema, including
   the approved-reason set.
