@@ -9,11 +9,11 @@ scope, and explicit local exceptions.
 ## Ownership boundaries
 
 - This repository owns lint, hygiene, analyzer, text, runtime-pin,
-  hook-adapter, and review policy as **org policy choices** — rules binding
+  hook-adapter, and review policy as **org policy choices**: rules binding
   Melodic Software repositories, which it would be wrong to impose on a
   repository we do not control.
 - [`melodic-software/claude-code-plugins`](https://github.com/melodic-software/claude-code-plugins)
-  owns **agnostic audit tooling** — surfaces any consumer could adopt
+  owns **agnostic audit tooling**: surfaces any consumer could adopt
   unchanged, whose defaults yield to that consumer's own declared policy where
   one exists. It ships by marketplace version bump, not by sync PR.
   [`conventions/README.md`](conventions/README.md) records how the `review`
@@ -32,18 +32,18 @@ which names the agnostic-audit-tooling owner.
 
 ## Repository shape
 
-- `components/<capability>/` — one cohesive source slice per independently
+- `components/<capability>/`: one cohesive source slice per independently
   adoptable capability: documentation, contract tests, fixtures, and any
   package metadata live with the policy they prove.
-- root tool configs — canonical files for tools that require or naturally
+- root tool configs: canonical files for tools that require or naturally
   discover a repository-root path. They exist exactly once; the corresponding
   component slice documents and tests them.
-- `conventions/` — reasoning-only engineering, review, and process standards
+- `conventions/`: reasoning-only engineering, review, and process standards
   that cannot be reduced honestly to deterministic tooling.
-- `distribution/` — explicit mappings for exact-file synchronization when no
+- `distribution/`: explicit mappings for exact-file synchronization when no
   native reference mechanism fits.
-- `harness/` — shared infrastructure for component contract tests.
-- `docs/adr/` — durable, repository-specific architecture decisions.
+- `harness/`: shared infrastructure for component contract tests.
+- `docs/adr/`: durable, repository-specific architecture decisions.
 
 `biome.jsonc` and `lefthook.yml` are genuine standards-repository adapters:
 they add this repository's scope/composition while referencing component
