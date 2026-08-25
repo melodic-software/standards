@@ -2,7 +2,7 @@
 
 Not every source that can be cited settles a question. A claim about how a tool
 behaves, what a default is, or whether an option exists is only as strong as the
-distance between the claim and the thing that decides it — and that distance is
+distance between the claim and the thing that decides it, and that distance is
 what a citation alone does not record. This convention ranks that distance and
 states how much corroboration a claim needs before it is treated as settled.
 [`documentation-and-citations.md`](documentation-and-citations.md) owns *whether
@@ -11,8 +11,8 @@ source is worth* and *how many are needed*. Neither answers the other's
 question.
 
 This spans two of the tiers [`enforceability-tiers.md`](enforceability-tiers.md)
-defines. A source floor is **deterministic** in nature — one primary plus two
-corroborators is an exact count — but the sources are named in a session, not in
+defines. A source floor is **deterministic** in nature: one primary plus two
+corroborators is an exact count. But the sources are named in a session, not in
 a tracked artifact, so no tool has anything to count. Deciding which rung a
 source occupies, and whether two sources are independent, is **reasoning-only**
 regardless: it turns on what the source owns and where its content came from.
@@ -24,16 +24,16 @@ Authority is a function of interpretive hops, not prestige or ranking position.
 
 | Rung | What it is | Standing |
 |---|---|---|
-| **Observed** | the thing itself answering now — command output, a file's contents, an API or query response, a live configuration value | primary — a claim may rest on it |
-| **Canonical** | the authority that owns the thing, read at its current version — the specification, the vendor's own reference, the source code, the changelog, the registry entry | primary — a claim may rest on it |
-| **Secondhand** | someone else's account of a primary rung — a practitioner write-up, a community answer, a synthesis tool's response, a subagent's summary | corroborating only — a claim may not rest on it |
-| **Recalled** | no retrieval behind it — memory, recall, an assertion whose source cannot be named | not a source — promote it to a primary rung or drop the claim |
+| **Observed** | the thing itself answering now: command output, a file's contents, an API or query response, a live configuration value | primary; a claim may rest on it |
+| **Canonical** | the authority that owns the thing, read at its current version: the specification, the vendor's own reference, the source code, the changelog, the registry entry | primary; a claim may rest on it |
+| **Secondhand** | someone else's account of a primary rung: a practitioner write-up, a community answer, a synthesis tool's response, a subagent's summary | corroborating only; a claim may not rest on it |
+| **Recalled** | no retrieval behind it: memory, recall, an assertion whose source cannot be named | not a source; promote it to a primary rung or drop the claim |
 
 A **Secondhand** source is not weak because it is wrong; it is weak because a
 reader cannot tell whether it is wrong without consulting the primary it
 paraphrases. Naming that primary is its whole value, and it holds its rung only
-while it does: one that has lost the primary it rested on — a summary of a
-summary, a report whose sources are gone — has decayed to **Recalled**, whatever
+while it does: one that has lost the primary it rested on, a summary of a
+summary, a report whose sources are gone, has decayed to **Recalled**, whatever
 it originally read.
 
 ## Primary means owning the fact, not being reputable
@@ -46,8 +46,8 @@ whether any implementation conforms; a maintainer's post is **Canonical** for
 intent and **Secondhand** for shipped behavior. Resolve the rung against the
 claim, never against the domain's reputation.
 
-Two consequences follow. Where a claim asserts a *runtime* fact — what a
-version does, what a flag accepts, what actually installed — **Observed**
+Two consequences follow. Where a claim asserts a *runtime* fact, such as what a
+version does, what a flag accepts, or what actually installed, **Observed**
 outranks **Canonical**: a release can ship ahead of the documentation that
 describes it, so when the two disagree about behavior, the running system is the
 one that decides. And a negative claim ("that option does not exist", "it was removed",
@@ -61,7 +61,7 @@ The floor for a claim durable enough to act on is **one primary-rung source
 retrieved for that claim, plus two independent corroborators of any rung**.
 Corroborator count is not citation count. Two sources are one source when they
 share an upstream pool, an author or author network, a generating tool, or a
-single model's priors — three write-ups paraphrasing one release note are one
+single model's priors: three write-ups paraphrasing one release note are one
 corroborator.
 
 Scale from that floor by consequence, not by convenience:
@@ -78,7 +78,7 @@ Scale from that floor by consequence, not by convenience:
 ## A rung expires with its retrieval
 
 A source's rung is a property of when it was read, not of the source. A fetch
-from a previous session has decayed to **Recalled** — its content is now
+from a previous session has decayed to **Recalled**: its content is now
 indistinguishable from memory, and the upstream may have moved. Re-retrieve
 before relying on it. This governs a source's standing as evidence;
 [`documentation-and-citations.md#time-bound-external-claims-need-a-recheck-trigger`](documentation-and-citations.md#time-bound-external-claims-need-a-recheck-trigger)
@@ -87,23 +87,23 @@ into durable content.
 
 ## Boundaries
 
-- **vs [`documentation-and-citations.md`](documentation-and-citations.md)** — that
+- **vs [`documentation-and-citations.md`](documentation-and-citations.md)**: that
   file owns whether a fact is cited rather than copied, where the link sits, and
   which footer it belongs to. This file owns how much the cited source is worth
   and how many are required.
-- **vs [`reference-dont-duplicate.md`](reference-dont-duplicate.md)** — that file
+- **vs [`reference-dont-duplicate.md`](reference-dont-duplicate.md)**: that file
   owns one source of truth per fact inside the repository. This file ranks
   sources outside it, where there is no single owner to defer to.
-- **vs [`deterministic-work-execution.md`](deterministic-work-execution.md)** —
+- **vs [`deterministic-work-execution.md`](deterministic-work-execution.md)**:
   that file owns whether an execution was honest enough for its output to count
   as evidence at all. This file owns what that output is worth beside other
   sources once it does. A primary rung means a claim may rest on the source; it
   does not mean the source answered the question that was asked.
-- **vs [`enforceability-tiers.md`](enforceability-tiers.md)** — that file
+- **vs [`enforceability-tiers.md`](enforceability-tiers.md)**: that file
   classifies a *convention* by who can decide it. This file classifies a
   *source* by what it can establish. The two ladders are unrelated; only the
   vocabulary for this document's own classification is borrowed.
-- **vs [`session-time-agent-output-trust.md`](session-time-agent-output-trust.md)** —
+- **vs [`session-time-agent-output-trust.md`](session-time-agent-output-trust.md)**:
   that file governs an assertion an agent makes about its own work. An
   agent's assertion carries no rung of its own; it inherits the rung of the
   source it names, or **Recalled** when it names none.

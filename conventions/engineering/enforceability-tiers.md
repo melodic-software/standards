@@ -6,15 +6,15 @@ Some conventions a tool can decide alone; some need a tool to flag candidates an
 
 | Tier | Who decides | When it applies |
 |---|---|---|
-| **Deterministic** | a linter, analyzer, or hook alone — pass/fail, no judgment | existence, format, syntax, exact match, count, path shape |
+| **Deterministic** | a linter, analyzer, or hook alone: pass/fail, no judgment | existence, format, syntax, exact match, count, path shape |
 | **Detect-then-judge** | a tool flags candidates (advisory); a human or agent rules on each | a mechanical signal narrows the set, but the verdict needs meaning or context |
-| **Reasoning-only** | a human or agent against written criteria — no tool can decide | meaning, intent, fit, abstraction quality, semantic equivalence |
+| **Reasoning-only** | a human or agent against written criteria: no tool can decide | meaning, intent, fit, abstraction quality, semantic equivalence |
 
 Deterministic examples are the kind of thing executable components own: a banned symbol, a code-style rule at error severity, a secret pattern, a malformed file. Detect-then-judge covers things like a near-duplicate flagged for a human to decide whether to extract, or an unrecognized CLI flag flagged for the author to confirm against the tool's help. Reasoning-only covers "is this the right abstraction", "does this name track its responsibility", "does this comment explain *why* and not *what*".
 
 ## Rule of thumb
 
-Existence, format, and syntax are **deterministic**. Meaning, intent, and fit are **reasoning-only**. **Detect-then-judge** is the middle: a cheap mechanical pass narrows the candidate set, then a human or agent rules on each survivor — never an auto-fix, because the deciding step is judgment and a confident false-positive fix is worse than a flag.
+Existence, format, and syntax are **deterministic**. Meaning, intent, and fit are **reasoning-only**. **Detect-then-judge** is the middle: a cheap mechanical pass narrows the candidate set, then a human or agent rules on each survivor, never an auto-fix, because the deciding step is judgment and a confident false-positive fix is worse than a flag.
 
 A finding can only climb to a tier its *nature* allows. No amount of cleverness makes "is this the right abstraction" deterministic; no review discipline is needed for "does this file parse" once a tool owns it.
 
@@ -26,4 +26,4 @@ When review keeps catching the same issue, classify its tier and move it as far 
 - **Detect-then-judge** → a tool that flags (advisory) plus a human verdict. Keep it advisory.
 - **Reasoning-only** → it stays in convention prose and review criteria. Not scriptable; do not pretend otherwise.
 
-Tier classification answers *can* this be mechanized. Whether a candidate is *worth* mechanizing — given the false-positive rate, the maintenance cost, and how often it actually fires — is a separate decision, and the default answer is "not yet". Classify the tier first; justify the automation second.
+Tier classification answers *can* this be mechanized. Whether a candidate is *worth* mechanizing, given the false-positive rate, the maintenance cost, and how often it actually fires, is a separate decision, and the default answer is "not yet". Classify the tier first; justify the automation second.
