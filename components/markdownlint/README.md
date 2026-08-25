@@ -11,7 +11,7 @@ editor integrations at the location they deploy to:
 | `markdownlint-home` | [`home/.markdownlint-cli2.jsonc`](home/.markdownlint-cli2.jsonc) | `~/.markdownlint-cli2.jsonc`, via the dotfiles `dot_` source name |
 
 Both configs own their rule choices, and both pin their `$schema` URL to this
-repository's own `markdownlint-cli2` `package.json` version — authoring-time
+repository's own `markdownlint-cli2` `package.json` version: authoring-time
 validation here, not a statement about which CLI version a consumer runs. The
 root config additionally declares a repository traversal scope; the home config
 declares its own, deliberately different one.
@@ -24,8 +24,8 @@ and falls back to stock defaults. The home payload closes that gap without
 touching repository-rooted runs, which keep using their own materialized copy.
 
 The two `config` blocks are identical and must stay that way.
-`markdownlint-home.test.sh` asserts the equality and fails the build on drift —
-that gate is what makes the duplication safe. `config.extends` would express
+`markdownlint-home.test.sh` asserts the equality and fails the build on drift.
+That gate is what makes the duplication safe. `config.extends` would express
 the sharing directly, but the file it names has to exist beside the deployed
 one, and only a single file deploys to the home directory.
 
@@ -33,7 +33,7 @@ The `ignores` blocks deliberately diverge. The root config excludes build and
 cache trees (`bin/`, `obj/`) on the premise that the tree is a repository
 checkout; under a home directory that premise fails, since `~/bin` holds
 authored Markdown rather than build output. The home config therefore keeps
-only the exclusions that hold anywhere — vendored `node_modules` and `.venv`.
+only the exclusions that hold anywhere: vendored `node_modules` and `.venv`.
 
 ## Verification
 
@@ -48,6 +48,6 @@ only the exclusions that hold anywhere — vendored `node_modules` and `.venv`.
   is linted rather than silently excluded.
 - `markdownlint-schema-pin.test.sh` proves both configs' `$schema` URL still
   names this repository's own pinned `markdownlint-cli2` `package.json`
-  version — that pin authors authoring-time validation here and makes no claim
+  version. That pin authors authoring-time validation here and makes no claim
   about a consumer's tool version, so nothing else keeps it from drifting
   silently when one is bumped without the other.

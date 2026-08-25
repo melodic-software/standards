@@ -11,6 +11,6 @@ Execution and the engine pin are owned by the actionlint action in
 `ci-workflows`. `fixtures/` and `actionlint.test.sh` prove the suppression
 against that entrypoint: the queue workflow lints clean with the config, an
 unrelated violation still fails alongside it, and a configless control run
-reproduces the suppressed message. The control case is the removal tripwire —
+reproduces the suppressed message. The control case is the removal tripwire:
 when rhysd/actionlint#654 ships in the pinned engine it fails, firing the
 removal trigger recorded in the config instead of leaving a stale suppression.

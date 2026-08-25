@@ -50,21 +50,21 @@ rather than relying on defaults.
 Per `updates` entry, keyed by `<package-ecosystem>:<directory>` (the plural
 `directories` list is joined, so a multi-root entry has one key):
 
-- `schedule-not-standard` — `schedule.interval` is not the standard interval.
-- `cooldown-below-minimum` — `cooldown.default-days`, or any `semver-*-days`
+- `schedule-not-standard`: `schedule.interval` is not the standard interval.
+- `cooldown-below-minimum`: `cooldown.default-days`, or any `semver-*-days`
   override, is missing or below the minimum.
-- `cooldown-soak-bypassed` — a match-all `cooldown.exclude` (`"*"`) or a
+- `cooldown-soak-bypassed`: a match-all `cooldown.exclude` (`"*"`) or a
   `cooldown.include` list defeats the soak even though `default-days` is set.
-- `groups-missing` — no `groups` block covers version updates: a
+- `groups-missing`: no `groups` block covers version updates: a
   `security-updates`-only group or a group whose `exclude-patterns` is a
   match-all (`"*"`) does not batch regular bumps.
-- `pr-limit-too-high` — `open-pull-requests-limit` exceeds the maximum.
-- `pr-limit-disables-updates` — `open-pull-requests-limit` is `0`, which turns
+- `pr-limit-too-high`: `open-pull-requests-limit` exceeds the maximum.
+- `pr-limit-disables-updates`: `open-pull-requests-limit` is `0`, which turns
   version updates off entirely rather than capping volume.
-- `ignore-disables-updates` — an `ignore` rule for `dependency-name: "*"` with
+- `ignore-disables-updates`: an `ignore` rule for `dependency-name: "*"` with
   no version or update-type narrowing suppresses every update.
-- `malformed-update-entry` — an `updates` item is not a mapping.
-- `incomplete-update-entry` — an `updates` item omits `package-ecosystem` or
+- `malformed-update-entry`: an `updates` item is not a mapping.
+- `incomplete-update-entry`: an `updates` item omits `package-ecosystem` or
   `directory`/`directories`.
 
 File-level: `dependabot-config-missing` when there is no `.github/dependabot.yml`
@@ -73,7 +73,7 @@ at all, `unsupported-version` when the config is not `version: 2`, and
 
 ## Exceptions
 
-The organization has a few deliberate, documented deviations — a root that
+The organization has a few deliberate, documented deviations: a root that
 tracks the latest upstream release on a daily cadence with no soak, or a
 single-tool ecosystem where grouping is a no-op. Each is recorded in a locally
 owned `.github/dependabot-policy.json`:
@@ -112,7 +112,7 @@ sync-managed materialization (for example
 `.github/standards/<component>/package-lock.json`): the managed path is
 governed by the standards sync, not by the consumer repository, and the
 generated fix is rejected. The observed failure mode is a security-update job
-that retries and fails repeatedly against the managed manifest — expected
+that retries and fails repeatedly against the managed manifest: expected
 noise, not a hazard requiring an in-repo response.
 
 The absorb path is upstream-bump-then-sync: this repository bumps the
@@ -120,7 +120,7 @@ affected dependency in the owning component, and `standards-sync` distributes
 the fix to every consumer's managed materialization the same way it
 distributes any other component change. A maintainer who sees a failing
 security-update job against a managed manifest should expect it to resolve
-once the next sync pull request merges — opening one does not update the
+once the next sync pull request merges. Opening one does not update the
 consumer's default branch, so a sync that stays open, is blocked, or is never
 raised leaves the managed manifest on the vulnerable version until it lands.
 The failing job is noise only while that sync is progressing; if no upstream

@@ -3,7 +3,7 @@
 Machine-readable policy and validator for fleet-wide pull-request conventions:
 Conventional Commits titles, required body sections, and native closing
 keywords (or an explicit no-issue marker). This is a standards-internal record
-and self-test — it is not distributed to consumers
+and self-test. It is not distributed to consumers
 ([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md));
 the gate consumers actually run is the `ci-workflows` `pr-issue-linkage.yml`
 reusable, which each repository pins directly.
@@ -26,7 +26,7 @@ is the Draft 2020-12 structural authority.
 
 Titles follow [Conventional Commits](https://www.conventionalcommits.org/) with
 the allowed types listed in [`policy.json`](policy.json). The fleet includes
-`security` as an allowed type — three repositories reached for it independently,
+`security` as an allowed type: three repositories reached for it independently,
 and it is not a semver/changelog axis (that remains on PR titles that ship
 release-impacting work under `feat`/`fix`).
 
@@ -55,8 +55,8 @@ See [`THREAT-MODEL.md`](THREAT-MODEL.md).
 
 ## Follow-on
 
-The thin-runner conversion this component once anticipated — `ci-workflows`
-reusables reading a materialized policy copy — is retired with the
+The thin-runner conversion this component once anticipated, `ci-workflows`
+reusables reading a materialized policy copy, is retired with the
 distribution ([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md)).
 A future consumer-side analyzer is a new adoption decision, not a revival of
 the old entry.

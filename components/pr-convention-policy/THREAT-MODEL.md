@@ -2,9 +2,9 @@
 
 ## Assets
 
-- `policy.json` — canonical allowed title types, required body sections, and
+- `policy.json`: canonical allowed title types, required body sections, and
   closing-keyword rules.
-- `pr-convention-policy.mjs` — read-only validator; reports findings and exit
+- `pr-convention-policy.mjs`: read-only validator; reports findings and exit
   status, never mutates inputs.
 
 ## Trust boundaries
@@ -29,7 +29,7 @@
 - A compromised policy merge could weaken conventions fleet-wide until
   reverted; mitigation is the same reviewed merge path as every other standards
   component.
-- Title/body validation does not prove linked issues exist — only that the
+- Title/body validation does not prove linked issues exist, only that the
   markers are present.
 
 ## Review triggers
