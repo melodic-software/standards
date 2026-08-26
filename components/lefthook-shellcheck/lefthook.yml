@@ -1,5 +1,9 @@
 # Opt-in ShellCheck hook. ShellCheck discovers the root .shellcheckrc, so this
 # adapter contains execution only and does not duplicate policy.
+#
+# The lane opts out of merge and rebase itself rather than relying on a
+# hook-level skip in the base fragment: a hook-level skip would take the
+# consumer's own security lanes down with it (see lefthook-base's header).
 
 pre-commit:
   commands:
@@ -7,3 +11,6 @@ pre-commit:
       glob: "**/*.{sh,bash}"
       run: shellcheck {staged_files}
       fail_text: "ShellCheck findings. Fix them, or annotate a justified exception with a shellcheck directive."
+      skip:
+        - merge
+        - rebase

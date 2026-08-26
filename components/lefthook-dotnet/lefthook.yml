@@ -16,11 +16,18 @@
 # slow for pre-commit, and running it here would double-report against the CI
 # build lane. This is the heaviest opt-in lane (it loads MSBuild); skip it via a
 # gitignored lefthook-local.yml if local commit latency matters more than parity.
+#
+# The lane opts out of merge and rebase itself rather than relying on a
+# hook-level skip in the base fragment: a hook-level skip would take the
+# consumer's own security lanes down with it (see lefthook-base's header).
 
 pre-commit:
   jobs:
     - name: dotnet-format
       glob: "**/*.cs"
+      skip:
+        - merge
+        - rebase
       run: node .lefthook/dotnet-format-staged.mjs {staged_files}
       fail_text: >-
         Whitespace/layout drift or invalid dotnet-format.json. Run: dotnet

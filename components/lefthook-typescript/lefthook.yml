@@ -5,6 +5,10 @@
 # Biome owns lint + format + import sorting in one pass. Type-checking (tsc) is
 # deliberately left to CI — it needs the project's tsconfig graph, not a per-file
 # staged check, and pairing it here would double-report against the CI tsc lane.
+#
+# The lane opts out of merge and rebase itself rather than relying on a
+# hook-level skip in the base fragment: a hook-level skip would take the
+# consumer's own security lanes down with it (see lefthook-base's header).
 
 pre-commit:
   commands:
@@ -21,3 +25,6 @@ pre-commit:
         - "**/packages.lock.json"
       run: npx --no-install @biomejs/biome check {staged_files}
       fail_text: "Biome findings. Run: npx --no-install @biomejs/biome check --write <files>"
+      skip:
+        - merge
+        - rebase

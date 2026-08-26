@@ -78,4 +78,24 @@ assert_file_absent 'editorconfig opts out of a merge commit' "$work/editorconfig
 # hook's own indent. Only the latter has the fleet-wide blast radius.
 assert_eq 'the fragment declares no hook-level skip' '0'   "$(grep -c '^  skip:' "$base" || true)"
 
+# --- Every lane in every fragment accounts for merge/rebase explicitly.
+# Codex caught the first version of this change updating only two of the five
+# adapters, which silently switched ShellCheck, Biome and dotnet-format on for
+# merge commits. With the blanket skip gone, "I forgot one" is no longer a
+# no-op, so the invariant is asserted over the whole component set rather than
+# over the files this change happened to touch. One lane per `run:`, one opt-out
+# per `skip:`; the ONLY lane allowed to lack one is gitleaks, which is the
+# entire point of the fix.
+for fragment in "$root"/components/lefthook-*/lefthook.yml; do
+  lanes="$(grep -c '^ *run:' "$fragment" || true)"
+  skips="$(grep -c '^ *skip:' "$fragment" || true)"
+  expected="$lanes"
+  # base carries gitleaks, the one deliberate exemption.
+  if [[ "$fragment" == *"/lefthook-base/"* ]]; then
+    expected="$((lanes - 1))"
+  fi
+  assert_eq "every lane in $(basename "$(dirname "$fragment")") declares merge/rebase intent" \
+    "$expected" "$skips"
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
