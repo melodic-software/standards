@@ -14,6 +14,20 @@
 # mandatory foundation every consumer extends; an extended file's settings win
 # over the consumer's root file, so the strict posture cannot be loosened by
 # accident (only deliberately, via a gitignored lefthook-local.yml).
+#
+# The merge/rebase skip is PER-COMMAND, never on the hook. A hook-level `skip`
+# short-circuits the entire merged pre-commit hook — every lane this fragment
+# declares, every lane a sibling fragment adds, and every lane the CONSUMER
+# declares in its own root file, because `extends` merges them all into one
+# hook and the extended file's setting wins. That is the correct behaviour for
+# a formatting or spelling gate, which has no business failing a developer on
+# lines they did not write. It is the wrong behaviour for a secret scan: a
+# credential staged while resolving a conflict enters history exactly as
+# permanently as one typed by hand, and a consumer whose own security lane
+# rides this hook (a repository-owned artifact guard, say) would silently
+# inherit the bypass with nothing in its own file to suggest it. So the
+# hygiene lanes below opt out of merge and rebase individually, `gitleaks`
+# never does, and a consumer's lanes are governed by the consumer alone.
 
 min_version: "2.0.0"
 assert_lefthook_installed: true
@@ -23,18 +37,21 @@ glob_matcher: doublestar
 
 pre-commit:
   parallel: true
-  skip:
-    - merge
-    - rebase
   commands:
     typos:
       # Spell-check staged files; auto-discovers _typos.toml from the repo root.
       glob: "**/*"
       run: typos {staged_files}
       fail_text: "Spelling issues. Fix them, or record a false positive per the Typos component's escape hatches."
+      skip:
+        - merge
+        - rebase
     gitleaks:
       # Secret-scan the staged diff. gitleaks reads `git diff --cached` itself, so
       # it takes no file list, and auto-discovers .gitleaks.toml from the root.
+      #
+      # Deliberately carries NO skip. This lane runs on merge and rebase
+      # commits too — see the header. Do not add one.
       run: gitleaks git --pre-commit --staged --no-banner
       fail_text: "Potential secret in staged changes. Remove it, or allowlist a verified false positive in .gitleaks.toml."
     editorconfig:
@@ -45,6 +62,9 @@ pre-commit:
       glob: "**/*"
       run: editorconfig-checker {staged_files}
       fail_text: "EditorConfig violation. Align with .editorconfig (most editors auto-fix on save)."
+      skip:
+        - merge
+        - rebase
     markdownlint:
       # Resolve the consumer's pinned markdownlint-cli2 directly from
       # node_modules/.bin (node_modules/.bin is not on a hook's PATH) instead of
@@ -55,3 +75,6 @@ pre-commit:
       glob: "**/*.{md,markdown}"
       run: "test -x node_modules/.bin/markdownlint-cli2 || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
       fail_text: "Markdown lint failures, or markdownlint-cli2 missing (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
+      skip:
+        - merge
+        - rebase

@@ -6,6 +6,10 @@
 # `ruff format --check` owns formatting. Type-checking (Pyright) is deliberately
 # left to CI — it needs whole-project context, not a per-file staged check, and
 # pairing it here would double-report against the CI type-check lane.
+#
+# Each lane opts out of merge and rebase individually rather than relying on a
+# hook-level skip in the base fragment: a hook-level skip would take the
+# consumer's own security lanes down with it (see lefthook-base's header).
 
 pre-commit:
   commands:
@@ -13,7 +17,13 @@ pre-commit:
       glob: "**/*.{py,pyi}"
       run: ruff check {staged_files}
       fail_text: "Ruff lint failures. Run: ruff check --fix <files>"
+      skip:
+        - merge
+        - rebase
     ruff-format:
       glob: "**/*.{py,pyi}"
       run: ruff format --check {staged_files}
       fail_text: "Ruff format drift. Run: ruff format <files>"
+      skip:
+        - merge
+        - rebase

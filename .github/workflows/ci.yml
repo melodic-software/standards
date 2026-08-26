@@ -924,6 +924,8 @@ jobs:
         run: lefthook validate
       - name: Lefthook base contract test
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh
+      - name: Lefthook merge/rebase skip placement test
+        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-merge-skip.test.sh
       - name: Lefthook ShellCheck contract test
         run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
 
