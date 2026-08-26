@@ -13,7 +13,7 @@ Execute the locked decision set: restore automerge safely (canary + proven watch
 ### Constraints
 
 - Exact-set App attestation: any roster change is an atomic two-sided operation (manifest edit + org-owner grant); grant-first per github-iac's documented procedure; a skew window reds out the whole fleet; schedule nothing sync-dependent inside it.
-- Every new target enters with explicit `automerge: false` (omitted defaults to TRUE and would bypass the canary).
+- [DISCHARGED at Phase 1.5] Every new target entered with explicit `automerge: false` while the canary was in flight (omitted defaults to TRUE and would have bypassed it). Post-1.5 the fleet default is armed; a new target takes an explicit opt-out only for a live per-target blocker (today, its default branch sitting outside the org `ci-gate` ruleset), recorded at its own key with a removal trigger.
 - Re-pinning any ci-workflows reusable caller requires appending the new `path@SHA` to `components/runner-policy/policy.json` in the same PR.
 - The zero-target validator rule (schema + engine + mjs lockstep) lands LAST in the component-cleanup series.
 - Managed-file deselection never deletes downstream: agent-orientation retirement requires explicit per-target PRs (blank, not delete).
@@ -245,7 +245,7 @@ Record run URLs + issue URL + per-dispatch classifier verdicts as the proof arti
 
 **Sanity Check:** medley test-issue timeline shows create → update → close by melodic-standards-sync[bot]; dispatch-1 concluded failure with `infrastructure-failure=false` and liveness skipped; dispatch-3 concluded success; no open v1:test issue remains; production lookup untouched (no open production-marker issue).
 
-### Phase 1.4: canary, re-arm melodic-software/.github [DOING]
+### Phase 1.4: canary, re-arm melodic-software/.github [DONE]
 
 Standards manifest PR after 1.3 proof passes.
 
@@ -256,14 +256,26 @@ Standards manifest PR after 1.3 proof passes.
 
 **Sanity Check:** `yq '.targets."melodic-software/.github" | has("automerge")'` → false; next `.github` sync PR shows `autoMergeRequest.enabledAt` set within its run; PR merges without human action OR a watchdog issue appears (both = canary working).
 
-### Phase 1.5: fleet re-arm [PENDING]
+**Evidence (2026-08-23):** the canary fired organically inside the time box. `.github` PR 62 opened 02:28:08Z; the App armed auto-merge on it at 02:28:10Z (`enabledBy` = the sync App itself, SQUASH); it self-merged at 02:28:39Z, `mergedBy` the same App, no human action. All four required contexts ran and passed (`pr-title`, `pr-issue-linkage`, `do-not-merge`, `ci-status`). The watchdog stayed green throughout.
 
-Standards manifest PR, gated on the 1.3 proof (canary-armed observation desirable; 1.4's 7-day box governs).
+### Phase 1.5: fleet re-arm [DONE]
 
-1. Remove `automerge: false` from the remaining 7 targets (restore the opt-out default fleet-wide).
-2. Final header re-cut: armed fleet-wide; watchdog proven (cite proof); per-target opt-out remains available for staged rollout windows.
+Standards manifest PR, gated on the 1.3 proof (canary-armed observation desirable; 1.4's 7-day box governs). Executed 2026-08-23 on the observed canary, inside the box.
 
-**Sanity Check:** `yq '[.targets[] | select(has("automerge"))] | length' distribution/sync-manifest.yml` → 0 (tests the data, not prose; the re-cut comment may legitimately mention the literal); manifest validator green (absent key = true is schema-optional, verified: schema:64, engine :723-732, engine tests cover both forms); next sync wave's PRs arm (spot-check one private + one public target for `autoMergeRequest.enabledAt`); human sync-merge load trends to zero over the following week.
+1. Remove `automerge: false` from 8 targets: the 7 originals (ci-runner, ci-workflows, claude-code-plugins, dotfiles, github-iac, medley, provisioning) plus codex-plugins. Three Phase 4 targets (agent-plugins, claude-code-proxy, cursor-plugins) keep the key: their default branches are not covered by the org `ci-gate` ruleset, so they carry no required status checks and an armed sync PR would merge ungated. Proven live: claude-code-proxy PR 182 merged 2026-08-23 with `ci-status`, Ruff, Pester and pytest all FAILURE, because none of them are required. codex-plugins entered in the same Phase 4 window and IS armed, because it alone among the four carries `ci-gate` (verified on its PR 22: all four contexts SUCCESS). Removal trigger for the three is tracked as Phase 1.6.
+2. Final header re-cut: fleet armed; watchdog proven (cite proof); the surviving opt-outs each name a live per-target blocker and its removal trigger, rather than reading as roster vintage.
+
+**Sanity Check:** `yq '[.targets[] | select(has("automerge"))] | length' distribution/sync-manifest.yml` → 3, and `yq '[.targets | to_entries[] | select(.value.automerge == false) | .key]'` → exactly agent-plugins, claude-code-proxy, cursor-plugins, each carrying a comment naming the `ci-gate` gap and its removal trigger (tests the data, not prose; the re-cut comment may legitimately mention the literal); manifest validator green (absent key = true is schema-optional, verified: schema:64, engine :666-684, engine tests cover both forms); next sync wave's PRs arm (spot-check one private + one public target for `autoMergeRequest.enabledAt`); human sync-merge load trends to zero over the following week.
+
+### Phase 1.6: extend the org ci-gate ruleset to the three disarmed targets [PENDING]
+
+Surfaced by Phase 1.5's adversarial review: three sync targets sit permanently disarmed with no tracked path back to armed, and nothing in the repo recorded the reason before this phase. `agent-plugins`, `claude-code-proxy` and `cursor-plugins` resolve to `base` + `signing` only, while every armed target also resolves `ci-gate` (org ruleset id 17989001), the rule that supplies `pr-title`, `pr-issue-linkage`, `do-not-merge` and `ci-status` as required contexts.
+
+1. github-iac PR: extend `ci-gate` to the three repositories. Pulumi-managed per repo convention, never the GitHub UI or ad-hoc `gh`.
+2. claude-code-proxy additionally needs its checks green before arming: PR 182's rollup shows Ruff, Pester, pytest and `ci-status` failing.
+3. Standards PR: drop the three `automerge: false` keys once each repository has one real sync PR showing all four required contexts firing.
+
+**Sanity Check:** `gh api repos/melodic-software/<repo>/rules/branches/main` reports `required_status_checks` carrying all four contexts for all three repositories; then `yq '[.targets[] | select(has("automerge"))] | length'` → 0.
 
 ### Phase 2: agent-orientation retirement
 

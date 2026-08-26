@@ -276,13 +276,21 @@ components:
     files:
       _typos.toml: _typos.toml
 
-# Automerge restore in progress (standards-sync-audit remediation,
+# Automerge is restored (standards-sync-audit remediation,
 # docs/topics/standards-sync-audit/): the watchdog's tracking-issue
 # create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
 # (proof artifact in that plan, 2026-08-17), and the melodic-software/.github
-# canary is armed — an absent automerge key is the armed default. The
-# remaining explicit opt-outs come off once the canary's first organic sync
-# PR is observed (time-boxed; the proof, not the canary merge, is the gate).
+# canary was observed end-to-end on 2026-08-23 — PR 62 armed on open and
+# self-merged 31 seconds later with all four required contexts green. An
+# absent automerge key is the armed default, and the fleet is armed.
+#
+# The three surviving opt-outs are NOT roster vintage. Each names a live
+# per-target blocker at its own key, with its own removal trigger; all three
+# share one root cause — their default branches sit outside the org ci-gate
+# ruleset, so they have no required status checks for an armed PR to wait on.
+# codex-plugins entered in the same Phase 4 window and IS armed, because it
+# carries ci-gate. The key stays available fleet-wide as a per-target opt-out
+# for any future staged rollout.
 targets:
   melodic-software/.github:
     managed:
@@ -296,9 +304,9 @@ targets:
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
   # no considered exclusion is overridden). Same shape as the two sibling
-  # marketplace targets: hygiene set + cloud-bootstrap. The repo starts empty
-  # of these payloads, so the first sync CREATES them — adoption from birth,
-  # no divergence to reconcile.
+  # marketplace targets: hygiene set + cloud-bootstrap. The adoption sync
+  # (PR 1, merged 2026-08-19) created those payloads; the repo is converged now
+  # and syncs incrementally like any other target.
   melodic-software/agent-plugins:
     managed:
       - cloud-bootstrap
@@ -308,6 +316,15 @@ targets:
       - markdownlint
       - repository-text
       - typos
+    # Disarmed because this repository's default branch is not covered by the
+    # org ci-gate ruleset: it carries no required status checks at all, so an
+    # armed sync PR would merge with nothing gating it. Its whole check rollup
+    # on PR 2 is a single GitGuardian entry. NOT a roster-vintage or first-sync
+    # opt-out — codex-plugins entered in the same Phase 4 window and is armed,
+    # because it carries ci-gate. Removal trigger: extend ci-gate to this
+    # repository (a Pulumi change in the github-iac repo, never the GitHub UI
+    # or ad-hoc gh), then drop this key once one real sync PR shows all four
+    # required contexts firing.
     automerge: false
   melodic-software/ci-runner:
     managed:
@@ -322,7 +339,6 @@ targets:
       - typos
     locally-owned:
       - actionlint
-    automerge: false
   melodic-software/ci-workflows:
     managed:
       # Flipped to managed after byte-parity held: the pre-existing local copy
@@ -342,7 +358,6 @@ targets:
       - review-instructions
       - shellcheck
       - typos
-    automerge: false
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
@@ -391,7 +406,6 @@ targets:
       # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
       - ruff
-    automerge: false
   # Phase 4 fleet expansion (standards-sync-audit plan, Brief line "Phase 4"):
   # claude-code-proxy, codex-plugins, and cursor-plugins enter with the
   # hygiene set plus cloud-bootstrap (each held an unmanaged, drifting copy of
@@ -433,7 +447,20 @@ targets:
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
       - ruff
+    # Disarmed, and the strongest case in the fleet: this repository's default
+    # branch carries no required status checks, and its checks are red. PR 182
+    # merged 2026-08-23 with ci-status, Ruff, Pester and pytest all FAILURE,
+    # precisely because none of them are required. Arming here would self-merge
+    # sync PRs through an open gate. Removal trigger: extend the org ci-gate
+    # ruleset to this repository (a Pulumi change in the github-iac repo, never
+    # the GitHub UI or ad-hoc gh), get the checks green, then drop this key once
+    # one real sync PR shows all four required contexts firing.
     automerge: false
+  # Armed, unlike its two Phase 4 siblings: codex-plugins is the one marketplace
+  # target whose default branch is covered by the org ci-gate ruleset, so the
+  # four required contexts actually gate its sync PRs (verified on PR 22,
+  # 2026-08-23 — pr-title, pr-issue-linkage, do-not-merge and ci-status all
+  # SUCCESS). The siblings stay disarmed for exactly that coverage's absence.
   melodic-software/codex-plugins:
     managed:
       - cloud-bootstrap
@@ -443,7 +470,6 @@ targets:
       - markdownlint
       - repository-text
       - typos
-    automerge: false
   melodic-software/cursor-plugins:
     managed:
       - cloud-bootstrap
@@ -453,6 +479,15 @@ targets:
       - markdownlint
       - repository-text
       - typos
+    # Disarmed because this repository's default branch is not covered by the
+    # org ci-gate ruleset: it carries no required status checks at all, so an
+    # armed sync PR would merge with nothing gating it. Its whole check rollup
+    # on PR 12 is a single GitGuardian entry. NOT a roster-vintage opt-out —
+    # codex-plugins entered in the same Phase 4 window and is armed, because it
+    # carries ci-gate. Removal trigger: extend ci-gate to this repository (a
+    # Pulumi change in the github-iac repo, never the GitHub UI or ad-hoc gh),
+    # then drop this key once one real sync PR shows all four required contexts
+    # firing.
     automerge: false
   melodic-software/dotfiles:
     managed:
@@ -479,7 +514,6 @@ targets:
       - typos
     locally-owned:
       - shellcheck
-    automerge: false
   melodic-software/github-iac:
     managed:
       - claude-review-caller
@@ -501,7 +535,6 @@ targets:
       - typos
     locally-owned:
       - actionlint
-    automerge: false
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -571,7 +604,6 @@ targets:
       # Diverged local copy at the canonical destination (_typos.toml,
       # 174 lines vs 58). Recorded 2026-08-16 (audit).
       - typos
-    automerge: false
   melodic-software/provisioning:
     managed:
       - actionlint
@@ -592,4 +624,3 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-    automerge: false
