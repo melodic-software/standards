@@ -6,6 +6,11 @@
 # `ruff format --check` owns formatting. Type-checking (Pyright) is deliberately
 # left to CI — it needs whole-project context, not a per-file staged check, and
 # pairing it here would double-report against the CI type-check lane.
+#
+# This fragment declares no `skip`. Whether a lane sits out merge and rebase
+# commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
+# here would win over the consumer's and silently defeat the documented
+# `skip: true` opt-out. See lefthook-base's header for the full rule.
 
 pre-commit:
   commands:

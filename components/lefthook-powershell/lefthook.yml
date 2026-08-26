@@ -11,6 +11,11 @@
 #
 # Adopt psscriptanalyzer-staged.ps1 and its isolated psscriptanalyzer-target.ps1
 # worker alongside the managed hook payload under `.lefthook/`.
+#
+# This fragment declares no `skip`. Whether a lane sits out merge and rebase
+# commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
+# here would win over the consumer's and silently defeat the documented
+# `skip: true` opt-out. See lefthook-base's header for the full rule.
 
 pre-commit:
   commands:
