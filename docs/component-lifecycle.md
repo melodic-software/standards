@@ -18,41 +18,41 @@ through the on-demand audit described by the
 The admitting pull request must supply all of the following evidence. Missing
 evidence means the component remains a consumer-local experiment.
 
-- **Live consumer** — identify at least one current repository and the exact
+- **Live consumer**: identify at least one current repository and the exact
   workflow, manifest, configuration, or code path that will consume the
   component. Anticipated use and an ecosystem's general popularity are not
   adoption evidence.
-- **Owner and outcome** — name the accountable maintainer, the problem being
+- **Owner and outcome**: name the accountable maintainer, the problem being
   solved, the measurable acceptance condition, and the rollback path. Durable
   ownership and operating instructions live beside the component; consumer
   lists stay in their authoritative surfaces.
-- **Delivery boundary** — choose the natural authority: a native package or
+- **Delivery boundary**: choose the natural authority: a native package or
   reference, a reusable workflow in `ci-workflows`, an organization setting in
   GitHub IaC, or exact materialization through this repository. Explain why the
   selected boundary preserves one source of truth.
-- **Alternatives and overlap** — compare the platform's official facility and
+- **Alternatives and overlap**: compare the platform's official facility and
   credible maintained alternatives against the requirement. Identify overlap
   with existing components and explain why composition will not duplicate
   findings or create competing configuration authorities.
-- **Operational fit** — exercise the real consumer and report signal quality,
+- **Operational fit**: exercise the real consumer and report signal quality,
   false positives, runtime, resource use, supported operating systems and
   architectures, required privileges, data or credential access, and failure
   behavior. A documentation-only comparison is not sufficient.
-- **Upstream health** — cite official documentation and releases; inspect
+- **Upstream health**: cite official documentation and releases; inspect
   project governance, active maintainers, security reporting, unresolved
   advisories, release and issue response, documented adopters, and archival or
   end-of-support status. Popularity is corroborating evidence, never a
   substitute for fitness or maintenance.
-- **Legal and security fit** — record the upstream license with its SPDX
+- **Legal and security fit**: record the upstream license with its SPDX
   identifier or expression, compatibility with the organization's applicable
   policy, artifact provenance and integrity mechanism, dependency and network
   boundary, and the review required by
   [security criteria](../conventions/review/security.md).
-- **Update path** — enable the repository's supported dependency updater for
+- **Update path**: enable the repository's supported dependency updater for
   every independent dependency root. If automation cannot cover a tool, record
   the owner, exact upstream release source, review procedure, and recurring
   check trigger beside the component.
-- **Verification** — add behavioral tests for the policy boundary, fixtures for
+- **Verification**: add behavioral tests for the policy boundary, fixtures for
   expected pass and fail cases, deterministic installation, and CI that runs
   the same entrypoint consumers will use. Structural validation is not
   behavioral proof.

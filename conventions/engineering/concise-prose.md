@@ -77,4 +77,4 @@ is incomplete, ambiguous, or abrupt.
 - [W3C cognitive accessibility pattern, "Keep Text Succinct"](https://www.w3.org/WAI/WCAG2/supplemental/patterns/o3p05-succinct-text/)
 - [W3C cognitive accessibility pattern, "Explain Implied Content"](https://www.w3.org/WAI/WCAG2/supplemental/patterns/o3p12-implicit-explained/)
 - [GOV.UK, "Publishing accessible documents"](https://www.gov.uk/guidance/publishing-accessible-documents)
-- [ISO 24495-1:2023, *Plain language — Part 1: Governing principles and guidelines*](https://www.iso.org/standard/78907.html)
+- [ISO 24495-1:2023, *Plain language — Part 1: Governing principles and guidelines*](https://www.iso.org/standard/78907.html) <!-- ai-slop-ignore: em dash is part of the literal ISO standard title -->

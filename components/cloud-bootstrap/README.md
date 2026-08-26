@@ -3,7 +3,7 @@
 The canonical per-repository cloud bootstrap (SSOT). The exported payload is
 [`cloud-bootstrap.sh`](cloud-bootstrap.sh), materialized to each fleet
 repository's `.claude/cloud-bootstrap.sh` by
-[`distribution/sync-manifest.yml`](../../distribution/sync-manifest.yml) —
+[`distribution/sync-manifest.yml`](../../distribution/sync-manifest.yml),
 so a fix lands here once and fans out as reviewed sync PRs; a hand-copied
 per-repo script drifts, a materialized one cannot while it stays `managed`.
 
@@ -19,15 +19,16 @@ the ~7-day-stale environment cache.
 
 ## What the script does
 
-Everything is data-driven from the consuming repo's own manifests — the
+Everything is data-driven from the consuming repo's own manifests: the
 script itself carries no repo names, no marketplace identifiers, and no
 pinned versions:
 
-- logs the environment snapshot stamp (`/opt/melodic-env-setup.done`) so
-  every session reports which environment build it booted from;
+- logs the environment snapshot stamp (`/opt/melodic-env-setup.done`, or its
+  `/tmp/melodic-env-setup.done` fallback when `/opt` was unwritable at cache
+  build) so every session reports which environment build it booted from;
 - Node from `.node-version` (via the VM's nvm), `npm ci` from the root
   `package-lock.json`, and the .NET SDK exactly as `global.json` pins,
-  repo-local — each skipped when the manifest is absent or already satisfied;
+  repo-local, each skipped when the manifest is absent or already satisfied;
 - repairs the shallow single-branch cloud clone (unshallow + make
   `origin/main` resolve) so base-ref diffs work;
 - runs the repo's committed `.claude/cloud-bootstrap.local.sh` when present
@@ -45,15 +46,15 @@ natively).
 
 One lever per mode, the same tri-mode the distribution README defines:
 
-- **Take** — the default: the repo's `managed` manifest entry materializes
+- **Take**, the default: the repo's `managed` manifest entry materializes
   this file byte-exact, and sync PRs carry every future change.
-- **Enrich** — commit a `.claude/cloud-bootstrap.local.sh` in the consuming
+- **Enrich**: commit a `.claude/cloud-bootstrap.local.sh` in the consuming
   repo. The canonical script runs it after the generic toolchain stage; it is
   never synced and never overwritten. Same contract as the caller:
   idempotent, best effort, bash-3.2-safe, always exit 0. Use it for extra
-  lockfile locations, pinned hygiene binaries, symlinks — anything
+  lockfile locations, pinned hygiene binaries, symlinks, anything
   repo-specific.
-- **Customize** — move the component to `locally-owned` for that repository
+- **Customize**: move the component to `locally-owned` for that repository
   in `distribution/sync-manifest.yml` (upstream first, then edit the copy
   downstream), per the
   [distribution lifecycle](../../distribution/README.md). The repo then owns
@@ -63,7 +64,7 @@ One lever per mode, the same tri-mode the distribution README defines:
 
 Both callers run `bash <script>`, so the interpreter is whatever `bash`
 resolves to. Stock macOS still ships bash 3.2: no `mapfile`, no arrays
-(empty-array expansion aborts under `set -u` before 4.4) — the script and any
+(empty-array expansion aborts under `set -u` before 4.4), so the script and any
 `cloud-bootstrap.local.sh` must hold to newline-delimited strings and
 `while read` loops.
 
@@ -74,5 +75,5 @@ standards is the manifest source, not a sync target, so its
 [`cloud-bootstrap.test.sh`](cloud-bootstrap.test.sh) (CI-gated) rather than
 by the synchronizer. Its enrich seam,
 [`.claude/cloud-bootstrap.local.sh`](../../.claude/cloud-bootstrap.local.sh),
-installs each component project's own lockfile — the root `package.json`
+installs each component project's own lockfile. The root `package.json`
 declares no workspaces, so a root `npm ci` does not reach them.

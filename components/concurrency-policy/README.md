@@ -42,7 +42,7 @@ concurrency:
 supersedes an in-flight run of the same pull request, so a force-push or a rapid
 second push cancels the prior run instead of queueing a second one. That number
 is empty on `push` and `schedule` events, so those runs fall back to the unique
-`github.run_id` and are never cancelled — a default-branch or scheduled run is
+`github.run_id` and are never cancelled: a default-branch or scheduled run is
 never superseded by another.
 
 The pull-request number, not `github.head_ref`, is deliberate. Both satisfy the
@@ -50,8 +50,8 @@ The pull-request number, not `github.head_ref`, is deliberate. Both satisfy the
 only on `pull_request` and `pull_request_target` events and is empty otherwise.
 But `head_ref` is a fork-controllable branch *name*: two pull requests from
 different head repositories that share a branch name collide in the same
-concurrency group, and one cancels the other. On `pull_request_target` — which
-runs with the base repository's token — that collision is attacker-influenced.
+concurrency group, and one cancels the other. On `pull_request_target`, which
+runs with the base repository's token, that collision is attacker-influenced.
 The pull-request number is unique per repository and is not fork-controllable,
 so it avoids the collision while keeping the identical push/schedule safety.
 GitHub's own documentation presents the `head_ref || run_id` form as the general
@@ -65,15 +65,15 @@ parsing. The token order and identity are exact.
 
 For each pull-request-triggered workflow that is not excepted:
 
-- `concurrency-missing` — no top-level `concurrency` block.
-- `concurrency-group-drift` — the `group` is not the canonical expression (for
+- `concurrency-missing`: no top-level `concurrency` block.
+- `concurrency-group-drift`: the `group` is not the canonical expression (for
   example `${{ github.workflow }}-${{ github.ref }}`, which lets two
   default-branch or scheduled runs cancel each other, or the `head_ref` variant
   above).
-- `concurrency-cancel-missing` — `cancel-in-progress` is not the literal `true`.
-- `concurrency-malformed` — `concurrency` is neither a group string nor a
+- `concurrency-cancel-missing`: `cancel-in-progress` is not the literal `true`.
+- `concurrency-malformed`: `concurrency` is neither a group string nor a
   mapping.
-- `concurrency-extra-keys` — the block carries a key other than `group` and
+- `concurrency-extra-keys`: the block carries a key other than `group` and
   `cancel-in-progress` (for example `queue`), so it is not the exact canonical
   shape.
 
@@ -108,7 +108,7 @@ pull-request-triggered, or already carries the canonical block is reported as
 `exception-inventory-drift`, so the inventory cannot silently widen or rot.
 
 The file is optional: a repository whose pull-request workflows are all
-canonical needs no configuration, and its absence declares no exceptions —
+canonical needs no configuration, and its absence declares no exceptions,
 the strictest stance.
 
 ## Enforcement gate

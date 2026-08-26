@@ -6,8 +6,8 @@
 
 ## Context
 
-ADR-0004 created `components/local-lane-guards/` — a dispatcher plus four
-guard drivers, synced exact-file to `tools/shared/local-lane-guards/` — so
+ADR-0004 created `components/local-lane-guards/`, a dispatcher plus four
+guard drivers synced exact-file to `tools/shared/local-lane-guards/`, so
 repositories could run the CI guards locally without forking driver logic.
 The standards sync audit's guard-by-guard inventory (fleet-wide, live
 origin/main) found that adoption never happened and never will in this
@@ -21,7 +21,7 @@ shape:
   (whose bundled copies of the pattern/driver files are byte-identical or
   managed) and in repo-local wrappers, not in a synced local lane.
 - The manifest definition sat with zero target references behind a named
-  reachability exemption in `sync-manifest.sh` — dead weight the validator
+  reachability exemption in `sync-manifest.sh`: dead weight the validator
   had to special-case.
 
 ## Decision
@@ -29,12 +29,12 @@ shape:
 Stop distributing the drivers: the `local-lane-guards` manifest definition,
 the validator's reachability exemption (and its conditional seed), and the
 exemption's test fixture are removed. The component DIRECTORY stays as
-producer-internal source plus contract test — the same treatment as the
-Phase 3.1 trio — with its README and dispatcher header re-cut to stop
+producer-internal source plus contract test, the same treatment as the
+Phase 3.1 trio, with its README and dispatcher header re-cut to stop
 documenting a distribution path that no longer exists.
 
 **This supersession is PARTIAL.** ADR-0004's driver-distribution decision
-ends; the pattern-library distribution it built on CONTINUES — the
+ends; the pattern-library distribution it built on CONTINUES: the
 `comment-hygiene-tools` and `path-detection-tools` components remain managed
 payloads (medley consumes both through repo-owned wrappers per its ADR-0019
 pattern and its comment-hygiene ADR).
@@ -44,15 +44,15 @@ pattern and its comment-hygiene ADR).
 The audit's per-guard inventory ends in deliberate states that were live but
 unrecorded; this ADR is their durable record:
 
-- **machine-specific-paths** — already at the target state in medley:
+- **machine-specific-paths**: already at the target state in medley.
   ADR-0019's two-driver/one-SSOT pattern has the managed
   `path-detection-tools` body sourced by a medley-owned wrapper ("share
   bodies, NOT wrapping"). Migration complete by prior art; nothing to do.
-- **exec-bit** — three INDEPENDENT, scope-differentiated implementations,
+- **exec-bit**: three INDEPENDENT, scope-differentiated implementations,
   not forks: canonical full-tree, medley staged/push-range, ccp
   new-index-entry (a different rule for its commit skill). Legitimate
   diversity of scope; deliberately not unified.
-- **heading-cites (reference-integrity)** — medley's copy diverged at a
+- **heading-cites (reference-integrity)**: medley's copy diverged at a
   non-canonical path (`tools/markdown-coupling/`); the ci-workflows action
   copy is byte-identical to canonical. Migration DEFERRED with a named
   revisit trigger: the next behavioral change to the canonical checker.

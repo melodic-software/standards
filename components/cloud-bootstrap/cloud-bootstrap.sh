@@ -38,11 +38,14 @@ repo_root="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." 
 cd -- "$repo_root"
 
 # Environment-snapshot inventory line: the shared environment's setup script
-# writes its version + build time to this stamp as its last action. Logging it
-# from every session makes "which snapshot is this account booting" visible
-# without a per-account audit.
+# writes its version + build time to this stamp as its last action, falling
+# back to /tmp when /opt is unwritable at cache build. Logging it from every
+# session makes "which snapshot is this account booting" visible without a
+# per-account audit.
 if [[ -f /opt/melodic-env-setup.done ]]; then
   echo "cloud-bootstrap: env snapshot $(cat /opt/melodic-env-setup.done)" >&2
+elif [[ -f /tmp/melodic-env-setup.done ]]; then
+  echo "cloud-bootstrap: env snapshot $(cat /tmp/melodic-env-setup.done) (fallback stamp; /opt was unwritable at cache build)" >&2
 else
   echo "cloud-bootstrap: no env setup stamp (unmanaged environment or interrupted cache build)" >&2
 fi

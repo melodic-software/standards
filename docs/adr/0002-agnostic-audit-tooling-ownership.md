@@ -35,8 +35,8 @@ ordering all stand.
 
 The discriminating axis is who the rule binds:
 
-- a rule binding Melodic Software repositories — one it would be wrong to
-  impose on a repository we do not control — is an org policy choice and stays
+- a rule binding Melodic Software repositories, one it would be wrong to
+  impose on a repository we do not control, is an org policy choice and stays
   in this repository;
 - a rule any consumer could adopt unchanged, whose default yields to that
   consumer's own declared policy where one exists, is agnostic and belongs to

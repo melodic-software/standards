@@ -167,7 +167,7 @@ label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
 validated input; only the caller's failure fallback is frozen to a literal from
 `fallbackLabelAllowlist`.
 
-The frozen literal must appear in `fallbackLabelAllowlist` — a set deliberately
+The frozen literal must appear in `fallbackLabelAllowlist`, a set deliberately
 narrower than `approvedHostedRunnerLabels`. A label may be an approved explicit
 `runs-on` target yet still be barred from becoming the silent recovery
 fallback, so a costlier hosted tier cannot slip in as the recovery label that
@@ -176,7 +176,7 @@ allowlist; configuration fails closed when it is absent. The allowlist also
 admits the managed fleet label: a repository whose CI is a hard dependency on
 the self-hosted fleet (routing policy `self-hosted-only`) may freeze its
 recovery fallback to that managed label instead of a hosted one, trading the
-hosted scheduling-availability hedge for zero hosted spend — when the fleet is
+hosted scheduling-availability hedge for zero hosted spend: when the fleet is
 down, that repository's workloads are queued either way, so the reporter
 stalling in the queue adds no marginal harm.
 
@@ -188,12 +188,12 @@ repository's other self-hosted jobs keep the default. Personal-repository
 callers may additionally pass
 `self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`.
 
-A caller whose ancillary-event jobs — `issue_comment`, `pull_request_review`,
-`pull_request_review_comment`, and `issues` — perform no checkout of PR or
+A caller whose ancillary-event jobs, meaning `issue_comment`, `pull_request_review`,
+`pull_request_review_comment`, and `issues`, perform no checkout of PR or
 issue content may pass `admits-ancillary-events: true` (or the deprecated alias
 `admits-comment-events: true`) to opt those events into fleet routing. Only the
 literal `true` is accepted; the default is not written. The policy permits the
-input but does not verify the no-checkout premise the caller declares — that
+input but does not verify the no-checkout premise the caller declares. That
 declaration is trusted under the same job-step review that backs a local-routing
 grant (see [`THREAT-MODEL.md`](THREAT-MODEL.md)). No other selector input or
 expression is allowed by the policy.
@@ -218,7 +218,7 @@ unknown secret names, and alternate expressions:
   instead pins a fixed hosted runner literal through the same input gets no
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
-  `id-token`-capable job — or `publication` when the caller's only write
+  `id-token`-capable job, or `publication` when the caller's only write
   scope is `packages` and it carries no other privileged surface, per the
   packages-only rule below.
   A contract may separately name a `minimumCallerPermissions` mapping: the
@@ -231,8 +231,8 @@ unknown secret names, and alternate expressions:
   the called workflow's own `permissions:` block requests, because a called
   workflow can only narrow the caller's `GITHUB_TOKEN` and never widen it, so a
   caller granting less than the callee asks for cannot do the work the contract
-  was reviewed for. That obligation is most often entirely read — the case no
-  write-requiring waiver can express at all — so the two fields are separate
+  was reviewed for. That obligation is most often entirely read, the case no
+  write-requiring waiver can express at all, so the two fields are separate
   rather than one field doing both jobs. **A floor may only require `read`,**
   and the validator rejects any other value: GitHub downgrades a caller's
   write grants to read (and write-only scopes to none) on forked and
@@ -245,10 +245,10 @@ unknown secret names, and alternate expressions:
   access stays ordered (`none` < `read` < `write`) and the check stays a
   floor, not a match, so a caller granting `write` where the contract requires
   `read` passes, extra scopes the contract does not name pass, and `read-all`
-  or `write-all` clears a read floor — each of those still clears the floor
+  or `write-all` clears a read floor: each of those still clears the floor
   after an event-time downgrade lands at `read`. A scope the caller does not
   name is granted nothing and fails, and a caller whose effective job
-  permissions are omitted fails closed — omitted permissions resolve to
+  permissions are omitted fails closed: omitted permissions resolve to
   repository- or organization-defined defaults this policy cannot read, so
   they can never prove the floor. A contract naming both fields must be
   satisfiable: because the waiver is the only mapping such a caller may
@@ -258,7 +258,7 @@ unknown secret names, and alternate expressions:
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
   exactly that named secret mapping while selector-routed, because the
-  immutable contract — not the caller — owns the secret boundary, the same
+  immutable contract, not the caller, owns the secret boundary, the same
   way a hosted-only contract's mapping does. The caller's permissions keep
   the ordinary explicit read-only requirement unless the contract also names
   `allowedCallerPermissions`, and every secret-capable runner-input contract
@@ -279,8 +279,8 @@ that invokes a cross-repository reusable workflow, requires a non-empty
 `justification`, and names one or more input keys in `requiredInputs`. The
 check is presence-only: every listed input must appear in the caller's `with:`
 mapping, but its value is not pinned. That lets a consumer require an explicit
-`skip-actors` line — so deleting it becomes a visible diff and policy failure
-rather than a silent re-widening to the reusable's default — without binding
+`skip-actors` line, so deleting it becomes a visible diff and policy failure
+rather than a silent re-widening to the reusable's default, without binding
 every fleet consumer of the same pin to one consumer-specific value. Each named
 input must still be admitted by the job's reviewed `allowedInputs` contract;
 value pinning belongs in the caller workflow itself, not in this inventory.
@@ -292,7 +292,7 @@ automatically rejected if the same workflow path already has a reviewed
 contract at a different SHA: this is the common Dependabot-bump case. Before
 the per-job checks run, the policy fetches both the previously reviewed
 revision and the candidate revision from the source repository and
-structurally diffs their security-relevant surface — the presence and validity
+structurally diffs their security-relevant surface: the presence and validity
 of `on.workflow_call`, workflow- and effective job-level `permissions`,
 `on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
 runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
@@ -303,7 +303,7 @@ any job trips the same privileged-control-plane credential detection already
 enforced against every directly declared or repository-local job (deployment
 environments, unapproved credential expressions, and `localCredentialActions`
 entries such as `actions/create-github-app-token`), and the exact
-credential-bearing values each job references — not just that detection's
+credential-bearing values each job references, not just that detection's
 category, so a bump that swaps an already-declared/allowed secret for a
 different secret in the identical position is a visible diff even when both
 trip the same category. The same exactness applies to a `localCredentialActions`
@@ -315,10 +315,10 @@ stay identical. And when a workflow- or job-scope `env:` value (or any
 other job field outside steps) contains a credential expression, that
 credential reaches every step in the job through the runner's process
 environment, so the compared surface switches the whole job to full
-recording — the complete workflow env including sibling values such as an
+recording: the complete workflow env including sibling values such as an
 upload URL, the complete job mapping outside steps, and every step in
-full — instead of recording only the fields that themselves contain a
-credential expression, which would let a bump rewrite a step body that
+full. Recording only the fields that themselves contain a
+credential expression would instead let a bump rewrite a step body that
 consumes the inherited credential without any visible diff. A structural
 match on that surface auto-approves the
 candidate only after every
@@ -345,8 +345,8 @@ routing-relevant fields (`runs-on`, `strategy`, the reusable-call
 `uses`/`with`/`secrets`, or the `container`/`services`/`environment`
 execution boundary) reference the `needs` context in any form declines
 auto-approval for that path: the referencing expression can stay
-byte-identical while another job's own value — an output, a `result`, or
-anything else reachable off `needs` — changes the real routing boundary
+byte-identical while another job's own value, an output, a `result`, or
+anything else reachable off `needs`, changes the real routing boundary
 underneath it. This check is deliberately coarse rather than an enumerated
 list of dangerous `needs` spellings. Earlier revisions matched only
 `needs.<job-id>.outputs.<name>`, then that plus GitHub's equivalent index
@@ -362,8 +362,8 @@ expression evaluator treats context and property names case-insensitively,
 declines auto-approval regardless of what follows or how it is spelled.
 Second, a reviewed contract with `selectorResultInput` declines
 auto-approval unconditionally, even on an otherwise identical surface: that
-contract is trusted for a fail-closed guarantee — that the called workflow's
-own steps still honor the forwarded `needs.<selector>.result` — which sits
+contract is trusted for a fail-closed guarantee, that the called workflow's
+own steps still honor the forwarded `needs.<selector>.result`, which sits
 entirely outside the compared workflow_call/permissions/routing/credential
 surface, so a bump could silently defeat it without moving anything this
 diff inspects. Third, for that same unobservable-trust reason, a reviewed
@@ -374,12 +374,12 @@ workflow's steps do with a privileged caller grant or a forwarded caller
 secret, content the compared surface never inspects. `minimumCallerPermissions`
 deliberately does not join those categories: it says nothing about what the
 called workflow's steps do, only what its `permissions:` block requests, and
-that block is itself part of the compared surface — a bump that changes it is
+that block is itself part of the compared surface: a bump that changes it is
 already declined by the diff, and one that does not carries the same floor.
 Fourth, a called
-workflow containing any commit-relative `uses:` reference — a job-level
+workflow containing any commit-relative `uses:` reference, a job-level
 `./.github/workflows/<file>.yml` nested reusable workflow or a step-level
-`./…` local action — declines auto-approval on both the candidate and every
+`./…` local action, declines auto-approval on both the candidate and every
 reviewed basis: GitHub resolves the `./` prefix from the same commit as the
 file that contains it, so a SHA bump changes what a byte-identical reference
 resolves to (the nested workflow's runners and secrets, the local action's
@@ -419,9 +419,9 @@ well. The strict-selector scheduling fix at
 job on the managed fleet for `self-hosted-only` while preserving the hosted
 selector for adaptive policies. The liveness-routing revision at
 `3415de3ff2fafee40e4d087eb6073d2f6952b595` routes to the managed fleet
-whenever a matching runner is online — busy runners queue instead of falling
-back to hosted — removes the rerun-to-hosted branch so a re-run keeps its
-original route, and reports `online-runner-count`. The revision at
+whenever a matching runner is online, with busy runners queueing instead of
+falling back to hosted; removes the rerun-to-hosted branch so a re-run keeps
+its original route; and reports `online-runner-count`. The revision at
 `f2d5e06757201f2fce187096a2c6fa805836c3d2` carries that selector
 byte-identical; it is approved so consumer pins adopting the repository's
 non-shallow Gitleaks scan fix keep a reviewed selector reference. The
@@ -486,8 +486,8 @@ input, changes its secret key set, or changes its routing surface
 (`runs-on: ${{ inputs.runner }}` in both). One privilege delta is inside the
 security reusable rather than on its contract: its `changes` relevance job
 gains `contents: read` alongside `pull-requests: read`, to read the repo-owned
-paths file. That is inbound-safe — `contents: read` is the caller's own
-top-level grant and a called workflow can only downgrade it — and
+paths file. That is inbound-safe, because `contents: read` is the caller's own
+top-level grant and a called workflow can only downgrade it, and
 `allowedCallerPermissions` is unchanged. Each `allowedInputs` set stays
 narrower than the declared surface: the review caller may pass only `runner`
 (of 12 declared), the security caller only `runner`, `paths-file`, and
@@ -526,7 +526,7 @@ fleet-routing revisions it is owner-scoped to `melodic-software`. Both lane
 contracts are byte-identical to their `c136b27f` predecessors: neither adds nor
 removes an input, changes its secret key set, changes `allowedCallerPermissions`,
 or changes its routing surface (`runs-on: ${{ inputs.runner }}` in both). The
-lane deltas are internal — the review lane moves its inline-comment tool grant
+lane deltas are internal: the review lane moves its inline-comment tool grant
 out of the caller-replaceable `claude-args` default into the compose step (so
 replacing the default can no longer drop it), adds a scoped `Bash(gh pr diff:*)`
 grant in its place, directs findings to line-anchored review comments, and
@@ -547,16 +547,16 @@ input, changes its secret key set, changes `allowedCallerPermissions`, or
 changes its routing surface (`runs-on: ${{ inputs.runner }}` in both). One
 declared default moved: the security lane's `claude-args` default drops the
 inline-comment tool grant, which now rides a compose step that appends it
-after whatever the caller passed — the same drop-proof shape the review lane
-adopted at `e9443874` — so a caller replacing the default wholesale keeps a
+after whatever the caller passed, the same drop-proof shape the review lane
+adopted at `e9443874`, so a caller replacing the default wholesale keeps a
 grant it previously lost silently (ci-workflows#382, ci-workflows#395), and
 default-inheriting callers see identical effective grants. The remaining lane
 deltas are internal: both lanes now fail closed on a claude-code-action
-workflow-validation self-skip — the outcome composite gains a `review-ran`
+workflow-validation self-skip: the outcome composite gains a `review-ran`
 output, the security lane's required check turns red when a PR was in scope
 and nothing ran (previously a silent green), and the review lane stops
 crediting validation skips against its per-PR review cap (ci-workflows#387,
-ci-workflows#389, ci-workflows#392) — and both lanes bump `claude-code-action`
+ci-workflows#389, ci-workflows#392). Both lanes also bump `claude-code-action`
 from 1.0.185 to 1.0.187. No privilege widens: the appended grant drives the
 same inline-comment tool both lanes already used, and the fail-closed change
 alters check conclusions, not permissions.
@@ -565,8 +565,8 @@ approved on the same basis: `select-runner.yml` is byte-identical to the prior
 revision, and neither lane contract changes an input, secret, caller
 permission, or routing surface. Its payload is the security lane's two-tier
 availability ruling (ci-workflows#397, docs in #398): the required check stays
-red only for the caller-drift validation skip — the shape the PR itself
-clears — while every classified external failure (auth, billing, rate-limit,
+red only for the caller-drift validation skip, the shape the PR itself
+clears, while every classified external failure (auth, billing, rate-limit,
 server, `other`) concludes green with a warning annotation, the failure marker
 comment, and the incident aggregator's conclusion-independent escalation as
 the compensating alarm chain. Check conclusions change; permissions do not.
@@ -581,10 +581,10 @@ here: the lane components' `with:` blocks are unchanged, and
 `billing-minutes-state` is absent from both `canonicalSelectorInputs` and
 `optionalCanonicalSelectorInputs`, so a caller cannot begin passing it without
 its own review. Both lane contracts copy forward unchanged for the same
-reason. The lanes gain only additive optional inputs — `plugins`,
-`plugin-marketplaces`, `plugin-command`, `pr-number` — none required, none
-passed by the components, with secret key sets, `allowedCallerPermissions`,
-and routing surface (`runs-on: ${{ inputs.runner }}` in both) identical.
+reason. The lanes gain only additive optional inputs: `plugins`,
+`plugin-marketplaces`, `plugin-command`, `pr-number`. None is required, none
+is passed by the components, and the secret key sets, `allowedCallerPermissions`,
+and routing surface (`runs-on: ${{ inputs.runner }}` in both) stay identical.
 This revision carries thirty-nine commits rather than a single theme, because
 no release was cut between v0.12.0 and v0.14.0. The caller-visible ones are
 the review lane's V2 move of its review logic into org plugin commands
@@ -618,7 +618,7 @@ declined because both lanes bump `anthropics/claude-code-action` from
 steps in full, so an action pin bump on a credential-consuming step is a
 visible `credentialReferences` diff that needs human contract entries rather
 than inheritance. Human review confirms the secret mapping itself is
-unchanged — the action still receives only
+unchanged: the action still receives only
 `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. The other
 caller-visible payload is the review lane declaring `workflow_call` outputs
 (`review-ran`, `review-failed`, `failure-class`) so a machine consumer can
@@ -631,8 +631,8 @@ repositories execute the gate.
 Five further reusable contracts are registered at this revision so consumers
 still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
 `do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
-forward from that workflow's newest previously approved SHA — the first four
-term-for-term, `zizmor` from `31a5b76c` — so none widens its input, secret,
+forward from that workflow's newest previously approved SHA, the first four
+term-for-term and `zizmor` from `31a5b76c`, so none widens its input, secret,
 routing, or caller-permission surface. The callee-side changes the surface
 diff declined to carry are: `do-not-merge-gate`, `semantic-pr`, and
 `pr-issue-linkage` add `actions: read` for the timed-out-prerequisite
@@ -645,8 +645,8 @@ deliberately absent from `allowedInputs`: uploading SARIF needs a caller
 review. A called workflow can only downgrade the caller's `GITHUB_TOKEN`
 permissions and never elevate them, so `do-not-merge-gate`, `semantic-pr`, and
 `pr-issue-linkage` each carry a `minimumCallerPermissions` floor of
-`pull-requests: read` and `actions: read` — the whole of what each declares at
-this revision — and a caller repinning here without granting both fails policy
+`pull-requests: read` and `actions: read`, the whole of what each declares at
+this revision, and a caller repinning here without granting both fails policy
 instead of failing inside the callee. The three stay on the ordinary read-only
 boundary: the floor grants nothing and every scope they request is read, so
 none names `allowedCallerPermissions`.
@@ -692,7 +692,7 @@ byte-identical to the reviewed `99ac2f8c5b09dbb785d4eaf18465cbd96c30290c`
 contract, so the existing hosted-only shape carries over unmodified.
 The standards-sync contract was bumped to
 `0b45b9fb1755649455e3bb2b9c56c619a412b06b`, whose diff against the reviewed
-`ec91c343` contract is confined to the generated sync-PR body heredoc — it
+`ec91c343` contract is confined to the generated sync-PR body heredoc: it
 adds the "No linked issue" sentence and a "## Related" section so
 distributed sync PRs pass each target's pr-issue-linkage gate
 (ci-workflows#146); inputs, secrets, permissions, and routing are
@@ -704,8 +704,8 @@ ci-workflows floor-conversion merge (Wave 1 of the private-repo hosted-floor
 elimination, melodic-software/github-iac#78), so strict consumers route these
 privileged scheduled maintenance lanes through the approved selector instead of a
 fixed hosted image. Each names an exact `allowedCallerPermissions` of
-`contents: read` plus `issues: write` — the narrow write-capable caller token its
-rolling tracking-issue lane needs — which the policy honors only while the call is
+`contents: read` plus `issues: write`, the narrow write-capable caller token its
+rolling tracking-issue lane needs, which the policy honors only while the call is
 genuinely selector-routed; the reusables' own permissions are unchanged. Their
 earlier hosted-only contracts stay registered until every consumer migrates.
 
@@ -733,24 +733,24 @@ job-level `permissions`, and routing are unchanged, so the reviewed
 `runner-input` shape carries over. The widened grant is on the minted
 installation token, not the caller's `GITHUB_TOKEN`; no manifest component maps
 under `.github/workflows/` today, so the grant is currently unexercised
-capability — it is what will let the sync materialize a target's workflow files
+capability: it is what will let the sync materialize a target's workflow files
 once such a mapping lands. A mint whose installation lacks the permission fails
 loudly before any target is touched.
 
 The standards-sync contract was bumped to
 `8202e03f30dd0c0189c862052d5f242b9a496798`. Its diff against the reviewed
-`ac223bbe` contract is two hunks — the arming step, and the file header comment
+`ac223bbe` contract is two hunks: the arming step, and the file header comment
 that describes it (ci-workflows#291): the gate moves from
 `steps.cpr.outputs.pull-request-operation == 'created'` to
 `steps.cpr.outputs.pull-request-number != ''`, and the step reads the pull
-request through one GraphQL query — replacing a REST `pulls.get` — that returns
+request through one GraphQL query, replacing a REST `pulls.get`, that returns
 early when the PR is currently armed, or when an auto-merge, auto-squash, or
 auto-rebase enabled event already records that arming once took. Inputs, secrets, job-level `permissions`, and routing are unchanged, so
 the reviewed `runner-input` shape carries over. What the bump changes is reach,
 not authority: the same mutation under the same token now applies to every sync
 PR the manifest marks `automerge: true` and that was never armed, rather than
 only one the current run opened. A PR opened while its target carried
-`automerge: false` — how a staged rollout window is held — is armed by the next
+`automerge: false`, how a staged rollout window is held, is armed by the next
 sync after the opt-out lifts, where the created-only gate left it unarmed for as
 long as that PR stayed open: `peter-evans/create-pull-request` attempts
 `pulls.create` first and reports `updated` only when that call is rejected
@@ -765,14 +765,14 @@ reached only the arming step. The predecessor `43bc8d0f` also predated
 ci-workflows#234, which split the stuck-PR scan into a cheap page fetch and a
 per-candidate merge-state probe with retry, so this bump carries a reliability
 fix to the armed-but-BLOCKED path as well as the new never-armed detection.
-Inputs, secrets, and routing were unchanged across those two SHAs — `runner`,
-`manifest`, `standards-ref`, `threshold-hours`, the same two App secrets — so
+Inputs, secrets, and routing were unchanged across those two SHAs: `runner`,
+`manifest`, `standards-ref`, `threshold-hours`, the same two App secrets. So
 the reviewed `runner-input` shape carried over unmodified.
 
 The live pin is now `ed6d410c1fe10d9deb40241bbe46428b31fafd57`, the first
 contract in this family whose input surface actually grew: it adds the required
 `tracking-issue-repository`, naming the one repository the watchdog files its
-rolling tracking issue in rather than defaulting to the caller — a default that
+rolling tracking issue in rather than defaulting to the caller, a default that
 404'd on every run, because `standards` is the sync source and deliberately
 outside the App's selected access (standards#273). Routing, secrets, and
 job-level `permissions` are unchanged: the reusable mints its own issue-scoped
@@ -782,9 +782,9 @@ caller now passes `runner` and `tracking-issue-repository`.
 Both sync-family contracts were bumped to
 `7107b34832a7b6db5d08d3b132621c599fbe5e50` (`v0.14.2`, standards-sync-audit
 Phase 0.4), converging them on the same release SHA the claude-lane callers
-pin. The sync caller moves off `8202e03f` — 123 commits behind and missing the
+pin. The sync caller moves off `8202e03f`, 123 commits behind and missing the
 `--retry-all-errors` curl hardening for the transient exit-56 failure class
-observed 2026-08-12 — and the watchdog moves off `ed6d410c`. Both reusables
+observed 2026-08-12, and the watchdog moves off `ed6d410c`. Both reusables
 are byte-identical between `v0.14.2` and the ci-workflows HEAD verified at
 re-pin time, and both `on.workflow_call` contracts are identical to their
 predecessors' (verified by API diff), so the reviewed `runner-input` shapes
@@ -795,7 +795,7 @@ carry over unmodified: `runner`, `manifest`, `standards-ref`, `dry-run`,
 The watchdog contract was bumped to
 `01c3295629ab9dea9a602ddb9e2217c83f014a10` (`v0.15.0`, standards-sync-audit
 Phase 1), the first contract in this family to grow by two inputs at once:
-`test-mode` (boolean) and `test-synthetic-candidates` (string — a string so
+`test-mode` (boolean) and `test-synthetic-candidates` (a string, so
 the legal `'0'`, which drives the close-path proof, survives the caller's
 empty-string fallback). Both exist for the dispatched proof runs that gate
 fleet re-arm: test mode fabricates synthetic candidates under a test-only
@@ -809,10 +809,10 @@ Both sync-family contracts were bumped to
 `a7742cb347f18650eebcfb66e608185f66ea5758` (`v0.16.0`, standards-sync-audit
 Phase 6.3), converging the sync caller (off `7107b348`) and the watchdog (off
 `01c32956`) on one release SHA again. The release adds only engine-flavor-gated
-Node prep steps inside the reusables and the managed-files-guard action —
-SHA-pinned setup-node plus a locked `npm ci --omit=dev --ignore-scripts`
-install, skipped entirely when the pinned standards ref predates the Node
-engine — ahead of the engine cutover. Both `on.workflow_call` contracts are
+Node prep steps inside the reusables and the managed-files-guard action,
+ahead of the engine cutover: SHA-pinned setup-node plus a locked
+`npm ci --omit=dev --ignore-scripts` install, skipped entirely when the
+pinned standards ref predates the Node engine. Both `on.workflow_call` contracts are
 identical to their predecessors' (no input, secret, or routing change), so the
 reviewed `runner-input` shapes carry over unmodified: the five-input sync
 surface and the seven-input watchdog surface including the test-mode pair,
@@ -821,7 +821,7 @@ with the same two App secrets on each.
 Both sync-family contracts were bumped to
 `d26c750691b5498fab529d115b63f84aa7aecebe` (`v0.17.0`, standards-sync-audit
 Phase 6.4 close-out). The release retires the reusables' checksum-verified yq
-installs — yq left the production sync path when the engine cut over to Node —
+installs, since yq left the production sync path when the engine cut over to Node,
 and advances the managed-files-guard caller's standards ref onto the Node
 engine. Both `on.workflow_call` contracts are identical to their `v0.16.0`
 predecessors' (no input, secret, or routing change), so the reviewed
@@ -832,7 +832,7 @@ the bump's timing matter. Never-armed detection considers only targets the
 manifest marks `automerge: true`, so it reports nothing while a rollout window
 holds every target opted out, and starts reporting the moment the window's
 `automerge: true` restore lands. The armed-but-BLOCKED scan is not gated that
-way — it sweeps every manifest target on the hourly cron regardless.
+way: it sweeps every manifest target on the hourly cron regardless.
 
 Read the two together before adding that first workflow mapping: a token that
 may write `.github/workflows/` plus auto-merge armed on every never-armed sync
@@ -857,7 +857,7 @@ Two public repositories execute this gate today: `standards` and
 
 > **Invariant:** No `claude-review` or `claude-security-review` contract may list
 > `standards-ref` or the `STANDARDS_REVIEW_APP_*` secrets while **any**
-> repository that executes the runner-policy gate is public — unless the
+> repository that executes the runner-policy gate is public, unless the
 > contract schema first grows repository- or visibility-scoped entries.
 
 The gate enforces this invariant at audit time by scanning each reviewed
@@ -913,7 +913,7 @@ version tags, prose, dates, and hex-only English words are not treated as SHA
 claims. Update the provenance comment in the same change as the pin. A Dependabot
 github-actions group bump that rewrites the SHA and leaves a stale short
 SHA in the comment is `pin-provenance-drift` in the consumer, not a missing
-`policy.json` action-SHA contract — composite actions are not
+`policy.json` action-SHA contract: composite actions are not
 SHA-allowlisted. The
 dual-form pin-comment shape itself (`# vX.Y.Z` or
 `# <short-sha> <date>[ <note>]`) is documented and detected by the
@@ -991,9 +991,9 @@ belongs to the `publication` category, not `privileged-control-plane`:
 `packages: write` is registry-publication authority rather than repository or
 organization state, and keeping it in the durable category lets published
 artifacts retain hosted provenance after the control-plane reasons retire.
-Any additional write scope — or any other privileged surface on the job, such
+Any additional write scope, or any other privileged surface on the job, such
 as a deployment environment, a credential expression, or a credential-minting
-action — keeps the job privileged. The one admission is the exact
+action, keeps the job privileged. The one admission is the exact
 GitHub-provided token expression (the common registry-authentication step
 env), which carries only the packages-only permission map the exception
 already reviews.
@@ -1011,26 +1011,26 @@ fleet while that job holds an exactly pinned privilege surface that would
 otherwise require hosted execution. A grant is keyed by
 `<workflow path>#<job id>`, requires a non-empty `justification`, and names:
 
-- `permissions` — the complete effective `GITHUB_TOKEN` mapping the job must
+- `permissions`: the complete effective `GITHUB_TOKEN` mapping the job must
   declare, compared exactly per scope and access level. Shorthands
   (`read-all`, `write-all`), omitted declarations, missing scopes, extra
   scopes, and access drift all fail closed. Pinning the map also admits the
   exact GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or `${{ github.token }}`
   expression as a complete job- or step-level `env`/`with` value, which the
   ordinary boundary reserves for statically read-only jobs.
-- `environment` (optional) — one exact deployment environment name the job
+- `environment` (optional): one exact deployment environment name the job
   must declare in plain string form. A differing name, a mapping-form or
   expression-valued environment, and an environment the grant does not name
   all stay privileged-hosted; an expression-valued grant name itself fails
   configuration, because GitHub evaluates environment expressions (`vars`,
   `needs`, `matrix`) and the protected environment could then change without
   a grant-inventory diff.
-- `secrets` (optional) — repository or organization secret names the job may
+- `secrets` (optional): repository or organization secret names the job may
   reference, each only as the exact complete `${{ secrets.NAME }}` value of a
   job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
   here; transformed expressions, workflow-level env values, `run:`
   interpolation, and conditions stay privileged-hosted.
-- `credentialActions` (optional) — full `owner/action@<40-hex-SHA>`
+- `credentialActions` (optional): full `owner/action@<40-hex-SHA>`
   references the job's steps may invoke, whose action name must be a central
   `localCredentialActions` entry (for example
   `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
@@ -1065,8 +1065,8 @@ policy cannot prove it read-only. Every directly selector-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
-`privileged-control-plane` exception — or `publication` when the only write
-scope is `packages`, per the packages-only rule above — unless the repository
+`privileged-control-plane` exception, or `publication` when the only write
+scope is `packages` per the packages-only rule above, unless the repository
 pins that job's exact effective mapping in a `localRoutingGrants` entry as
 described above. A full-SHA action does not weaken this rule because an action
 can obtain `github.token` implicitly.
@@ -1077,7 +1077,7 @@ policy follows that chain recursively. Every dynamic/local called job must
 declare an effective read-only job or workflow mapping when a caller can pass
 write; omission fails because the caller grant would flow through. A fixed
 hosted called job may inherit write only with its own
-`privileged-control-plane` exception — or `publication` when the called job
+`privileged-control-plane` exception, or `publication` when the called job
 declares its own packages-only write map with no other privileged surface,
 per the packages-only rule above. A local reusable caller's write grant is
 therefore not rejected wholesale when every potentially local called job
@@ -1090,7 +1090,7 @@ for that exact job names them as described above. Absent a grant, the only
 workload credential exception is the exact
 GitHub-provided `${{ secrets.GITHUB_TOKEN }}` or functionally equivalent
 `${{ github.token }}` as a complete step-level `env`/`with` value under
-statically read-only effective permissions — or under a packages-only write
+statically read-only effective permissions, or under a packages-only write
 map, where the token carries exactly the `publication`-categorized authority
 per the packages-only rule above. Workflow/job environment values,
 run-script interpolation, bracket aliases, case variants, transformations, and
