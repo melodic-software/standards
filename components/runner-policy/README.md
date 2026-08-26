@@ -628,6 +628,21 @@ lines. No privilege widens: no lane adds a secret, a caller permission, an
 allowed input, or a routing surface. The shared contracts still omit
 `standards-ref` and the `STANDARDS_REVIEW_APP_*` secrets while public
 repositories execute the gate.
+The revision at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2) repeats
+that shape exactly. `select-runner.yml` is byte-identical to `d26c750`, and
+so are `standards-sync.yml` and `standards-sync-stuck-automerge-alert.yml`;
+both lanes keep their `workflow_call` inputs, secrets, caller permissions,
+and `runs-on: ${{ inputs.runner }}` routing, so all four contracts and the
+selector input contract copy forward verbatim. Auto-approval declined for
+the same reason again: both lanes bump `anthropics/claude-code-action` from
+`d40ddef4` (v1.0.195) to `3f854a8f` (v1.0.198) inside the steps that pass
+`claude_code_oauth_token`, which the credential-references surface records in
+full, so the pin bump reads as a `credentialReferences` diff. The whole
+reusable diff between `d26c750` and `0f8176e` for both lanes is those four
+action pin lines and nothing else; the secret mapping is still only
+`claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. No
+privilege widens: no lane adds a secret, a caller permission, an allowed
+input, or a routing surface.
 Five further reusable contracts are registered at this revision so consumers
 still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
 `do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
@@ -659,9 +674,9 @@ and `allow-no-lockfiles` in addition to `runner`; `pulumi-version-drift-check`
 keeps `runner` plus the `contents: read` / `issues: write` caller-permission
 waiver the drift job already exercised. Neither SHA adds a secret or a
 routing surface.
-Eighteen selector revisions remain approved for an ordered consumer rollout.
+Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these fifteen strict-scheduling
+owned by a different repository owner, so these sixteen strict-scheduling
 revisions are approved only for `melodic-software`; `kyle-sexton` repositories
 cannot select them. The three older revisions remain globally approved until
 compatible consumers migrate.
@@ -826,6 +841,14 @@ and advances the managed-files-guard caller's standards ref onto the Node
 engine. Both `on.workflow_call` contracts are identical to their `v0.16.0`
 predecessors' (no input, secret, or routing change), so the reviewed
 `runner-input` shapes carry over unmodified once more.
+
+Both were bumped again to `0f8176e87e0be518f382664779655011bf95784a`
+(`v0.17.2`) alongside the claude-lanes re-pin, so the whole ci-workflows
+surface this repository calls sits on one release. Neither sync-family
+reusable changed at all between `d26c750` and `0f8176e` (the release touches
+the two claude lanes, `claude-assistant`, `claude-e2e-verify`, `go-quality`,
+and `osv-scanner`), so both contracts are byte-for-byte the ones reviewed at
+`v0.17.0`.
 
 The two halves reach different target sets, and the difference is what makes
 the bump's timing matter. Never-armed detection considers only targets the

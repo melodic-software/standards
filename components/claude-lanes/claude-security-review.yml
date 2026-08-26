@@ -70,7 +70,7 @@ jobs:
   select-security:
     name: Select runner
     permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@d26c750691b5498fab529d115b63f84aa7aecebe # v0.17.0
+    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
     secrets:
       observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
     with:
@@ -99,7 +99,7 @@ jobs:
     concurrency:
       group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@d26c750691b5498fab529d115b63f84aa7aecebe # v0.17.0
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
     with:
       # Hosted fallback per the runner-policy recovery contract (never a
       # self-hosted label, never vars.CI_HOSTED_RUNNER): if the selector

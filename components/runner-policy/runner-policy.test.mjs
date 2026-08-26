@@ -35,6 +35,7 @@ const AVAILABILITY_RULING_LANE_SHA = "734158c4cb6e67b0b99fd703045ac0f7f9f042d5";
 const BILLING_AWARE_ROUTING_LANE_SHA = "62bef7bab01e8532fedfa739879034a210e9e67d";
 const REPINE_LANE_SHA_V0_14_2 = "7107b34832a7b6db5d08d3b132621c599fbe5e50";
 const REPINE_LANE_SHA_V0_17_0 = "d26c750691b5498fab529d115b63f84aa7aecebe";
+const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -3163,6 +3164,7 @@ test("production selector allowlist contains only independently reviewed commits
       `${SELECTOR_PATH}@${BILLING_AWARE_ROUTING_LANE_SHA}`,
       `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_14_2}`,
       `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_17_0}`,
+      `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_17_2}`,
     ],
   });
   for (const sha of selectorShas) {
@@ -3180,6 +3182,7 @@ test("production selector allowlist contains only independently reviewed commits
     BILLING_AWARE_ROUTING_LANE_SHA,
     REPINE_LANE_SHA_V0_14_2,
     REPINE_LANE_SHA_V0_17_0,
+    REPINE_LANE_SHA_V0_17_2,
   ]) {
     const reference = `${SELECTOR_PATH}@${sha}`;
     assert.deepEqual(BASE_POLICY.approvedSelectorInputContracts[reference], {
