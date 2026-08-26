@@ -12,9 +12,10 @@
 # Adopt psscriptanalyzer-staged.ps1 and its isolated psscriptanalyzer-target.ps1
 # worker alongside the managed hook payload under `.lefthook/`.
 #
-# Each lane opts out of merge and rebase individually rather than relying on a
-# hook-level skip in the base fragment: a hook-level skip would take the
-# consumer's own security lanes down with it (see lefthook-base's header).
+# This fragment declares no `skip`. Whether a lane sits out merge and rebase
+# commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
+# here would win over the consumer's and silently defeat the documented
+# `skip: true` opt-out. See lefthook-base's header for the full rule.
 
 pre-commit:
   commands:
@@ -22,6 +23,3 @@ pre-commit:
       glob: "**/*.{ps1,psm1,psd1}"
       run: pwsh -NoProfile -NonInteractive -File .lefthook/psscriptanalyzer-staged.ps1 {staged_files}
       fail_text: "PSScriptAnalyzer findings. Fix them, or suppress a justified rule per the PSScriptAnalyzer component's settings."
-      skip:
-        - merge
-        - rebase

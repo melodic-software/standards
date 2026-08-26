@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
-# Pins WHERE the merge/rebase skip lives, which is a security property and not a
-# style one. The skip must sit on each hygiene command, never on the pre-commit
-# hook: lefthook's `extends` merges every fragment plus the consumer's own root
-# file into ONE hook, so a hook-level skip short-circuits the whole thing —
-# gitleaks and any repository-owned security lane included — and the consumer
-# has nothing in its own file to suggest that happened.
+# Pins who decides whether a lane sits out merge and rebase commits. The answer
+# is the consumer, never a fragment, and both halves are load-bearing.
 #
-# The observable is a recording shim per lane. Each lane writes a marker when it
+# A hook-level `skip` in a fragment short-circuits the whole merged pre-commit
+# hook -- lefthook's `extends` folds every fragment and the consumer's root file
+# into one hook, and the extended file's setting wins. That is how a
+# `skip: [merge, rebase]` in the base fragment disabled gitleaks on merge
+# commits, and with it any security lane the CONSUMER declared in its own file.
+#
+# Moving the skip onto the commands fixes that and breaks something else: the
+# extended file still wins, so a `skip` on a lane defeats the consumer's
+# documented `skip: true` override for that lane. So no fragment declares one at
+# all, and a consumer that wants the opt-out writes it in its own root file.
+#
+# The observable is a recording shim per lane: each writes a marker when it
 # runs, so "did this lane execute during a merge commit" is an artifact on disk.
-# Merge state is forced by writing .git/MERGE_HEAD rather than by constructing a
-# real conflict: lefthook reads that file to decide, and a synthetic conflict
-# would add fixture surface without changing what is under test.
+# Merge state is forced by writing .git/MERGE_HEAD, which is what lefthook
+# reads; a synthetic conflict would add fixture surface without changing what is
+# under test.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -27,9 +34,9 @@ make_repo "$work"
 mkdir -p "$work/.lefthook"
 cp "$base" "$work/.lefthook/base.yml"
 
-# A consumer that extends base AND declares its own security lane, which is the
-# shape the bypass actually harmed: the guard is repo-owned, so nothing in the
-# consumer's file mentions a skip, yet a hook-level skip in base would disable it.
+# A consumer that extends base AND declares its own security lane -- the shape
+# the hook-level skip actually harmed, since nothing in the consumer's file
+# mentioned a skip yet its guard was disabled anyway.
 cat >"$work/lefthook.yml" <<'YAML'
 extends:
   - .lefthook/base.yml
@@ -55,47 +62,55 @@ cd "$work" || exit 1
 printf 'hello\n' >file.txt
 git add file.txt
 
-# --- Ordinary commit: every lane runs (the baseline the merge case is read against)
+# --- Ordinary commit: the baseline the merge case is read against.
 lefthook run pre-commit >/dev/null 2>&1
 assert_file_exists 'baseline: gitleaks runs on an ordinary commit' "$work/gitleaks.log"
-assert_file_exists 'baseline: typos runs on an ordinary commit' "$work/typos.log"
-assert_file_exists 'baseline: the consumer guard runs on an ordinary commit' "$work/consumer-guard-shim.log"
+assert_file_exists 'baseline: the consumer guard runs on an ordinary commit' \
+  "$work/consumer-guard-shim.log"
 
 rm -f "$work"/*.log
 
-# --- Merge commit: security lanes MUST still run, hygiene lanes must not.
+# --- Merge commit: the regression this file exists for. Both security lanes
+# must still run; before the fix neither did, and the hook reported
+# "pre-commit (skip) hook setting" without executing anything at all.
 git rev-parse HEAD >"$work/.git/MERGE_HEAD"
 lefthook run pre-commit >/dev/null 2>&1
 
 assert_file_exists 'gitleaks still runs during a merge commit' "$work/gitleaks.log"
 assert_file_exists 'a consumer-owned security lane still runs during a merge commit' \
   "$work/consumer-guard-shim.log"
-assert_file_absent 'typos opts out of a merge commit' "$work/typos.log"
-assert_file_absent 'editorconfig opts out of a merge commit' "$work/editorconfig-checker.log"
+rm -f "$work/.git/MERGE_HEAD"
 
-# --- The structural assertion: no hook-level skip may reappear in the fragment.
-# A per-command skip is indented under `commands:`; a hook-level one sits at the
-# hook's own indent. Only the latter has the fleet-wide blast radius.
-assert_eq 'the fragment declares no hook-level skip' '0'   "$(grep -c '^  skip:' "$base" || true)"
+# --- The consumer keeps both decisions. It can opt a lane out of merge commits
+# without the fragment's help, and (covered in full by lefthook-shellcheck's
+# contract test) its `skip: true` override still works -- which a fragment-level
+# skip on the same lane would have silently defeated.
+cat >"$work/lefthook.yml" <<'YAML'
+extends:
+  - .lefthook/base.yml
 
-# --- Every lane in every fragment accounts for merge/rebase explicitly.
-# Codex caught the first version of this change updating only two of the five
-# adapters, which silently switched ShellCheck, Biome and dotnet-format on for
-# merge commits. With the blanket skip gone, "I forgot one" is no longer a
-# no-op, so the invariant is asserted over the whole component set rather than
-# over the files this change happened to touch. One lane per `run:`, one opt-out
-# per `skip:`; the ONLY lane allowed to lack one is gitleaks, which is the
-# entire point of the fix.
+pre-commit:
+  commands:
+    typos:
+      skip:
+        - merge
+        - rebase
+YAML
+rm -f "$work"/*.log
+git rev-parse HEAD >"$work/.git/MERGE_HEAD"
+lefthook run pre-commit >/dev/null 2>&1
+assert_file_absent 'a consumer can opt a lane out of merge commits itself' "$work/typos.log"
+assert_file_exists 'and doing so leaves gitleaks running' "$work/gitleaks.log"
+rm -f "$work/.git/MERGE_HEAD"
+
+# --- The structural invariant: no fragment may declare a skip, at any level.
+# Asserted over the whole component set rather than the files a given change
+# touches, because the first cut of this fix updated two adapters and missed
+# three. Comment text mentioning `skip:` does not match -- the pattern is
+# anchored to the key.
 for fragment in "$root"/components/lefthook-*/lefthook.yml; do
-  lanes="$(grep -c '^ *run:' "$fragment" || true)"
-  skips="$(grep -c '^ *skip:' "$fragment" || true)"
-  expected="$lanes"
-  # base carries gitleaks, the one deliberate exemption.
-  if [[ "$fragment" == *"/lefthook-base/"* ]]; then
-    expected="$((lanes - 1))"
-  fi
-  assert_eq "every lane in $(basename "$(dirname "$fragment")") declares merge/rebase intent" \
-    "$expected" "$skips"
+  assert_eq "$(basename "$(dirname "$fragment")") declares no skip; the consumer owns that call" \
+    '0' "$(grep -c '^ *skip:' "$fragment" || true)"
 done
 
 [[ $FAILED -eq 0 ]] || exit 1
