@@ -88,7 +88,7 @@ fi
 # repo-locally — the env copy is a warm cache, the bootstrap the
 # correctness guarantee.
 DOTNET_FALLBACK_VERSIONS='10.0.302 10.0.400'
-NODE_FALLBACK_VERSION='24.19.0'
+NODE_FALLBACK_VERSION='24.20.0'
 dotnet_versions="$DOTNET_FALLBACK_VERSIONS"
 if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/global.json" ]]; then
   if ! command -v jq >/dev/null 2>&1; then
