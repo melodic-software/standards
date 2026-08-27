@@ -32,7 +32,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-08-23.1'
+SCRIPT_VERSION='2026-08-27.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 LOG='/var/log/melodic-env-setup.log'
