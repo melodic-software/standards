@@ -3,6 +3,7 @@
 Private repositories intentionally excluded from the unauthenticated online
 lane:
 
+- <https://github.com/melodic-software/claude-code-proxy>
 - <https://github.com/melodic-software/dotfiles>
 - <https://github.com/melodic-software/github-iac>
 - <https://github.com/melodic-software/itinerary-planner>

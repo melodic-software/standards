@@ -122,7 +122,8 @@ fi
 
 # read_list <path> — file lines with blank lines dropped.
 read_list() {
-  [[ -f "$1" ]] || die "list not found: $1"
+  # -e, not -f: a process substitution (/dev/fd/N) is a valid list source.
+  [[ -e "$1" ]] || die "list not found: $1"
   sed '/^[[:space:]]*$/d' "$1"
 }
 
