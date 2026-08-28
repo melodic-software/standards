@@ -88,16 +88,26 @@ assert_contains 'nested fixture lookalike remains checked' \
 assert_contains 'nested components prefix remains checked' \
   "$path_dump" 'https://www.rfc-editor.org/rfc/rfc3986?boundary=nested-prefix'
 
+# The private-repo inventory is derived, not copied: the two entries must be
+# byte-identical to what private-repo-inventory.sh renders for the set it reads
+# back from the file (sorted, unique, both hosts carrying the same set). Whether
+# that set matches actual repository visibility is the inventory check's job
+# (the `check` step in the same CI lane and the scheduled workflow), so no
+# repository name is hard-coded here — the earlier copy of the list in this
+# test was exactly the drift the script exists to remove.
+inventory_script="$root/components/lychee/private-repo-inventory.sh"
+inventory_list="$(bash "$inventory_script" list --config "$config")"
+assert_nonzero 'private-repo inventory is non-empty' "${#inventory_list}"
+rendered_rules="$(bash "$inventory_script" generate --config "$config" \
+  --private-list <(printf '%s\n' "$inventory_list"))"
 private_org_rule="$(grep -F \
   "  '^https?://github\\.com/melodic-software/" "$config" || true)"
-assert_eq 'private GitHub exclusion is one exact transferred-org inventory' \
-  "  '^https?://github\\.com/melodic-software/(dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley-archive|medley|melodic-main-archive|provisioning|songwriting)(\\.git)?([/#?]|$)'," \
-  "$private_org_rule"
+assert_eq 'private GitHub exclusion is the rendered inventory entry' \
+  "$(printf '%s\n' "$rendered_rules" | sed -n 1p)" "$private_org_rule"
 private_raw_rule="$(grep -F \
   "  '^https?://raw\\.githubusercontent\\.com/melodic-software/" "$config" || true)"
-assert_eq 'private raw-content exclusion uses the same exact inventory' \
-  "  '^https?://raw\\.githubusercontent\\.com/melodic-software/(dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley-archive|medley|melodic-main-archive|provisioning|songwriting)/'," \
-  "$private_raw_rule"
+assert_eq 'private raw-content exclusion is the rendered inventory entry' \
+  "$(printf '%s\n' "$rendered_rules" | sed -n 2p)" "$private_raw_rule"
 assert_eq 'obsolete personal-owner private exclusion is absent' '0' \
   "$(grep -cF 'github\.com/kyle-sexton/' "$config" || true)"
 
@@ -105,8 +115,12 @@ dump_out="$(lychee --dump --config "$config" \
   components/lychee/fixtures/good/Exclusions.md 2>&1)"
 rc=$?
 assert_exit 'URL exclusion boundary dump needs no network and exits 0' 0 "$rc"
-for repo in dotfiles github-iac itinerary-planner knowledge-corpus medley \
-  medley-archive melodic-main-archive provisioning songwriting; do
+exclusions_fixture="$(cat components/lychee/fixtures/good/Exclusions.md)"
+for repo in $inventory_list; do
+  # The fixture must actually cite each inventoried repo, or the exclusion
+  # assertion below would pass on an absent link rather than an excluded one.
+  assert_contains "exclusions fixture cites melodic-software/$repo" \
+    "$exclusions_fixture" "<https://github.com/melodic-software/$repo>"
   assert_not_contains "private inventory excludes melodic-software/$repo" \
     "$dump_out" "https://github.com/melodic-software/$repo"
 done

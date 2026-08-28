@@ -1,0 +1,167 @@
+name: lychee-private-inventory
+
+# Keeps lychee.toml's private-repo exclude inventory honest against actual
+# repository visibility, the drift that hit twice by hand-maintenance
+# (standards#212, #483). The pull-request half of this check lives in ci.yml's
+# `lychee-fixtures` lane and needs no credential: a public repository's token
+# can list the org's public repositories, which catches an excluded repository
+# that went public. This scheduled half adds the direction a public token
+# cannot see — a NEW private repository that nobody added to the list — by
+# reading the standards-sync App installation's repository set: github-iac
+# holds that set equal to the sync-manifest target roster, so every sync
+# target's visibility is known here. Private repositories that are not sync
+# targets stay outside both halves; the script reports them as unverified.
+#
+# The App token is minted metadata-read only, over the installation's whole
+# repository set, and is used for exactly one read. It cannot write anything,
+# which is also why this workflow files a tracking issue in THIS repository
+# through the job's own token rather than opening a fix PR: the sync App
+# deliberately holds no write grant on its source repository.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1`, the watchdog's
+    # hourly `17 * * * *`, and claude-lanes-repin's `41 14 * * *`.
+    - cron: "23 15 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # A boolean, never the credential (same shape as claude-lanes-repin).
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+      ISSUE_MARKER: "<!-- standards:lychee-private-inventory:v1 -->"
+      ISSUE_TITLE: "lychee private-repo inventory disagrees with repository visibility"
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mint a metadata-read App token over the installation
+        id: app-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          # `owner` without `repositories` scopes the token to EVERY repository
+          # in the installation — wanted here, because the installation's
+          # repository set is the fact being read — and `permission-metadata`
+          # is the only grant, so the token can read names and visibility and
+          # nothing else.
+          owner: melodic-software # zizmor: ignore[github-app] whole-installation scope is the fact being read; the token carries metadata:read and nothing else
+          permission-metadata: read
+
+      - name: Read the installation's repository visibility
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate 'installation/repositories?per_page=100' \
+            --jq '.repositories[] | "\(.name)\t\(.private)"' >"$RUNNER_TEMP/installation.tsv"
+          printf 'Installation repositories: %s\n' "$(wc -l <"$RUNNER_TEMP/installation.tsv")"
+
+      - name: Report the missing App credential
+        if: env.HAS_APP_CREDENTIAL != 'true'
+        run: |
+          echo "::warning::STANDARDS_SYNC_APP_* is not configured, so only the public-visibility half of the inventory check runs here; a newly created private sync target cannot be detected until it is."
+
+      - name: Check the inventory against visibility
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          args=(check --config lychee.toml)
+          if [[ -f "$RUNNER_TEMP/installation.tsv" ]]; then
+            args+=(--installation-list "$RUNNER_TEMP/installation.tsv")
+          fi
+          # The runner's default shell already carries `-e`, which `set -uo`
+          # does not clear, so the exit code is captured in the `if` (where
+          # a non-zero status is not fatal) rather than through `$?` after a
+          # bare call that `-e` would have aborted the step on.
+          rc=0
+          if ! bash components/lychee/private-repo-inventory.sh "${args[@]}" >"$RUNNER_TEMP/check.out" 2>"$RUNNER_TEMP/check.err"; then
+            rc=$?
+          fi
+          cat "$RUNNER_TEMP/check.out"
+          cat "$RUNNER_TEMP/check.err" >&2
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+          if [[ "$rc" -eq 2 ]]; then
+            echo "::error::the inventory check could not run (see above)"
+            exit 2
+          fi
+          exit 0
+
+      # One rolling tracking issue, keyed by a hidden marker: created on the
+      # first drift, refreshed on every later one, and closed by the first
+      # clean run — so a drift is never a permanently red cron nobody reads
+      # (standards#274), and never a pile of duplicate issues either.
+      - name: File or refresh the drift tracking issue
+        if: steps.check.outputs.rc == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          body="$RUNNER_TEMP/issue-body.md"
+          {
+            printf '%s\n\n' "$ISSUE_MARKER"
+            cat <<'SUMMARY'
+          ## Summary
+
+          The private-repo exclude inventory in `lychee.toml` disagrees with actual repository visibility. Regenerate it at the source — never in a downstream copy (that is how .github#46 was silently reverted):
+
+          ```sh
+          bash components/lychee/private-repo-inventory.sh generate --write
+          ```
+
+          ## Findings
+
+          ```text
+          SUMMARY
+            cat "$RUNNER_TEMP/check.err"
+            cat <<'FOOTER'
+          ```
+
+          FOOTER
+            printf -- '- Run: %s\n' "$RUN_URL"
+            printf -- '- Updated automatically by the lychee-private-inventory workflow; the first clean run closes this issue.\n'
+          } >"$body"
+          existing="$(gh issue list --state open --search "\"$ISSUE_MARKER\" in:body" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing" ]]; then
+            gh issue edit "$existing" --body-file "$body"
+            echo "Refreshed tracking issue #$existing"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file "$body" --label automated --label link-check
+          fi
+          echo "::error::lychee.toml private-repo inventory drift — see the tracking issue"
+          exit 1
+
+      - name: Close the drift tracking issue on a clean run
+        if: steps.check.outputs.rc == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --state open --search "\"$ISSUE_MARKER\" in:body" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing" ]]; then
+            gh issue close "$existing" --comment "The inventory agrees with repository visibility again (run ${RUN_URL})."
+            echo "Closed tracking issue #$existing"
+          fi

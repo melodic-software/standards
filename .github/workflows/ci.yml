@@ -351,6 +351,18 @@ jobs:
           lychee --version
       - name: Lychee contract test
         run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
+      - name: Private-repo inventory contract test
+        run: bash harness/shell/run-tests.sh components/lychee/private-repo-inventory.test.sh
+      # The credential-free half of the inventory check: a public repository's
+      # token lists the org's public repositories, so an excluded repository
+      # that went public fails here, and the two alternations are held sorted
+      # and identical. The other direction (a new private repository missing
+      # from the list) needs the App installation's view and runs in the
+      # scheduled lychee-private-inventory workflow.
+      - name: Private-repo inventory agrees with public visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash components/lychee/private-repo-inventory.sh check --config lychee.toml
 
   ruff:
     permissions:
