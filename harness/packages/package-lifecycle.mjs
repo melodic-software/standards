@@ -248,7 +248,7 @@ async function main() {
   const workspace = await mkdtemp(join(tmpdir(), "standards-package-baseline-"));
   try {
     for (const packageDirectory of normalizedPackages) {
-      const baselineDirectory = await exportBaseline(root, baseRef, packageDirectory, workspace);
+      const baselineDirectory = exportBaseline(root, baseRef, packageDirectory, workspace);
       const result = await checkPackageLifecycle({
         baselineDirectory,
         currentDirectory: join(root, packageDirectory),
