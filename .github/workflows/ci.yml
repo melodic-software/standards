@@ -539,6 +539,11 @@ jobs:
       # for one script.
       - name: Test the lane caller re-pin script
         run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
+      # The lockstep suite imports repin-policy-lockstep.mjs, which imports
+      # runner-policy.mjs and therefore needs that component's ajv install —
+      # the same dependency root the runner-policy job installs.
+      - name: Install runner-policy dependencies
+        run: npm ci --prefix components/runner-policy
       - name: Test lockstep argv accepts a mixed old-sha set
         run: node --test components/claude-lanes/repin-policy-lockstep.test.mjs
 

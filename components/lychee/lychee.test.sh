@@ -11,12 +11,8 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 config='lychee.toml'
 
-if ! command -v lychee >/dev/null 2>&1; then
-  skip_suite 'lychee not installed'
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-  skip_suite 'python3 not installed (serves the accept-list HTTP fixture)'
-fi
+command -v lychee >/dev/null 2>&1 || skip_suite 'lychee not installed'
+command -v python3 >/dev/null 2>&1 || skip_suite 'python3 not installed (serves the accept-list HTTP fixture)'
 # The include_fragments = "full" config key requires a recent lychee.
 require_min_version lychee "$(lychee --version | awk '{ print $2 }')" 0.24.2
 
@@ -115,7 +111,7 @@ dump_out="$(lychee --dump --config "$config" \
   components/lychee/fixtures/good/Exclusions.md 2>&1)"
 rc=$?
 assert_exit 'URL exclusion boundary dump needs no network and exits 0' 0 "$rc"
-exclusions_fixture="$(cat components/lychee/fixtures/good/Exclusions.md)"
+exclusions_fixture="$(<components/lychee/fixtures/good/Exclusions.md)"
 for repo in $inventory_list; do
   # The fixture must actually cite each inventoried repo, or the exclusion
   # assertion below would pass on an absent link rather than an excluded one.

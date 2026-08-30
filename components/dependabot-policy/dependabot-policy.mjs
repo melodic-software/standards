@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import Ajv2020 from "ajv/dist/2020.js";
@@ -37,7 +37,7 @@ export function parseUniqueJson(source, location) {
   }
 }
 
-const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const MODULE_DIRECTORY = import.meta.dirname;
 const DEFAULT_POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
 const DEFAULT_CONFIG_PATH = ".github/dependabot-policy.json";
 const DEFAULT_DEPENDABOT_PATH = ".github/dependabot.yml";
@@ -308,11 +308,12 @@ export async function auditRepository({
 
   const dependabot = await readDependabot(resolve(dependabotPath));
   const findings = [];
+  const file = DEFAULT_DEPENDABOT_PATH;
   if (dependabot === undefined) {
     findings.push(
       finding(
         "dependabot-config-missing",
-        DEFAULT_DEPENDABOT_PATH,
+        file,
         undefined,
         "the repository declares no .github/dependabot.yml, so no dependency-update policy is enforced",
       ),
@@ -320,7 +321,6 @@ export async function auditRepository({
     return sortFindings(findings);
   }
 
-  const file = DEFAULT_DEPENDABOT_PATH;
   if (dependabot.version !== 2) {
     findings.push(
       finding(

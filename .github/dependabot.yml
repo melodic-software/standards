@@ -33,8 +33,8 @@ updates:
     # SHA-allowlisted and stay Dependabot-managed.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
-  # Keep the npm dev-dependencies current — the markdownlint-cli2 and YAML
-  # parser pins, plus the lefthook pin that the local git hooks run on.
+  # Keep the npm dev-dependencies current — the root devDependency pins
+  # (linters, parsers, and the lefthook hooks runner).
   - package-ecosystem: npm
     directory: /
     labels: ["dependencies"]

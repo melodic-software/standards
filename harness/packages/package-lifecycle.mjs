@@ -142,34 +142,29 @@ export async function checkPackageLifecycle({ baselineDirectory, currentDirector
     `${current.name ?? currentDirectory} version`,
   );
 
-  if (!baselineDirectory) {
-    const workspace = await mkdtemp(join(tmpdir(), "standards-package-lifecycle-"));
-    try {
-      await files(await pack(currentDirectory, join(workspace, "current")));
-      return { name: current.name, version: currentVersion, status: "new" };
-    } finally {
-      await rm(workspace, { recursive: true, force: true });
-    }
-  }
-
-  const baseline = await manifest(baselineDirectory);
-  const baselineVersion = releaseVersion(
-    baseline.version,
-    `${baseline.name ?? baselineDirectory} baseline version`,
-  );
-  if (current.name !== baseline.name) {
-    throw new Error(
-      `package identity changed from ${JSON.stringify(baseline.name)} to ${JSON.stringify(current.name)}`,
-    );
-  }
-  if (semver.lt(currentVersion, baselineVersion)) {
-    throw new Error(
-      `${current.name} version regressed from ${baselineVersion} to ${currentVersion}`,
-    );
-  }
-
   const workspace = await mkdtemp(join(tmpdir(), "standards-package-lifecycle-"));
   try {
+    if (!baselineDirectory) {
+      await files(await pack(currentDirectory, join(workspace, "current")));
+      return { name: current.name, version: currentVersion, status: "new" };
+    }
+
+    const baseline = await manifest(baselineDirectory);
+    const baselineVersion = releaseVersion(
+      baseline.version,
+      `${baseline.name ?? baselineDirectory} baseline version`,
+    );
+    if (current.name !== baseline.name) {
+      throw new Error(
+        `package identity changed from ${JSON.stringify(baseline.name)} to ${JSON.stringify(current.name)}`,
+      );
+    }
+    if (semver.lt(currentVersion, baselineVersion)) {
+      throw new Error(
+        `${current.name} version regressed from ${baselineVersion} to ${currentVersion}`,
+      );
+    }
+
     const baselinePayload = await files(await pack(baselineDirectory, join(workspace, "baseline")));
     const currentPayload = await files(await pack(currentDirectory, join(workspace, "current")));
     const changed = !payloadsEqual(baselinePayload, currentPayload);
@@ -224,7 +219,7 @@ export function parseArguments(argv, environment = process.env) {
   };
 }
 
-async function exportBaseline(root, baseRef, packageDirectory, destination) {
+function exportBaseline(root, baseRef, packageDirectory, destination) {
   const object = `${baseRef}:${packageDirectory.replaceAll("\\", "/")}/package.json`;
   const exists = spawnSync("git", ["cat-file", "-e", object], { cwd: root });
   if (exists.status !== 0) return undefined;
@@ -253,7 +248,7 @@ async function main() {
   const workspace = await mkdtemp(join(tmpdir(), "standards-package-baseline-"));
   try {
     for (const packageDirectory of normalizedPackages) {
-      const baselineDirectory = await exportBaseline(root, baseRef, packageDirectory, workspace);
+      const baselineDirectory = exportBaseline(root, baseRef, packageDirectory, workspace);
       const result = await checkPackageLifecycle({
         baselineDirectory,
         currentDirectory: join(root, packageDirectory),

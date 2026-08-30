@@ -107,8 +107,8 @@ assert_eq 'generate --write rewrites both alternations' \
   $'alpha\nbeta\ndelta\ngamma' "$(bash "$script" list --config "$config")"
 out="$(bash "$script" check --config "$config" --public-list "$work/public.txt" --private-list "$work/private-plus.txt" 2>&1)"
 assert_exit 'the rewritten config passes check' 0 $?
-assert_contains 'the untouched entries survive the rewrite' "$(cat "$config")" "'^https?://localhost',"
-assert_contains 'the comment survives the rewrite' "$(cat "$config")" '# PRIVATE GitHub repos.'
+assert_contains 'the untouched entries survive the rewrite' "$(<"$config")" "'^https?://localhost',"
+assert_contains 'the comment survives the rewrite' "$(<"$config")" '# PRIVATE GitHub repos.'
 
 : >"$work/empty.txt"
 out="$(bash "$script" generate --config "$config" --private-list "$work/empty.txt" 2>&1)"

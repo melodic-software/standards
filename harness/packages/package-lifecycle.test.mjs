@@ -3,7 +3,6 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
@@ -174,13 +173,10 @@ test("rejects a non-private component without the approved registry", async (t) 
 });
 
 test("publish workflow matrix and component triggers match discovered packages", async () => {
-  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const root = join(import.meta.dirname, "..", "..");
   const packages = await discoverPublishablePackages(root);
   const workflow = parse(
-    await readFile(
-      new URL("../../.github/workflows/publish-packages.yml", import.meta.url),
-      "utf8",
-    ),
+    await readFile(join(root, ".github", "workflows", "publish-packages.yml"), "utf8"),
   );
   const names = packages.map((directory) => directory.slice("components/".length));
   assert.deepEqual(workflow.jobs.publish.strategy.matrix.component, names);

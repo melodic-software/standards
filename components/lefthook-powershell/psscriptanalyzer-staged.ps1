@@ -48,7 +48,7 @@ if (-not (Test-Path -LiteralPath $worker -PathType Leaf)) {
     exit 1
 }
 
-$pwsh = (Get-Process -Id $PID).Path
+$pwsh = [Environment]::ProcessPath
 $failed = $false
 foreach ($file in $targets) {
     $workerArguments = @(
@@ -65,7 +65,7 @@ foreach ($file in $targets) {
 
     $output = & $pwsh @workerArguments 2>&1
     $workerExitCode = $LASTEXITCODE
-    $output | ForEach-Object { Write-Output $_ }
+    Write-Output $output
     if ($workerExitCode -ne 0) {
         $failed = $true
     }
