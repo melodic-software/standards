@@ -309,6 +309,18 @@ function tagOf(node) {
   return "!!str";
 }
 
+// An explicit collection tag on a scalar (e.g. `!!map oops`) classifies by tag
+// while the node carries no .items, so every shape check must also require the
+// real node shape before descending — otherwise the descent throws instead of
+// reaching the record's own die() diagnostic.
+function isMapShaped(node) {
+  return isMap(node) && tagOf(node) === "!!map";
+}
+
+function isSeqShaped(node) {
+  return isSeq(node) && tagOf(node) === "!!seq";
+}
+
 function scalarKeyString(node) {
   const n = deref(node);
   if (isScalar(n)) return String(n.value);
@@ -400,7 +412,7 @@ const automergeByTarget = new Map();
 
 function checkRecordShell(kind, name, valueNode) {
   const node = deref(valueNode);
-  if (tagOf(node) !== "!!map") die(`${kind} '${name}' must be a mapping`);
+  if (!isMapShaped(node)) die(`${kind} '${name}' must be a mapping`);
   if (node.items.some((item) => tagOf(item.key) === "!!merge")) {
     die(`${kind} '${name}' merge keys are not supported`);
   }
@@ -437,7 +449,7 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   }
   manifestDoc = docs[0];
   const root = deref(manifestDoc.contents);
-  if (tagOf(root) !== "!!map") die("manifest root must be a mapping");
+  if (!isMapShaped(root)) die("manifest root must be a mapping");
   if (hasDuplicateMapKey(root)) die("manifest contains a duplicate mapping key");
 
   for (const item of root.items) {
@@ -454,11 +466,11 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     die("manifest version must be the integer 2");
   }
   const componentsNode = deref(findMapValue(root, "components"));
-  if (tagOf(componentsNode) !== "!!map" || componentsNode.items.length === 0) {
+  if (!isMapShaped(componentsNode) || componentsNode.items.length === 0) {
     die("components must be a non-empty mapping");
   }
   const targetsNode = deref(findMapValue(root, "targets"));
-  if (tagOf(targetsNode) !== "!!map" || targetsNode.items.length === 0) {
+  if (!isMapShaped(targetsNode) || targetsNode.items.length === 0) {
     die("targets must be a non-empty mapping");
   }
   if (!componentsNode.items.every((item) => tagOf(item.key) === "!!str")) {
@@ -492,7 +504,7 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     validateRecordKeys(`component '${component}'`, "files", ["requires"], keys);
 
     const filesNode = deref(findMapValue(node, "files"));
-    if (tagOf(filesNode) !== "!!map" || filesNode.items.length === 0) {
+    if (!isMapShaped(filesNode) || filesNode.items.length === 0) {
       die(`component '${component}' files must be a non-empty mapping`);
     }
     const fileEntryNodes = filesNode.items.map((entry) => [deref(entry.key), deref(entry.value)]);
@@ -541,7 +553,7 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     requiresByComponent.set(component, []);
     if (keys.includes("requires")) {
       const requiresNode = deref(findMapValue(node, "requires"));
-      if (tagOf(requiresNode) !== "!!seq" || requiresNode.items.length === 0) {
+      if (!isSeqShaped(requiresNode) || requiresNode.items.length === 0) {
         die(`component '${component}' requires must be a non-empty sequence`);
       }
       const depNodes = stringSeqRows(requiresNode);
@@ -631,7 +643,7 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     validateRecordKeys(`target '${target}'`, "managed", ["locally-owned", "automerge"], keys);
 
     const managedNode = deref(findMapValue(node, "managed"));
-    if (tagOf(managedNode) !== "!!seq" || managedNode.items.length === 0) {
+    if (!isSeqShaped(managedNode) || managedNode.items.length === 0) {
       die(`target '${target}' managed must be a non-empty sequence`);
     }
     const managedNodes = stringSeqRows(managedNode);
@@ -647,7 +659,7 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     let locallyOwned = [];
     if (keys.includes("locally-owned")) {
       const localNode = deref(findMapValue(node, "locally-owned"));
-      if (tagOf(localNode) !== "!!seq" || localNode.items.length === 0) {
+      if (!isSeqShaped(localNode) || localNode.items.length === 0) {
         die(`target '${target}' locally-owned must be a non-empty sequence when present`);
       }
       const localNodes = stringSeqRows(localNode);

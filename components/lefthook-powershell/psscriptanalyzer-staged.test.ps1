@@ -36,7 +36,7 @@ function Assert-Condition {
 function Invoke-AdapterProcess {
     param([Parameter(Mandatory)][string[]]$Files)
 
-    $pwsh = (Get-Process -Id $PID).Path
+    $pwsh = [Environment]::ProcessPath
     $output = & $pwsh -NoProfile -NonInteractive -File $adapter @Files 2>&1
     [pscustomobject]@{
         ExitCode = $LASTEXITCODE

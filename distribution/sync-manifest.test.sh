@@ -1002,6 +1002,31 @@ bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
 invalid_case 'component key with a bare newline' "$bad" \
   "component 'consumer' keys may not contain control characters"
 
+# Regression: an explicit collection tag on a scalar (e.g. `!!map "oops"`)
+# classifies by tag while the node carries no items, so every shape check must
+# reject it with the record's own diagnostic instead of crashing on the descent.
+# The authoring schema sees yq's converted JSON (a plain string) and rejects the
+# same fixtures structurally.
+bad="${manifest/"$component_block"/'  consumer: !!map "oops"'}"
+invalid_case 'component is a scalar with an explicit map tag' "$bad" \
+  "component 'consumer' must be a mapping"
+
+bad="${manifest/"$target_block"/'  beta/two: !!map "oops"'}"
+invalid_case 'target is a scalar with an explicit map tag' "$bad" \
+  "target 'beta/two' must be a mapping"
+
+bad="${manifest/'    files:'$'\n''      consumer.txt: consumer.txt'/'    files: !!map "oops"'}"
+invalid_case 'component files is a scalar with an explicit map tag' "$bad" \
+  "component 'consumer' files must be a non-empty mapping"
+
+bad="${manifest/"$requires_block"/'    requires: !!seq "oops"'}"
+invalid_case 'component requires is a scalar with an explicit seq tag' "$bad" \
+  "component 'consumer' requires must be a non-empty sequence"
+
+bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed: !!seq "oops"'}"
+invalid_case 'target managed is a scalar with an explicit seq tag' "$bad" \
+  "target 'beta/two' managed must be a non-empty sequence"
+
 node "$root/distribution/control-char-equivalence.mjs" ||
   { echo 'control-character equivalence test failed' >&2; exit 1; }
 
