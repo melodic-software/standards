@@ -401,11 +401,9 @@ const automergeByTarget = new Map();
 function checkRecordShell(kind, name, valueNode) {
   const node = deref(valueNode);
   if (tagOf(node) !== "!!map") die(`${kind} '${name}' must be a mapping`);
-  let hasMerge = false;
-  for (const item of node.items) {
-    if (tagOf(item.key) === "!!merge") hasMerge = true;
+  if (node.items.some((item) => tagOf(item.key) === "!!merge")) {
+    die(`${kind} '${name}' merge keys are not supported`);
   }
-  if (hasMerge) die(`${kind} '${name}' merge keys are not supported`);
   const keyNodes = node.items.map((item) => deref(item.key));
   if (!keyNodes.every((key) => tagOf(key) === "!!str")) {
     die(`${kind} '${name}' keys must be strings`);
