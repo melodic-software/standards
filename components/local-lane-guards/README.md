@@ -23,7 +23,7 @@ reference implementation behind the ci-workflows action copies.
 | `coarse-prefilter.sh` | Shared coarse `git grep` prefilter for that driver |
 | `check-exec-bit.sh` | Shebang → git mode 100755 |
 | `check-machine-specific-paths.sh` | Absolute user-home / checkout-root scan |
-| `check-heading-cites.sh` | `file.md` "Anchor" prose citation resolver |
+| `check-heading-cites.sh` | `file.md` "Anchor" prose citation resolver <!-- heading-cite-ignore-line --> |
 
 Pattern **bodies** stay in their existing components: this driver sources
 `../comment-hygiene/comment-hygiene-patterns.sh` and

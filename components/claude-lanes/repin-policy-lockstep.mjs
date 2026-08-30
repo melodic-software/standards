@@ -185,11 +185,11 @@ function readCallerPins(workflowPath, callerFiles) {
   return found;
 }
 
-async function rewriteCallerFiles(newSha, tag) {
+export async function rewriteCallerFiles(newSha, tag, root = ROOT) {
   const uniqueFiles = [...new Set(REPIN_TARGETS.flatMap((target) => target.callerFiles))];
   let anyChanged = false;
   for (const rel of uniqueFiles) {
-    const abs = path.join(ROOT, rel);
+    const abs = path.join(root, rel);
     let text;
     try {
       text = await readFile(abs, "utf8");
@@ -206,7 +206,9 @@ async function rewriteCallerFiles(newSha, tag) {
       return updated;
     });
     if (!changed) continue;
-    await writeFile(abs, `${next.join("\n")}\n`);
+    // split preserved any trailing newline as an empty element, so trim
+    // trailing newlines before re-adding exactly one final newline.
+    await writeFile(abs, `${next.join("\n").replace(/\n+$/u, "")}\n`);
     anyChanged = true;
   }
   return anyChanged;
@@ -334,8 +336,10 @@ async function main() {
 
   for (const target of REPIN_TARGETS) {
     const pins = readCallerPins(target.workflowPath, target.callerFiles);
-    const oldShas = [...new Set(pins.map((pin) => pin.oldSha).filter((sha) => sha !== newSha))];
-    if (oldShas.length === 0) continue;
+    const pinnedOldShas = [
+      ...new Set(pins.map((pin) => pin.oldSha).filter((sha) => sha !== newSha)),
+    ];
+    if (pinnedOldShas.length === 0) continue;
 
     const repoPath = target.workflowPath.replace(`${UPSTREAM}/`, "");
     let newSource = newSourceByRepoPath.get(repoPath);
@@ -344,7 +348,7 @@ async function main() {
       newSourceByRepoPath.set(repoPath, newSource);
     }
 
-    for (const fromSha of oldShas) {
+    for (const fromSha of pinnedOldShas) {
       if (target.kind === "selector") {
         const oldSource = fetchUpstreamFile(repoPath, fromSha);
         if (oldSource !== newSource) {

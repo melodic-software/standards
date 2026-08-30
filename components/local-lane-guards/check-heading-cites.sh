@@ -23,8 +23,8 @@ Usage: check-heading-cites.sh [options]
 
 Resolve every `file.md` "Anchor" prose cite in the durable markdown corpus
 (backtick path `file.md` "Anchor" OR namespaced prose path/file.md "Anchor" when the
-path contains `/`)
-cited file's anchor set (headings + bold lead-ins). Anchor match is
+path contains `/`) against the cited file's anchor set (headings + bold
+lead-ins). Anchor match is
 exact OR prefix-with-delimiter-guard (cite may quote a truncated anchor; the
 next character of the full anchor must be one of: space, "(", ":"). Both sides
 are normalized before comparison: backticks stripped, one trailing period

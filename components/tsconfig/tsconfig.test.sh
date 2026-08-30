@@ -43,12 +43,12 @@ write_extending_tsconfig() {
 write_extending_tsconfig "$good" "$consumer/good/tsconfig.json"
 write_extending_tsconfig "$bad" "$consumer/bad/tsconfig.json"
 
-good="$consumer/good/tsconfig.json"
-bad="$consumer/bad/tsconfig.json"
-tsc --noEmit -p "$good" >/dev/null 2>&1
+good_consumer="$consumer/good/tsconfig.json"
+bad_consumer="$consumer/bad/tsconfig.json"
+tsc --noEmit -p "$good_consumer" >/dev/null 2>&1
 assert_exit 'good fixture type-checks clean' 0 "$?"
 
-out="$(tsc --noEmit -p "$bad" 2>&1)"
+out="$(tsc --noEmit -p "$bad_consumer" 2>&1)"
 assert_nonzero 'bad fixture exits non-zero' "$?"
 assert_contains 'bad fixture enforces strict (TS7006)' "$out" 'TS7006'
 assert_contains 'bad fixture enforces noUncheckedIndexedAccess (TS2532)' "$out" 'TS2532'

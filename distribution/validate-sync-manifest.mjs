@@ -4,9 +4,10 @@ import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
 
 // Authoring-time structural validator for sync-manifest.yml fixtures.
-// Overlapping subset of distribution/sync-manifest.sh rules — not a second
-// live gate. CI runs this only from sync-manifest.test.sh fixture-agreement
-// contract cases; distribution/sync-manifest.yml is gated by the Bash engine.
+// Overlapping subset of the sync-manifest.mjs engine rules (invoked via the
+// thin sync-manifest.sh wrapper) — not a second live gate. CI runs this only
+// from sync-manifest.test.sh fixture-agreement contract cases;
+// distribution/sync-manifest.yml is gated by that engine.
 const schemaPath = new URL("./sync-manifest.schema.json", import.meta.url);
 const schema = JSON.parse(await readFile(schemaPath, "utf8"));
 const source = await new Promise((resolve, reject) => {

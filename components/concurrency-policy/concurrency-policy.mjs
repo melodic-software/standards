@@ -3,7 +3,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import Ajv2020 from "ajv/dist/2020.js";
@@ -37,7 +37,7 @@ export function parseUniqueJson(source, location) {
   }
 }
 
-const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const MODULE_DIRECTORY = import.meta.dirname;
 const DEFAULT_CONFIG_PATH = ".github/concurrency-policy.json";
 const CONFIG_SCHEMA_PATH = path.join(MODULE_DIRECTORY, "concurrency-policy.schema.json");
 const CONFIG_SCHEMA = parseUniqueJson(

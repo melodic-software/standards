@@ -12,7 +12,7 @@ self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$self_dir/pin-comment-patterns.sh"
 
 if [[ $# -eq 0 ]]; then
-  echo "usage: $0 <workflow-file>..." >&2
+  printf 'usage: %s <workflow-file>...\n' "$0" >&2
   exit 2
 fi
 

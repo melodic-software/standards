@@ -50,7 +50,7 @@ SH
 # Case 1: the base shellcheck lane, reached via extends, passes a clean staged file.
 git add clean.sh
 lefthook run pre-commit --command shellcheck >/dev/null 2>&1
-assert_exit 'clean staged file passes the extended shellcheck lane' 0 $?
+assert_exit 'clean staged file passes the extended shellcheck lane' 0 "$?"
 git rm --cached -q clean.sh
 
 # Case 2: it fires on a non-conforming staged file.
@@ -72,6 +72,6 @@ pre-commit:
       skip: true
 YAML
 lefthook run pre-commit --command shellcheck >/dev/null 2>&1
-assert_exit 'consumer skip:true opts the lane out' 0 $?
+assert_exit 'consumer skip:true opts the lane out' 0 "$?"
 
 [[ $FAILED -eq 0 ]] || exit 1
