@@ -40,7 +40,7 @@ lower_token="$(grep -v '^#' "$lower_fixture" | tr -d '[:space:]')"
 lower_out="$(typos --config "$config" "$lower_fixture" 2>&1)"
 rc=$?
 assert_exit 'scansion lower fixture exits 2' 2 "$rc"
-assert_contains 'scansion lower still corrected' "$lower_out" "should be"
+assert_contains 'scansion lower still corrected' "$lower_out" 'should be'
 assert_contains 'scansion lower names the fixture token' "$lower_out" "$lower_token"
 
 # Parent-config negative: without the allowlist entry, uppercase DUM must fail.

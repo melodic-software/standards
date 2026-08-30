@@ -94,7 +94,7 @@ else
   skip_case 'go test -race requires cgo and the configured C compiler'
 fi
 
-out="$(cd "$good" && golangci-lint run --config "$config" ./... 2>&1)"
+(cd "$good" && golangci-lint run --config "$config" ./... >/dev/null 2>&1)
 rc=$?
 assert_exit 'golangci-lint: good fixture and explained suppression pass' 0 "$rc"
 
