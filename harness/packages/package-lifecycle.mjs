@@ -107,21 +107,21 @@ async function files(directory, prefix = "") {
   const entries = await readdir(directory, { withFileTypes: true });
   entries.sort((left, right) => left.name.localeCompare(right.name));
   for (const entry of entries) {
-    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      for (const [name, contents] of await files(path, relative)) result.set(name, contents);
+      for (const [name, contents] of await files(path, relativePath)) result.set(name, contents);
     } else if (entry.isFile()) {
       let contents = await readFile(path);
-      if (relative === "package/package.json") {
+      if (relativePath === "package/package.json") {
         const normalized = contents
           .toString("utf8")
           .replace(/("version"\s*:\s*)"(?:\\.|[^"\\])*"/, '$1"__VERSION__"');
         contents = Buffer.from(normalized);
       }
-      result.set(relative, contents);
+      result.set(relativePath, contents);
     } else {
-      throw new Error(`packed payload contains unsupported entry ${relative}`);
+      throw new Error(`packed payload contains unsupported entry ${relativePath}`);
     }
   }
   return result;

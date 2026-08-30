@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests the PSScriptAnalyzer component's root-canonical ruleset.
+# Tests the PSScriptAnalyzer component: the root-canonical ruleset passes
 # the good fixture and flags the bad fixture. This asserts the config only;
 # Invoke-ScriptAnalyzer is called directly. The Lefthook adapter's one-pass
 # error behavior has a separate focused regression test. Skips cleanly when the
@@ -36,7 +36,7 @@ run_pssa() {
     '
 }
 
-out="$(run_pssa "$root/components/psscriptanalyzer/fixtures/good/Clean.ps1")"; rc=$?
+run_pssa "$root/components/psscriptanalyzer/fixtures/good/Clean.ps1" >/dev/null; rc=$?
 assert_exit 'good fixture has no findings' 0 "$rc"
 
 out="$(run_pssa "$root/components/psscriptanalyzer/fixtures/bad/Violations.ps1")"; rc=$?

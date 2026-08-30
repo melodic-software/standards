@@ -75,10 +75,12 @@ export function validatePolicy(value, location = "policy") {
   throw new ConfigurationError(`${errorLocation} ${error.message}`);
 }
 
+function escapeRegExp(value) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function buildTitlePattern(policy) {
-  const types = policy.title.allowedTypes.map((type) =>
-    type.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-  );
+  const types = policy.title.allowedTypes.map((type) => escapeRegExp(type));
   const scope = policy.title.requireScope ? "\\([^)]+\\)" : "(?:\\([^)]+\\))?";
   const breaking = "!?";
   return new RegExp(`^(${types.join("|")})${scope}${breaking}: .+$`, "u");
@@ -202,10 +204,7 @@ export function stripRenderedHtmlComments(text) {
 }
 
 function extractSection(text, heading) {
-  const headingRe = new RegExp(
-    `^##\\s+${heading.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-    "iu",
-  );
+  const headingRe = new RegExp(`^##\\s+${escapeRegExp(heading)}$`, "iu");
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => headingRe.test(line.trim()));
   if (start === -1) return null;
@@ -219,21 +218,20 @@ function extractSection(text, heading) {
 }
 
 function buildNoIssuePattern(markers) {
-  const escaped = markers.map((marker) => marker.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const escaped = markers.map((marker) => escapeRegExp(marker));
   return new RegExp(`\\b(?:${escaped.join("|")})\\b`, "iu");
 }
 
 function buildClosingKeywordPattern(keywords) {
   const alternatives = keywords.map((keyword) => {
     const lower = keyword.toLowerCase();
-    const escapeRegex = (value) => value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (lower.endsWith("es")) {
-      return `${escapeRegex(lower.slice(0, -2))}(?:e[sd]?|es)`;
+      return `${escapeRegExp(lower.slice(0, -2))}(?:e[sd]?|es)`;
     }
     if (lower.endsWith("s")) {
-      return `${escapeRegex(lower.slice(0, -1))}[sd]?`;
+      return `${escapeRegExp(lower.slice(0, -1))}[sd]?`;
     }
-    return `${escapeRegex(lower)}(?:e[sd]?|s)?`;
+    return `${escapeRegExp(lower)}(?:e[sd]?|s)?`;
   });
   return new RegExp(
     `\\b(?:${alternatives.join("|")})\\s*:?\\s*(?:[\\w.-]+\\/[\\w.-]+)?#\\d+\\b`,

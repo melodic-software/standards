@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import {
   ConfigurationError,
@@ -22,8 +22,7 @@ import {
 } from "../runner-policy/runner-policy.mjs";
 import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const UPSTREAM = "melodic-software/ci-workflows";
 const SELECTOR_PATH = `${UPSTREAM}/.github/workflows/select-runner.yml`;
 const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
@@ -172,7 +171,7 @@ function readHeadFile(rel) {
   }
 }
 
-async function readCallerPins(workflowPath, callerFiles) {
+function readCallerPins(workflowPath, callerFiles) {
   const found = [];
   for (const rel of callerFiles) {
     // apply rewrites the worktree first. Read the committed pin so each
@@ -334,7 +333,7 @@ async function main() {
   let selectorUnchanged = true;
 
   for (const target of REPIN_TARGETS) {
-    const pins = await readCallerPins(target.workflowPath, target.callerFiles);
+    const pins = readCallerPins(target.workflowPath, target.callerFiles);
     const oldShas = [...new Set(pins.map((pin) => pin.oldSha).filter((sha) => sha !== newSha))];
     if (oldShas.length === 0) continue;
 

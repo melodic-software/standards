@@ -18,7 +18,7 @@ export function parseLockstepArgs(argv) {
     return { error: "usage" };
   }
   const oldShas = oldShaCsv.split(",").map((sha) => sha.trim());
-  if (oldShas.length === 0 || oldShas.some((sha) => sha === "" || !SHA_RE.test(sha))) {
+  if (oldShas.some((sha) => !SHA_RE.test(sha))) {
     return { error: "sha" };
   }
   if (!SHA_RE.test(newSha)) {

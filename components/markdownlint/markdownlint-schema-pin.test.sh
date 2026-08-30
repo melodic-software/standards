@@ -36,7 +36,7 @@ pinned_version="$(node -e '
 
 if [[ -z "$pinned_version" ]]; then
   fail 'package.json pins markdownlint-cli2 as a devDependency' 'no version found'
-  [[ $FAILED -eq 0 ]] || exit 1
+  exit 1
 fi
 
 expected_schema="https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v${pinned_version}/schema/markdownlint-cli2-config-schema.json"
