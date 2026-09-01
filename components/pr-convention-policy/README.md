@@ -47,7 +47,12 @@ component encodes the rule the `pr-issue-linkage` gate enforces. The
 authoritative gate is the `ci-workflows` `pr-issue-linkage.yml` reusable,
 which hardcodes its own copy of the section list (four sections as of
 v0.14.2, `7107b34`). The two lists must change in lockstep; letting them
-drift is exactly the failure #393 recorded.
+drift is exactly the failure #393 recorded. That lockstep is now enforced by
+[`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008), which the
+`pr-convention-lockstep` CI lane runs against the live gate source, the
+source-control plugin's hook validator, the org PR template, the distributed
+`.claude/rules/pr-body-contract.md` rule, and the contract of the reusable at
+every caller's pinned SHA.
 
 ## Security
 

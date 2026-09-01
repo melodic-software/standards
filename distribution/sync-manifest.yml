@@ -243,6 +243,15 @@ components:
   path-detection-tools:
     files:
       components/path-detection/machine-path-patterns.sh: tools/shared/path-detection/machine-path-patterns.sh
+  # Always-loaded PR-body contract rule for every pr-issue-linkage gate caller
+  # (standards ADR-0008): the one repo-tracked signal that reaches sessions
+  # with no plugins installed. The source doubles as this repository's own
+  # live rule (standards is manifest source, not a target); the lockstep
+  # drift check (components/pr-convention-policy/lockstep-drift.mjs) holds it
+  # in step with policy.json.
+  pr-body-contract-rule:
+    files:
+      .claude/rules/pr-body-contract.md: .claude/rules/pr-body-contract.md
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
@@ -299,6 +308,7 @@ targets:
       - gitleaks
       - lychee
       - markdownlint
+      - pr-body-contract-rule
       - repository-text
       - typos
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
@@ -334,6 +344,7 @@ targets:
       - go-analysis
       - lychee
       - markdownlint
+      - pr-body-contract-rule
       - repository-text
       - shellcheck
       - typos
@@ -353,6 +364,7 @@ targets:
       - markdownlint
       - node-runtime
       - path-detection-action
+      - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
       - review-instructions
@@ -367,6 +379,7 @@ targets:
       - markdownlint
       - node-runtime
       - path-detection-guardrails
+      - pr-body-contract-rule
       - pyright
       - repository-text
       - review-instructions
@@ -468,6 +481,7 @@ targets:
       - gitleaks
       - lychee
       - markdownlint
+      - pr-body-contract-rule
       - repository-text
       - typos
   melodic-software/cursor-plugins:
@@ -505,6 +519,7 @@ targets:
       - markdownlint
       - markdownlint-home
       - node-runtime
+      - pr-body-contract-rule
       - psscriptanalyzer
       - pyright
       - repository-text
@@ -528,6 +543,7 @@ targets:
       - lychee
       - markdownlint
       - node-runtime
+      - pr-body-contract-rule
       - repository-text
       - review-instructions
       - runner-policy
@@ -555,6 +571,7 @@ targets:
       - lychee
       - node-runtime
       - path-detection-tools
+      - pr-body-contract-rule
       - runner-policy
     locally-owned:
       - actionlint
@@ -618,6 +635,7 @@ targets:
       - lychee
       - markdownlint
       - node-runtime
+      - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
       - review-instructions
