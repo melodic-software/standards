@@ -298,11 +298,16 @@ jobs:
         run: npm run test:pr-convention-lockstep
       # Four gate callers are private repositories, so the live check reads
       # every source through the contents API with a contents-read token from
-      # the standards-sync App (the lychee-private-inventory precedent). No
-      # token (e.g. a fork PR, where secrets are absent) is not a skip: the
-      # private fetches fail as `fetch-error` and the lane goes red.
+      # the standards-sync App (the lychee-private-inventory precedent). The
+      # mint step is guarded on the secrets being present (fork PRs carry
+      # none) so an absent credential reaches the enforcement step tokenless
+      # instead of dying inside the mint action; the private fetches then
+      # fail as `fetch-error` and the lane goes red. Not a skip either way.
       - name: Mint a contents-read App token over the installation
         id: lockstep-token
+        if: >-
+          ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+              && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
