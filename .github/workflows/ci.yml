@@ -270,6 +270,57 @@ jobs:
       - name: Enforce pr-convention policy sample
         run: npm run lint:pr-convention-policy
 
+  # Lockstep drift check (ADR-0008). Separate job, not a step in
+  # pr-convention-policy: the live enforcement run fetches the gate reusable,
+  # the plugin hook validator, the org PR template, and every caller's pin
+  # over the network, and that non-hermetic dependency must not contaminate
+  # the hermetic component lane. The fixture tests run first so a parser
+  # regression reads as a test failure, not as drift.
+  pr-convention-lockstep:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: components/pr-convention-policy/package-lock.json
+      - name: Install pr-convention-policy dependencies
+        run: npm ci --prefix components/pr-convention-policy
+      - name: Test lockstep parsers and mutation probes (hermetic)
+        run: npm run test:pr-convention-lockstep
+      # Four gate callers are private repositories, so the live check reads
+      # every source through the contents API with a contents-read token from
+      # the standards-sync App (the lychee-private-inventory precedent). The
+      # mint step is guarded on the secrets being present (fork PRs carry
+      # none) so an absent credential reaches the enforcement step tokenless
+      # instead of dying inside the mint action; the private fetches then
+      # fail as `fetch-error` and the lane goes red. Not a skip either way.
+      - name: Mint a contents-read App token over the installation
+        id: lockstep-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          owner: melodic-software # zizmor: ignore[github-app] read-only contents over the installation; the lockstep check reads gate callers fleet-wide
+          permission-contents: read
+      - name: Enforce lockstep against live copies and caller pins
+        env:
+          LOCKSTEP_GITHUB_TOKEN: ${{ steps.lockstep-token.outputs.token }}
+        run: npm run lint:pr-convention-lockstep
+
   powershell-fixtures:
     permissions:
       contents: read
@@ -962,6 +1013,7 @@ jobs:
       - concurrency-policy
       - dependabot-policy
       - pr-convention-policy
+      - pr-convention-lockstep
       - powershell-fixtures
       - shellcheck-fixtures
       - lychee-fixtures
@@ -1008,6 +1060,7 @@ jobs:
             ${{ needs.concurrency-policy.result }}
             ${{ needs.dependabot-policy.result }}
             ${{ needs.pr-convention-policy.result }}
+            ${{ needs.pr-convention-lockstep.result }}
             ${{ needs.powershell-fixtures.result }}
             ${{ needs.shellcheck-fixtures.result }}
             ${{ needs.lychee-fixtures.result }}
