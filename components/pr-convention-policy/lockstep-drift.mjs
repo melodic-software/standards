@@ -106,6 +106,51 @@ export function parseMarkdownHeadings(markdownText) {
   return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
 }
 
+// The gate's keyword and marker enforcement are executable regex
+// declarations, so they are validated FUNCTIONALLY: extract each declared
+// pattern and probe it with every policy keyword/marker. A keyword that
+// survives only in a comment or error message no longer passes.
+export function parseGatePatterns(workflowText, location) {
+  const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/i;/);
+  const marker = workflowText.match(/const NO_ISSUE_MARKER = \/(.+)\/i;/);
+  if (!keyword || !marker) {
+    throw new DriftError(
+      `${location}: CLOSING_KEYWORD / NO_ISSUE_MARKER regex declarations not found`,
+    );
+  }
+  return { keyword: new RegExp(keyword[1], "i"), marker: new RegExp(marker[1], "i") };
+}
+
+// The hook validator's enforcement is a pair of POSIX ERE strings; translate
+// the one POSIX class they use and probe them the same way. The probes pad
+// with spaces because both EREs guard with [^a-z0-9_] boundary classes.
+export function parseValidatorPatterns(shellText, location) {
+  const keyword = shellText.match(/KEYWORD_ERE='([^']+)'/);
+  const marker = shellText.match(/NO_ISSUE_ERE='([^']+)'/);
+  if (!keyword || !marker) {
+    throw new DriftError(`${location}: KEYWORD_ERE / NO_ISSUE_ERE declarations not found`);
+  }
+  const toJs = (ere) => new RegExp(ere.replaceAll("[[:space:]]", "\\s"), "i");
+  return { keyword: toJs(keyword[1]), marker: toJs(marker[1]) };
+}
+
+function assertPatternsEnforce(patterns, policy, location) {
+  const missing = [];
+  for (const keyword of policy.body.closingKeywords) {
+    if (!patterns.keyword.test(` ${keyword} #12 `)) {
+      missing.push(`closing keyword "${keyword}"`);
+    }
+  }
+  for (const marker of policy.body.noIssueMarkers) {
+    if (!patterns.marker.test(` ${marker}: none `)) {
+      missing.push(`no-issue marker "${marker}"`);
+    }
+  }
+  if (missing.length > 0) {
+    throw new DriftError(`${location}: declared pattern rejects ${missing.join(", ")}`);
+  }
+}
+
 export function parseCallerPin(workflowText, location) {
   const match = workflowText.match(/pr-issue-linkage\.yml@([0-9a-f]{40})/);
   if (!match) {
@@ -174,24 +219,57 @@ export function checkCopies(policy, texts) {
     ),
   );
   run(() => assertMentions(texts.rulesFile, policy.body.closingKeywords, "rules file (closing keywords)"));
-  run(() => assertMentions(texts.gate, policy.body.closingKeywords, "gate reusable (closing keywords)"));
+  // The rules file is guidance, not enforcement: it must steer agents to at
+  // least one accepted opt-out marker, not enumerate every accepted phrasing.
+  run(() => {
+    if (!policy.body.noIssueMarkers.some((marker) => texts.rulesFile.includes(marker))) {
+      throw new DriftError(
+        `rules file (no-issue markers): mentions none of: ${policy.body.noIssueMarkers.join(", ")}`,
+      );
+    }
+  });
+  run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
-    assertMentions(texts.gate, policy.body.noIssueMarkers, "gate reusable (no-issue markers)"),
+    assertMentions(texts.orgTemplate, policy.body.noIssueMarkers, "org PR template (no-issue markers)"),
+  );
+  run(() =>
+    assertPatternsEnforce(
+      parseGatePatterns(texts.gate, "gate reusable"),
+      policy,
+      "gate reusable (enforcement patterns)",
+    ),
+  );
+  run(() =>
+    assertPatternsEnforce(
+      parseValidatorPatterns(texts.hookValidator, "hook validator"),
+      policy,
+      "hook validator (enforcement patterns)",
+    ),
   );
   return errors;
 }
 
+// Validates the full contract at the pin — sections AND the executable
+// keyword/marker patterns — so a pinned reusable whose section list matches
+// current policy but whose keyword or marker enforcement is stale still
+// reports drift.
 export function checkPinnedReusable(policy, repo, sha, reusableText) {
   const location = `caller ${repo} pin ${sha.slice(0, 7)}`;
   const errors = [];
-  try {
-    assertExactSections(parseGateSections(reusableText, location), policy.body.requiredSections, location);
-  } catch (error) {
-    if (!(error instanceof DriftError)) {
-      throw error;
+  const run = (fn) => {
+    try {
+      fn();
+    } catch (error) {
+      if (!(error instanceof DriftError)) {
+        throw error;
+      }
+      errors.push(error.message);
     }
-    errors.push(error.message);
-  }
+  };
+  run(() =>
+    assertExactSections(parseGateSections(reusableText, location), policy.body.requiredSections, location),
+  );
+  run(() => assertPatternsEnforce(parseGatePatterns(reusableText, location), policy, location));
   return errors;
 }
 
