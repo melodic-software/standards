@@ -114,7 +114,7 @@ test("current pinned contract passes", () => {
   assert.deepEqual(checkPinnedReusable(POLICY, "dotfiles", "a".repeat(40), GOOD_GATE), []);
 });
 
-test("unparseable sources throw DriftError, never pass silently", () => {
+test("unparsable sources throw DriftError, never pass silently", () => {
   assert.throws(() => parseGateSections("jobs: {}", "gate"), DriftError);
   assert.throws(() => parseValidatorSections("echo hi", "validator"), DriftError);
   assert.throws(() => parseCallerPin("uses: something-else", "caller"), DriftError);
