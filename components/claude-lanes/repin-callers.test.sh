@@ -88,6 +88,12 @@ case "$path" in
   */git/tags/*)
     printf '%s\n' "${STUB_TAG_OBJECT_SHA:?stub gh: STUB_TAG_OBJECT_SHA unset}"
     ;;
+  */commits/*)
+    # The resolved commit's metadata; the subject reads its committer date.
+    # Defaults so the resolve cases that predate the date output need no
+    # extra setup; the date cases set it explicitly.
+    printf '%s\n' "${STUB_COMMIT_DATE-2026-01-15T09:30:00Z}"
+    ;;
   repos/*/*)
     # Bare `repos/<owner>/<repo>` — the repository-readable probe. Reached only
     # after the more specific patterns above have not matched.
@@ -126,6 +132,26 @@ assert_contains 'resolve: lightweight tag reports the commit object' "$out" 'com
 assert_contains 'resolve: lightweight tag emits resolved=true' "$(cat "$out_file")" 'resolved=true'
 assert_contains 'resolve: lightweight tag emits the tag' "$(cat "$out_file")" 'tag=v0.9.1'
 assert_contains 'resolve: lightweight tag emits the commit SHA' "$(cat "$out_file")" "sha=$old_sha"
+assert_contains 'resolve: lightweight tag emits the commit date as YYYY-MM-DD' "$(cat "$out_file")" 'date=2026-01-15'
+
+# The date is the release COMMIT's committer date, truncated to the day, in
+# the shape a fallback-form pin comment records — apply compares the two.
+out_file="$scratch/out-date"
+export STUB_COMMIT_DATE='2026-08-21T08:17:24Z'
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_exit 'resolve: commit date exits 0' 0 "$rc"
+assert_contains 'resolve: commit date is truncated to the day' "$(cat "$out_file")" 'date=2026-08-21'
+assert_not_contains 'resolve: commit date carries no time component' "$(cat "$out_file")" 'T08:17'
+
+# An unparsable date is upstream data the ahead-of-release comparison cannot
+# consume; it must fail loudly rather than emit a date apply then misreads.
+out_file="$scratch/out-bad-date"
+export STUB_COMMIT_DATE='not-a-date'
+rc=0; out="$(run_resolve "$out_file")" || rc=$?
+assert_nonzero 'resolve: an unparsable commit date fails' "$rc"
+assert_contains 'resolve: an unparsable commit date raises an error' "$out" '::error::'
+assert_not_contains 'resolve: an unparsable commit date never emits resolved=true' "$(cat "$out_file")" 'resolved=true'
+unset STUB_COMMIT_DATE
 
 # Annotated tag — the ref points at a tag object that must be dereferenced
 # again. The emitted SHA must be the tag object's target, never the tag object.
@@ -286,11 +312,14 @@ YAML
   git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'lane callers'
 }
 
-# run_apply <dir> <outfile> <tag> <sha>
+# run_apply <dir> <outfile> <tag> <sha> [release-date]
+#
+# The release date only matters to fallback-form pins; the tag-form fixtures
+# below take a fixed default so their cases stay about the rewrite itself.
 run_apply() {
-  local dir="$1" outfile="$2" tag="$3" sha="$4"
+  local dir="$1" outfile="$2" tag="$3" sha="$4" release_date="${5:-2026-08-21}"
   : > "$outfile"
-  (cd "$dir" && GITHUB_OUTPUT="$outfile" bash "$script" apply "$tag" "$sha" 2>&1)
+  (cd "$dir" && GITHUB_OUTPUT="$outfile" bash "$script" apply "$tag" "$sha" "$release_date" 2>&1)
 }
 
 # ------------------------------------------- apply: rewrite scope + major jump
@@ -359,29 +388,140 @@ jobs:
   review:
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
 YAML
+# The guard caller pins a composite ACTION at a step, in the convention's
+# fallback comment form, dated before the release under test — so this
+# release may advance it, and the rewrite must land the tag form.
+guard_sha='c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6'
+guard_caller='components/managed-files-guard/managed-files-guard.yml'
+mkdir -p "$repo/components/managed-files-guard"
+cat > "$repo/$guard_caller" <<YAML
+name: managed-files-guard
+on: pull_request
+jobs:
+  managed-files-guard:
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-01
+YAML
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
 out_file="$scratch/out-apply-mixed"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
 assert_contains 'apply: mixed-SHA extras report a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: mixed-SHA extras record both old SHAs' "$(cat "$out_file")" "$old_sha"
 assert_contains 'apply: mixed-SHA extras record the sync-family SHA' "$(cat "$out_file")" "$other_sha"
+assert_contains 'apply: mixed-SHA extras record the guard action SHA' "$(cat "$out_file")" "$guard_sha"
 mixed_old="$(grep '^old-sha=' "$out_file" | cut -d= -f2-)"
 assert_contains 'apply: mixed-SHA old-sha is a comma-separated unique set' "$mixed_old" ','
 assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' "$out" 'outside'
+assert_not_contains 'apply: a fallback pin dated before the release is not reported as ahead' "$out" 'left as is'
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml \
   "$repo"/.github/workflows/sync.yml \
   "$repo"/.github/workflows/standards-sync-stuck-automerge-alert.yml \
-  "$repo"/.github/workflows/claude-review.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
+  "$repo"/.github/workflows/claude-review.yml \
+  "$repo/$guard_caller" | wc -l | tr -d ' ')"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '8' "$mixed_pins"
+assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
+  "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
+assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
+  "$(cat "$repo/$guard_caller")" '2026-08-01'
 mixed_paths="$(git -C "$repo" diff --name-only | sort | paste -sd, -)"
 assert_contains 'apply: mixed-SHA extras include sync.yml' "$mixed_paths" '.github/workflows/sync.yml'
 assert_contains 'apply: mixed-SHA extras include the alert caller' "$mixed_paths" \
   '.github/workflows/standards-sync-stuck-automerge-alert.yml'
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
   '.github/workflows/claude-review.yml'
+assert_contains 'apply: mixed-SHA extras include the guard caller component' "$mixed_paths" "$guard_caller"
+
+# ------------------------------------------ apply: a pin ahead of the release
+
+# THE DOWNGRADE FENCE. A fallback-form pin names a commit by its date; when
+# that date is after the release commit's, the release cannot contain it, and
+# rewriting the file would move the pin BACKWARDS — behind the fix it was
+# pinned for. The lane callers still advance; the ahead file is reported and
+# left byte-identical.
+repo="$scratch/repo-ahead"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
+for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+  cat > "$repo/.github/workflows/$extra" <<YAML
+name: extra
+on: pull_request
+jobs:
+  job:
+    uses: melodic-software/ci-workflows/.github/workflows/${extra}@${old_sha} # v0.9.1
+YAML
+done
+cat > "$repo/$guard_caller" <<YAML
+name: managed-files-guard
+on: pull_request
+jobs:
+  managed-files-guard:
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-30
+YAML
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned ahead of the release'
+out_file="$scratch/out-apply-ahead"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+assert_exit 'apply: an ahead pin exits 0' 0 "$rc"
+assert_contains 'apply: an ahead pin still reports the lane change' "$(cat "$out_file")" 'changed=true'
+assert_contains 'apply: an ahead pin is reported as left as is' "$out" \
+  "::notice::${guard_caller} pins a commit dated 2026-08-30, after v0.9.2 (2026-08-21); left as is."
+assert_contains 'apply: the ahead file keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-30"
+assert_not_contains 'apply: the ahead file is never moved to the release' "$(cat "$repo/$guard_caller")" "$new_sha"
+assert_eq 'apply: the ahead file stays byte-identical' \
+  "$(git -C "$repo" diff --name-only -- "$guard_caller")" ''
+assert_not_contains 'apply: the ahead SHA is not handed to lockstep as an old SHA' \
+  "$(grep '^old-sha=' "$out_file")" "$guard_sha"
+assert_contains 'apply: the version note names the file left untouched' "$(cat "$out_file")" \
+  "(2026-08-21): \`${guard_caller}\`. Those pins advance"
+ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
+  "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
+assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
+
+# Same-day is not ahead: a release cut the day the pinned commit landed is
+# taken to contain it, so the pin advances to the tag form.
+repo="$scratch/repo-same-day"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
+for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+done
+printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
+  "$guard_sha" > "$repo/$guard_caller"
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release'
+out_file="$scratch/out-apply-same-day"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+assert_exit 'apply: a same-day pin exits 0' 0 "$rc"
+assert_not_contains 'apply: a same-day pin is not ahead' "$out" 'left as is'
+assert_contains 'apply: a same-day pin advances to the tag form' "$(cat "$repo/$guard_caller")" "@${new_sha} # v0.9.2"
+
+# Every enumerated caller ahead of the release is a clean no-op, not a
+# failure and not a proposal: the tree stays clean for a later step.
+repo="$scratch/repo-all-ahead"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+sed -i -E "s|# v0\.9\.1\$|# c136b27 2026-09-09|" "$repo"/components/claude-lanes/*.yml
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'every lane pinned ahead'
+out_file="$scratch/out-apply-all-ahead"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+assert_exit 'apply: every caller ahead exits 0' 0 "$rc"
+assert_contains 'apply: every caller ahead reports changed=false' "$(cat "$out_file")" 'changed=false'
+assert_contains 'apply: every caller ahead is a notice' "$out" 'ahead of v0.9.2; nothing to propose'
+assert_silent 'apply: every caller ahead leaves the tree clean' "$(git -C "$repo" status --porcelain)"
+
+# The date is the comparison's whole basis, so a missing or malformed one is
+# refused before any file is touched.
+repo="$scratch/repo-bad-date"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+rc=0; out="$(run_apply "$repo" "$scratch/out-bad-date" 'v0.9.2' "$new_sha" '21/08/2026')" || rc=$?
+assert_nonzero 'apply: a malformed release date is refused' "$rc"
+assert_contains 'apply: a malformed release date is named' "$out" '21/08/2026'
+assert_silent 'apply: a malformed release date touches nothing' "$(git -C "$repo" status --porcelain)"
 
 # A production-shaped repo that drops one extra must not silently skip it.
 repo="$scratch/repo-partial-extras"
@@ -508,5 +648,8 @@ rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" frobnicate 2>&1)"
 assert_nonzero 'an unknown subcommand is a usage error' "$rc"
 rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 2>&1)" || rc=$?
 assert_nonzero 'apply with a missing argument is a usage error' "$rc"
+rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2>&1)" || rc=$?
+assert_nonzero 'apply without the release date is a usage error' "$rc"
+assert_contains 'apply usage names the date argument' "$out" '<date>'
 
 [[ $FAILED -eq 0 ]] || exit 1
