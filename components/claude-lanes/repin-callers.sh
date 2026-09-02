@@ -214,7 +214,9 @@ repin::ahead_of() {
     [[ -n "$pin_line" ]] || continue
     pin_sha="$(sed -nE 's/.*@([0-9a-fA-F]{40}).*/\1/p' <<<"$pin_line" | head -n1)"
     [[ -n "$pin_sha" ]] || continue
-    status="$(repin::compare_status "$release_sha" "$pin_sha")" || return 1
+    # Not `|| return 1`: that form is SC2310 (set -e suppressed in ||).
+    # compare_status already failed-loud; with set -e the assignment exits.
+    status="$(repin::compare_status "$release_sha" "$pin_sha")"
     case "$status" in
       ahead | diverged)
         echo "$pin_sha"
