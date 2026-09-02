@@ -811,6 +811,7 @@ jobs:
           bash harness/shell/run-tests.sh
           components/cloud-environment/setup.test.sh
           components/cloud-bootstrap/cloud-bootstrap.test.sh
+          .cursor/install.test.sh
 
   distribution:
     permissions:
