@@ -1,0 +1,4 @@
+{
+  "name": "Melodic Software standards",
+  "install": "bash .cursor/install.sh"
+}
