@@ -106,14 +106,19 @@ lane callers re-pins the guard and the sync fans it out.
 
 Two properties of that ride are deliberate:
 
-- **A pin ahead of the release is left alone.** The fallback comment records
-  the pinned commit's date; `apply` compares it with the release commit's
-  date (`resolve` emits it) and leaves untouched any file whose pin postdates
-  the release. Without that fence the very next scheduled run would have
-  proposed moving this file from `3b2f4ea` (2026-08-30) back to v0.17.2
-  (2026-08-21), behind the fail-open fix. The pin advances to the tag form on
-  the first release that postdates it; until then the re-pin pull request
-  names the file in its version note and moves the lane callers only.
+- **A pin ahead of the release is left alone.** `apply` asks GitHub's
+  compare API whether the pinned SHA is an ancestor of the release SHA
+  ([compare two commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits)).
+  Status `ahead` or `diverged` leaves the file untouched; `behind` or
+  `identical` lets the rewrite proceed. Day-level pin-comment dates are not
+  consulted: a pin landed later on the same UTC day as the release, or on
+  another line of history, cannot be proven contained by a `YYYY-MM-DD`
+  string. Without that fence the very next scheduled run would have proposed
+  moving this file from `3b2f4ea` (2026-08-30) back to v0.17.2 (2026-08-21),
+  behind the fail-open fix. The pin advances to the tag form on the first
+  release that contains it; until then the re-pin pull request names the
+  file in its version note and moves the lane callers only. A failed
+  compare is a hard failure, not a rewrite.
 - **Not in `repin-policy-lockstep.mjs`'s `REPIN_TARGETS`.** Every `kind` that
   table expresses (`selector`, `lane`, `reusable`) copies a
   `components/runner-policy/policy.json` contract forward from the old SHA to

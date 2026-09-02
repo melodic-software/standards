@@ -40,11 +40,12 @@ readonly -a EXTRA_CALLER_FILES=(
 # pinned by 40-character commit SHA.
 readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
 # The pin-comment convention's fallback form (`# <short-sha> <YYYY-MM-DD>`),
-# which a pin to an as-yet-unreleased commit carries. The date is the pinned
-# commit's own date, which is what lets apply tell a pin AHEAD of a release
-# from one behind it.
+# which a pin to an as-yet-unreleased commit carries. The date is provenance
+# for humans; apply decides "ahead of the release" from GitHub compare
+# ancestry against the release SHA, not from that date.
 readonly FALLBACK_PIN_RE="${PIN_RE}[[:space:]]+# [0-9a-f]{7,40} [0-9]{4}-[0-9]{2}-[0-9]{2}"
 readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+readonly UPSTREAM_REPO='melodic-software/ci-workflows'
 
 usage() {
   cat >&2 <<'USAGE'
@@ -176,24 +177,56 @@ repin::resolve() {
   } >> "$GITHUB_OUTPUT"
 }
 
-# repin::ahead_of <file> <release-date>
+# repin::compare_status <release-sha> <pin-sha>
 #
-# Prints the date of a fallback-form pin in <file> whose recorded commit date
-# is LATER than <release-date>, or nothing. Such a pin names a commit the
-# release cannot contain, so rewriting it to the release would move the pin
-# backwards — behind the very fix the commit was pinned for. Tag-form pins
-# never match: a release is the newest of its line by construction of
-# `resolve`.
+# Prints GitHub's compare `status` of <release-sha>... <pin-sha> on the
+# upstream repo (https://docs.github.com/en/rest/commits/commits#compare-two-commits):
+#   ahead     — pin has commits the release does not; rewriting would downgrade
+#   diverged  — neither is an ancestor of the other; same downgrade risk
+#   behind    — pin is an ancestor of the release; the release contains it
+#   identical — pin *is* the release
+# A failed lookup is fatal: guessing "not ahead" would rewrite, which is the
+# downgrade this fence exists to prevent.
+repin::compare_status() {
+  local release_sha="$1" pin_sha="$2" status err
+  err="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$err'" RETURN
+  if ! status="$(gh api "repos/${UPSTREAM_REPO}/compare/${release_sha}...${pin_sha}" \
+    --jq .status 2>"$err")"; then
+    echo "::error::Could not compare ${release_sha}...${pin_sha} on ${UPSTREAM_REPO}." >&2
+    cat "$err" >&2
+    return 1
+  fi
+  printf '%s\n' "$status"
+}
+
+# repin::ahead_of <file> <release-sha>
+#
+# Prints the SHA of a fallback-form pin in <file> that is not an ancestor of
+# <release-sha> (compare status `ahead` or `diverged`), or nothing. Tag-form
+# pins never match: a release is the newest of its line by construction of
+# `resolve`. Day-level pin-comment dates are not consulted — same-day pins
+# and cross-branch timestamps cannot prove containment.
 repin::ahead_of() {
-  local file="$1" release_date="$2" pin_date
-  while IFS= read -r pin_date; do
-    [[ -n "$pin_date" ]] || continue
-    # ISO dates order lexically, so string comparison is date comparison.
-    if [[ "$pin_date" > "$release_date" ]]; then
-      echo "$pin_date"
-      return 0
-    fi
-  done < <(grep -hoE "$FALLBACK_PIN_RE" "$file" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}$' || true)
+  local file="$1" release_sha="$2" pin_line pin_sha status
+  while IFS= read -r pin_line; do
+    [[ -n "$pin_line" ]] || continue
+    pin_sha="$(sed -nE 's/.*@([0-9a-fA-F]{40}).*/\1/p' <<<"$pin_line" | head -n1)"
+    [[ -n "$pin_sha" ]] || continue
+    status="$(repin::compare_status "$release_sha" "$pin_sha")" || return 1
+    case "$status" in
+      ahead | diverged)
+        echo "$pin_sha"
+        return 0
+        ;;
+      behind | identical) ;;
+      *)
+        echo "::error::compare ${release_sha}...${pin_sha} returned '${status}', not a documented status." >&2
+        return 1
+        ;;
+    esac
+  done < <(grep -hE "$FALLBACK_PIN_RE" "$file" || true)
 }
 
 # repin::apply <tag> <sha> <date>
@@ -201,11 +234,11 @@ repin::ahead_of() {
 # Emits changed=false and exits 0 when the callers already carry <sha>/<tag>;
 # emits changed=true plus old-tags and version-note otherwise, leaving the
 # rewritten files in the working tree for the caller to commit. A file whose
-# fallback-form pin is dated after <date> is ahead of the release and is left
-# untouched (see repin::ahead_of); it is reported, never rewritten.
+# fallback-form pin is not an ancestor of <sha> is ahead of the release and
+# is left untouched (see repin::ahead_of); it is reported, never rewritten.
 repin::apply() {
   local tag="$1" sha="$2" release_date="$3"
-  local root expected rewritten old_sha old_tags new_major old_major old_tag note ahead_date ahead_list delim
+  local root expected rewritten old_sha old_tags new_major old_major old_tag note ahead_sha ahead_list delim
   local -a targets rewrite ahead excludes
 
   if [[ ! "$release_date" =~ $DATE_RE ]]; then
@@ -250,9 +283,9 @@ repin::apply() {
   rewrite=()
   ahead=()
   for file in "${targets[@]}"; do
-    ahead_date="$(repin::ahead_of "$file" "$release_date")"
-    if [[ -n "$ahead_date" ]]; then
-      echo "::notice::${file} pins a commit dated ${ahead_date}, after ${tag} (${release_date}); left as is."
+    ahead_sha="$(repin::ahead_of "$file" "$sha")"
+    if [[ -n "$ahead_sha" ]]; then
+      echo "::notice::${file} pins ${ahead_sha}, not an ancestor of ${tag} (${sha}); left as is."
       ahead+=("$file")
     else
       rewrite+=("$file")
@@ -270,8 +303,8 @@ repin::apply() {
   # Unique old SHAs across every rewritten file — do not collapse to the
   # first pin. The workflow passes this unique-set to lockstep, which accepts
   # one SHA or a comma-separated list and still reads each caller file.
-  old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${rewrite[@]}" \
-    | tr '[:upper:]' '[:lower:]' | tr -d '@' | sort -u | paste -sd, - || true)"
+  old_sha="$(grep -hoE "$PIN_RE" "${rewrite[@]}" \
+    | grep -oE '[0-9a-fA-F]{40}$' | tr '[:upper:]' '[:lower:]' | sort -u | paste -sd, - || true)"
   old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${rewrite[@]}" \
     | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
 
@@ -322,7 +355,7 @@ repin::apply() {
     ahead_list="$(printf "\`%s\`, " "${ahead[@]}")"
     note+="
 
-Left untouched because their pinned commit is dated after ${tag} (${release_date}): ${ahead_list%, }. Those pins advance on the first release that postdates them."
+Left untouched because their pinned commit is not an ancestor of ${tag} (${sha}): ${ahead_list%, }. Those pins advance on the first release that contains them."
   fi
 
   # A random heredoc delimiter, per GitHub's own multi-line output guidance:

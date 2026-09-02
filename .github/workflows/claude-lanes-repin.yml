@@ -97,9 +97,9 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
           SHA: ${{ steps.release.outputs.sha }}
-          # The release commit's date. A caller pinned in the pin-comment
-          # convention's fallback form to a commit dated AFTER it is ahead of
-          # the release and is left alone rather than moved backwards.
+          # Still required by apply's argv (malformed dates fail closed).
+          # Ahead-of-release is decided by GitHub compare ancestry of SHA
+          # against the fallback pin, not by this date.
           DATE: ${{ steps.release.outputs.date }}
         run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA" "$DATE"
 

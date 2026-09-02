@@ -94,6 +94,16 @@ case "$path" in
     # extra setup; the date cases set it explicitly.
     printf '%s\n' "${STUB_COMMIT_DATE-2026-01-15T09:30:00Z}"
     ;;
+  */compare/*)
+    # apply's ancestry fence: GitHub compare status of release...pin.
+    # Tests set STUB_COMPARE_STATUS to a documented status (ahead / behind /
+    # identical / diverged) or STUB_COMPARE_STATUS=fail to force a lookup error.
+    if [[ "${STUB_COMPARE_STATUS:-}" == 'fail' ]]; then
+      echo 'gh: Not Found (HTTP 404)' >&2
+      exit 1
+    fi
+    printf '%s\n' "${STUB_COMPARE_STATUS:?stub gh: STUB_COMPARE_STATUS unset}"
+    ;;
   repos/*/*)
     # Bare `repos/<owner>/<repo>` — the repository-readable probe. Reached only
     # after the more specific patterns above have not matched.
@@ -319,7 +329,10 @@ YAML
 run_apply() {
   local dir="$1" outfile="$2" tag="$3" sha="$4" release_date="${5:-2026-08-21}"
   : > "$outfile"
-  (cd "$dir" && GITHUB_OUTPUT="$outfile" bash "$script" apply "$tag" "$sha" "$release_date" 2>&1)
+  # Stub stays on PATH so a fallback-form pin's compare lookup never hits
+  # the network; tag-form apply cases do not call gh and ignore it.
+  (cd "$dir" && PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$outfile" \
+    bash "$script" apply "$tag" "$sha" "$release_date" 2>&1)
 }
 
 # ------------------------------------------- apply: rewrite scope + major jump
@@ -404,6 +417,9 @@ jobs:
 YAML
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
+# Fallback pin is contained by the release (compare `behind`); date is
+# ignored. Tag-form extras do not call compare.
+export STUB_COMPARE_STATUS=behind
 out_file="$scratch/out-apply-mixed"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
@@ -433,14 +449,17 @@ assert_contains 'apply: mixed-SHA extras include the alert caller' "$mixed_paths
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
   '.github/workflows/claude-review.yml'
 assert_contains 'apply: mixed-SHA extras include the guard caller component' "$mixed_paths" "$guard_caller"
+unset STUB_COMPARE_STATUS
 
 # ------------------------------------------ apply: a pin ahead of the release
 
-# THE DOWNGRADE FENCE. A fallback-form pin names a commit by its date; when
-# that date is after the release commit's, the release cannot contain it, and
-# rewriting the file would move the pin BACKWARDS — behind the fix it was
-# pinned for. The lane callers still advance; the ahead file is reported and
-# left byte-identical.
+# THE DOWNGRADE FENCE. A fallback-form pin names a commit the GitHub compare
+# API reports as `ahead` or `diverged` of the release SHA: rewriting it would
+# move the pin BACKWARDS. Day-level pin-comment dates are not consulted —
+# same-day pins and cross-branch timestamps cannot prove containment.
+# The lane callers still advance; the ahead file is reported and left
+# byte-identical.
+export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
@@ -468,7 +487,7 @@ rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" ||
 assert_exit 'apply: an ahead pin exits 0' 0 "$rc"
 assert_contains 'apply: an ahead pin still reports the lane change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: an ahead pin is reported as left as is' "$out" \
-  "::notice::${guard_caller} pins a commit dated 2026-08-30, after v0.9.2 (2026-08-21); left as is."
+  "::notice::${guard_caller} pins ${guard_sha}, not an ancestor of v0.9.2 (${new_sha}); left as is."
 assert_contains 'apply: the ahead file keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-30"
 assert_not_contains 'apply: the ahead file is never moved to the release' "$(cat "$repo/$guard_caller")" "$new_sha"
 assert_eq 'apply: the ahead file stays byte-identical' \
@@ -476,14 +495,14 @@ assert_eq 'apply: the ahead file stays byte-identical' \
 assert_not_contains 'apply: the ahead SHA is not handed to lockstep as an old SHA' \
   "$(grep '^old-sha=' "$out_file")" "$guard_sha"
 assert_contains 'apply: the version note names the file left untouched' "$(cat "$out_file")" \
-  "(2026-08-21): \`${guard_caller}\`. Those pins advance"
+  "(${new_sha}): \`${guard_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
 assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 
-# Same-day is not ahead: a release cut the day the pinned commit landed is
-# taken to contain it, so the pin advances to the tag form.
-repo="$scratch/repo-same-day"
+# Same-day dates do not prove containment. When compare says the pin is
+# ahead of the release, apply must leave it — this is the Codex P2 on #511.
+repo="$scratch/repo-same-day-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
 for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
@@ -493,15 +512,58 @@ done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
 git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release'
-out_file="$scratch/out-apply-same-day"
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
+export STUB_COMPARE_STATUS=ahead
+out_file="$scratch/out-apply-same-day-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
-assert_exit 'apply: a same-day pin exits 0' 0 "$rc"
-assert_not_contains 'apply: a same-day pin is not ahead' "$out" 'left as is'
-assert_contains 'apply: a same-day pin advances to the tag form' "$(cat "$repo/$guard_caller")" "@${new_sha} # v0.9.2"
+assert_exit 'apply: a same-day ahead pin exits 0' 0 "$rc"
+assert_contains 'apply: a same-day ahead pin is left as is' "$out" 'left as is'
+assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
+
+# When compare says the release contains the pin (`behind`), same-day is
+# irrelevant and the pin advances to the tag form.
+repo="$scratch/repo-same-day-behind"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
+for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+done
+printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
+  "$guard_sha" > "$repo/$guard_caller"
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, contained'
+export STUB_COMPARE_STATUS=behind
+out_file="$scratch/out-apply-same-day-behind"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+assert_exit 'apply: a same-day contained pin exits 0' 0 "$rc"
+assert_not_contains 'apply: a same-day contained pin is not left as is' "$out" 'left as is'
+assert_contains 'apply: a same-day contained pin advances to the tag form' \
+  "$(cat "$repo/$guard_caller")" "@${new_sha} # v0.9.2"
+
+# A failed compare must not rewrite: guessing "not ahead" is the downgrade.
+repo="$scratch/repo-compare-fail"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
+for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+done
+printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
+  "$guard_sha" > "$repo/$guard_caller"
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'compare lookup fails'
+export STUB_COMPARE_STATUS=fail
+out_file="$scratch/out-apply-compare-fail"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+assert_nonzero 'apply: a failed compare is a hard failure' "$rc"
+assert_contains 'apply: a failed compare names the lookup' "$out" 'Could not compare'
+assert_contains 'apply: a failed compare keeps the fallback pin' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
+unset STUB_COMPARE_STATUS
 
 # Every enumerated caller ahead of the release is a clean no-op, not a
 # failure and not a proposal: the tree stays clean for a later step.
+export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-all-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 sed -i -E "s|# v0\.9\.1\$|# c136b27 2026-09-09|" "$repo"/components/claude-lanes/*.yml
@@ -513,6 +575,7 @@ assert_exit 'apply: every caller ahead exits 0' 0 "$rc"
 assert_contains 'apply: every caller ahead reports changed=false' "$(cat "$out_file")" 'changed=false'
 assert_contains 'apply: every caller ahead is a notice' "$out" 'ahead of v0.9.2; nothing to propose'
 assert_silent 'apply: every caller ahead leaves the tree clean' "$(git -C "$repo" status --porcelain)"
+unset STUB_COMPARE_STATUS
 
 # The date is the comparison's whole basis, so a missing or malformed one is
 # refused before any file is touched.
