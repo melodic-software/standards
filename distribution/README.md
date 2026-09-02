@@ -83,8 +83,10 @@ Native adoption remains authoritative where it naturally lives:
 
 - package and `extends` references in consumer manifests;
 - actions and reusable workflows in consumer workflow files, with the
-  Claude review-lane callers as the recorded exception (see
-  [Claude review-lane caller components](#claude-review-lane-caller-components));
+  Claude review-lane callers and the managed-files-guard caller as the
+  recorded exceptions (see
+  [Claude review-lane caller components](#claude-review-lane-caller-components)
+  and [managed-files-guard caller component](#managed-files-guard-caller-component));
 - repository governance in the relevant `github-iac` repository;
 - repository reachability and App access in live GitHub state.
 
@@ -183,7 +185,8 @@ requests. The report tells you which entries moved.
    component.
 3. Add native packages, local adapters, workflow callers (other than the
    sync-managed
-   [Claude review-lane callers](#claude-review-lane-caller-components)),
+   [Claude review-lane callers](#claude-review-lane-caller-components) and
+   [managed-files-guard caller](#managed-files-guard-caller-component)),
    permissions, and the CI gateway in the consumer repository where those
    executable facts belong.
 4. Review the generated materialization PR and verify CI.
@@ -271,8 +274,9 @@ not a general workload runner or fallback. During migration the legacy unroutabl
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
 each consumer. The
-[Claude review-lane callers](#claude-review-lane-caller-components) are the
-one recorded exception to that workflow-shape rule. A materialization PR is
+[Claude review-lane callers](#claude-review-lane-caller-components) and the
+[managed-files-guard caller](#managed-files-guard-caller-component) are the
+two recorded exceptions to that workflow-shape rule. A materialization PR is
 not an adoption completion signal until its corresponding integration PR
 supplies this wiring and CI passes.
 
@@ -367,6 +371,30 @@ reusable routing kind in runner-policy, a deliberate narrowing of the blanket
 public-target test for `components/claude-lanes/`, and either absorbing
 claude-code-plugins' repo-owned `security-review-evidence` guard into the
 reusable or accepting that caller stays `locally-owned`.
+
+## managed-files-guard caller component
+
+`managed-files-guard-caller` materializes the thin hosted-only caller for the
+`ci-workflows` `managed-files-guard` composite action at
+`.github/workflows/managed-files-guard.yml`. The action fails a consumer pull
+request that hand-edits one of that repository's managed destinations, which
+is the signal ADR-0007 assigned to a downstream edit of a managed file. It is
+the second recorded exception to the consumer-owned-caller rule, on the same
+grounds as the first: the guard is a fleet signal only if every target runs
+the same caller at the same pin.
+
+The caller runs on the approved hosted label directly, with no selector, so
+it is `managed` for the hosted-only-eligible targets (the public targets plus
+`claude-code-proxy`, private but not enrolled for local routing) and
+deliberately NOT for the four selector-enrolled private targets (`dotfiles`,
+`github-iac`, `medley`, `provisioning`), where runner-policy requires a
+selector route for every read-only job; those take a selector-routed sibling
+in a second hop. `ci-workflows` is `locally-owned`: it hosts the action and
+already runs the guard from its own tree. The check is advisory (not in any
+`ci-status`) during its soak, and the caller passes `standards-ref: main`
+until the soak completes. Rationale, pins, the advance path through the
+`claude-lanes-repin` cascade, and the promotion record live in
+[`components/managed-files-guard/README.md`](../components/managed-files-guard/README.md).
 
 ## Review-instructions reconciliation (medley)
 

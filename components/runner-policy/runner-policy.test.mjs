@@ -9034,3 +9034,54 @@ test("a selector-routed claude lane caller is rejected outright on a public cons
     );
   }
 });
+
+// The managed-files-guard caller is the hosted-only counterpart: a fixed
+// approved hosted label, a read-only token, and a full-SHA composite-action
+// step (composite actions are not SHA-allowlisted, so no contract entry is
+// involved). It is managed for public targets and for private targets NOT
+// enrolled for local routing, and one of its managed targets
+// (claude-code-plugins) executes this gate, so the shipped bytes must audit
+// clean under exactly those inventories — and must NOT be admitted to an
+// enrolled private consumer, which is why those targets take a
+// selector-routed sibling instead (components/managed-files-guard/README.md).
+async function managedFilesGuardCaller() {
+  const manifest = parse(
+    await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
+  );
+  const component = "managed-files-guard-caller";
+  const sources = Object.keys(manifest.components[component]?.files ?? {});
+  assert.equal(sources.length, 1, `expected ${component} to ship exactly one file`);
+  const body = await readFile(new URL(`../../${sources[0]}`, import.meta.url), "utf8");
+  return { component, source: sources[0], body, manifest };
+}
+
+test("the managed-files-guard caller audits clean on every target that manages it", async () => {
+  const { component, source, body, manifest } = await managedFilesGuardCaller();
+  const managedTargets = Object.entries(manifest.targets)
+    .filter(([, definition]) => (definition.managed ?? []).includes(component))
+    .map(([target]) => target);
+  assert.ok(managedTargets.length > 0, `expected at least one target to manage ${component}`);
+  for (const target of managedTargets) {
+    const visibility = isPublicTarget(target) ? "public" : "private";
+    const root = await consumerCarrying({ body, visibility, selfHostedCi: false });
+    assert.deepEqual(
+      await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+      [],
+      `${source} is managed for ${target} (${visibility}, hosted-only) but does not audit clean there`,
+    );
+  }
+});
+
+test("the managed-files-guard caller is not admitted to a selector-enrolled private consumer", async () => {
+  const { body, source } = await managedFilesGuardCaller();
+  const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+  const findings = await auditRepository({
+    root,
+    githubRepository: "melodic-software/medley",
+    fetchImpl: HERMETIC_FETCH_STUB,
+  });
+  assert.ok(
+    findings.length > 0,
+    `${source} audits clean for an enrolled private consumer; the selector-routed second hop may be unnecessary — revisit the hosted-only exclusion deliberately`,
+  );
+});

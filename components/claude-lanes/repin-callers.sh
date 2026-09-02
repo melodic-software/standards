@@ -6,8 +6,8 @@
 #
 # Two subcommands, matching the workflow's two steps:
 #
-#   repin-callers.sh resolve <owner/repo>   newest release -> tag + commit SHA
-#   repin-callers.sh apply <tag> <sha>      rewrite the caller pins
+#   repin-callers.sh resolve <owner/repo>       newest release -> tag, SHA, date
+#   repin-callers.sh apply <tag> <sha> <date>   rewrite the caller pins
 #
 # Both report through GITHUB_OUTPUT (`key=value`, the Actions convention), so
 # a test sets that variable to a scratch file and reads the result the same
@@ -22,24 +22,36 @@ set -euo pipefail
 # asserts against them.
 readonly LANE_DIR='components/claude-lanes'
 
-# Sync-family and repo-local callers live outside LANE_DIR. They may already
-# pin a different SHA than the lane components; apply reads each file's own
-# pin rather than assuming one fleet-wide old SHA.
+# Sync-family and repo-local callers, plus the one other sync-managed caller
+# component, live outside LANE_DIR. They may already pin a different SHA than
+# the lane components; apply reads each file's own pin rather than assuming
+# one fleet-wide old SHA. The managed-files-guard caller pins a composite
+# ACTION rather than a reusable workflow: it rides this cascade for the pin
+# rewrite alone and has no runner-policy contract for the lockstep half to
+# copy forward (components/managed-files-guard/README.md).
 readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
   '.github/workflows/sync.yml'
   '.github/workflows/standards-sync-stuck-automerge-alert.yml'
+  'components/managed-files-guard/managed-files-guard.yml'
 )
 
 # Any `uses:` reference to a ci-workflows reusable workflow or composite action
 # pinned by 40-character commit SHA.
 readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
+# The pin-comment convention's fallback form (`# <short-sha> <YYYY-MM-DD>`),
+# which a pin to an as-yet-unreleased commit carries. The date is provenance
+# for humans; apply decides "ahead of the release" from GitHub compare
+# ancestry against the release SHA, not from that date.
+readonly FALLBACK_PIN_RE="${PIN_RE}[[:space:]]+# [0-9a-f]{7,40} [0-9]{4}-[0-9]{2}-[0-9]{2}"
+readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+readonly UPSTREAM_REPO='melodic-software/ci-workflows'
 
 usage() {
   cat >&2 <<'USAGE'
 usage:
-  repin-callers.sh resolve <owner/repo>   resolve the newest release to tag + SHA
-  repin-callers.sh apply <tag> <sha>      re-pin the lane callers to tag/SHA
+  repin-callers.sh resolve <owner/repo>       resolve the newest release to tag, SHA, and commit date
+  repin-callers.sh apply <tag> <sha> <date>   re-pin the callers to tag/SHA; <date> is that commit's YYYY-MM-DD
 
 Requires GITHUB_OUTPUT to name a writable file; `resolve` also requires gh.
 USAGE
@@ -76,7 +88,7 @@ require_output_file() {
 # dependence on commit chronology.
 repin::resolve() {
   local upstream="$1"
-  local err releases tag ref object_type object_sha sha
+  local err releases tag ref object_type object_sha sha date
 
   err="$(mktemp)"
   # shellcheck disable=SC2064  # expand $err now: the trap must survive it going out of scope
@@ -144,23 +156,97 @@ repin::resolve() {
     return 1
   fi
 
-  echo "Resolved ${tag} (${object_type} object) to ${sha}."
+  # The release commit's own date, in the same YYYY-MM-DD shape a fallback-form
+  # pin comment records for the commit IT names, so apply can compare the two.
+  # Committer date, not author date: it is when the commit entered history,
+  # which is the ordering a "does this release contain that commit" question
+  # approximates.
+  date="$(gh api "repos/${upstream}/commits/${sha}" --jq '.commit.committer.date')"
+  date="${date:0:10}"
+  if [[ ! "$date" =~ $DATE_RE ]]; then
+    echo "::error::Commit ${sha} reported committer date '${date}', which is not YYYY-MM-DD." >&2
+    return 1
+  fi
+
+  echo "Resolved ${tag} (${object_type} object) to ${sha} (${date})."
   {
     echo 'resolved=true'
     echo "tag=${tag}"
     echo "sha=${sha}"
+    echo "date=${date}"
   } >> "$GITHUB_OUTPUT"
 }
 
-# repin::apply <tag> <sha>
+# repin::compare_status <release-sha> <pin-sha>
+#
+# Prints GitHub's compare `status` of <release-sha>... <pin-sha> on the
+# upstream repo (https://docs.github.com/en/rest/commits/commits#compare-two-commits):
+#   ahead     — pin has commits the release does not; rewriting would downgrade
+#   diverged  — neither is an ancestor of the other; same downgrade risk
+#   behind    — pin is an ancestor of the release; the release contains it
+#   identical — pin *is* the release
+# A failed lookup is fatal: guessing "not ahead" would rewrite, which is the
+# downgrade this fence exists to prevent.
+repin::compare_status() {
+  local release_sha="$1" pin_sha="$2" status err
+  err="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$err'" RETURN
+  if ! status="$(gh api "repos/${UPSTREAM_REPO}/compare/${release_sha}...${pin_sha}" \
+    --jq .status 2>"$err")"; then
+    echo "::error::Could not compare ${release_sha}...${pin_sha} on ${UPSTREAM_REPO}." >&2
+    cat "$err" >&2
+    return 1
+  fi
+  printf '%s\n' "$status"
+}
+
+# repin::ahead_of <file> <release-sha>
+#
+# Prints the SHA of a fallback-form pin in <file> that is not an ancestor of
+# <release-sha> (compare status `ahead` or `diverged`), or nothing. Tag-form
+# pins never match: a release is the newest of its line by construction of
+# `resolve`. Day-level pin-comment dates are not consulted — same-day pins
+# and cross-branch timestamps cannot prove containment.
+repin::ahead_of() {
+  local file="$1" release_sha="$2" pin_line pin_sha status
+  while IFS= read -r pin_line; do
+    [[ -n "$pin_line" ]] || continue
+    pin_sha="$(sed -nE 's/.*@([0-9a-fA-F]{40}).*/\1/p' <<<"$pin_line" | head -n1)"
+    [[ -n "$pin_sha" ]] || continue
+    # Not `|| return 1`: that form is SC2310 (set -e suppressed in ||).
+    # compare_status already failed-loud; with set -e the assignment exits.
+    status="$(repin::compare_status "$release_sha" "$pin_sha")"
+    case "$status" in
+      ahead | diverged)
+        echo "$pin_sha"
+        return 0
+        ;;
+      behind | identical) ;;
+      *)
+        echo "::error::compare ${release_sha}...${pin_sha} returned '${status}', not a documented status." >&2
+        return 1
+        ;;
+    esac
+  done < <(grep -hE "$FALLBACK_PIN_RE" "$file" || true)
+}
+
+# repin::apply <tag> <sha> <date>
 #
 # Emits changed=false and exits 0 when the callers already carry <sha>/<tag>;
 # emits changed=true plus old-tags and version-note otherwise, leaving the
-# rewritten files in the working tree for the caller to commit.
+# rewritten files in the working tree for the caller to commit. A file whose
+# fallback-form pin is not an ancestor of <sha> is ahead of the release and
+# is left untouched (see repin::ahead_of); it is reported, never rewritten.
 repin::apply() {
-  local tag="$1" sha="$2"
-  local root expected rewritten old_sha old_tags new_major old_major old_tag note delim
-  local -a targets excludes
+  local tag="$1" sha="$2" release_date="$3"
+  local root expected rewritten old_sha old_tags new_major old_major old_tag note ahead_sha ahead_list delim
+  local -a targets rewrite ahead excludes
+
+  if [[ ! "$release_date" =~ $DATE_RE ]]; then
+    echo "::error::Release date '${release_date}' is not YYYY-MM-DD." >&2
+    return 2
+  fi
 
   root="$(git rev-parse --show-toplevel)"
   cd "$root"
@@ -193,21 +279,41 @@ repin::apply() {
     fi
   done
 
+  # Split the enumerated set into files this release may advance and files
+  # already ahead of it. The split is per file: every enumerated caller pins
+  # one ci-workflows revision, so a file is either behind the release or not.
+  rewrite=()
+  ahead=()
+  for file in "${targets[@]}"; do
+    ahead_sha="$(repin::ahead_of "$file" "$sha")"
+    if [[ -n "$ahead_sha" ]]; then
+      echo "::notice::${file} pins ${ahead_sha}, not an ancestor of ${tag} (${sha}); left as is."
+      ahead+=("$file")
+    else
+      rewrite+=("$file")
+    fi
+  done
+  if [[ "${#rewrite[@]}" -eq 0 ]]; then
+    echo "::notice::Every enumerated caller is ahead of ${tag}; nothing to propose."
+    echo 'changed=false' >> "$GITHUB_OUTPUT"
+    return 0
+  fi
+
   # grep exits 1 on no match, which pipefail would turn into a failed
   # assignment under errexit; `|| true` keeps the count (0) and drops the exit.
-  expected="$(grep -hoE "$PIN_RE" "${targets[@]}" | wc -l || true)"
-  # Unique old SHAs across every enumerated file — do not collapse to the
+  expected="$(grep -hoE "$PIN_RE" "${rewrite[@]}" | wc -l || true)"
+  # Unique old SHAs across every rewritten file — do not collapse to the
   # first pin. The workflow passes this unique-set to lockstep, which accepts
   # one SHA or a comma-separated list and still reads each caller file.
-  old_sha="$(grep -hoE '@[0-9a-fA-F]{40}' "${targets[@]}" \
-    | tr '[:upper:]' '[:lower:]' | tr -d '@' | sort -u | paste -sd, - || true)"
-  old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${targets[@]}" \
+  old_sha="$(grep -hoE "$PIN_RE" "${rewrite[@]}" \
+    | grep -oE '[0-9a-fA-F]{40}$' | tr '[:upper:]' '[:lower:]' | sort -u | paste -sd, - || true)"
+  old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${rewrite[@]}" \
     | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
 
   sed -i -E "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${sha} # ${tag}|" \
-    "${targets[@]}"
+    "${rewrite[@]}"
 
-  rewritten="$(grep -hoE "${PIN_RE}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  rewritten="$(grep -hoE "${PIN_RE}[[:space:]]+# ${tag}\$" "${rewrite[@]}" | wc -l || true)"
   if [[ "$expected" -eq 0 || "$expected" -ne "$rewritten" ]]; then
     echo "::error::Expected ${expected} ci-workflows pins to carry '@${sha} # ${tag}'; ${rewritten} do." >&2
     return 1
@@ -226,7 +332,7 @@ repin::apply() {
     return 1
   fi
 
-  if git diff --quiet -- "${targets[@]}"; then
+  if git diff --quiet -- "${rewrite[@]}"; then
     echo "::notice::Enumerated callers already pin ${tag}; nothing to propose."
     echo 'changed=false' >> "$GITHUB_OUTPUT"
     return 0
@@ -246,6 +352,12 @@ repin::apply() {
 > **Major-version jump** from \`${old_tags}\` to \`${tag}\`. This is not a drop-in bump: read the upstream release notes for breaking changes to the lane callers' inputs, secrets, and required check names before merging."
   else
     note="Same major version as the pin it replaces (\`${old_tags}\` to \`${tag}\`)."
+  fi
+  if [[ "${#ahead[@]}" -gt 0 ]]; then
+    ahead_list="$(printf "\`%s\`, " "${ahead[@]}")"
+    note+="
+
+Left untouched because their pinned commit is not an ancestor of ${tag} (${sha}): ${ahead_list%, }. Those pins advance on the first release that contains them."
   fi
 
   # A random heredoc delimiter, per GitHub's own multi-line output guidance:
@@ -270,9 +382,9 @@ main() {
       repin::resolve "$2"
       ;;
     apply)
-      [[ $# -eq 3 ]] || { usage; exit 2; }
+      [[ $# -eq 4 ]] || { usage; exit 2; }
       require_output_file
-      repin::apply "$2" "$3"
+      repin::apply "$2" "$3" "$4"
       ;;
     *)
       usage
