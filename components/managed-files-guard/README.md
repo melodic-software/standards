@@ -148,6 +148,22 @@ Two properties of that ride are deliberate:
   unresolvable manifest, no-ops when the repository is not a manifest target,
   and needs only `contents: read` (standards is public; the checkout of it
   uses the job's ambient token with `persist-credentials: false`).
+- **The `actions/checkout` pin.** Unlike the Claude lane callers, this file
+  carries a third-party action pin, and two consequences follow. In this
+  repository, Dependabot's `github-actions` ecosystem scans
+  `.github/workflows/` only, so the component's checkout pin never moves on
+  its own; the contract test asserts it equals the sibling workflows' pin, so
+  a Dependabot bump of those workflows fails the `actionlint` lane until the
+  component follows in the same change. That is the checkout advance path,
+  and it is deliberate lockstep, not friction to remove. In a consumer, its
+  own Dependabot will propose bumping `actions/checkout` inside the managed
+  file; that pull request is precisely the hand-edit the guard reports, and
+  the next sync reverts it. Expect that finding class during the soak, and
+  classify it as structural rather than as a downstream defect. Before
+  promotion, resolve it one of two ways: the action absorbs the consumer
+  checkout (so the caller carries no third-party pin at all), or the fleet
+  Dependabot posture for managed callers is settled in `github-iac`. Neither
+  belongs to this hop.
 
 ## Verification
 
