@@ -24,6 +24,58 @@
 # earliest writable PATH directory that precedes the daemon. That makes the
 # pinned toolchain win for a bare `node` invocation without depending on nvm
 # being sourced in every shell.
+#
+# Engine version+SHA-256 pins stay in lockstep with the ci-workflows composite
+# action defaults at the SHA `ci.yml` already pins. `.cursor/install.test.sh`
+# fetches those action.yml files and fails on drift.
+
+# cursor_install::choose_link_dir <node-bin-dir>
+# Print the first writable PATH directory that precedes /exec-daemon and is
+# not the nvm bin dir itself. nvm use prepends that dir; GNU ln then treats a
+# self-link as an error and, under set -e, aborts before npm ci / engines.
+cursor_install::choose_link_dir() {
+  local node_bin="$1" dir="" saved_ifs="$IFS"
+  IFS=:
+  for dir in $PATH; do
+    case "$dir" in
+      /exec-daemon | /exec-daemon/*) break ;;
+      *) : ;;
+    esac
+    [[ -d "$dir" ]] || continue
+    if [[ "$dir" -ef "$node_bin" ]]; then
+      continue
+    fi
+    if [[ -w "$dir" ]] || sudo -n test -w "$dir" 2>/dev/null; then
+      printf '%s\n' "$dir"
+      IFS="$saved_ifs"
+      return 0
+    fi
+  done
+  IFS="$saved_ifs"
+}
+
+# cursor_install::link_bins <node-bin-dir> <link-dir>
+# Symlink node/npm/npx into link-dir, skipping a pair that already is the
+# same inode so GNU ln cannot abort the install.
+cursor_install::link_bins() {
+  local node_bin="$1" link_dir="$2" bin
+  for bin in node npm npx; do
+    if [[ -e "$link_dir/$bin" && "$link_dir/$bin" -ef "$node_bin/$bin" ]]; then
+      continue
+    fi
+    if [[ -w "$link_dir" ]]; then
+      ln -sf "$node_bin/$bin" "$link_dir/$bin"
+    else
+      sudo ln -sf "$node_bin/$bin" "$link_dir/$bin"
+    fi
+  done
+}
+
+# Sourced by .cursor/install.test.sh for the PATH-link helpers only.
+if [[ "${CURSOR_INSTALL_LIBONLY:-}" == 1 ]]; then
+  return 0
+fi
+
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -56,34 +108,9 @@ fi
 # --- Make the pinned node win on PATH ---------------------------------------
 # Link node/npm/npx into the first writable PATH directory that comes before
 # /exec-daemon, whose bundled node would otherwise shadow the pinned one.
-link_dir=""
-saved_ifs="$IFS"
-IFS=:
-for dir in $PATH; do
-  case "$dir" in
-    /exec-daemon | /exec-daemon/*) break ;;
-    *) : ;;
-  esac
-  [[ -d "$dir" ]] || continue
-  if [[ -w "$dir" ]]; then
-    link_dir="$dir"
-    break
-  fi
-  if sudo -n test -w "$dir" 2>/dev/null; then
-    link_dir="$dir"
-    break
-  fi
-done
-IFS="$saved_ifs"
-
+link_dir="$(cursor_install::choose_link_dir "$node_bin_dir")"
 if [[ -n "$link_dir" ]]; then
-  for bin in node npm npx; do
-    if [[ -w "$link_dir" ]]; then
-      ln -sf "$node_bin_dir/$bin" "$link_dir/$bin"
-    else
-      sudo ln -sf "$node_bin_dir/$bin" "$link_dir/$bin"
-    fi
-  done
+  cursor_install::link_bins "$node_bin_dir" "$link_dir"
   hash -r
   log "linked pinned node/npm/npx into $link_dir"
 else
