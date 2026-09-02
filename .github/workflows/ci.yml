@@ -583,6 +583,11 @@ jobs:
       # in the one job that has the pinned engine installed.
       - name: Test claude lane caller components
         run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
+      # Same shape, same reason: the managed-files-guard caller is workflow
+      # bytes that live outside .github/workflows until a sync materializes
+      # them, so the consumer entrypoint runs over them here too.
+      - name: Test the managed-files-guard caller component
+        run: bash harness/shell/run-tests.sh components/managed-files-guard/managed-files-guard.test.sh
       # Behavioral coverage for the scheduled re-pin job's logic. It needs no
       # yq and no actionlint — it lives in this job because this is where the
       # rest of the claude-lanes coverage already runs, keeping one lane
@@ -607,13 +612,14 @@ jobs:
     #
     # `.` audits this repo's own workflows only: zizmor discovers workflow
     # definitions by their `.github/workflows` location, so the workflow BYTES
-    # under components/claude-lanes/ — which become consumers'
-    # .github/workflows/ files — are invisible to a repo-root scan. They are
-    # named explicitly so the lane audits what it ships.
+    # under components/claude-lanes/ and components/managed-files-guard/ —
+    # which become consumers' .github/workflows/ files — are invisible to a
+    # repo-root scan. They are named explicitly so the lane audits what it
+    # ships.
     uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
     with:
       runner: ubuntu-24.04
-      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml
+      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml
       fail-on-severity: high
 
   osv-scanner:
@@ -946,12 +952,13 @@ jobs:
         # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
         # already tolerates a glob with no current matches).
         #
-        # components/claude-lanes/ holds workflow BYTES that ship to consumers'
-        # .github/workflows/. Every workflow-shaped lane in this repo discovers
-        # files by that location, so the caller components are invisible to all
-        # of them; scanning them here keeps their pins under the same convention
-        # the files they become are held to.
-        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml
+        # components/claude-lanes/ and components/managed-files-guard/ hold
+        # workflow BYTES that ship to consumers' .github/workflows/. Every
+        # workflow-shaped lane in this repo discovers files by that location,
+        # so the caller components are invisible to all of them; scanning them
+        # here keeps their pins under the same convention the files they
+        # become are held to.
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml components/managed-files-guard/*.yml
       - name: Pin-comment-convention contract test
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 

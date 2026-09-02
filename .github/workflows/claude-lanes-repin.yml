@@ -97,7 +97,11 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
           SHA: ${{ steps.release.outputs.sha }}
-        run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA"
+          # Still required by apply's argv (malformed dates fail closed).
+          # Ahead-of-release is decided by GitHub compare ancestry of SHA
+          # against the fallback pin, not by this date.
+          DATE: ${{ steps.release.outputs.date }}
+        run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA" "$DATE"
 
       # repin-policy-lockstep.mjs imports components/runner-policy/runner-policy.mjs,
       # which imports `ajv` and `yaml` from that component's own package.json.
@@ -193,6 +197,7 @@ jobs:
           base: ${{ steps.default-branch.outputs.name }}
           add-paths: |
             components/claude-lanes
+            components/managed-files-guard
             components/runner-policy/policy.json
             components/runner-policy/runner-policy.test.mjs
             .github/workflows/claude-review.yml
@@ -207,7 +212,9 @@ jobs:
             ## Summary
 
             Re-pins every `melodic-software/ci-workflows` reference under
-            `components/claude-lanes/` from `${{ steps.repin.outputs.old-tags }}`
+            `components/claude-lanes/`, the `managed-files-guard` caller
+            component, and this repository's own sync-family callers from
+            `${{ steps.repin.outputs.old-tags }}`
             to `${{ steps.release.outputs.tag }}`
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
             release. Opened by `.github/workflows/claude-lanes-repin.yml`.
@@ -218,11 +225,11 @@ jobs:
 
             ${{ steps.policy-lockstep.outputs.policy-note }}
 
-            Merging this cascades: `sync.yml` re-materializes the lane callers
+            Merging this cascades: `sync.yml` re-materializes the callers
             into every target `distribution/sync-manifest.yml` marks
-            `claude-review-caller` / `claude-security-review-caller` managed
-            for, as a reviewed pull request per target. This pull request is
-            never auto-merged.
+            `claude-review-caller` / `claude-security-review-caller` /
+            `managed-files-guard-caller` managed for, as a reviewed pull
+            request per target. This pull request is never auto-merged.
 
             ## Test plan
 

@@ -225,6 +225,32 @@ components:
   lychee:
     files:
       lychee.toml: lychee.toml
+  # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
+  # hosted-only workflow calling the ci-workflows `managed-files-guard`
+  # composite action, which fails a consumer PR that hand-edits one of that
+  # repository's managed destinations. The second recorded exception to the
+  # workflow-caller exclusion in README.md, for the same reason as the first:
+  # the guard is only a fleet signal if every target carries the same caller
+  # at the same pin, and the sync is the one mechanism that holds that.
+  #
+  # FIRST HOP — hosted-only-eligible targets only. The caller's `runs-on` is
+  # the approved hosted label directly, which runner-policy admits on a
+  # public repository and on a private one not enrolled for local routing.
+  # Deliberate exclusions this hop, with their removal trigger:
+  # - dotfiles, github-iac, medley, provisioning: private targets enrolled
+  #   for selector routing (each manages `runner-policy` with a
+  #   selector-routed lane caller), where a fixed hosted read-only job fails
+  #   the runner-policy gate. They take a selector-routed sibling component
+  #   in the second hop; trigger: that sibling landing.
+  # - ci-workflows: `locally-owned` — it hosts the action and already runs
+  #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
+  #   pinned to its own commit), so a second caller would double the check.
+  # - standards: manifest source, not a target.
+  # Not in `ci-status` anywhere during soak; promotion is per-target and
+  # recorded in components/managed-files-guard/README.md.
+  managed-files-guard-caller:
+    files:
+      components/managed-files-guard/managed-files-guard.yml: .github/workflows/managed-files-guard.yml
   markdownlint:
     files:
       .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
@@ -307,6 +333,7 @@ targets:
       - editorconfig-checker
       - gitleaks
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
       - repository-text
@@ -323,6 +350,7 @@ targets:
       - editorconfig-checker
       - gitleaks
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - repository-text
       - typos
@@ -343,6 +371,7 @@ targets:
       - gitleaks
       - go-analysis
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
       - repository-text
@@ -370,12 +399,20 @@ targets:
       - review-instructions
       - shellcheck
       - typos
+    # ci-workflows hosts the managed-files-guard action and already runs it
+    # as a job of its own ci.yml, through a `./` action ref that resolves to
+    # the commit under test. A synced caller pinned to an older commit would
+    # run the guard twice per PR, once at each revision. Removal trigger:
+    # ci-workflows retiring its in-repo job in favor of the synced caller.
+    locally-owned:
+      - managed-files-guard-caller
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
       - editorconfig-checker
       - gitleaks
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - node-runtime
       - path-detection-guardrails
@@ -450,6 +487,7 @@ targets:
       - lefthook-powershell
       - lefthook-python
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - node-runtime
       - psscriptanalyzer
@@ -480,6 +518,7 @@ targets:
       - editorconfig-checker
       - gitleaks
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
       - repository-text
@@ -490,6 +529,7 @@ targets:
       - editorconfig-checker
       - gitleaks
       - lychee
+      - managed-files-guard-caller
       - markdownlint
       - repository-text
       - typos
