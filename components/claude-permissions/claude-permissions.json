@@ -340,7 +340,6 @@
       "Read(**/*.ppk)",
       "Read(**/.azure-cli/**)",
       "Read(**/.claude.json)",
-      "Read(**/.claude/settings.local.json)",
       "Read(**/.credentials.json)",
       "Read(**/.env)",
       "Read(**/.env.*)",
@@ -359,11 +358,11 @@
       "Read(**/secrets.json)",
       "Read(**/secrets/**)",
       "Read(.azure-cli/**)",
-      "Read(.claude/settings.local.json)",
       "Read(.env)",
       "Read(.env.*)",
       "Read(secrets.json)",
-      "Read(secrets/**)"
+      "Read(secrets/**)",
+      "Read(~/.claude.json)"
     ],
     "withdraw": [
       "Bash(git branch --list *)",

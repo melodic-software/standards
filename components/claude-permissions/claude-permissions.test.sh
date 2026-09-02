@@ -80,4 +80,35 @@ for pattern in "${required_lefthook_denies[@]}"; do
   fi
 done
 
+# .claude.json is the official credential store (sign-in session, MCP config).
+# Relative `**/` only matches at/under the session cwd; `~/` is the home
+# anchor that covers the real file from a project directory. Both must stay.
+# settings.local.json is personal overrides, not a credential store, and a
+# Read deny also blocks Edit — those rows must not return.
+required_read_denies=(
+  'Read(**/.claude.json)'
+  'Read(~/.claude.json)'
+)
+for pattern in "${required_read_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required .claude.json Read deny"
+  fi
+done
+
+forbidden_read_denies=(
+  'Read(**/.claude/settings.local.json)'
+  'Read(.claude/settings.local.json)'
+)
+for pattern in "${forbidden_read_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    fail "deny omits $pattern" "settings.local.json Read deny must stay retired"
+  else
+    pass "deny omits $pattern"
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
