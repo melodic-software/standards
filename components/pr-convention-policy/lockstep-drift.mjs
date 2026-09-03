@@ -117,21 +117,32 @@ export function parseMarkdownHeadings(markdownText) {
 // pattern and probe it with every policy keyword/marker. A keyword that
 // survives only in a comment or error message no longer passes.
 export function parseGatePatterns(workflowText, location) {
-  // Flags on the DECLARATION are not part of the contract being checked: only the
-  // pattern body is extracted, and both probes below are constructed with "i"
-  // regardless. Pinning the match to a literal `/i;` therefore asserted an
-  // incidental detail, and ci-workflows making CLOSING_KEYWORD global (`/gi;`, so
-  // every occurrence on a line can be classified) turned a healthy gate into
+  // Accept any declared flag set rather than a literal `/i;`: ci-workflows made
+  // CLOSING_KEYWORD global (`/gi;`, so every occurrence on a line can be
+  // classified) and the old literal match turned a healthy gate into
   // "declarations not found" — a parse failure wearing a drift error's clothes.
-  // Accept any flag set; drift is still caught functionally by probing the body.
-  const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/[dgimsuvy]*;/);
-  const marker = workflowText.match(/const NO_ISSUE_MARKER =\s*\/(.+)\/[dgimsuvy]*;/);
+  //
+  // Flags are CAPTURED, not discarded, because they are behavior. Both bodies are
+  // lowercase and depend on `i` to accept the documented `Closes #12`; rebuilding
+  // the probe with a hardcoded `i` would silently pass a gate that had dropped it
+  // and become case-sensitive, which is exactly the enforcement drift this check
+  // exists to catch. `g` and `y` are the one exception, stripped below.
+  const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/([dgimsuvy]*);/);
+  const marker = workflowText.match(/const NO_ISSUE_MARKER =\s*\/(.+)\/([dgimsuvy]*);/);
   if (!keyword || !marker) {
     throw new DriftError(
       `${location}: CLOSING_KEYWORD / NO_ISSUE_MARKER regex declarations not found`,
     );
   }
-  return { keyword: new RegExp(keyword[1], "i"), marker: new RegExp(marker[1], "i") };
+  // `g` and `y` make `.test()` stateful via lastIndex, and assertPatternsEnforce
+  // probes each pattern once per policy keyword, so a retained `g` would make
+  // every probe after the first read a moved cursor instead of the pattern.
+  // Neither flag changes WHAT the pattern matches, so dropping them is safe.
+  const probeFlags = (flags) => flags.replaceAll(/[gy]/g, "");
+  return {
+    keyword: new RegExp(keyword[1], probeFlags(keyword[2])),
+    marker: new RegExp(marker[1], probeFlags(marker[2])),
+  };
 }
 
 // The hook validator's enforcement is a pair of POSIX ERE strings; translate

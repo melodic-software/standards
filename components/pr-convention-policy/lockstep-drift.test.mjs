@@ -185,17 +185,41 @@ test("caller roster covers all ten gate repositories", () => {
 // Regression: ci-workflows made CLOSING_KEYWORD global so every occurrence on a
 // line can be classified. The parser pinned the declaration to a literal `/i;`,
 // so a healthy gate reported "declarations not found" — a parse failure that
-// reads as drift. Flags are not part of the contract: only the body is
-// extracted, and both probes are built with "i" either way.
-test("declaration flags are not part of the contract", () => {
+// reads as drift.
+test("a global declaration parses and still probes", () => {
   const globalGate = GOOD_GATE.replaceAll("/i;", "/gi;");
   const patterns = parseGatePatterns(globalGate, "gate");
   assert.ok(patterns.keyword.test("Closes #12"), "keyword body still probes");
   assert.ok(patterns.marker.test("No linked issue"), "marker body still probes");
-  assert.equal(patterns.keyword.global, false, "probe is rebuilt with i only");
+  assert.equal(patterns.keyword.global, false, "g is stripped so .test() is stateless");
   assert.deepEqual(
     parseGatePatterns(globalGate, "gate").keyword.source,
     parseGatePatterns(GOOD_GATE, "gate").keyword.source,
     "same body extracted regardless of declared flags",
   );
+});
+
+// Tolerating flags must not blind the check to losing one. Both declared bodies
+// are lowercase and rely on `i` to accept the documented `Closes #12`, so a gate
+// that dropped `i` would silently become case-sensitive. Probing with a
+// hardcoded `i` would pass it; probing with the DECLARED flags catches it.
+test("a gate that drops the i flag is enforcement drift, not a pass", () => {
+  const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
+  const patterns = parseGatePatterns(caseSensitiveGate, "gate");
+  assert.equal(patterns.keyword.ignoreCase, false, "declared flags are preserved");
+  assert.equal(patterns.keyword.test("Closes #12"), false, "capitalised form now rejected");
+  const texts = goodTexts();
+  texts.gate = caseSensitiveGate;
+  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate reusable (enforcement"));
+  assert.equal(errors.length, 1, "drift is reported");
+  assert.match(errors[0], /closing keyword "Closes"/);
+});
+
+// `g`/`y` are stripped because they make .test() advance lastIndex, and
+// assertPatternsEnforce probes each pattern once per policy keyword.
+test("a global probe does not go stateful across repeated keyword probes", () => {
+  const patterns = parseGatePatterns(GOOD_GATE.replaceAll("/i;", "/gi;"), "gate");
+  for (const keyword of POLICY.body.closingKeywords) {
+    assert.ok(patterns.keyword.test(` ${keyword} #12 `), `${keyword} probes on every call`);
+  }
 });
