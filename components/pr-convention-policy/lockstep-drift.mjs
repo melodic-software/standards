@@ -117,8 +117,15 @@ export function parseMarkdownHeadings(markdownText) {
 // pattern and probe it with every policy keyword/marker. A keyword that
 // survives only in a comment or error message no longer passes.
 export function parseGatePatterns(workflowText, location) {
-  const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/i;/);
-  const marker = workflowText.match(/const NO_ISSUE_MARKER = \/(.+)\/i;/);
+  // Flags on the DECLARATION are not part of the contract being checked: only the
+  // pattern body is extracted, and both probes below are constructed with "i"
+  // regardless. Pinning the match to a literal `/i;` therefore asserted an
+  // incidental detail, and ci-workflows making CLOSING_KEYWORD global (`/gi;`, so
+  // every occurrence on a line can be classified) turned a healthy gate into
+  // "declarations not found" — a parse failure wearing a drift error's clothes.
+  // Accept any flag set; drift is still caught functionally by probing the body.
+  const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/[dgimsuvy]*;/);
+  const marker = workflowText.match(/const NO_ISSUE_MARKER =\s*\/(.+)\/[dgimsuvy]*;/);
   if (!keyword || !marker) {
     throw new DriftError(
       `${location}: CLOSING_KEYWORD / NO_ISSUE_MARKER regex declarations not found`,

@@ -10,6 +10,7 @@ import {
   DriftError,
   GATE_CALLERS,
   parseCallerPin,
+  parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
   parseValidatorSections,
@@ -179,4 +180,22 @@ test("unparsable sources throw DriftError, never pass silently", () => {
 test("caller roster covers all ten gate repositories", () => {
   assert.equal(Object.keys(GATE_CALLERS).length, 10);
   assert.equal(GATE_CALLERS["ci-workflows"], ".github/workflows/pr-issue-linkage-self.yml");
+});
+
+// Regression: ci-workflows made CLOSING_KEYWORD global so every occurrence on a
+// line can be classified. The parser pinned the declaration to a literal `/i;`,
+// so a healthy gate reported "declarations not found" — a parse failure that
+// reads as drift. Flags are not part of the contract: only the body is
+// extracted, and both probes are built with "i" either way.
+test("declaration flags are not part of the contract", () => {
+  const globalGate = GOOD_GATE.replaceAll("/i;", "/gi;");
+  const patterns = parseGatePatterns(globalGate, "gate");
+  assert.ok(patterns.keyword.test("Closes #12"), "keyword body still probes");
+  assert.ok(patterns.marker.test("No linked issue"), "marker body still probes");
+  assert.equal(patterns.keyword.global, false, "probe is rebuilt with i only");
+  assert.deepEqual(
+    parseGatePatterns(globalGate, "gate").keyword.source,
+    parseGatePatterns(GOOD_GATE, "gate").keyword.source,
+    "same body extracted regardless of declared flags",
+  );
 });
