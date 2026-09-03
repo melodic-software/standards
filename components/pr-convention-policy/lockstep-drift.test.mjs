@@ -66,7 +66,10 @@ test("policy fixture agreement: every good fixture matches policy.json", () => {
 
 test("parsers extract the narrow surfaces", () => {
   assert.deepEqual(parseGateSections(GOOD_GATE, "gate"), POLICY.body.requiredSections);
-  assert.deepEqual(parseValidatorSections(GOOD_VALIDATOR, "validator"), POLICY.body.requiredSections);
+  assert.deepEqual(
+    parseValidatorSections(GOOD_VALIDATOR, "validator"),
+    POLICY.body.requiredSections,
+  );
   assert.deepEqual(parseMarkdownHeadings(GOOD_TEMPLATE), POLICY.body.requiredSections);
   assert.equal(
     parseCallerPin(
@@ -152,7 +155,9 @@ test("validator keyword/marker regressions are caught functionally", () => {
   texts.hookValidator = texts.hookValidator
     .replace("|resolve[sd]?", "")
     .replace("(linked|related)", "(linked)");
-  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("hook validator (enforcement"));
+  const errors = checkCopies(POLICY, texts).filter((e) =>
+    e.includes("hook validator (enforcement"),
+  );
   assert.equal(errors.length, 1);
   assert.match(errors[0], /"Resolves"/);
   assert.match(errors[0], /"No related issue"/);

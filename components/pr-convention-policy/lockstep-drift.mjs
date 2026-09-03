@@ -26,15 +26,21 @@ import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
 const MODULE_DIRECTORY = import.meta.dirname;
 const POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
-const RULES_FILE_PATH = path.join(MODULE_DIRECTORY, "..", "..", ".claude", "rules", "pr-body-contract.md");
+const RULES_FILE_PATH = path.join(
+  MODULE_DIRECTORY,
+  "..",
+  "..",
+  ".claude",
+  "rules",
+  "pr-body-contract.md",
+);
 
 // Contents-API URLs, not raw.githubusercontent: four gate callers are private
 // repositories, and the API honors the token `LOCKSTEP_GITHUB_TOKEN` (or
 // `GITHUB_TOKEN`) that the CI lane mints from the org GitHub App. Public
 // sources still resolve unauthenticated.
 const API_BASE = "https://api.github.com/repos/melodic-software";
-const contentsUrl = (repo, ref, filePath) =>
-  `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
+const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
 export const COPY_SOURCES = {
   gate: contentsUrl("ci-workflows", "main", ".github/workflows/pr-issue-linkage.yml"),
   hookValidator: contentsUrl(
@@ -199,7 +205,9 @@ export function checkCopies(policy, texts) {
       throw error;
     }
   };
-  run(() => assertExactSections(parseGateSections(texts.gate, "gate reusable"), sections, "gate reusable"));
+  run(() =>
+    assertExactSections(parseGateSections(texts.gate, "gate reusable"), sections, "gate reusable"),
+  );
   run(() =>
     assertExactSections(
       parseValidatorSections(texts.hookValidator, "hook validator"),
@@ -207,7 +215,9 @@ export function checkCopies(policy, texts) {
       "hook validator",
     ),
   );
-  run(() => assertContainsSections(parseMarkdownHeadings(texts.orgTemplate), sections, "org PR template"));
+  run(() =>
+    assertContainsSections(parseMarkdownHeadings(texts.orgTemplate), sections, "org PR template"),
+  );
   // The rules file names the section headings in prose (backticked, inside
   // bullets), not as its own document headings — a mention check, not a
   // heading parse.
@@ -218,7 +228,9 @@ export function checkCopies(policy, texts) {
       "rules file (sections)",
     ),
   );
-  run(() => assertMentions(texts.rulesFile, policy.body.closingKeywords, "rules file (closing keywords)"));
+  run(() =>
+    assertMentions(texts.rulesFile, policy.body.closingKeywords, "rules file (closing keywords)"),
+  );
   // The rules file is guidance, not enforcement: it must steer agents to at
   // least one accepted opt-out marker, not enumerate every accepted phrasing.
   run(() => {
@@ -230,7 +242,11 @@ export function checkCopies(policy, texts) {
   });
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
-    assertMentions(texts.orgTemplate, policy.body.noIssueMarkers, "org PR template (no-issue markers)"),
+    assertMentions(
+      texts.orgTemplate,
+      policy.body.noIssueMarkers,
+      "org PR template (no-issue markers)",
+    ),
   );
   run(() =>
     assertPatternsEnforce(
@@ -267,7 +283,11 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
     }
   };
   run(() =>
-    assertExactSections(parseGateSections(reusableText, location), policy.body.requiredSections, location),
+    assertExactSections(
+      parseGateSections(reusableText, location),
+      policy.body.requiredSections,
+      location,
+    ),
   );
   run(() => assertPatternsEnforce(parseGatePatterns(reusableText, location), policy, location));
   return errors;
@@ -318,7 +338,9 @@ export async function runLiveCheck() {
       if (!pinTexts.has(sha)) {
         pinTexts.set(
           sha,
-          await fetchText(contentsUrl("ci-workflows", sha, ".github/workflows/pr-issue-linkage.yml")),
+          await fetchText(
+            contentsUrl("ci-workflows", sha, ".github/workflows/pr-issue-linkage.yml"),
+          ),
         );
       }
       errors.push(...checkPinnedReusable(policy, repo, sha, pinTexts.get(sha)));
@@ -332,17 +354,24 @@ export async function runLiveCheck() {
   return errors;
 }
 
+// This block is the CLI entrypoint of a shebang script whose entire contract is
+// what it prints and what it exits with, so stdout/stderr are the interface
+// rather than stray debugging. noConsole is suppressed per call rather than
+// repo-wide, which would blind the rule everywhere else in this component.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
     const errors = await runLiveCheck();
     if (errors.length > 0) {
       for (const message of errors) {
+        // biome-ignore lint/suspicious/noConsole: CLI drift output is this script's interface
         console.error(`drift: ${message}`);
       }
       process.exit(1);
     }
+    // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
     console.log("pr-convention lockstep: all copies and caller pins match policy.json");
   } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
     console.error(error.message);
     process.exit(1);
   }
