@@ -200,9 +200,9 @@ test("a global declaration parses and still probes", () => {
 });
 
 // Tolerating flags must not blind the check to losing one. Both declared bodies
-// are lowercase and rely on `i` to accept the documented `Closes #12`, so a gate
-// that dropped `i` would silently become case-sensitive. Probing with a
-// hardcoded `i` would pass it; probing with the DECLARED flags catches it.
+// are lowercase and rely on `i` to accept the documented capitalised keyword
+// forms, so a gate that dropped `i` would silently become case-sensitive.
+// Probing with a hardcoded `i` would pass it; the DECLARED flags catch it.
 test("a gate that drops the i flag is enforcement drift, not a pass", () => {
   const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
   const patterns = parseGatePatterns(caseSensitiveGate, "gate");

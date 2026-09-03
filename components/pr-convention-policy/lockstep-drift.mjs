@@ -123,9 +123,9 @@ export function parseGatePatterns(workflowText, location) {
   // "declarations not found" — a parse failure wearing a drift error's clothes.
   //
   // Flags are CAPTURED, not discarded, because they are behavior. Both bodies are
-  // lowercase and depend on `i` to accept the documented `Closes #12`; rebuilding
-  // the probe with a hardcoded `i` would silently pass a gate that had dropped it
-  // and become case-sensitive, which is exactly the enforcement drift this check
+  // lowercase and depend on `i` to accept the documented capitalised keyword forms;
+  // rebuilding the probe with a hardcoded `i` would silently pass a gate that had
+  // dropped it and become case-sensitive, which is exactly the enforcement drift this check
   // exists to catch. `g` and `y` are the one exception, stripped below.
   const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/([dgimsuvy]*);/);
   const marker = workflowText.match(/const NO_ISSUE_MARKER =\s*\/(.+)\/([dgimsuvy]*);/);
