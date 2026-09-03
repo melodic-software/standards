@@ -33,7 +33,7 @@ the primary consumer merges the file into a shared template-data namespace) carr
   reachable; the choice was all or nothing, and a rule that stops first-class tools while
   leaving a one-line subprocess read open is not a security boundary. The file still holds
   sign-in session state and MCP server configuration, and that material is now protected by
-  operator judgement rather than by a floor rule that could not express the distinction.
+  operator judgment rather than by a floor rule that could not express the distinction.
   Consumers wanting the old posture can re-add either spelling to their own `deny`.
 
   **`.claude/settings.local.json` is deliberately not on the floor.** Official settings
@@ -46,11 +46,9 @@ the primary consumer merges the file into a shared template-data namespace) carr
   at the repository root even when the session starts in a subdirectory — so the
   coverage was incomplete in the sessions that matter. `Read()` rules are path/glob
   only; there is no JSON-key filter that could keep MCP/OAuth fields denied while
-  exposing `skillUsage` counters. Those counters live in `.claude.json` and stay
-  denied; official docs also record that Read/Edit denials do not apply to a
-  subprocess that opens the file itself, which is the expressible diagnostic path.
-  `CLAUDE_CONFIG_DIR` can relocate `.claude.json` outside both remaining patterns;
-  that residual is accepted.
+  exposing `skillUsage` counters. Those counters live in `.claude.json`, which is no
+  longer denied at all (see the entry above), so the point is now moot rather than a
+  residual: nothing in this floor distinguishes one key of that file from another.
 - **`allow`** lists the grants an unattended agent loop needs that no built-in mechanism carries:
   the routine non-destructive working verbs (add, commit, non-force push, pull,
   checkout/switch, PR and issue CRUD), the babysit lane's gate tooling, and the read-only

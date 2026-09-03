@@ -90,7 +90,7 @@ done
 # the rows never denied a determined reader — they only denied the first-class
 # tools. `Read()` rules are path/glob only, so no rule could keep the OAuth and
 # MCP fields denied while exposing the rest; the file is protected by operator
-# judgement rather than by a rule that could not express the distinction.
+# judgment rather than by a rule that could not express the distinction.
 forbidden_read_denies=(
   'Read(**/.claude/settings.local.json)'
   'Read(.claude/settings.local.json)'
