@@ -594,6 +594,20 @@ lanes (ci-workflows#442), the security lane's incremental relevance gating on
 (ci-workflows#435), the approval agent behind opt-in guardrails
 (ci-workflows#436), and absorbed runtime and tool pins. No privilege widens:
 no lane adds a secret, a caller permission, or a routing surface.
+Amended 2026-09-03 (standards#521): the review lane contract at this
+revision, and at this revision only, now admits `pr-number` and
+`timeout-minutes` beside `runner`. Both are optional inputs the reusable
+declares at `62bef7bab01e8532fedfa739879034a210e9e67d` (`pr-number` is one of the additive inputs listed
+above; `timeout-minutes` bounds the review job's wall time), and the
+consumer is claude-code-plugins' locally-owned once-per-PR caller, which
+passes `timeout-minutes: 15` on every event and `pr-number` only on
+`workflow_dispatch`, where no pull-request context exists (github-iac
+`docs/topics/ci-perf/PLAN.md`, Phase 2.4). Neither input touches a secret,
+a caller permission, or the routing surface. The copy-forward statements
+below predate this amendment: v0.14.2 and every later review-lane contract
+keep `allowedInputs: ["runner"]` until a repin review re-approves the two
+inputs at that SHA, so a consumer that moves off
+`62bef7bab01e8532fedfa739879034a210e9e67d` must expect the narrower contract.
 The revision at `7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2) is
 approved on the byte-identical-selector basis: `select-runner.yml` matches
 `62bef7bab01e8532fedfa739879034a210e9e67d` exactly, and both lane reusable
