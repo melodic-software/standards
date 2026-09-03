@@ -10,6 +10,7 @@ import {
   DriftError,
   GATE_CALLERS,
   parseCallerPin,
+  parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
   parseValidatorSections,
@@ -66,7 +67,10 @@ test("policy fixture agreement: every good fixture matches policy.json", () => {
 
 test("parsers extract the narrow surfaces", () => {
   assert.deepEqual(parseGateSections(GOOD_GATE, "gate"), POLICY.body.requiredSections);
-  assert.deepEqual(parseValidatorSections(GOOD_VALIDATOR, "validator"), POLICY.body.requiredSections);
+  assert.deepEqual(
+    parseValidatorSections(GOOD_VALIDATOR, "validator"),
+    POLICY.body.requiredSections,
+  );
   assert.deepEqual(parseMarkdownHeadings(GOOD_TEMPLATE), POLICY.body.requiredSections);
   assert.equal(
     parseCallerPin(
@@ -152,7 +156,9 @@ test("validator keyword/marker regressions are caught functionally", () => {
   texts.hookValidator = texts.hookValidator
     .replace("|resolve[sd]?", "")
     .replace("(linked|related)", "(linked)");
-  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("hook validator (enforcement"));
+  const errors = checkCopies(POLICY, texts).filter((e) =>
+    e.includes("hook validator (enforcement"),
+  );
   assert.equal(errors.length, 1);
   assert.match(errors[0], /"Resolves"/);
   assert.match(errors[0], /"No related issue"/);
@@ -174,4 +180,46 @@ test("unparsable sources throw DriftError, never pass silently", () => {
 test("caller roster covers all ten gate repositories", () => {
   assert.equal(Object.keys(GATE_CALLERS).length, 10);
   assert.equal(GATE_CALLERS["ci-workflows"], ".github/workflows/pr-issue-linkage-self.yml");
+});
+
+// Regression: ci-workflows made CLOSING_KEYWORD global so every occurrence on a
+// line can be classified. The parser pinned the declaration to a literal `/i;`,
+// so a healthy gate reported "declarations not found" — a parse failure that
+// reads as drift.
+test("a global declaration parses and still probes", () => {
+  const globalGate = GOOD_GATE.replaceAll("/i;", "/gi;");
+  const patterns = parseGatePatterns(globalGate, "gate");
+  assert.ok(patterns.keyword.test("Closes #12"), "keyword body still probes");
+  assert.ok(patterns.marker.test("No linked issue"), "marker body still probes");
+  assert.equal(patterns.keyword.global, false, "g is stripped so .test() is stateless");
+  assert.deepEqual(
+    parseGatePatterns(globalGate, "gate").keyword.source,
+    parseGatePatterns(GOOD_GATE, "gate").keyword.source,
+    "same body extracted regardless of declared flags",
+  );
+});
+
+// Tolerating flags must not blind the check to losing one. Both declared bodies
+// are lowercase and rely on `i` to accept the documented capitalised keyword
+// forms, so a gate that dropped `i` would silently become case-sensitive.
+// Probing with a hardcoded `i` would pass it; the DECLARED flags catch it.
+test("a gate that drops the i flag is enforcement drift, not a pass", () => {
+  const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
+  const patterns = parseGatePatterns(caseSensitiveGate, "gate");
+  assert.equal(patterns.keyword.ignoreCase, false, "declared flags are preserved");
+  assert.equal(patterns.keyword.test("Closes #12"), false, "capitalised form now rejected");
+  const texts = goodTexts();
+  texts.gate = caseSensitiveGate;
+  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate reusable (enforcement"));
+  assert.equal(errors.length, 1, "drift is reported");
+  assert.match(errors[0], /closing keyword "Closes"/);
+});
+
+// `g`/`y` are stripped because they make .test() advance lastIndex, and
+// assertPatternsEnforce probes each pattern once per policy keyword.
+test("a global probe does not go stateful across repeated keyword probes", () => {
+  const patterns = parseGatePatterns(GOOD_GATE.replaceAll("/i;", "/gi;"), "gate");
+  for (const keyword of POLICY.body.closingKeywords) {
+    assert.ok(patterns.keyword.test(` ${keyword} #12 `), `${keyword} probes on every call`);
+  }
 });
