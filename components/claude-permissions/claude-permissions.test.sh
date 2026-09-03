@@ -80,32 +80,27 @@ for pattern in "${required_lefthook_denies[@]}"; do
   fi
 done
 
-# .claude.json is the official credential store (sign-in session, MCP config).
-# Relative `**/` only matches at/under the session cwd; `~/` is the home
-# anchor that covers the real file from a project directory. Both must stay.
 # settings.local.json is personal overrides, not a credential store, and a
 # Read deny also blocks Edit — those rows must not return.
-required_read_denies=(
-  'Read(**/.claude.json)'
-  'Read(~/.claude.json)'
-)
-for pattern in "${required_read_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    pass "deny includes $pattern"
-  else
-    fail "deny includes $pattern" "missing required .claude.json Read deny"
-  fi
-done
-
+#
+# The two .claude.json rows were retired for the same mechanical reason: a Read
+# deny blocks Edit and Write on the same path, so they blocked the documented way
+# to manage the file, not just reads of it. Official docs also record that a
+# Read/Edit denial does not apply to a subprocess that opens the file itself, so
+# the rows never denied a determined reader — they only denied the first-class
+# tools. `Read()` rules are path/glob only, so no rule could keep the OAuth and
+# MCP fields denied while exposing the rest; the file is protected by operator
+# judgement rather than by a rule that could not express the distinction.
 forbidden_read_denies=(
   'Read(**/.claude/settings.local.json)'
   'Read(.claude/settings.local.json)'
+  'Read(**/.claude.json)'
+  'Read(~/.claude.json)'
 )
 for pattern in "${forbidden_read_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \
     '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    fail "deny omits $pattern" "settings.local.json Read deny must stay retired"
+    fail "deny omits $pattern" "retired Read deny must not return"
   else
     pass "deny omits $pattern"
   fi

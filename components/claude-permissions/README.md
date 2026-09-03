@@ -19,10 +19,22 @@ the primary consumer merges the file into a shared template-data namespace) carr
   `Bash()` and `PowerShell()` rule spellings, bare and starred argument forms; the `gh api`
   DELETE surface for org/repo/security-critical resources; hook-disable environment
   prefixes; network-share mounts; and secret-material `Read()` patterns (key files, env
-  files, credential stores, and `~/.claude.json` / `**/.claude.json`, which officially
-  hold sign-in session state and MCP server configuration) in both bare and `**/`-prefixed
-  forms plus the home-anchored `~/` spelling that relative globs miss from a project
-  directory. The union is deliberately the STRICTEST observed form of each rule.
+  files, credential stores) in both bare and `**/`-prefixed forms. The union is
+  deliberately the STRICTEST observed form of each rule.
+
+  **`~/.claude.json` is deliberately not on the floor.** It was, in both the `**/` and
+  home-anchored spellings, and both rows were retired for the reason the
+  `settings.local.json` rows below were: a `Read` deny also blocks Edit and Write on the
+  same path, so the rows blocked the documented way to *manage* the file rather than only
+  reads of it. They also never denied a determined reader, because official docs record
+  that a Read/Edit denial does not apply to a subprocess that opens the file itself, which
+  remains the expressible diagnostic path. `Read()` rules are path/glob only, so no rule
+  could keep the sign-in session and MCP server fields denied while leaving the rest
+  reachable; the choice was all or nothing, and a rule that stops first-class tools while
+  leaving a one-line subprocess read open is not a security boundary. The file still holds
+  sign-in session state and MCP server configuration, and that material is now protected by
+  operator judgement rather than by a floor rule that could not express the distinction.
+  Consumers wanting the old posture can re-add either spelling to their own `deny`.
 
   **`.claude/settings.local.json` is deliberately not on the floor.** Official settings
   docs classify it as personal project overrides and the save target for "Yes, and don't
