@@ -319,13 +319,13 @@ components:
 # self-merged 31 seconds later with all four required contexts green. An
 # absent automerge key is the armed default, and the fleet is armed.
 #
-# The three surviving opt-outs are NOT roster vintage. Each names a live
-# per-target blocker at its own key, with its own removal trigger; all three
-# share one root cause — their default branches sit outside the org ci-gate
-# ruleset, so they have no required status checks for an armed PR to wait on.
-# codex-plugins entered in the same Phase 4 window and IS armed, because it
-# carries ci-gate. The key stays available fleet-wide as a per-target opt-out
-# for any future staged rollout.
+# No per-target opt-out remains as of 2026-09-04. The last three
+# (agent-plugins, cursor-plugins, claude-code-proxy) were disarmed only because
+# their default branches sat outside the org ci-gate ruleset; github-iac#367
+# extended the ruleset to them once each carried the four required contexts,
+# and their keys were dropped with the dated evidence recorded at each target.
+# The key stays available fleet-wide as a per-target opt-out for any future
+# staged rollout.
 targets:
   melodic-software/.github:
     managed:
