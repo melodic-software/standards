@@ -303,10 +303,14 @@ jobs:
       # Four gate callers are private repositories, so the live check reads
       # every source through the contents API with a contents-read token from
       # the standards-sync App (the lychee-private-inventory precedent). The
-      # mint step is guarded on the secrets being present (fork PRs carry
-      # none) so an absent credential reaches the enforcement step tokenless
-      # instead of dying inside the mint action; the private fetches then
-      # fail as `fetch-error` and the lane goes red. Not a skip either way.
+      # mint step is guarded on the secrets being present so an absent
+      # credential reaches the enforcement step tokenless instead of dying
+      # inside the mint action; the private fetches then fail as
+      # `fetch-error` and the lane goes red. Not a skip either way. Two run
+      # kinds see no repository secrets: fork PRs, which carry none by
+      # design, and Dependabot PRs, which resolve the same two names from
+      # this repository's Dependabot secrets. Mirror both there whenever the
+      # App key rotates, or every Dependabot PR fails this lane.
       - name: Mint a contents-read App token over the installation
         id: lockstep-token
         if: env.HAS_APP_CREDENTIAL == 'true'
