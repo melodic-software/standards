@@ -197,6 +197,42 @@ test("cancel-in-progress as false or an expression is flagged, not crashed", asy
   ]);
 });
 
+test("the ci-perf contract-only cancel expression passes, and only byte-identically", async () => {
+  const canonicalGroup = `concurrency:
+  group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
+`;
+  const exact = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+`;
+  const rootExact = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", exact) },
+  });
+  assert.deepEqual(rules(await auditRepository({ root: rootExact })), []);
+
+  // One space added inside the fromJSON array literal. The composite compares
+  // its own default against this text, so a reformatted copy is drift, not a
+  // stylistic variant.
+  const whitespaceVariant = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+`;
+  const rootWhitespace = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", whitespaceVariant) },
+  });
+  assert.deepEqual(rules(await auditRepository({ root: rootWhitespace })), [
+    ".github/workflows/ci.yml:concurrency-cancel-missing",
+  ]);
+
+  // The base-edit clause dropped. This one is not cosmetic: without it an
+  // `edited` event that changed the base branch would be treated as
+  // contract-only, so the lanes would never re-test the new merge commit.
+  const clauseVariant = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.action == 'edited')) }}
+`;
+  const rootClause = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", clauseVariant) },
+  });
+  assert.deepEqual(rules(await auditRepository({ root: rootClause })), [
+    ".github/workflows/ci.yml:concurrency-cancel-missing",
+  ]);
+});
+
 test("group-only string shorthand drifts and lacks cancellation", async () => {
   const shorthand = "concurrency: my-static-group\n";
   const root = await repository({

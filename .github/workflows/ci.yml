@@ -4,6 +4,25 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `edited`, `labeled` and `unlabeled` can change the pr-title,
+    # do-not-merge and issue-linkage answers without a new commit, so the
+    # required check has to re-evaluate. Whether such an event is
+    # CONTRACT-ONLY (lanes gated off, ci-status carrying the recorded
+    # `ci-lanes` verdict forward) is decided by one predicate, repeated
+    # verbatim in `cancel-in-progress` and in every job's `if:` except
+    # `ci-status`:
+    #
+    #   github.event.pull_request.head.repo.full_name == github.repository &&
+    #   (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) ||
+    #    (github.event.action == 'edited' && !github.event.changes.base))
+    #
+    # An `edited` event carrying `changes.base` is a BASE-BRANCH change: the
+    # merge commit the lanes test changes with it, so that runs in full. A
+    # fork pull request is never contract-only — its token is read-only on
+    # `pull_request` whatever `permissions:` requests, so it cannot record
+    # lane state — and runs the full workflow on every event exactly as
+    # before. No `ready_for_review`: this workflow is not draft-gated.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -11,9 +30,17 @@ permissions:
 # The PR number keys pull_request runs, so a new push supersedes that PR's
 # in-flight run without colliding with same-named branches from other head
 # repos; main pushes fall back to the unique run_id and are never cancelled.
+#
+# A contract-only event never cancels: it must queue behind an in-flight full
+# run so the `ci-lanes` status it reads is already written. GitHub keeps one
+# running and one pending run per group and the newest pending wins, so the
+# carry-forward always executes after the full run it depends on. A
+# `synchronize` still cancels everything on the old SHA, and on a push the
+# predicate is false, so this stays `true` there exactly as before (a no-op
+# against the unique run_id key).
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
 
 # Public repository: every lane runs on GitHub-hosted ubuntu-24.04 (free for
 # public repositories); the local-runner selector is not permitted here. The
@@ -21,7 +48,12 @@ concurrency:
 # not change. Workload steps are route-independent: pinned setup/composite
 # actions install every tool, and setup-action caches are GitHub-managed.
 jobs:
+  # Every job except `ci-status` carries the contract-only gate verbatim. It is
+  # explicit on each one rather than transitive: a dependent whose `needs` all
+  # skipped is skipped by default, but a job with `if: always()` or
+  # `!cancelled()` runs regardless, so only the explicit form is reliable.
   markdown:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -38,6 +70,7 @@ jobs:
           globs: '**/*.md !components/**/fixtures/bad/**'
 
   powershell:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -54,6 +87,7 @@ jobs:
           exclude: components/psscriptanalyzer/fixtures/bad
 
   shellcheck:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -70,6 +104,7 @@ jobs:
           exclude: components/shellcheck/fixtures/bad
 
   lychee:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -86,6 +121,7 @@ jobs:
           exclude: 'components/[^/]+/fixtures/bad'
 
   editorconfig:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -104,6 +140,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
 
   gitleaks:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -121,6 +158,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
 
   typos:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -139,6 +177,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
   markdown-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -163,6 +202,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
 
   runner-policy:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     name: Runner policy
     permissions:
       contents: read
@@ -202,6 +242,7 @@ jobs:
           CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 
   concurrency-policy:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -225,6 +266,7 @@ jobs:
         run: npm run lint:concurrency-policy
 
   dependabot-policy:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -248,6 +290,7 @@ jobs:
         run: npm run lint:dependabot-policy
 
   pr-convention-policy:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -277,6 +320,7 @@ jobs:
   # the hermetic component lane. The fixture tests run first so a parser
   # regression reads as a test failure, not as drift.
   pr-convention-lockstep:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -326,6 +370,7 @@ jobs:
         run: npm run lint:pr-convention-lockstep
 
   powershell-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -357,6 +402,7 @@ jobs:
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
   shellcheck-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -382,6 +428,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
   lychee-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -420,6 +467,7 @@ jobs:
         run: bash components/lychee/private-repo-inventory.sh check --config lychee.toml
 
   ruff:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -436,6 +484,7 @@ jobs:
           exclude: components/ruff/fixtures/bad
 
   pyright:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -455,6 +504,7 @@ jobs:
           paths: components/pyright/fixtures/good
 
   biome:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -474,6 +524,7 @@ jobs:
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/runner-policy distribution harness/packages
 
   tsc:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     name: TypeScript ${{ matrix.typescript }}
     permissions:
       contents: read
@@ -504,6 +555,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-build:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -526,6 +578,7 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   dotnet-format:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -543,6 +596,7 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   actionlint:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -608,6 +662,7 @@ jobs:
         run: node --test components/claude-lanes/repin-policy-lockstep.test.mjs
 
   zizmor:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     # Actions security lint. High-severity findings block the lane; lower
@@ -627,6 +682,7 @@ jobs:
       fail-on-severity: high
 
   osv-scanner:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     # Advisory dependency vuln scan; reports against package-lock.json without
@@ -637,6 +693,7 @@ jobs:
       runner: ubuntu-24.04
 
   go-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -682,6 +739,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
   python-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -718,6 +776,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   typescript-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -750,6 +809,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   dotnet-fixtures:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -788,6 +848,7 @@ jobs:
           DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
 
   harness:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -801,6 +862,7 @@ jobs:
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
   cloud-environment:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -818,6 +880,7 @@ jobs:
           .cursor/install.test.sh
 
   distribution:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -858,6 +921,7 @@ jobs:
         run: bash distribution/sync-manifest.sh validate
 
   exec-bit:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -871,6 +935,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/exec-bit@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   machine-specific-paths:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -888,6 +953,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
 
   eol-renormalize:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -901,6 +967,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
 
   comment-hygiene:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -918,6 +985,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
   local-lane-guards:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -931,6 +999,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
 
   pin-comment-convention:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -968,6 +1037,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 
   lefthook:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -1011,7 +1081,13 @@ jobs:
 
   ci-status:
     if: ${{ !cancelled() }}
-    permissions: {}
+    permissions:
+      contents: read
+      # pr-contract upserts the advisory linkage comment and moves the linkage
+      # label; ci-status records the `ci-lanes` commit status the carry-forward
+      # branch reads back on the next contract-only event.
+      pull-requests: write
+      statuses: write
     needs:
       - markdown
       - powershell
@@ -1055,10 +1131,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Check the pull-request contract
+        uses: melodic-software/ci-workflows/.github/actions/pr-contract@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0
+        with:
+          token: ${{ github.token }}
+          # Carried over from the pr-issue-linkage.yml caller this step
+          # replaces, so Dependabot's bodies keep skipping the linkage check
+          # rather than starting to fail it. Exact-login match, never a
+          # `*[bot]` pattern.
+          exempt-authors: 'dependabot[bot]'
       - name: Aggregate lane results
-        uses: melodic-software/ci-workflows/.github/actions/ci-status@87fb95c3b05fa318b9dd8c2c164cc550071a1ccb # v0.7.0
+        # `!cancelled()` so a failing pr-contract step does not skip the
+        # aggregation: the job still fails on the contract step's exit code,
+        # and the `ci-lanes` status is on the SHA for the next contract-only
+        # run.
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/ci-status@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0
         with:
           treat-skipped-as: fail
+          token: ${{ github.token }}
           results: >-
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}

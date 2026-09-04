@@ -66,7 +66,8 @@ their reviewed Git revision.
 | A superseded pull-request run keeps a runner slot while a newer push queues behind it. | Pull-request-triggered workflows must carry the canonical group and `cancel-in-progress: true`; a missing block, drifted group, or absent cancellation is a finding. | Missing, group-drift, cancel-missing, and shorthand cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | A group keyed on `github.ref` cancels a default-branch or scheduled run. | The canonical group falls back to the unique `github.run_id` on non-pull-request events; a `github.ref` group is reported as drift. | The `github.ref` drift case over a push-and-pull-request workflow in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | A fork-controllable `head_ref` group collides across same-named branches, and one pull-request run cancels another. | The canonical group uses the unique, non-fork-controllable `github.event.pull_request.number`; the `head_ref` variant is reported as drift. | The `head_ref` drift case in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
-| A non-literal `cancel-in-progress` expression silently disables cancellation. | Only the literal boolean `true` passes; `false`, an omitted flag, and an expression string are findings rather than crashes. | The false, omitted, and expression `cancel-in-progress` cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
+| A non-literal `cancel-in-progress` expression silently disables cancellation. | Exactly two values pass: the literal boolean `true` and the byte-identical ci-perf contract-only expression. `false`, an omitted flag, and every other expression string are findings rather than crashes. | The false, omitted, and expression `cancel-in-progress` cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
+| The accepted contract-only expression is reformatted or a clause is dropped, so lanes gate off on an event the `ci-status` composite still aggregates, or a base-branch edit skips the lanes that would re-test the new merge commit. | The expression is matched byte for byte against the composite's `contract-only` default, with none of the whitespace tolerance the `group` allows; a spacing variant and a clause-dropping variant are both findings. | The byte-identical contract-only case, with its whitespace and clause variants, in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | YAML ambiguity hides a different workflow graph. | The parser requires unique keys, disables aliases and merge keys, and records parse failures. Only regular top-level workflow files are indexed; symlinks are findings. | Duplicate-key and workflow-symlink cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | Duplicate JSON member names make the exception file interpretation-dependent. | The raw exception file is preflighted with the pinned parser's strict unique-key mode before `JSON.parse`, per the interoperability guidance in [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). | The duplicate-member case in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | An exception becomes a blanket bypass or outlives its cause. | Exceptions are keyed to one workflow, use an allowlisted reason with a justification, and fail on an unused, non-pull-request, or already-conformant target. | The unknown-reason, missing-justification, unknown-key, and inventory-drift cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
@@ -80,6 +81,13 @@ their reviewed Git revision.
 - Concurrency is one capacity control. It prevents redundant runs of the same
   workflow but does not bound the number of distinct workflows, jobs, or matrix
   legs a change triggers. Those remain separate volume controls.
+- The contract-only expression's correctness is asserted here only as equality
+  with the `ci-status` composite's `contract-only` default at
+  `melodic-software/ci-workflows` `v0.20.0`. This analyzer cannot read that
+  composite, so a change to the composite's default would leave this constant
+  stale and every audited workflow wrong in the same direction. Keeping the two
+  in step is a release-time concern of that repository and of the lockstep lane,
+  not a control this component enforces.
 - Job-level concurrency inside a reusable workflow is out of scope here; a
   `delegated-job-level` exception records that the enforcement lives in the
   called workflow, which is reviewed on its own.
