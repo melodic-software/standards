@@ -1135,6 +1135,11 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/pr-contract@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0
         with:
           token: ${{ github.token }}
+          # Carried over from the pr-issue-linkage.yml caller this step
+          # replaces, so Dependabot's bodies keep skipping the linkage check
+          # rather than starting to fail it. Exact-login match, never a
+          # `*[bot]` pattern.
+          exempt-authors: 'dependabot[bot]'
       - name: Aggregate lane results
         # `!cancelled()` so a failing pr-contract step does not skip the
         # aggregation: the job still fails on the contract step's exit code,
