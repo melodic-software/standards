@@ -1,26 +1,36 @@
 #!/usr/bin/env node
 
 // Lockstep drift check (ADR-0008): `policy.json` is the canonical record of
-// the fleet PR-body convention, but four other copies of the contract exist
-// and must change in lockstep with it — the ci-workflows `pr-issue-linkage`
-// reusable, the source-control plugin's PreToolUse validator, the org
-// `.github` PR template, and this repository's distributed
+// the fleet PR convention, but other copies of the contract exist and must
+// change in lockstep with it — the ci-workflows `pr-contract` composite (the
+// live gate every consumer runs inside its `ci-status` job), the
+// source-control plugin's PreToolUse validator, the org `.github` PR
+// template, and this repository's distributed
 // `.claude/rules/pr-body-contract.md`. Letting any copy drift is exactly the
 // failure #393 recorded (and claude-code-plugins#3205 repeated). This check
-// also dereferences every gate caller's pinned SHA and validates the section
-// list of the reusable AT THAT PIN, because a stale pin enforcing an older
-// contract (the codex-plugins v0.9.1 case) is drift no source-copy diff can
-// see.
+// also dereferences every consumer's pinned artifact and validates the
+// contract AT THAT PIN, because a stale pin enforcing an older contract (the
+// codex-plugins v0.9.1 case) is drift no source-copy diff can see.
 //
-// CLI mode fetches live sources over raw.githubusercontent (public repos,
-// unauthenticated) and exits non-zero on drift; every network failure is a
-// distinct `fetch-error` failure, never a skip. Parsing and comparison logic
-// is exported for the hermetic fixture tests in `lockstep-drift.test.mjs`.
+// Phase 3 of the ci-perf program (github-iac#396) moves the fleet from the
+// `pr-issue-linkage.yml` reusable to the `pr-contract` composite, one
+// repository at a time. A consumer therefore runs one artifact or the other,
+// never both, for the days that transition takes: the fleet scan detects
+// which one a repository uses and checks the contract with the matching
+// extractor, so a mixed fleet passes and a drifted artifact of either kind
+// still fails.
+//
+// CLI mode fetches live sources over the GitHub contents API and exits
+// non-zero on drift; every network failure is a distinct `fetch-error`
+// failure, never a skip. Parsing and comparison logic is exported for the
+// hermetic fixture tests in `lockstep-drift.test.mjs`.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+
+import { parse as parseYaml } from "yaml";
 
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
@@ -35,14 +45,19 @@ const RULES_FILE_PATH = path.join(
   "pr-body-contract.md",
 );
 
-// Contents-API URLs, not raw.githubusercontent: four gate callers are private
+// Contents-API URLs, not raw.githubusercontent: several consumers are private
 // repositories, and the API honors the token `LOCKSTEP_GITHUB_TOKEN` (or
 // `GITHUB_TOKEN`) that the CI lane mints from the org GitHub App. Public
 // sources still resolve unauthenticated.
 const API_BASE = "https://api.github.com/repos/melodic-software";
 const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
+
+export const COMPOSITE_DIRECTORY = ".github/actions/pr-contract";
+const REUSABLE_PATH = ".github/workflows/pr-issue-linkage.yml";
+
 export const COPY_SOURCES = {
-  gate: contentsUrl("ci-workflows", "main", ".github/workflows/pr-issue-linkage.yml"),
+  gateRun: contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/run.sh`),
+  gateAction: contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/action.yml`),
   hookValidator: contentsUrl(
     "claude-code-plugins",
     "main",
@@ -51,20 +66,33 @@ export const COPY_SOURCES = {
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
 };
 
-// Every repository that requires the pr-issue-linkage check. ci-workflows
-// hosts the reusable and calls it through a self-caller with its own name.
-export const GATE_CALLERS = {
-  ".github": ".github/workflows/pr-issue-linkage.yml",
-  "ci-runner": ".github/workflows/pr-issue-linkage.yml",
-  "ci-workflows": ".github/workflows/pr-issue-linkage-self.yml",
-  "claude-code-plugins": ".github/workflows/pr-issue-linkage.yml",
-  "codex-plugins": ".github/workflows/pr-issue-linkage.yml",
-  dotfiles: ".github/workflows/pr-issue-linkage.yml",
-  "github-iac": ".github/workflows/pr-issue-linkage.yml",
-  medley: ".github/workflows/pr-issue-linkage.yml",
-  provisioning: ".github/workflows/pr-issue-linkage.yml",
-  standards: ".github/workflows/pr-issue-linkage.yml",
-};
+// Every repository in the fleet, whether or not it is gated today.
+export const CONSUMER_REPOSITORIES = [
+  ".github",
+  "agent-plugins",
+  "ci-runner",
+  "ci-workflows",
+  "claude-code-plugins",
+  "claude-code-proxy",
+  "codex-plugins",
+  "cursor-plugins",
+  "dotfiles",
+  "github-iac",
+  "medley",
+  "provisioning",
+  "standards",
+];
+
+// The three repositories the sync does not reach and the org `ci-gate` ruleset
+// does not cover. A repository with neither artifact is REPORTED here and
+// FAILS anywhere else: a gated repository that lost its contract check is the
+// drift this lane exists to catch.
+export const UNSYNCED_REPOSITORIES = ["agent-plugins", "claude-code-proxy", "cursor-plugins"];
+
+// The composite is called from the `ci-status` job, which lives in `ci.yml`
+// everywhere except medley. Scanning these first lets the common case
+// short-circuit instead of reading a whole workflow directory.
+const WORKFLOW_SCAN_PRIORITY = ["ci.yml", "ci-status.yml"];
 
 export class DriftError extends Error {
   constructor(message) {
@@ -80,9 +108,93 @@ export class FetchError extends Error {
   }
 }
 
+function collect(errors, fn) {
+  try {
+    fn();
+  } catch (error) {
+    if (!(error instanceof DriftError)) {
+      throw error;
+    }
+    errors.push(error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The `pr-contract` composite (the live gate, and every migrated consumer).
+//
+// `run.sh` states the section list as data: the analyzer's END block calls
+// `section_report("<name>")` once per required section, in contract order.
+// ---------------------------------------------------------------------------
+export function parseCompositeSections(runShText, location) {
+  const names = [...runShText.matchAll(/section_report\("([^"]+)"\)/g)].map((m) => m[1]);
+  if (names.length === 0) {
+    throw new DriftError(`${location}: no \`section_report("<name>")\` calls found in run.sh`);
+  }
+  return names;
+}
+
+// The composite's keyword and marker enforcement are executable awk regex
+// literals, so they are validated FUNCTIONALLY the same way the reusable's
+// were: extract each declared pattern and probe it with every policy
+// keyword/marker. A keyword that survives only in a comment or an error
+// message no longer passes.
+export function parseCompositePatterns(runShText, location) {
+  const keyword = runShText.match(/match\(chunk, \/(.+)\/\)\) break/);
+  const marker = runShText.match(/tolower\(body\) ~ \/(.+)\/\) print "no-issue"/);
+  if (!keyword || !marker) {
+    throw new DriftError(
+      `${location}: closing-keyword / no-issue-marker match expressions not found in run.sh`,
+    );
+  }
+  // Both awk patterns are lowercase and match against text the analyzer has
+  // already lowercased (`lower = tolower(line)` for the keyword scan,
+  // `tolower(body)` in the anchor above for the marker). The probes below
+  // lowercase to mirror that. If the lowercasing ever went away the extracted
+  // pattern would become case-sensitive against raw text and reject the
+  // documented capitalised forms, so its presence is asserted rather than
+  // assumed — the composite's equivalent of the reusable's `i` flag.
+  if (!/lower = tolower\(line\)/.test(runShText)) {
+    throw new DriftError(
+      `${location}: the closing-keyword scan no longer lowercases the line (\`lower = tolower(line)\`), so the extracted pattern is not the one the gate applies`,
+    );
+  }
+  return { keyword: new RegExp(keyword[1]), marker: new RegExp(marker[1]) };
+}
+
+// `action.yml`'s `inputs.types.default` is the composite's copy of
+// `policy.json`'s `allowedTypes`: the title regex is built from it at runtime,
+// and no caller in the fleet overrides it. Parsed as YAML rather than by
+// regex so the anchor is the data key, not the shape of the description block
+// above it.
+export function parseCompositeTypes(actionYmlText, location) {
+  let document;
+  try {
+    document = parseYaml(actionYmlText);
+  } catch (error) {
+    throw new DriftError(`${location}: action.yml is not parsable YAML: ${error.message}`);
+  }
+  const declared = document?.inputs?.types?.default;
+  if (typeof declared !== "string") {
+    throw new DriftError(`${location}: action.yml declares no string \`inputs.types.default\``);
+  }
+  const types = declared
+    .split(",")
+    .map((type) => type.trim())
+    .filter(Boolean);
+  if (types.length === 0) {
+    throw new DriftError(`${location}: the \`types\` input default is empty`);
+  }
+  return types;
+}
+
+// ---------------------------------------------------------------------------
+// The `pr-issue-linkage.yml` reusable (the predecessor, still pinned by every
+// consumer that has not taken its Phase 3 pull request yet).
+//
 // The reusable declares its contract as a `requiredSections` array of
 // `{ name: "...", guidance: "..." }` literals inside an actions/github-script
 // step. The array literal is the narrowest stable surface to parse.
+// ---------------------------------------------------------------------------
 export function parseGateSections(workflowText, location) {
   const arrayMatch = workflowText.match(/const requiredSections = \[([\s\S]*?)\n\s*\];/);
   if (!arrayMatch) {
@@ -95,27 +207,6 @@ export function parseGateSections(workflowText, location) {
   return names;
 }
 
-// The hook validator declares `REQUIRED_SECTIONS=(Summary Fix ...)`.
-export function parseValidatorSections(shellText, location) {
-  const match = shellText.match(/REQUIRED_SECTIONS=\(([^)]*)\)/);
-  if (!match) {
-    throw new DriftError(`${location}: no REQUIRED_SECTIONS=(...) declaration found`);
-  }
-  const names = match[1].split(/\s+/).filter(Boolean);
-  if (names.length === 0) {
-    throw new DriftError(`${location}: REQUIRED_SECTIONS declaration is empty`);
-  }
-  return names;
-}
-
-export function parseMarkdownHeadings(markdownText) {
-  return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
-}
-
-// The gate's keyword and marker enforcement are executable regex
-// declarations, so they are validated FUNCTIONALLY: extract each declared
-// pattern and probe it with every policy keyword/marker. A keyword that
-// survives only in a comment or error message no longer passes.
 export function parseGatePatterns(workflowText, location) {
   // Accept any declared flag set rather than a literal `/i;`: ci-workflows made
   // CLOSING_KEYWORD global (`/gi;`, so every occurrence on a line can be
@@ -145,6 +236,27 @@ export function parseGatePatterns(workflowText, location) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// The other two remote copies.
+// ---------------------------------------------------------------------------
+
+// The hook validator declares `REQUIRED_SECTIONS=(Summary Fix ...)`.
+export function parseValidatorSections(shellText, location) {
+  const match = shellText.match(/REQUIRED_SECTIONS=\(([^)]*)\)/);
+  if (!match) {
+    throw new DriftError(`${location}: no REQUIRED_SECTIONS=(...) declaration found`);
+  }
+  const names = match[1].split(/\s+/).filter(Boolean);
+  if (names.length === 0) {
+    throw new DriftError(`${location}: REQUIRED_SECTIONS declaration is empty`);
+  }
+  return names;
+}
+
+export function parseMarkdownHeadings(markdownText) {
+  return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
+}
+
 // The hook validator's enforcement is a pair of POSIX ERE strings; translate
 // the one POSIX class they use and probe them the same way. The probes pad
 // with spaces because both EREs guard with [^a-z0-9_] boundary classes.
@@ -158,15 +270,61 @@ export function parseValidatorPatterns(shellText, location) {
   return { keyword: toJs(keyword[1]), marker: toJs(marker[1]) };
 }
 
-function assertPatternsEnforce(patterns, policy, location) {
+// ---------------------------------------------------------------------------
+// Which artifact a consumer runs.
+// ---------------------------------------------------------------------------
+
+// A `uses:` of the composite, pinned to a 40-hex ci-workflows SHA.
+const COMPOSITE_PIN_PATTERN =
+  /melodic-software\/ci-workflows\/\.github\/actions\/pr-contract@([0-9a-f]{40})/;
+// ci-workflows dogfoods its own composite through a local `./` reference,
+// which carries no SHA — the artifact is that repository's own tree at `main`.
+// Anchored on `uses:` so the same path in a lint `paths:` list or a
+// `bash .github/actions/pr-contract/run.test.sh` line is not mistaken for a
+// call site.
+const COMPOSITE_LOCAL_PATTERN = /uses:\s*\.\/\.github\/actions\/pr-contract(?=\s|$)/m;
+const REUSABLE_PIN_PATTERN = /pr-issue-linkage\.yml@([0-9a-f]{40})/;
+
+// The composite wins over the reusable: during the Phase 3 transition
+// ci-workflows carries both (its `pr-issue-linkage-self.yml` caller stays
+// until 3.4), and the artifact that gates is the one inside `ci-status`.
+export function detectArtifactPin(workflowText) {
+  const pinned = workflowText.match(COMPOSITE_PIN_PATTERN);
+  if (pinned) {
+    return { kind: "composite", sha: pinned[1] };
+  }
+  if (COMPOSITE_LOCAL_PATTERN.test(workflowText)) {
+    return { kind: "composite", sha: "main" };
+  }
+  const reusable = workflowText.match(REUSABLE_PIN_PATTERN);
+  if (reusable) {
+    return { kind: "reusable", sha: reusable[1] };
+  }
+  return null;
+}
+
+export function parseCallerPin(workflowText, location) {
+  const match = workflowText.match(REUSABLE_PIN_PATTERN);
+  if (!match) {
+    throw new DriftError(`${location}: no 40-hex pr-issue-linkage.yml@<sha> pin found`);
+  }
+  return match[1];
+}
+
+// ---------------------------------------------------------------------------
+// Comparisons.
+// ---------------------------------------------------------------------------
+
+function assertPatternsEnforce(patterns, policy, location, { lowercaseProbe = false } = {}) {
+  const probe = (text) => (lowercaseProbe ? text.toLowerCase() : text);
   const missing = [];
   for (const keyword of policy.body.closingKeywords) {
-    if (!patterns.keyword.test(` ${keyword} #12 `)) {
+    if (!patterns.keyword.test(probe(` ${keyword} #12 `))) {
       missing.push(`closing keyword "${keyword}"`);
     }
   }
   for (const marker of policy.body.noIssueMarkers) {
-    if (!patterns.marker.test(` ${marker}: none `)) {
+    if (!patterns.marker.test(probe(` ${marker}: none `))) {
       missing.push(`no-issue marker "${marker}"`);
     }
   }
@@ -175,20 +333,33 @@ function assertPatternsEnforce(patterns, policy, location) {
   }
 }
 
-export function parseCallerPin(workflowText, location) {
-  const match = workflowText.match(/pr-issue-linkage\.yml@([0-9a-f]{40})/);
-  if (!match) {
-    throw new DriftError(`${location}: no 40-hex pr-issue-linkage.yml@<sha> pin found`);
-  }
-  return match[1];
-}
-
 function assertExactSections(actual, expected, location) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new DriftError(
       `${location}: section list [${actual.join(", ")}] != policy [${expected.join(", ")}]`,
     );
   }
+}
+
+// Order is not behavior here — the composite builds a regex alternation from
+// the list — so the comparison is set-wise and the message names the exact
+// divergence rather than printing two lists to diff by eye.
+function assertAllowedTypes(actual, expected, location) {
+  const missing = expected.filter((type) => !actual.includes(type));
+  const unexpected = actual.filter((type) => !expected.includes(type));
+  if (missing.length === 0 && unexpected.length === 0) {
+    return;
+  }
+  const parts = [];
+  if (missing.length > 0) {
+    parts.push(`missing ${missing.join(", ")}`);
+  }
+  if (unexpected.length > 0) {
+    parts.push(`unexpected ${unexpected.join(", ")}`);
+  }
+  throw new DriftError(
+    `${location}: allowed title types ${parts.join("; ")} (declared: ${actual.join(", ")})`,
+  );
 }
 
 function assertContainsSections(headings, expected, location) {
@@ -212,19 +383,28 @@ function assertMentions(text, terms, location) {
 export function checkCopies(policy, texts) {
   const errors = [];
   const sections = policy.body.requiredSections;
-  const run = (fn) => {
-    try {
-      fn();
-    } catch (error) {
-      if (error instanceof DriftError) {
-        errors.push(error.message);
-        return;
-      }
-      throw error;
-    }
-  };
+  const run = (fn) => collect(errors, fn);
   run(() =>
-    assertExactSections(parseGateSections(texts.gate, "gate reusable"), sections, "gate reusable"),
+    assertExactSections(
+      parseCompositeSections(texts.gateRun, "gate composite"),
+      sections,
+      "gate composite",
+    ),
+  );
+  run(() =>
+    assertPatternsEnforce(
+      parseCompositePatterns(texts.gateRun, "gate composite"),
+      policy,
+      "gate composite (enforcement patterns)",
+      { lowercaseProbe: true },
+    ),
+  );
+  run(() =>
+    assertAllowedTypes(
+      parseCompositeTypes(texts.gateAction, "gate composite"),
+      policy.title.allowedTypes,
+      "gate composite (title types)",
+    ),
   );
   run(() =>
     assertExactSections(
@@ -268,13 +448,6 @@ export function checkCopies(policy, texts) {
   );
   run(() =>
     assertPatternsEnforce(
-      parseGatePatterns(texts.gate, "gate reusable"),
-      policy,
-      "gate reusable (enforcement patterns)",
-    ),
-  );
-  run(() =>
-    assertPatternsEnforce(
       parseValidatorPatterns(texts.hookValidator, "hook validator"),
       policy,
       "hook validator (enforcement patterns)",
@@ -283,23 +456,18 @@ export function checkCopies(policy, texts) {
   return errors;
 }
 
+function pinLabel(sha) {
+  return sha === "main" ? "local at main" : `pin ${sha.slice(0, 7)}`;
+}
+
 // Validates the full contract at the pin — sections AND the executable
 // keyword/marker patterns — so a pinned reusable whose section list matches
 // current policy but whose keyword or marker enforcement is stale still
 // reports drift.
 export function checkPinnedReusable(policy, repo, sha, reusableText) {
-  const location = `caller ${repo} pin ${sha.slice(0, 7)}`;
+  const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
-  const run = (fn) => {
-    try {
-      fn();
-    } catch (error) {
-      if (!(error instanceof DriftError)) {
-        throw error;
-      }
-      errors.push(error.message);
-    }
-  };
+  const run = (fn) => collect(errors, fn);
   run(() =>
     assertExactSections(
       parseGateSections(reusableText, location),
@@ -311,18 +479,104 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
   return errors;
 }
 
-async function fetchText(url) {
+// The composite's equivalent: sections and enforcement patterns from `run.sh`,
+// allowed title types from `action.yml`. The types are checked at the pin
+// because a consumer pinned to a pre-`security` composite would reject a
+// `security:` title that policy allows — drift the source-copy check on `main`
+// cannot see.
+export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText) {
+  const location = `caller ${repo} ${pinLabel(sha)}`;
+  const errors = [];
+  const run = (fn) => collect(errors, fn);
+  run(() =>
+    assertExactSections(
+      parseCompositeSections(runShText, location),
+      policy.body.requiredSections,
+      location,
+    ),
+  );
+  run(() =>
+    assertPatternsEnforce(parseCompositePatterns(runShText, location), policy, location, {
+      lowercaseProbe: true,
+    }),
+  );
+  run(() =>
+    assertAllowedTypes(
+      parseCompositeTypes(actionYmlText, location),
+      policy.title.allowedTypes,
+      location,
+    ),
+  );
+  return errors;
+}
+
+// One verdict per consumer over a resolved fleet. `kind: "none"` is a drift
+// finding everywhere except the three repositories the sync does not reach,
+// where it is a note; `kind: "unresolved"` means the live loop already
+// recorded a fetch failure for that repository and this pass adds nothing.
+export function checkFleet(policy, resolutions) {
+  const errors = [];
+  const notes = [];
+  for (const repo of CONSUMER_REPOSITORIES) {
+    const resolution = resolutions.get(repo);
+    if (resolution === undefined) {
+      errors.push(`caller ${repo}: the fleet scan produced no artifact resolution`);
+      continue;
+    }
+    if (resolution.kind === "unresolved") {
+      continue;
+    }
+    if (resolution.kind === "none") {
+      const message = `caller ${repo}: no pr-contract composite step and no pr-issue-linkage caller`;
+      if (UNSYNCED_REPOSITORIES.includes(repo)) {
+        notes.push(`${message} (known unsynced repository; reported, not failed)`);
+      } else {
+        errors.push(message);
+      }
+      continue;
+    }
+    if (resolution.kind === "composite") {
+      errors.push(
+        ...checkPinnedComposite(
+          policy,
+          repo,
+          resolution.sha,
+          resolution.runSh,
+          resolution.actionYml,
+        ),
+      );
+      continue;
+    }
+    errors.push(...checkPinnedReusable(policy, repo, resolution.sha, resolution.reusable));
+  }
+  return { errors, notes };
+}
+
+// ---------------------------------------------------------------------------
+// Live mode.
+// ---------------------------------------------------------------------------
+
+function apiHeaders(accept) {
   const token = process.env.LOCKSTEP_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
-  const headers = { Accept: "application/vnd.github.raw+json" };
+  const headers = { Accept: accept };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+  return headers;
+}
+
+async function fetchWithRetry(url, accept, { notFoundIsNull = false } = {}) {
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers: apiHeaders(accept) });
       if (response.ok) {
-        return await response.text();
+        return response;
+      }
+      // A missing `.github/workflows` directory is a fact about the fleet, not
+      // a transport failure: the repository simply runs no workflows.
+      if (notFoundIsNull && response.status === 404) {
+        return null;
       }
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -335,41 +589,112 @@ async function fetchText(url) {
   throw new FetchError(`fetch-error: ${url}: ${lastError.message}`);
 }
 
+async function fetchText(url) {
+  const response = await fetchWithRetry(url, "application/vnd.github.raw+json");
+  return await response.text();
+}
+
+async function fetchDirectory(url) {
+  const response = await fetchWithRetry(url, "application/vnd.github+json", {
+    notFoundIsNull: true,
+  });
+  if (response === null) {
+    return [];
+  }
+  return await response.json();
+}
+
+function scanOrder(names) {
+  const rank = (name) => (WORKFLOW_SCAN_PRIORITY.includes(name) ? 0 : 1);
+  return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+// Reads a repository's workflow directory and returns the artifact it runs.
+// The composite short-circuits the scan; a reusable pin is remembered but the
+// scan continues, because a repository mid-transition can carry both and the
+// composite is the one that gates.
+async function resolveConsumerArtifact(repo, cachedText) {
+  const entries = await fetchDirectory(`${API_BASE}/${repo}/contents/.github/workflows?ref=main`);
+  const names = entries
+    .filter((entry) => entry.type === "file" && /\.ya?ml$/.test(entry.name))
+    .map((entry) => entry.name);
+  let reusable = null;
+  for (const name of scanOrder(names)) {
+    const text = await cachedText(contentsUrl(repo, "main", `.github/workflows/${name}`));
+    const found = detectArtifactPin(text);
+    if (!found) {
+      continue;
+    }
+    if (found.kind === "composite") {
+      return found;
+    }
+    reusable ??= found;
+  }
+  return reusable ?? { kind: "none" };
+}
+
 export async function runLiveCheck() {
   const policy = parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH);
+  const cache = new Map();
+  const cachedText = async (url) => {
+    if (!cache.has(url)) {
+      cache.set(url, await fetchText(url));
+    }
+    return cache.get(url);
+  };
+
   const texts = {
-    gate: await fetchText(COPY_SOURCES.gate),
-    hookValidator: await fetchText(COPY_SOURCES.hookValidator),
-    orgTemplate: await fetchText(COPY_SOURCES.orgTemplate),
+    gateRun: await cachedText(COPY_SOURCES.gateRun),
+    gateAction: await cachedText(COPY_SOURCES.gateAction),
+    hookValidator: await cachedText(COPY_SOURCES.hookValidator),
+    orgTemplate: await cachedText(COPY_SOURCES.orgTemplate),
     rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
   };
   const errors = checkCopies(policy, texts);
 
-  // A caller whose fetch fails is reported and the loop continues, so one
+  // A consumer whose fetch fails is reported and the loop continues, so one
   // unreachable private repository cannot mask drift findings collected from
   // the rest; any fetch-error still fails the run.
-  const pinTexts = new Map();
-  for (const [repo, callerPath] of Object.entries(GATE_CALLERS)) {
+  const resolutions = new Map();
+  for (const repo of CONSUMER_REPOSITORIES) {
     try {
-      const callerText = await fetchText(contentsUrl(repo, "main", callerPath));
-      const sha = parseCallerPin(callerText, `caller ${repo}`);
-      if (!pinTexts.has(sha)) {
-        pinTexts.set(
-          sha,
-          await fetchText(
-            contentsUrl("ci-workflows", sha, ".github/workflows/pr-issue-linkage.yml"),
-          ),
-        );
+      const found = await resolveConsumerArtifact(repo, cachedText);
+      if (found.kind === "none") {
+        resolutions.set(repo, found);
+        continue;
       }
-      errors.push(...checkPinnedReusable(policy, repo, sha, pinTexts.get(sha)));
+      if (found.kind === "composite") {
+        // `main` means a local `./` reference: the artifact is that
+        // repository's own tree, which for ci-workflows is the gate source
+        // already fetched above (the cache makes this free).
+        const source = found.sha === "main" ? repo : "ci-workflows";
+        const ref = found.sha;
+        resolutions.set(repo, {
+          kind: "composite",
+          sha: found.sha,
+          runSh: await cachedText(contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/run.sh`)),
+          actionYml: await cachedText(
+            contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/action.yml`),
+          ),
+        });
+        continue;
+      }
+      resolutions.set(repo, {
+        kind: "reusable",
+        sha: found.sha,
+        reusable: await cachedText(contentsUrl("ci-workflows", found.sha, REUSABLE_PATH)),
+      });
     } catch (error) {
       if (!(error instanceof FetchError) && !(error instanceof DriftError)) {
         throw error;
       }
-      errors.push(error.message);
+      resolutions.set(repo, { kind: "unresolved" });
+      errors.push(`caller ${repo}: ${error.message}`);
     }
   }
-  return errors;
+
+  const fleet = checkFleet(policy, resolutions);
+  return { errors: [...errors, ...fleet.errors], notes: fleet.notes };
 }
 
 // This block is the CLI entrypoint of a shebang script whose entire contract is
@@ -378,7 +703,11 @@ export async function runLiveCheck() {
 // repo-wide, which would blind the rule everywhere else in this component.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
-    const errors = await runLiveCheck();
+    const { errors, notes } = await runLiveCheck();
+    for (const message of notes) {
+      // biome-ignore lint/suspicious/noConsole: CLI note output is this script's interface
+      console.log(`note: ${message}`);
+    }
     if (errors.length > 0) {
       for (const message of errors) {
         // biome-ignore lint/suspicious/noConsole: CLI drift output is this script's interface
@@ -387,7 +716,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       process.exit(1);
     }
     // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
-    console.log("pr-convention lockstep: all copies and caller pins match policy.json");
+    console.log("pr-convention lockstep: all copies and consumer pins match policy.json");
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
     console.error(error.message);
