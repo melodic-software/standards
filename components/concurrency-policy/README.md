@@ -57,9 +57,39 @@ so it avoids the collision while keeping the identical push/schedule safety.
 GitHub's own documentation presents the `head_ref || run_id` form as the general
 example; this standard tightens it to the number for that reason.
 
-Internal expression whitespace is tolerated (`${{github.workflow}}` and
-`${{ github.workflow }}` are equivalent), and YAML quoting is transparent after
-parsing. The token order and identity are exact.
+Internal expression whitespace is tolerated in the `group` (`${{github.workflow}}`
+and `${{ github.workflow }}` are equivalent), and YAML quoting is transparent
+after parsing. The token order and identity are exact.
+
+## The ci-perf contract-only shape
+
+`cancel-in-progress` accepts one alternative to the literal `true`, and only
+one:
+
+```yaml
+cancel-in-progress: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+```
+
+A workflow whose required check carries the pull-request contract also runs on
+`edited`, `labeled` and `unlabeled` — events that change the contract answer
+without a new commit. Those runs gate every lane off and carry the recorded lane
+verdict forward instead of re-running the lanes, so such a run must never cancel
+the full run it reads that verdict from: cancelling it means the verdict is
+never recorded and the carry-forward can only fail. Expressed as
+`!(<contract-only predicate>)`, cancellation stays on for every full-run event —
+including `synchronize`, which still cancels everything on the superseded SHA —
+and switches off only for the events that carry forward. On `push` the predicate
+is false, so the value is `true` exactly as before.
+
+The predicate is the `contract-only` default of the `ci-status` composite action
+in `melodic-software/ci-workflows` at `.github/actions/ci-status`, tag `v0.20.0`.
+The two must agree: if the workflow's copy drifted, the lanes would gate off
+while the composite still resolved `contract-only` false and aggregated a set of
+`skipped` results. Because agreement is the whole point, this value is compared
+byte for byte — the whitespace tolerance the `group` enjoys does not apply, and
+any other expression, including a reformatted or reordered copy of this one, is
+`concurrency-cancel-missing` as before. The accepted set is exactly two values:
+the literal `true` and the string above.
 
 ## What it checks
 
@@ -70,7 +100,8 @@ For each pull-request-triggered workflow that is not excepted:
   example `${{ github.workflow }}-${{ github.ref }}`, which lets two
   default-branch or scheduled runs cancel each other, or the `head_ref` variant
   above).
-- `concurrency-cancel-missing`: `cancel-in-progress` is not the literal `true`.
+- `concurrency-cancel-missing`: `cancel-in-progress` is neither the literal
+  `true` nor the ci-perf contract-only expression above.
 - `concurrency-malformed`: `concurrency` is neither a group string nor a
   mapping.
 - `concurrency-extra-keys`: the block carries a key other than `group` and

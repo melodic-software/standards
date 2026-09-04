@@ -63,6 +63,20 @@ const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 const CANONICAL_GROUP =
   /^\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.run_id\s*\}\}$/u;
 const CANONICAL_GROUP_TEXT = `\${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}`;
+
+// The ci-perf contract-only shape. A workflow whose required check carries the
+// pull-request contract re-runs on `edited`, `labeled` and `unlabeled`, events
+// that change the contract answer without a new commit. Those runs gate every
+// lane off and carry the recorded lane verdict forward, so they must never
+// cancel the full run they read that verdict from: cancelling it means the
+// verdict is never recorded and the carry-forward can only fail. The predicate
+// is the one the `ci-status` composite in ci-workflows carries as its
+// `contract-only` default at v0.20.0, and it must match that default exactly —
+// a drifted copy would gate lanes off while the composite still aggregates, so
+// the only accepted form here is the byte-identical expression below. Unlike
+// `group`, no whitespace or clause variation is tolerated: this is a
+// fail-closed allow-list of two values, the literal `true` and this string.
+const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}`;
 const ALLOWED_CONCURRENCY_KEYS = new Set(["group", "cancel-in-progress"]);
 
 function finding(rule, file, message) {
@@ -216,12 +230,16 @@ function concurrencyFindings(file, workflow) {
       ),
     );
   }
-  if (concurrency.cancelInProgress !== true) {
+  if (
+    concurrency.cancelInProgress !== true &&
+    concurrency.cancelInProgress !== CONTRACT_ONLY_CANCEL_TEXT
+  ) {
     findings.push(
       finding(
         "concurrency-cancel-missing",
         file,
-        `top-level concurrency.cancel-in-progress must be the literal true, found ` +
+        `top-level concurrency.cancel-in-progress must be the literal true or the ci-perf ` +
+          `contract-only expression \`${CONTRACT_ONLY_CANCEL_TEXT}\`, found ` +
           `${JSON.stringify(concurrency.cancelInProgress ?? null)}`,
       ),
     );
