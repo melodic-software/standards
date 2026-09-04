@@ -83,10 +83,18 @@ export const CONSUMER_REPOSITORIES = [
   "standards",
 ];
 
-// The three repositories the sync does not reach and the org `ci-gate` ruleset
-// does not cover. A repository with neither artifact is REPORTED here and
-// FAILS anywhere else: a gated repository that lost its contract check is the
-// drift this lane exists to catch.
+// The three repositories outside the `pr-body-contract-rule` sync roster
+// (nine targets in `distribution/sync-manifest.yml`, not twelve). A repository
+// with neither artifact is REPORTED here and FAILS anywhere else: a gated
+// repository that lost its contract check is the drift this lane exists to
+// catch.
+//
+// The exemption is narrower than it looks and should shrink to nothing. The
+// manifest records (2026-09-04) that github-iac#367 already extended the org
+// `ci-gate` ruleset to all three and that each carries the four required
+// contexts, so a lost caller here is as much a gate removal as anywhere else.
+// Revisit at Phase 3.3, which flips `requires-ci = true` for exactly these
+// three.
 export const UNSYNCED_REPOSITORIES = ["agent-plugins", "claude-code-proxy", "cursor-plugins"];
 
 // The composite is called from the `ci-status` job, which lives in `ci.yml`
