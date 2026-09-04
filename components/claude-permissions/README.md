@@ -19,10 +19,22 @@ the primary consumer merges the file into a shared template-data namespace) carr
   `Bash()` and `PowerShell()` rule spellings, bare and starred argument forms; the `gh api`
   DELETE surface for org/repo/security-critical resources; hook-disable environment
   prefixes; network-share mounts; and secret-material `Read()` patterns (key files, env
-  files, credential stores, and `~/.claude.json` / `**/.claude.json`, which officially
-  hold sign-in session state and MCP server configuration) in both bare and `**/`-prefixed
-  forms plus the home-anchored `~/` spelling that relative globs miss from a project
-  directory. The union is deliberately the STRICTEST observed form of each rule.
+  files, credential stores) in both bare and `**/`-prefixed forms. The union is
+  deliberately the STRICTEST observed form of each rule.
+
+  **`~/.claude.json` is deliberately not on the floor.** It was, in both the `**/` and
+  home-anchored spellings, and both rows were retired for the reason the
+  `settings.local.json` rows below were: a `Read` deny also blocks Edit and Write on the
+  same path, so the rows blocked the documented way to *manage* the file rather than only
+  reads of it. They also never denied a determined reader, because official docs record
+  that a Read/Edit denial does not apply to a subprocess that opens the file itself, which
+  remains the expressible diagnostic path. `Read()` rules are path/glob only, so no rule
+  could keep the sign-in session and MCP server fields denied while leaving the rest
+  reachable; the choice was all or nothing, and a rule that stops first-class tools while
+  leaving a one-line subprocess read open is not a security boundary. The file still holds
+  sign-in session state and MCP server configuration, and that material is now protected by
+  operator judgment rather than by a floor rule that could not express the distinction.
+  Consumers wanting the old posture can re-add either spelling to their own `deny`.
 
   **`.claude/settings.local.json` is deliberately not on the floor.** Official settings
   docs classify it as personal project overrides and the save target for "Yes, and don't
@@ -34,11 +46,9 @@ the primary consumer merges the file into a shared template-data namespace) carr
   at the repository root even when the session starts in a subdirectory — so the
   coverage was incomplete in the sessions that matter. `Read()` rules are path/glob
   only; there is no JSON-key filter that could keep MCP/OAuth fields denied while
-  exposing `skillUsage` counters. Those counters live in `.claude.json` and stay
-  denied; official docs also record that Read/Edit denials do not apply to a
-  subprocess that opens the file itself, which is the expressible diagnostic path.
-  `CLAUDE_CONFIG_DIR` can relocate `.claude.json` outside both remaining patterns;
-  that residual is accepted.
+  exposing `skillUsage` counters. Those counters live in `.claude.json`, which is no
+  longer denied at all (see the entry above), so the point is now moot rather than a
+  residual: nothing in this floor distinguishes one key of that file from another.
 - **`allow`** lists the grants an unattended agent loop needs that no built-in mechanism carries:
   the routine non-destructive working verbs (add, commit, non-force push, pull,
   checkout/switch, PR and issue CRUD), the babysit lane's gate tooling, and the read-only
