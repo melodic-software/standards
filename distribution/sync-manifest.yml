@@ -319,13 +319,13 @@ components:
 # self-merged 31 seconds later with all four required contexts green. An
 # absent automerge key is the armed default, and the fleet is armed.
 #
-# The three surviving opt-outs are NOT roster vintage. Each names a live
-# per-target blocker at its own key, with its own removal trigger; all three
-# share one root cause — their default branches sit outside the org ci-gate
-# ruleset, so they have no required status checks for an armed PR to wait on.
-# codex-plugins entered in the same Phase 4 window and IS armed, because it
-# carries ci-gate. The key stays available fleet-wide as a per-target opt-out
-# for any future staged rollout.
+# No per-target opt-out remains as of 2026-09-04. The last three
+# (agent-plugins, cursor-plugins, claude-code-proxy) were disarmed only because
+# their default branches sat outside the org ci-gate ruleset; github-iac#367
+# extended the ruleset to them once each carried the four required contexts,
+# and their keys were dropped with the dated evidence recorded at each target.
+# The key stays available fleet-wide as a per-target opt-out for any future
+# staged rollout.
 targets:
   melodic-software/.github:
     managed:
@@ -354,16 +354,10 @@ targets:
       - markdownlint
       - repository-text
       - typos
-    # Disarmed because this repository's default branch is not covered by the
-    # org ci-gate ruleset: it carries no required status checks at all, so an
-    # armed sync PR would merge with nothing gating it. Its whole check rollup
-    # on PR 2 is a single GitGuardian entry. NOT a roster-vintage or first-sync
-    # opt-out — codex-plugins entered in the same Phase 4 window and is armed,
-    # because it carries ci-gate. Removal trigger: extend ci-gate to this
-    # repository (a Pulumi change in the github-iac repo, never the GitHub UI
-    # or ad-hoc gh), then drop this key once one real sync PR shows all four
-    # required contexts firing.
-    automerge: false
+    # Armed as of 2026-09-04: agent-plugins#11 landed ci.yml plus the three
+    # metadata callers, probe PR agent-plugins#12 showed pr-title,
+    # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
+    # github-iac#367 extended the org ci-gate ruleset to this repository.
   melodic-software/ci-runner:
     managed:
       - cloud-bootstrap
@@ -498,20 +492,14 @@ targets:
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
       - ruff
-    # Disarmed, and the strongest case in the fleet: this repository's default
-    # branch carries no required status checks, and its checks are red. PR 182
-    # merged 2026-08-23 with ci-status, Ruff, Pester and pytest all FAILURE,
-    # precisely because none of them are required. Arming here would self-merge
-    # sync PRs through an open gate. Removal trigger: extend the org ci-gate
-    # ruleset to this repository (a Pulumi change in the github-iac repo, never
-    # the GitHub UI or ad-hoc gh), get the checks green, then drop this key once
-    # one real sync PR shows all four required contexts firing.
-    automerge: false
-  # Armed, unlike its two Phase 4 siblings: codex-plugins is the one marketplace
-  # target whose default branch is covered by the org ci-gate ruleset, so the
-  # four required contexts actually gate its sync PRs (verified on PR 22,
+    # Armed as of 2026-09-04: main CI has been green since 2026-09-03,
+    # claude-code-proxy#214 landed the three metadata callers beside the
+    # existing ci-status emitter, and github-iac#367 extended the org ci-gate
+    # ruleset to this repository so the four contexts are required.
+  # Armed since Phase 4: codex-plugins was the first marketplace target whose
+  # default branch was covered by the org ci-gate ruleset (verified on PR 22,
   # 2026-08-23 — pr-title, pr-issue-linkage, do-not-merge and ci-status all
-  # SUCCESS). The siblings stay disarmed for exactly that coverage's absence.
+  # SUCCESS). Its two siblings joined it on 2026-09-04 via github-iac#367.
   melodic-software/codex-plugins:
     managed:
       - cloud-bootstrap
@@ -533,16 +521,10 @@ targets:
       - markdownlint
       - repository-text
       - typos
-    # Disarmed because this repository's default branch is not covered by the
-    # org ci-gate ruleset: it carries no required status checks at all, so an
-    # armed sync PR would merge with nothing gating it. Its whole check rollup
-    # on PR 12 is a single GitGuardian entry. NOT a roster-vintage opt-out —
-    # codex-plugins entered in the same Phase 4 window and is armed, because it
-    # carries ci-gate. Removal trigger: extend ci-gate to this repository (a
-    # Pulumi change in the github-iac repo, never the GitHub UI or ad-hoc gh),
-    # then drop this key once one real sync PR shows all four required contexts
-    # firing.
-    automerge: false
+    # Armed as of 2026-09-04: cursor-plugins#24 landed a ci-status aggregate
+    # plus the three metadata callers, probe PR cursor-plugins#25 showed all
+    # four contexts SUCCESS, and github-iac#367 extended the org ci-gate
+    # ruleset to this repository.
   melodic-software/dotfiles:
     managed:
       - actionlint
