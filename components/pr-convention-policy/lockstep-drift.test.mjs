@@ -216,7 +216,8 @@ test("composite keyword/marker regressions are caught functionally, not by menti
 // The composite's awk patterns are lowercase and match text the analyzer has
 // already lowercased. Probing them with lowercased input is only correct while
 // that lowercasing is there; a composite that dropped it would become
-// case-sensitive against raw text and reject `Closes #12`. The extractor must
+// case-sensitive against raw text and reject the capitalised keyword forms the
+// contract documents. The extractor must
 // refuse to certify it rather than probe a pattern the gate no longer applies.
 test("a composite that stops lowercasing the line is drift, not a pass", () => {
   const texts = goodTexts();
@@ -346,6 +347,19 @@ test("a local composite reference resolves to main, and a bare path does not", (
 
 test("a workflow with neither artifact detects nothing", () => {
   assert.equal(detectArtifactPin("jobs:\n  build:\n    runs-on: ubuntu-24.04\n"), null);
+});
+
+// A migration leaves commented-out call sites behind. Selecting an artifact a
+// repository does not run would suppress detection of the one it does, and a
+// repository that had lost its last live caller would validate an unused
+// artifact instead of reporting that it runs neither.
+test("a commented-out call site is not a call site", () => {
+  assert.equal(detectArtifactPin(`      # ${COMPOSITE_STEP.trim()}\n`), null);
+  assert.equal(detectArtifactPin(`    # ${REUSABLE_CALL.trim()}\n`), null);
+  assert.equal(
+    detectArtifactPin(`      # - uses: ./.github/actions/pr-contract\n${REUSABLE_CALL}\n`).kind,
+    "reusable",
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -274,16 +274,28 @@ export function parseValidatorPatterns(shellText, location) {
 // Which artifact a consumer runs.
 // ---------------------------------------------------------------------------
 
+// Every pattern below anchors on a `uses:` entry with no `#` earlier on the
+// line, so only a live call site counts. The same paths appear elsewhere in
+// ci-workflows' own `ci.yml` as a lint `paths:` list and as a
+// `bash .github/actions/pr-contract/run.test.sh` command, and a migration
+// leaves commented-out call sites behind; either one would otherwise select an
+// artifact the repository does not run and suppress the one it does.
+const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
 // A `uses:` of the composite, pinned to a 40-hex ci-workflows SHA.
-const COMPOSITE_PIN_PATTERN =
-  /melodic-software\/ci-workflows\/\.github\/actions\/pr-contract@([0-9a-f]{40})/;
+const COMPOSITE_PIN_PATTERN = new RegExp(
+  `${USES_PREFIX}melodic-software/ci-workflows/\\.github/actions/pr-contract@([0-9a-f]{40})`,
+  "m",
+);
 // ci-workflows dogfoods its own composite through a local `./` reference,
 // which carries no SHA — the artifact is that repository's own tree at `main`.
-// Anchored on `uses:` so the same path in a lint `paths:` list or a
-// `bash .github/actions/pr-contract/run.test.sh` line is not mistaken for a
-// call site.
-const COMPOSITE_LOCAL_PATTERN = /uses:\s*\.\/\.github\/actions\/pr-contract(?=\s|$)/m;
-const REUSABLE_PIN_PATTERN = /pr-issue-linkage\.yml@([0-9a-f]{40})/;
+const COMPOSITE_LOCAL_PATTERN = new RegExp(
+  `${USES_PREFIX}\\./\\.github/actions/pr-contract(?=\\s|$)`,
+  "m",
+);
+const REUSABLE_PIN_PATTERN = new RegExp(
+  `${USES_PREFIX}\\S*pr-issue-linkage\\.yml@([0-9a-f]{40})`,
+  "m",
+);
 
 // The composite wins over the reusable: during the Phase 3 transition
 // ci-workflows carries both (its `pr-issue-linkage-self.yml` caller stays
