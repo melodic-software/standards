@@ -83,19 +83,13 @@ export const CONSUMER_REPOSITORIES = [
   "standards",
 ];
 
-// The three repositories outside the `pr-body-contract-rule` sync roster
-// (nine targets in `distribution/sync-manifest.yml`, not twelve). A repository
-// with neither artifact is REPORTED here and FAILS anywhere else: a gated
-// repository that lost its contract check is the drift this lane exists to
-// catch.
-//
-// The exemption is narrower than it looks and should shrink to nothing. The
-// manifest records (2026-09-04) that github-iac#367 already extended the org
-// `ci-gate` ruleset to all three and that each carries the four required
-// contexts, so a lost caller here is as much a gate removal as anywhere else.
-// Revisit at Phase 3.3, which flips `requires-ci = true` for exactly these
-// three.
-export const UNSYNCED_REPOSITORIES = ["agent-plugins", "claude-code-proxy", "cursor-plugins"];
+// There is no exemption: every repository above must run one of the two
+// contract artifacts, and running neither is drift. agent-plugins,
+// claude-code-proxy and cursor-plugins were carried as a non-failing report
+// while they sat outside the org `ci-gate` ruleset; `sync-manifest.yml` records
+// that github-iac#367 extended the ruleset to all three and that each carries
+// the required contexts, so a lost caller there is as much a gate removal as
+// anywhere else. Fail closed.
 
 // The composite is called from the `ci-status` job, which lives in `ci.yml`
 // everywhere except medley. Scanning these first lets the common case
@@ -169,18 +163,21 @@ export function parseCompositePatterns(runShText, location) {
   return { keyword: new RegExp(keyword[1]), marker: new RegExp(marker[1]) };
 }
 
+function parseActionYml(actionYmlText, location) {
+  try {
+    return parseYaml(actionYmlText);
+  } catch (error) {
+    throw new DriftError(`${location}: action.yml is not parsable YAML: ${error.message}`);
+  }
+}
+
 // `action.yml`'s `inputs.types.default` is the composite's copy of
 // `policy.json`'s `allowedTypes`: the title regex is built from it at runtime,
 // and no caller in the fleet overrides it. Parsed as YAML rather than by
 // regex so the anchor is the data key, not the shape of the description block
 // above it.
 export function parseCompositeTypes(actionYmlText, location) {
-  let document;
-  try {
-    document = parseYaml(actionYmlText);
-  } catch (error) {
-    throw new DriftError(`${location}: action.yml is not parsable YAML: ${error.message}`);
-  }
+  const document = parseActionYml(actionYmlText, location);
   const declared = document?.inputs?.types?.default;
   if (typeof declared !== "string") {
     throw new DriftError(`${location}: action.yml declares no string \`inputs.types.default\``);
@@ -193,6 +190,30 @@ export function parseCompositeTypes(actionYmlText, location) {
     throw new DriftError(`${location}: the \`types\` input default is empty`);
   }
   return types;
+}
+
+// `inputs.require-scope.default` is the composite's copy of `policy.json`'s
+// `title.requireScope`, and the title regex makes the scope group mandatory
+// when it is `true`. A composite release that flipped it would reject every
+// unscoped title fleet-wide while the section and type checks still reported
+// agreement. YAML gives back a string for the quoted `'false'` the composite
+// declares and a boolean for a bare `false`; both are accepted, anything else
+// is drift rather than a coerced guess.
+export function parseCompositeRequireScope(actionYmlText, location) {
+  const document = parseActionYml(actionYmlText, location);
+  const declared = document?.inputs?.["require-scope"]?.default;
+  if (declared === true || declared === "true") {
+    return true;
+  }
+  if (declared === false || declared === "false") {
+    return false;
+  }
+  if (declared === undefined) {
+    throw new DriftError(`${location}: action.yml declares no \`inputs.require-scope.default\``);
+  }
+  throw new DriftError(
+    `${location}: \`inputs.require-scope.default\` is not a boolean: ${JSON.stringify(declared)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +403,12 @@ function assertAllowedTypes(actual, expected, location) {
   );
 }
 
+function assertRequireScope(actual, expected, location) {
+  if (actual !== expected) {
+    throw new DriftError(`${location}: require-scope is ${actual}, policy says ${expected}`);
+  }
+}
+
 function assertContainsSections(headings, expected, location) {
   const missing = expected.filter((name) => !headings.includes(name));
   if (missing.length > 0) {
@@ -424,6 +451,13 @@ export function checkCopies(policy, texts) {
       parseCompositeTypes(texts.gateAction, "gate composite"),
       policy.title.allowedTypes,
       "gate composite (title types)",
+    ),
+  );
+  run(() =>
+    assertRequireScope(
+      parseCompositeRequireScope(texts.gateAction, "gate composite"),
+      policy.title.requireScope,
+      "gate composite (require-scope)",
     ),
   );
   run(() =>
@@ -500,10 +534,11 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
 }
 
 // The composite's equivalent: sections and enforcement patterns from `run.sh`,
-// allowed title types from `action.yml`. The types are checked at the pin
-// because a consumer pinned to a pre-`security` composite would reject a
-// `security:` title that policy allows — drift the source-copy check on `main`
-// cannot see.
+// allowed title types and `require-scope` from `action.yml`. Both title axes
+// are checked at the pin because a consumer pinned to a pre-`security`
+// composite would reject a `security:` title that policy allows, and one
+// pinned to a `require-scope: true` composite would reject every unscoped
+// title — drift the source-copy check on `main` cannot see.
 export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText) {
   const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
@@ -527,16 +562,22 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
       location,
     ),
   );
+  run(() =>
+    assertRequireScope(
+      parseCompositeRequireScope(actionYmlText, location),
+      policy.title.requireScope,
+      location,
+    ),
+  );
   return errors;
 }
 
 // One verdict per consumer over a resolved fleet. `kind: "none"` is a drift
-// finding everywhere except the three repositories the sync does not reach,
-// where it is a note; `kind: "unresolved"` means the live loop already
-// recorded a fetch failure for that repository and this pass adds nothing.
+// finding for every repository, with no exemption; `kind: "unresolved"` means
+// the live loop already recorded a fetch failure for that repository and this
+// pass adds nothing.
 export function checkFleet(policy, resolutions) {
   const errors = [];
-  const notes = [];
   for (const repo of CONSUMER_REPOSITORIES) {
     const resolution = resolutions.get(repo);
     if (resolution === undefined) {
@@ -547,12 +588,7 @@ export function checkFleet(policy, resolutions) {
       continue;
     }
     if (resolution.kind === "none") {
-      const message = `caller ${repo}: no pr-contract composite step and no pr-issue-linkage caller`;
-      if (UNSYNCED_REPOSITORIES.includes(repo)) {
-        notes.push(`${message} (known unsynced repository; reported, not failed)`);
-      } else {
-        errors.push(message);
-      }
+      errors.push(`caller ${repo}: no pr-contract composite step and no pr-issue-linkage caller`);
       continue;
     }
     if (resolution.kind === "composite") {
@@ -569,7 +605,7 @@ export function checkFleet(policy, resolutions) {
     }
     errors.push(...checkPinnedReusable(policy, repo, resolution.sha, resolution.reusable));
   }
-  return { errors, notes };
+  return errors;
 }
 
 // ---------------------------------------------------------------------------
@@ -713,8 +749,8 @@ export async function runLiveCheck() {
     }
   }
 
-  const fleet = checkFleet(policy, resolutions);
-  return { errors: [...errors, ...fleet.errors], notes: fleet.notes };
+  errors.push(...checkFleet(policy, resolutions));
+  return errors;
 }
 
 // This block is the CLI entrypoint of a shebang script whose entire contract is
@@ -723,11 +759,7 @@ export async function runLiveCheck() {
 // repo-wide, which would blind the rule everywhere else in this component.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
-    const { errors, notes } = await runLiveCheck();
-    for (const message of notes) {
-      // biome-ignore lint/suspicious/noConsole: CLI note output is this script's interface
-      console.log(`note: ${message}`);
-    }
+    const errors = await runLiveCheck();
     if (errors.length > 0) {
       for (const message of errors) {
         // biome-ignore lint/suspicious/noConsole: CLI drift output is this script's interface

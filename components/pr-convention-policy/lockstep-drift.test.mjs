@@ -13,13 +13,13 @@ import {
   DriftError,
   detectArtifactPin,
   parseCallerPin,
+  parseCompositeRequireScope,
   parseCompositeSections,
   parseCompositeTypes,
   parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
   parseValidatorSections,
-  UNSYNCED_REPOSITORIES,
 } from "./lockstep-drift.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
@@ -125,6 +125,10 @@ test("parsers extract the narrow surfaces", () => {
     parseCompositeTypes(GOOD_COMPOSITE_ACTION, "composite"),
     POLICY.title.allowedTypes,
   );
+  assert.equal(
+    parseCompositeRequireScope(GOOD_COMPOSITE_ACTION, "composite"),
+    POLICY.title.requireScope,
+  );
   assert.deepEqual(parseGateSections(GOOD_GATE, "gate"), POLICY.body.requiredSections);
   assert.deepEqual(
     parseValidatorSections(GOOD_VALIDATOR, "validator"),
@@ -168,6 +172,41 @@ test("a composite type list that adds a type policy does not allow is reported",
   );
   assert.equal(errors.length, 1);
   assert.match(errors[0], /unexpected wip/);
+});
+
+// A composite that flipped `require-scope` would reject every unscoped title
+// fleet-wide while the section and type checks still reported agreement.
+test("a composite that flips require-scope away from policy is reported", () => {
+  const texts = goodTexts();
+  texts.gateAction = texts.gateAction.replace("default: 'false'", "default: 'true'");
+  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("require-scope"));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /require-scope is true, policy says false/);
+});
+
+// YAML gives a string for the quoted `'false'` the composite declares and a
+// boolean for a bare `false`; both mean the same thing to Actions, and anything
+// else is drift rather than a coerced guess.
+test("require-scope accepts either YAML spelling and refuses a non-boolean", () => {
+  assert.equal(
+    parseCompositeRequireScope(
+      GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: false"),
+      "composite",
+    ),
+    false,
+  );
+  assert.throws(
+    () =>
+      parseCompositeRequireScope(
+        GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: maybe"),
+        "composite",
+      ),
+    DriftError,
+  );
+  assert.throws(
+    () => parseCompositeRequireScope("name: pr-contract\ninputs:\n  types:\n", "composite"),
+    DriftError,
+  );
 });
 
 test("mutated validator section list is reported", () => {
@@ -369,12 +408,7 @@ test("a commented-out call site is not a call site", () => {
 function fleetResolutions(overrides = {}) {
   const resolutions = new Map();
   for (const repo of CONSUMER_REPOSITORIES) {
-    resolutions.set(
-      repo,
-      UNSYNCED_REPOSITORIES.includes(repo)
-        ? { kind: "none" }
-        : { kind: "reusable", sha: "a".repeat(40), reusable: GOOD_GATE },
-    );
+    resolutions.set(repo, { kind: "reusable", sha: "a".repeat(40), reusable: GOOD_GATE });
   }
   // ci-workflows dogfoods the composite from its own tree.
   resolutions.set("ci-workflows", {
@@ -396,8 +430,8 @@ const compositeAt = (sha, runSh = GOOD_COMPOSITE_RUN, actionYml = GOOD_COMPOSITE
   actionYml,
 });
 
-test("a mixed fleet passes: composite consumers, reusable consumers, and the three unsynced", () => {
-  const { errors, notes } = checkFleet(
+test("a mixed fleet of composite and reusable consumers passes", () => {
+  const errors = checkFleet(
     POLICY,
     fleetResolutions({
       "codex-plugins": compositeAt("4".repeat(40)),
@@ -405,20 +439,17 @@ test("a mixed fleet passes: composite consumers, reusable consumers, and the thr
     }),
   );
   assert.deepEqual(errors, []);
-  assert.equal(notes.length, UNSYNCED_REPOSITORIES.length);
-  for (const repo of UNSYNCED_REPOSITORIES) {
-    assert.ok(
-      notes.some((note) => note.startsWith(`caller ${repo}:`)),
-      `${repo} is reported, not failed`,
-    );
-  }
 });
 
-test("a gated repository running neither artifact fails, unlike the unsynced three", () => {
-  const { errors, notes } = checkFleet(POLICY, fleetResolutions({ dotfiles: { kind: "none" } }));
-  assert.equal(errors.length, 1);
-  assert.match(errors[0], /caller dotfiles: no pr-contract composite step/);
-  assert.equal(notes.length, UNSYNCED_REPOSITORIES.length);
+// Fail-closed, with no per-repository exemption: github-iac#367 put every
+// repository in the roster under the org `ci-gate` ruleset, so a repository
+// running neither artifact is a gate removal wherever it happens.
+test("a repository running neither artifact fails the fleet, whichever repository it is", () => {
+  for (const repo of ["dotfiles", "agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+    const errors = checkFleet(POLICY, fleetResolutions({ [repo]: { kind: "none" } }));
+    assert.equal(errors.length, 1, `${repo} produces exactly one finding`);
+    assert.match(errors[0], new RegExp(`caller ${repo}: no pr-contract composite step`));
+  }
 });
 
 test("types drift at one composite consumer fails the fleet", () => {
@@ -427,9 +458,20 @@ test("types drift at one composite consumer fails the fleet", () => {
     GOOD_COMPOSITE_RUN,
     GOOD_COMPOSITE_ACTION.replace(",security", ""),
   );
-  const { errors } = checkFleet(POLICY, fleetResolutions({ medley: drifted }));
+  const errors = checkFleet(POLICY, fleetResolutions({ medley: drifted }));
   assert.equal(errors.length, 1);
   assert.match(errors[0], /caller medley pin 6666666: allowed title types missing security/);
+});
+
+test("require-scope drift at one composite consumer fails the fleet", () => {
+  const drifted = compositeAt(
+    "a1".repeat(20),
+    GOOD_COMPOSITE_RUN,
+    GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: 'true'"),
+  );
+  const errors = checkFleet(POLICY, fleetResolutions({ dotfiles: drifted }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller dotfiles pin a1a1a1a: require-scope is true, policy says false/);
 });
 
 test("sections drift at one composite consumer fails the fleet", () => {
@@ -437,7 +479,7 @@ test("sections drift at one composite consumer fails the fleet", () => {
     "7".repeat(40),
     GOOD_COMPOSITE_RUN.replace('section_report("Verification")', 'section_report("Evidence")'),
   );
-  const { errors } = checkFleet(POLICY, fleetResolutions({ provisioning: drifted }));
+  const errors = checkFleet(POLICY, fleetResolutions({ provisioning: drifted }));
   assert.equal(errors.length, 1);
   assert.match(errors[0], /caller provisioning pin 7777777: section list/);
 });
@@ -448,24 +490,19 @@ test("sections drift at one reusable consumer still fails the fleet", () => {
     sha: "8".repeat(40),
     reusable: GOOD_GATE.replace('"Fix"', '"Patch"'),
   };
-  const { errors } = checkFleet(POLICY, fleetResolutions({ "ci-runner": drifted }));
+  const errors = checkFleet(POLICY, fleetResolutions({ "ci-runner": drifted }));
   assert.equal(errors.length, 1);
   assert.match(errors[0], /caller ci-runner pin 8888888: section list/);
 });
 
 test("a repository whose fetch already failed is not double-reported", () => {
-  const { errors, notes } = checkFleet(
-    POLICY,
-    fleetResolutions({ standards: { kind: "unresolved" } }),
-  );
+  const errors = checkFleet(POLICY, fleetResolutions({ standards: { kind: "unresolved" } }));
   assert.deepEqual(errors, []);
-  assert.equal(notes.length, UNSYNCED_REPOSITORIES.length);
 });
 
-test("consumer roster covers all thirteen repositories, three of them unsynced", () => {
+test("consumer roster covers all thirteen repositories", () => {
   assert.equal(CONSUMER_REPOSITORIES.length, 13);
-  assert.equal(UNSYNCED_REPOSITORIES.length, 3);
-  for (const repo of UNSYNCED_REPOSITORIES) {
+  for (const repo of ["agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
     assert.ok(CONSUMER_REPOSITORIES.includes(repo), `${repo} is in the roster`);
   }
 });

@@ -59,7 +59,8 @@ component encodes the rule the gate enforces. The authoritative gate is the
 contract: the section list as the `section_report("<name>")` calls in
 [`run.sh`](https://github.com/melodic-software/ci-workflows/blob/main/.github/actions/pr-contract/run.sh),
 the closing keywords and no-issue markers as the awk patterns beside them, and
-the allowed title types as the `types` input default in `action.yml`. Those
+the allowed title types and the scope requirement as the `types` and
+`require-scope` input defaults in `action.yml`. Those
 copies must change in lockstep with `policy.json`; letting them drift is
 exactly the failure #393 recorded. That lockstep is enforced by
 [`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008), which the
