@@ -583,7 +583,7 @@ assert_eq 'production validate batches tracked-source ls-files calls' '1' \
   "$(cat "$spawn_count_dir/ls-files")"
 assert_eq 'production validate batches tracked-source hash-object calls' '1' \
   "$(cat "$spawn_count_dir/hash-object")"
-assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 12 targets'
+assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 13 targets'
 
 if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   rm "$tmp_root/symlink-probe"
@@ -631,10 +631,13 @@ assert_eq 'lefthook-dotnet production CLI source is executable in the Git index'
   "$(git -C "$root" ls-files --stage -- "$lefthook_dotnet_source" | awk '{print $1}')"
 
 # Exercise every production target that carries either CLI, not only the
-# generic executable fixture. Linux is the deployment environment that records
-# worktree modes in materialization PR indexes; source-index assertions remain
+# generic executable fixture. Each CLI's assertions run only where the target
+# manages that component: a public .NET target carries lefthook-dotnet without
+# runner-policy (runner-policy is a private selector-routed consumer's file).
+# Linux is the deployment environment that records worktree modes in
+# materialization PR indexes; source-index assertions remain
 # platform-independent and fail before apply if either production mode regresses.
-while IFS=$'\t' read -r production_slug includes_dotnet; do
+while IFS=$'\t' read -r production_slug includes_runner_policy includes_dotnet; do
   production_target="$tmp_root/production-${production_slug//\//-}"
   make_target "$production_target" "$production_slug"
   out="$(
@@ -646,19 +649,21 @@ while IFS=$'\t' read -r production_slug includes_dotnet; do
   )"
   rc=$?
   assert_exit "$production_slug production mapping applies" 0 "$rc"
-  assert_contains "$production_slug runner-policy apply reports executable mode" "$out" \
-    "$runner_policy_source -> $runner_policy_destination (100755)"
-  assert_file_exists "$production_slug runner-policy CLI reaches the target" \
-    "$production_target/$runner_policy_destination"
-  if [[ "$(uname -s)" == Linux* ]]; then
-    assert_eq "$production_slug runner-policy target worktree mode is executable" 755 \
-      "$(stat -c '%a' "$production_target/$runner_policy_destination")"
-    git -C "$production_target" add -- "$runner_policy_destination"
-    assert_eq "$production_slug runner-policy target index mode is executable" 100755 \
-      "$(git -C "$production_target" ls-files --stage -- "$runner_policy_destination" | awk '{print $1}')"
-  else
-    skip_case "$production_slug runner-policy worktree mode requires a mode-preserving filesystem"
-    skip_case "$production_slug runner-policy index mode requires a mode-preserving filesystem"
+  if [[ "$includes_runner_policy" == true ]]; then
+    assert_contains "$production_slug runner-policy apply reports executable mode" "$out" \
+      "$runner_policy_source -> $runner_policy_destination (100755)"
+    assert_file_exists "$production_slug runner-policy CLI reaches the target" \
+      "$production_target/$runner_policy_destination"
+    if [[ "$(uname -s)" == Linux* ]]; then
+      assert_eq "$production_slug runner-policy target worktree mode is executable" 755 \
+        "$(stat -c '%a' "$production_target/$runner_policy_destination")"
+      git -C "$production_target" add -- "$runner_policy_destination"
+      assert_eq "$production_slug runner-policy target index mode is executable" 100755 \
+        "$(git -C "$production_target" ls-files --stage -- "$runner_policy_destination" | awk '{print $1}')"
+    else
+      skip_case "$production_slug runner-policy worktree mode requires a mode-preserving filesystem"
+      skip_case "$production_slug runner-policy index mode requires a mode-preserving filesystem"
+    fi
   fi
 
   if [[ "$includes_dotnet" == true ]]; then
@@ -681,7 +686,7 @@ done < <(
   yq -r \
     '.targets | to_entries[] |
      select(.value.managed | any_c(. == "runner-policy" or . == "lefthook-dotnet")) |
-     [.key, (.value.managed | any_c(. == "lefthook-dotnet"))] | @tsv' \
+     [.key, (.value.managed | any_c(. == "runner-policy")), (.value.managed | any_c(. == "lefthook-dotnet"))] | @tsv' \
     "$actual_manifest"
 )
 
@@ -758,7 +763,7 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
     '[.targets | to_entries[] | select(.value.managed[]? == "go-analysis") | .key]' \
     "$actual_manifest")"
 
-expected_review_instructions_targets='["melodic-software/ci-workflows","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
+expected_review_instructions_targets='["melodic-software/account-rotation","melodic-software/ci-workflows","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
 actual_review_instructions_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "review-instructions") | .key]' \

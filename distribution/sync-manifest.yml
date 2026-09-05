@@ -338,6 +338,38 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - typos
+  # Adopted 2026-09-05 at repository creation (github-iac governs it; the
+  # Pulumi entry and this target land in the same window). A public .NET tool
+  # repo, so the set is github-iac's minus what a public hosted-only target
+  # cannot carry: `claude-settings-github-iac` (per-target settings file),
+  # `runner-policy` (private selector-routed consumers only), and both
+  # `components/claude-lanes/` callers, which name the private fleet's runner
+  # label and are refused on a public repository (see the
+  # `claude-security-review-caller` note above). Hosted lane callers arrive by
+  # repo-local PR, the claude-code-plugins route. Plus the hosted-only
+  # `managed-files-guard-caller`, which every public target carries.
+  # `automerge: false` because the repository sits outside the org ci-gate
+  # ruleset until github-iac flips its requires-ci, so an armed sync PR would
+  # merge ungated; removal trigger: that flip, in the change that lands the
+  # four ci-gate callers.
+  melodic-software/account-rotation:
+    automerge: false
+    managed:
+      - cloud-bootstrap
+      - dotnet-analysis
+      - editorconfig-checker
+      - gitleaks
+      - lefthook-base
+      - lefthook-dotnet
+      - lychee
+      - managed-files-guard-caller
+      - markdownlint
+      - node-runtime
+      - pr-body-contract-rule
+      - repository-text
+      - review-instructions
+      - shellcheck
+      - typos
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
   # no considered exclusion is overridden). Same shape as the two sibling

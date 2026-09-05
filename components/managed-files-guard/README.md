@@ -40,9 +40,10 @@ repository and on a private repository not enrolled for local CI routing, so
 one file serves both without a per-visibility variant. This hop is therefore
 managed for exactly the hosted-only-eligible targets:
 
-- `melodic-software/.github`, `agent-plugins`, `ci-runner`,
-  `claude-code-plugins`, `codex-plugins`, `cursor-plugins` (public), and
-  `claude-code-proxy` (private, not enrolled for selector routing).
+- `melodic-software/.github`, `account-rotation`, `agent-plugins`,
+  `ci-runner`, `claude-code-plugins`, `codex-plugins`, `cursor-plugins`
+  (public), and `claude-code-proxy` (private, not enrolled for selector
+  routing).
 
 `claude-code-plugins` is the one consumer here that also executes the
 `runner-policy` gate; `components/runner-policy/runner-policy.test.mjs`
