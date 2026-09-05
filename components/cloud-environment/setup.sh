@@ -143,11 +143,6 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
 # packages.microsoft.com is on the default allowlist).
 (
   LOG="$track_a_log"
-  if apt-get update -y >>"$LOG" 2>&1; then
-    log 'apt-get update ok'
-  else
-    log 'WARN apt-get update failed'
-  fi
   # gh comes from its checksummed upstream release asset, at the version and
   # hash the CI runner image and local dev machines pin. Ubuntu's own archive
   # ships a years-stale gh (2.45.0 observed live in a cloud session, 53 minor
