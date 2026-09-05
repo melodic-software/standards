@@ -1289,7 +1289,7 @@ for (const managedLabel of [
   "kyle-ubuntu-24.04-x64",
   "kyle-build-ubuntu-24.04-x64",
 ]) {
-  test(`managed runner namespace ${managedLabel} requires selector output`, async () => {
+  test(`managed runner namespace ${managedLabel} is refused on a public repository`, async () => {
     const root = await repository({
       visibility: "public",
       selfHostedCi: false,
@@ -1297,9 +1297,13 @@ for (const managedLabel of [
         "ci.yml": `jobs:\n  test:\n    runs-on: ${managedLabel}\n    steps: []\n`,
       },
     });
+    // Both rules fire and both are wanted: the raw-pin scan says the label is
+    // not consumable here, and the routing gate names the reason. A public
+    // repository can never enable routing, because the repository-policy schema
+    // forces selfHostedCi false when visibility is public.
     assert.deepEqual(
       (await audit(root)).map(({ rule }) => rule),
-      ["raw-self-hosted-label"],
+      ["public-self-hosted-routing", "raw-self-hosted-label"],
     );
   });
 }
@@ -8896,6 +8900,335 @@ test("anchored uses scalars retain provenance enforcement", async () => {
   );
 });
 
+// ---------------------------------------------------------------------------
+// The `managed-literal` routing target: the governed fleet label written
+// directly, with no selector job in the workflow. Admitted only on a private
+// repository enrolled for local routing; everywhere else the existing routing
+// gate refuses it under its existing rule id.
+// ---------------------------------------------------------------------------
+
+const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
+const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
+const FLEET_LANE_CONTRACT = {
+  routing: "runner-input",
+  runnerInput: "runner",
+  allowedInputs: ["runner", "pr-number", "timeout-minutes"],
+  allowedSecrets: {
+    CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+  },
+  allowedCallerPermissions: {
+    contents: "read",
+    "pull-requests": "write",
+    "id-token": "write",
+  },
+};
+
+test("an enrolled private repository may name the governed fleet label with no selector", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a fleet literal on a public repository is refused as public-self-hosted-routing", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+    },
+  });
+  const rules = (await audit(root)).map(({ rule }) => rule);
+  assert.ok(rules.includes("public-self-hosted-routing"));
+  assert.ok(rules.includes("raw-self-hosted-label"));
+});
+
+test("a fleet literal without local-routing enrollment is refused as self-hosted-routing-disabled", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+    },
+  });
+  const rules = (await audit(root)).map(({ rule }) => rule);
+  assert.ok(rules.includes("self-hosted-routing-disabled"));
+});
+
+test("a fleet literal cannot be reached by a config that claims private under public evidence", async () => {
+  const root = await repository({
+    visibility: "private",
+    selfHostedCi: true,
+    workflows: {
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+    },
+  });
+  // ConfigurationError, which the CLI reports as exit 2 rather than as a
+  // finding: a repository cannot enrol itself for local routing by lying about
+  // its own visibility in a checked-in file.
+  await assert.rejects(
+    () => audit(root, { repositoryVisibility: "public" }),
+    (error) =>
+      error instanceof ConfigurationError && /visibility evidence is public/.test(error.message),
+  );
+});
+
+test("a hosted literal keeps its exception rules alongside the fleet literal", async () => {
+  const workflows = {
+    "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+  };
+  const enrolled = await repository({ workflows });
+  assert.deepEqual(
+    (await audit(enrolled)).map(({ rule }) => rule),
+    ["hosted-exception-required"],
+  );
+
+  const excepted = await repository({
+    workflows,
+    exceptions: {
+      ".github/workflows/ci.yml#test": {
+        reason: "windows",
+        justification: "This exercises the named-exception path for a hosted literal.",
+      },
+    },
+  });
+  assert.deepEqual(await audit(excepted), []);
+
+  for (const inventory of [
+    { visibility: "public", selfHostedCi: false },
+    { visibility: "private", selfHostedCi: false },
+  ]) {
+    const hostedOnly = await repository({ ...inventory, workflows });
+    assert.deepEqual(await audit(hostedOnly), [], JSON.stringify(inventory));
+  }
+});
+
+test("a write-token job on the fleet label needs a reviewed local-routing grant", async () => {
+  const job = `permissions: read-all
+jobs:
+  apply:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ${FLEET_LABEL}
+    steps: []
+`;
+  const ungranted = await repository({ workflows: { "ci.yml": job } });
+  const ungrantedFindings = await audit(ungranted);
+  assert.deepEqual(
+    ungrantedFindings.map(({ rule }) => rule),
+    ["hosted-exception-required", "privileged-hosted-only"],
+  );
+  assert.match(
+    ungrantedFindings.find(({ rule }) => rule === "privileged-hosted-only").message,
+    /requires a reviewed localRoutingGrants entry or a hosted exception/,
+  );
+
+  const granted = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#apply": {
+        permissions: { contents: "read", issues: "write" },
+        justification:
+          "The reviewed statement of what this job's token may do on a persistent host.",
+      },
+    },
+    workflows: { "ci.yml": job },
+  });
+  assert.deepEqual(await audit(granted), []);
+
+  const mismatched = await repository({
+    localRoutingGrants: {
+      ".github/workflows/ci.yml#apply": {
+        permissions: { contents: "read", "pull-requests": "write" },
+        justification: "A grant whose reviewed map does not match the job's effective map.",
+      },
+    },
+    workflows: { "ci.yml": job },
+  });
+  const mismatchedFindings = await audit(mismatched);
+  assert.match(
+    mismatchedFindings.find(({ rule }) => rule === "privileged-hosted-only").message,
+    /outside the reviewed local-routing grant/,
+  );
+});
+
+test("a fleet-literal job with non-explicit permissions is still refused", async () => {
+  const root = await repository({
+    workflows: {
+      "ci.yml": `jobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+    },
+  });
+  const findings = await audit(root);
+  assert.ok(findings.some(({ rule }) => rule === "privileged-hosted-only"));
+  assert.match(
+    findings.find(({ rule }) => rule === "privileged-hosted-only").message,
+    /omitted GITHUB_TOKEN permissions/,
+  );
+});
+
+test("a grant keyed to a fleet-literal reusable-call job is inventory drift, not a waiver", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: FLEET_LANE_CONTRACT },
+    },
+    localRoutingGrants: {
+      ".github/workflows/claude-review.yml#review": {
+        permissions: { contents: "read", "pull-requests": "write", "id-token": "write" },
+        justification: "A grant cannot waive anything for a job that calls an external workflow.",
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ${FLEET_REVIEW_LABEL}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["local-routing-grant-drift"],
+  );
+});
+
+test("a reusable call whose runner input is the fleet review label is admitted under its contract", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: FLEET_LANE_CONTRACT },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ${FLEET_REVIEW_LABEL}
+      pr-number: \${{ inputs.pr-number }}
+      timeout-minutes: 15
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a repository-local call whose jobs run on the fleet label is audited, not silent", async () => {
+  const workflows = {
+    "gateway.yml": `permissions: read-all
+jobs:
+  worker:
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/worker.yml
+`,
+    "worker.yml": `on:
+  workflow_call:
+jobs:
+  build:
+    runs-on: ${FLEET_LABEL}
+    steps: []
+`,
+  };
+  const root = await repository({ workflows });
+  const findings = await audit(root);
+  // Before `managed-literal` existed, the called job matched neither the local
+  // nor the hosted execution test in the permission-flow pass, so a job
+  // inheriting a write-capable caller token ran on a persistent host with no
+  // finding at all.
+  assert.ok(
+    findings.some(
+      ({ rule, file, job }) =>
+        rule === "local-reusable-permissions" &&
+        file === ".github/workflows/worker.yml" &&
+        job === "build",
+    ),
+    JSON.stringify(findings),
+  );
+
+  const narrowed = await repository({
+    workflows: {
+      ...workflows,
+      "worker.yml": `on:
+  workflow_call:
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ${FLEET_LABEL}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(narrowed)).filter(({ rule }) => rule === "local-reusable-permissions"),
+    [],
+  );
+});
+
+test("a Phase 3.2 ci-status grant applies unchanged when the literal replaces the selector", async () => {
+  // The four github-iac/dotfiles/provisioning/medley `ci-status` grants are
+  // written against a selector-routed job. Phase 4 replaces the expression with
+  // the label and changes nothing else, so the same grant JSON must admit both
+  // spellings; if it admitted only the first, every one of those repositories
+  // would fire an unconsumed-grant drift the moment its wave landed.
+  const grants = {
+    ".github/workflows/ci.yml#ci-status": {
+      permissions: { contents: "read", "pull-requests": "write", statuses: "write" },
+      justification:
+        "The pull-request contract steps comment on the pull request and write the ci-lanes status.",
+    },
+  };
+  const jobBody = `    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+`;
+  const selectorRouted = await repository({
+    localRoutingGrants: grants,
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  choose:
+${SELECTOR}  ci-status:
+    needs: choose
+    if: \${{ !cancelled() }}
+${jobBody}    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(selectorRouted), []);
+
+  const fleetLiteral = await repository({
+    localRoutingGrants: grants,
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  ci-status:
+${jobBody}    runs-on: ${FLEET_LABEL}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(fleetLiteral), []);
+});
+
 // Repository visibility, keyed by sync-manifest target name. `routingEnabled`
 // admits the governed selector only for private self-hosted consumers, and
 // that ban consults neither `exceptions` nor `localRoutingGrants` — so a
@@ -8986,18 +9319,40 @@ test("every managed target of a claude lane caller admits that caller", async ()
   }
 });
 
-test("selector-routed claude lane callers are not managed for a public sync target", async () => {
+// A caller reaches the managed fleet either through the governed selector or
+// by naming a managed label directly. Both spellings are private-only, so the
+// public-target assertions below must recognise both; a test keyed to the
+// selector alone would quietly stop asserting anything the moment a caller
+// dropped its selector job.
+const MANAGED_LABEL_REGEXES = BASE_POLICY.managedLabelPatterns.map(
+  (pattern) => new RegExp(pattern, "u"),
+);
+
+function routesToTheManagedFleet(body) {
+  return (
+    body.includes("/select-runner.yml@") ||
+    MANAGED_LABEL_REGEXES.some((pattern) => pattern.test(body))
+  );
+}
+
+test("fleet-routed claude lane callers are not managed for a public sync target", async () => {
+  let asserted = 0;
   for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
-    if (!body.includes("/select-runner.yml@")) continue;
+    if (!routesToTheManagedFleet(body)) continue;
     for (const target of Object.keys(manifest.targets)) {
       if (!isPublicTarget(target)) continue;
+      asserted += 1;
       assert.ok(
         !(manifest.targets[target]?.managed ?? []).includes(component),
-        `${source} routes through the governed selector, which a public repository may not reference; ` +
+        `${source} routes work to the managed fleet, which a public repository may not do; ` +
           `component '${component}' must not be managed for ${target}`,
       );
     }
   }
+  assert.ok(
+    asserted > 0,
+    "expected at least one fleet-routed caller checked against a public target",
+  );
 });
 
 test("claude lane caller components pass runner policy for a private self-hosted consumer", async () => {
@@ -9015,9 +9370,11 @@ test("claude lane caller components pass runner policy for a private self-hosted
   }
 });
 
-test("a selector-routed claude lane caller is rejected outright on a public consumer", async () => {
+test("a fleet-routed claude lane caller is rejected outright on a public consumer", async () => {
+  let asserted = 0;
   for (const { source, body } of await claudeLaneCallerComponents()) {
-    if (!body.includes("/select-runner.yml@")) continue;
+    if (!routesToTheManagedFleet(body)) continue;
+    asserted += 1;
     const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
     const rules = new Set(
       (
@@ -9033,6 +9390,7 @@ test("a selector-routed claude lane caller is rejected outright on a public cons
       `${source} is expected to be private-only; if it became public-safe, revisit TARGET_VISIBILITY handling deliberately`,
     );
   }
+  assert.ok(asserted > 0, "expected at least one fleet-routed caller audited on a public consumer");
 });
 
 // The managed-files-guard caller is the hosted-only counterpart: a fixed

@@ -198,6 +198,45 @@ declaration is trusted under the same job-step review that backs a local-routing
 grant (see [`THREAT-MODEL.md`](THREAT-MODEL.md)). No other selector input or
 expression is allowed by the policy.
 
+## Naming the managed fleet label directly
+
+An enrolled private repository has a second way to reach the fleet: write a
+managed label matching `managedLabelPatterns` as a plain literal, with no
+selector job. The analyzer classifies that target as `managed-literal` and
+treats it exactly as it treats an approved selector output. The same
+`localRoutingGrants` inventory admits a write-capable token on it, the same
+`allowedCallerPermissions` waiver admits a reviewed reusable call whose
+`runner` input carries the label, and the same explicit-read-only floor applies
+so an omitted or non-explicit permission mapping is still a finding.
+
+The literal is admitted only where routing is enabled, that is a repository
+whose inventory says `visibility: private` and `selfHostedCi: true`. On a
+public repository it reports `public-self-hosted-routing`, and on a private
+repository with `selfHostedCi: false` it reports `self-hosted-routing-disabled`,
+which are the same rule ids a selector call gets in those inventories. A
+repository cannot enrol itself by misdeclaring its own visibility:
+`CI_REPOSITORY_VISIBILITY` from the event is compared against the checked-in
+value and a disagreement is a configuration error, not a finding.
+
+`raw-self-hosted-label` keeps every case it should still catch: a literal
+containing `self-hosted`, a `vars.CI_SELF_HOSTED_LABEL` or `CI_MANAGED_RUNNER`
+reference, and a managed label on any repository that is not an enrolled
+private consumer. Only the exact label a routing-enabled job resolves to is
+skipped, in `runs-on` and in an approved reusable call's `runner` input alike.
+
+The literal gives up what the selector provided. There is no hosted recovery
+fallback and no failure sentinel: if no runner in the fleet is online, the job
+queues instead of skipping or falling back, and no rule in this component
+changes that. The controls that answer it are elsewhere: the fleet's
+queue-depth alerting reports a managed-runner job that has waited too long, and
+bringing a second host online is an operational task, not a policy one. A lane
+where queueing is unacceptable keeps a hosted literal and a named exception.
+
+The selector remains a first-class routing target and its allowlists,
+input contracts and `selector-pin` and `selector-contract` rules are unchanged.
+A repository may carry both spellings in different workflows during a
+migration.
+
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
 `policy.json`'s `approvedReusableWorkflowContracts`. Its contract names the
@@ -1043,9 +1082,10 @@ hosted; it never authorizes selector output or a reusable `inputs.runner` value
 for these structurally excluded jobs.
 
 `localRoutingGrants` is the reviewed inventory for the opposite direction: it
-admits one directly declared, genuinely selector-routed job to the managed
-fleet while that job holds an exactly pinned privilege surface that would
-otherwise require hosted execution. A grant is keyed by
+admits one directly declared job that routes to the managed fleet, either
+through the approved selector output or by naming the fleet label directly,
+while that job holds an exactly pinned privilege surface that would otherwise
+require hosted execution. A grant is keyed by
 `<workflow path>#<job id>`, requires a non-empty `justification`, and names:
 
 - `permissions`: the complete effective `GITHUB_TOKEN` mapping the job must
@@ -1075,10 +1115,15 @@ otherwise require hosted execution. A grant is keyed by
   credential-minting code; a tag, branch, or other SHA stays
   privileged-hosted, and actions outside the central list cannot be granted.
 
-A grant applies only while the job genuinely consumes the approved selector
-output under the unchanged cancellation-safe condition and literal-fallback
-contract; a fixed hosted target keeps the ordinary privileged exception
-inventory, and job/service containers remain structurally hosted regardless.
+A grant applies only while the job genuinely routes to the managed fleet:
+either consuming the approved selector output under the unchanged
+cancellation-safe condition and literal-fallback contract, or naming the fleet
+label as a literal on a repository enrolled for local routing. A fixed hosted
+target keeps the ordinary privileged exception inventory, and job/service
+containers remain structurally hosted regardless. A grant written against a
+selector-routed job admits the same job unchanged after the expression is
+replaced by the label, which is what lets a repository move a job to the
+literal without editing its reviewed grant.
 A reusable-call (`uses:`) job never takes the grant path: its caller
 permissions flow into an external workflow whose behavior at the pinned SHA
 only the central contract review sees, so `allowedCallerPermissions` remains
