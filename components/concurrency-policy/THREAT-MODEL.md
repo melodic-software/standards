@@ -15,8 +15,13 @@ identify what can go wrong, map concrete responses, and validate the result.
 - Every pull-request-triggered workflow supersedes its own in-flight run so a
   force-push or rapid re-push cannot fan out redundant runs that exhaust runner
   capacity.
-- A push to the default branch or a scheduled run is never cancelled by another
-  run of the same workflow.
+- Whether a push to the default branch or a scheduled run can be superseded is
+  the group's fallback term, a per-repository decision restricted to two values:
+  `github.run_id`, under which such a run is never cancelled, and `github.ref`,
+  under which a burst of pushes to one ref collapses to the newest. Any other
+  term is a finding.
+- A contract-only run, which records no lane verdict of its own and carries a
+  recorded one forward, can neither be evicted nor evict another run.
 - A concurrency group cannot be widened into a cross-pull-request or
   cross-fork collision through a fork-controllable branch name.
 - The exception inventory cannot become a blanket bypass or outlive the
@@ -64,7 +69,9 @@ their reviewed Git revision.
 | Threat | Control | Executable evidence |
 | --- | --- | --- |
 | A superseded pull-request run keeps a runner slot while a newer push queues behind it. | Pull-request-triggered workflows must carry the canonical group and `cancel-in-progress: true`; a missing block, drifted group, or absent cancellation is a finding. | Missing, group-drift, cancel-missing, and shorthand cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
-| A group keyed on `github.ref` cancels a default-branch or scheduled run. | The canonical group falls back to the unique `github.run_id` on non-pull-request events; a `github.ref` group is reported as drift. | The `github.ref` drift case over a push-and-pull-request workflow in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
+| A group keyed on `github.ref` cancels a default-branch or scheduled run where the repository did not decide to allow it. | `github.ref` is admitted only as the fallback term of an otherwise conforming group, never as the whole key: the canonical form falls back to the unique `github.run_id`, and the branched form's fallback is restricted to those two terms. `${{ github.workflow }}-${{ github.ref }}` remains drift, and the term actually in force is reported as an informational finding so a fleet check can list it. | The `github.ref` drift case over a push-and-pull-request workflow, the rejected-fallback-term cases, and the reported fallback in the branched accept cases, in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
+| A contract-only run is evicted while pending, so its check suite never receives the required check run and the pull request stops reporting. | The branched group puts every contract-only run in a group of its own keyed on `github.run_id`; a contract branch that omits `github.run_id`, or whose predicate does not match the composite's `contract-only` default byte for byte, is drift. | The contract-branch-without-`github.run_id` and one-byte-predicate-drift cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
+| An informational finding is mistaken for a passing gate, or a blocking finding is silently downgraded. | Findings carry an explicit `level`; only `concurrency-group-fallback` is `info`. The exit status and the `--json` `ok` field are computed from the presence of any non-`info` finding, so a new info rule cannot mask a blocking one. | The command-line exit-status case in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | A fork-controllable `head_ref` group collides across same-named branches, and one pull-request run cancels another. | The canonical group uses the unique, non-fork-controllable `github.event.pull_request.number`; the `head_ref` variant is reported as drift. | The `head_ref` drift case in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | A non-literal `cancel-in-progress` expression silently disables cancellation. | Exactly two values pass: the literal boolean `true` and the byte-identical ci-perf contract-only expression. `false`, an omitted flag, and every other expression string are findings rather than crashes. | The false, omitted, and expression `cancel-in-progress` cases in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |
 | The accepted contract-only expression is reformatted or a clause is dropped, so lanes gate off on an event the `ci-status` composite still aggregates, or a base-branch edit skips the lanes that would re-test the new merge commit. | The expression is matched byte for byte against the composite's `contract-only` default, with none of the whitespace tolerance the `group` allows; a spacing variant and a clause-dropping variant are both findings. | The byte-identical contract-only case, with its whitespace and clause variants, in [`concurrency-policy.test.mjs`](concurrency-policy.test.mjs). |

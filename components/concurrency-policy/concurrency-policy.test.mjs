@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,6 +18,31 @@ const CANONICAL = `concurrency:
 `;
 const JOBS = 'jobs:\n  build:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "true"\n';
 const temporaryRoots = [];
+
+// The ci-perf contract-only predicate, spelled out here rather than imported so
+// the analyzer's copy is compared against an independent literal.
+const PREDICATE = `github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))`;
+const CONTRACT_BRANCH = `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)`;
+
+// The branched group as one line, and as the folded scalar the design writes.
+// Both spellings reach the analyzer as a single string; the folded one keeps a
+// newline and the continuation indent at each of the two operator joins.
+function branchedSingleLine(fallback, contractBranch = CONTRACT_BRANCH, predicate = PREDICATE) {
+  return `concurrency:
+  group: \${{ (${predicate}) && ${contractBranch} || format('{0}-{1}', github.workflow, github.event.pull_request.number || ${fallback}) }}
+  cancel-in-progress: true
+`;
+}
+
+function branchedFolded(fallback, cancelInProgress = "true") {
+  return `concurrency:
+  group: >-
+    \${{ (${PREDICATE})
+        && ${CONTRACT_BRANCH}
+        || format('{0}-{1}', github.workflow, github.event.pull_request.number || ${fallback}) }}
+  cancel-in-progress: ${cancelInProgress}
+`;
+}
 
 function workflow(onYaml, concurrencyYaml = "") {
   return `${onYaml}\n${concurrencyYaml}${JOBS}`;
@@ -38,8 +64,20 @@ async function repository({ config, workflows = {} } = {}) {
   return root;
 }
 
+// Blocking findings only. Info findings never fail the gate, so every
+// accept-case assertion below reads them through `fallbacks` instead.
 function rules(findings) {
-  return findings.map((item) => `${item.file}:${item.rule}`).sort();
+  return findings
+    .filter((item) => item.level !== "info")
+    .map((item) => `${item.file}:${item.rule}`)
+    .sort();
+}
+
+function fallbacks(findings) {
+  return findings
+    .filter((item) => item.level === "info")
+    .map((item) => `${item.file}:${item.rule}:${item.fallback}`)
+    .sort();
 }
 
 test.after(async () => {
@@ -75,7 +113,11 @@ test("canonical block on a pull_request workflow passes", async () => {
   const root = await repository({
     workflows: { "ci.yml": workflow("on: pull_request", CANONICAL) },
   });
-  assert.deepEqual(await auditRepository({ root }), []);
+  const findings = await auditRepository({ root });
+  assert.deepEqual(rules(findings), []);
+  assert.deepEqual(fallbacks(findings), [
+    ".github/workflows/ci.yml:concurrency-group-fallback:github.run_id",
+  ]);
 });
 
 test("quoted group string and extra expression whitespace still conform", async () => {
@@ -86,27 +128,27 @@ test("quoted group string and extra expression whitespace still conform", async 
   const root = await repository({
     workflows: { "ci.yml": workflow("on:\n  pull_request:", quoted) },
   });
-  assert.deepEqual(await auditRepository({ root }), []);
+  assert.deepEqual(rules(await auditRepository({ root })), []);
 });
 
 test("pull_request_target with the canonical block passes", async () => {
   const root = await repository({
     workflows: { "ci.yml": workflow("on: pull_request_target", CANONICAL) },
   });
-  assert.deepEqual(await auditRepository({ root }), []);
+  assert.deepEqual(rules(await auditRepository({ root })), []);
 });
 
 test("array and mapping on: forms are recognized as pull-request-triggered", async () => {
   const array = await repository({
     workflows: { "ci.yml": workflow("on: [push, pull_request]", CANONICAL) },
   });
-  assert.deepEqual(await auditRepository({ root: array }), []);
+  assert.deepEqual(rules(await auditRepository({ root: array })), []);
   const mapping = await repository({
     workflows: {
       "ci.yml": workflow("on:\n  push:\n    branches: [main]\n  pull_request:", CANONICAL),
     },
   });
-  assert.deepEqual(await auditRepository({ root: mapping }), []);
+  assert.deepEqual(rules(await auditRepository({ root: mapping })), []);
 });
 
 test("non-pull-request workflows are out of scope", async () => {
@@ -125,6 +167,127 @@ test("repository with no workflows directory passes", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "concurrency-policy-empty-"));
   temporaryRoots.push(root);
   assert.deepEqual(await auditRepository({ root }), []);
+});
+
+test("the ci-perf branched group passes single-line and folded, with either fallback", async () => {
+  for (const fallback of ["github.ref", "github.run_id"]) {
+    const single = await repository({
+      workflows: { "ci.yml": workflow("on: pull_request", branchedSingleLine(fallback)) },
+    });
+    const singleFindings = await auditRepository({ root: single });
+    assert.deepEqual(rules(singleFindings), []);
+    assert.deepEqual(fallbacks(singleFindings), [
+      `.github/workflows/ci.yml:concurrency-group-fallback:${fallback}`,
+    ]);
+
+    // The folded scalar the design writes. Its continuation lines are
+    // more-indented, so the parser keeps a newline and that indent at each
+    // join; only the joins and the `${{ }}` delimiters tolerate it.
+    const folded = await repository({
+      workflows: {
+        "ci.yml": workflow(
+          "on:\n  push:\n    branches: [main]\n  pull_request:",
+          branchedFolded(fallback),
+        ),
+      },
+    });
+    const foldedFindings = await auditRepository({ root: folded });
+    assert.deepEqual(rules(foldedFindings), []);
+    assert.deepEqual(fallbacks(foldedFindings), [
+      `.github/workflows/ci.yml:concurrency-group-fallback:${fallback}`,
+    ]);
+  }
+});
+
+test("the branched group pairs with either accepted cancel-in-progress value", async () => {
+  const contractOnlyCancel = `\${{ !(${PREDICATE}) }}`;
+  for (const cancel of ["true", contractOnlyCancel]) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": workflow("on: pull_request", branchedFolded("github.run_id", cancel)),
+      },
+    });
+    assert.deepEqual(rules(await auditRepository({ root })), []);
+  }
+});
+
+test("a branched group whose predicate drifts by one byte is rejected", async () => {
+  // One space added inside the fromJSON array literal, and separately the
+  // base-edit clause dropped. Both are the drift the byte-identity rule exists
+  // to catch: the composite compares its own default against this text.
+  const spaced = PREDICATE.replace('"labeled","unlabeled"', '"labeled", "unlabeled"');
+  const clauseDropped = PREDICATE.replace(
+    "(github.event.action == 'edited' && !github.event.changes.base)",
+    "github.event.action == 'edited'",
+  );
+  const bare = `\${{ ${PREDICATE} && ${CONTRACT_BRANCH} || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}`;
+  for (const predicate of [spaced, clauseDropped]) {
+    assert.notEqual(predicate, PREDICATE);
+    const root = await repository({
+      workflows: {
+        "ci.yml": workflow(
+          "on: pull_request",
+          branchedSingleLine("github.run_id", CONTRACT_BRANCH, predicate),
+        ),
+      },
+    });
+    assert.deepEqual(rules(await auditRepository({ root })), [
+      ".github/workflows/ci.yml:concurrency-group-drift",
+    ]);
+  }
+
+  // The predicate stripped of its surrounding parentheses. `&&` binds tighter
+  // than `||` in GitHub expressions, so this happens to evaluate the same way,
+  // but it is not the shape the grammar admits.
+  const unparenthesized = await repository({
+    workflows: {
+      "ci.yml": workflow(
+        "on: pull_request",
+        `concurrency:\n  group: ${bare}\n  cancel-in-progress: true\n`,
+      ),
+    },
+  });
+  assert.deepEqual(rules(await auditRepository({ root: unparenthesized })), [
+    ".github/workflows/ci.yml:concurrency-group-drift",
+  ]);
+});
+
+test("a fallback term other than github.ref or github.run_id is rejected", async () => {
+  for (const fallback of [
+    "github.head_ref",
+    "github.sha",
+    "github.ref_name",
+    "github.run_number",
+  ]) {
+    const root = await repository({
+      workflows: { "ci.yml": workflow("on: pull_request", branchedSingleLine(fallback)) },
+    });
+    const findings = await auditRepository({ root });
+    assert.deepEqual(rules(findings), [".github/workflows/ci.yml:concurrency-group-drift"]);
+    assert.deepEqual(fallbacks(findings), []);
+  }
+});
+
+test("a contract branch without github.run_id is rejected", async () => {
+  // Without run_id the contract-only branch is shared across every
+  // contract-only run of the pull request, so one can evict another and leave
+  // the check suite with no ci-status check run: the failure mode the branch
+  // exists to remove.
+  const branches = [
+    `format('ci-contract-{0}', github.event.pull_request.number)`,
+    `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.sha)`,
+    `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_attempt)`,
+  ];
+  for (const contractBranch of branches) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": workflow("on: pull_request", branchedSingleLine("github.run_id", contractBranch)),
+      },
+    });
+    assert.deepEqual(rules(await auditRepository({ root })), [
+      ".github/workflows/ci.yml:concurrency-group-drift",
+    ]);
+  }
 });
 
 test("missing top-level concurrency on a pull_request workflow is flagged", async () => {
@@ -411,6 +574,42 @@ test("an unknown config key and a missing justification fail closed", async () =
     auditRepository({ root: noJustification }),
     (error) => error instanceof ConfigurationError,
   );
+});
+
+test("the command line exits 0 on info findings and 1 on blocking findings", async () => {
+  const analyzer = path.join(import.meta.dirname, "concurrency-policy.mjs");
+  const run = (root) =>
+    new Promise((resolve) => {
+      execFile(process.execPath, [analyzer, "--root", root, "--json"], (error, stdout) =>
+        resolve({ code: error === null ? 0 : error.code, stdout }),
+      );
+    });
+
+  const infoOnly = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", branchedFolded("github.ref")) },
+  });
+  const passed = await run(infoOnly);
+  assert.equal(passed.code, 0);
+  const passedReport = JSON.parse(passed.stdout);
+  assert.equal(passedReport.ok, true);
+  assert.deepEqual(passedReport.findings, [
+    {
+      level: "info",
+      rule: "concurrency-group-fallback",
+      file: ".github/workflows/ci.yml",
+      message:
+        "top-level concurrency.group is the branched form with fallback term `github.ref`, so " +
+        "push and schedule runs collapse into one group per ref",
+      fallback: "github.ref",
+    },
+  ]);
+
+  const drifted = await repository({
+    workflows: { "ci.yml": workflow("on: pull_request", branchedSingleLine("github.head_ref")) },
+  });
+  const failed = await run(drifted);
+  assert.equal(failed.code, 1);
+  assert.equal(JSON.parse(failed.stdout).ok, false);
 });
 
 test("duplicate JSON members in the config fail closed", () => {
