@@ -97,6 +97,27 @@ The interface between this component and consuming repositories:
 - The component is repo-agnostic and must never contain secrets or
   repo-specific logic.
 
+## The `gh` pin
+
+`gh` is installed from its checksummed upstream release asset
+(`github.com/cli/cli/releases`, `linux_amd64`), not from `apt`: Ubuntu's own
+archive ships a years-stale `gh` (2.45.0 observed live in a cloud session),
+and `cli.github.com` — the upstream apt repo — is not on the default
+allowlist. The pinned version is **2.98.0**; it and the SHA-256 beside it are
+the same pair
+[`melodic-software/ci-runner`](https://github.com/melodic-software/ci-runner/blob/main/Dockerfile)
+bakes into the CI runner image and `melodic-software/dotfiles` pins through
+mise on local machines, so all three lanes run one `gh`. Bump the three
+together, and authenticate a new asset against the checksums `cli/cli`
+publishes for that release before recording its hash here.
+
+The install is amd64-only, mirroring the runner image: the pinned hash covers
+that one asset, and a non-x86_64 VM is a logged `WARN` skip rather than an
+unverified download. Like every other step it is best-effort — `github.com` is
+on the default allowlist, but the GitHub proxy's repository scope can `403`
+release assets from repositories not attached to a session, and a silent miss
+surfaces in the verification checklist rather than failing the build.
+
 ## Network prerequisite
 
 The environment must use **Custom** network access with **"Also include
@@ -137,6 +158,12 @@ the snapshot.
   a manual obligation. Either way the env copy is only a warm cache: each
   repo's bootstrap installs its exact pins repo-locally, so a stale warm
   cache costs build time, not correctness.
+- The `gh` pin has no in-repo manifest either, and unlike the toolchains above
+  it is not a warm cache: no repo bootstrap reinstalls `gh`, so this script is
+  the only thing holding cloud sessions at the fleet version. Bump
+  `GH_VERSION` and `GH_SHA256` in the same change as the CI runner image and
+  the dotfiles mise pin. The version is lockstep-tested against this README in
+  `setup.test.sh`.
 - A merged change does **not** reach existing environments on its own: the
   snapshot rebuilds only on an edit to the environment's script/network
   fields or on ~7-day cache expiry. To pick up a new version immediately,
