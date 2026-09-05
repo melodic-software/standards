@@ -9699,18 +9699,28 @@ test("both claude lane contracts at the wave tag copy their predecessors forward
   assert.equal(asserted, 2);
 });
 
-test("every claude lane caller component pins the wave tag", async () => {
+// Convergence as a property, never as a hardcoded SHA. The daily
+// claude-lanes-repin lane rewrites these components on every ci-workflows
+// release, and a test naming one revision would go red by construction on
+// each of its pull requests while nothing was actually wrong. Assert instead
+// that the lane callers agree with each other on one revision, which is what
+// convergence means; whether that revision has a reviewed contract is already
+// proved by the three tests above that audit these same bytes against the
+// real policy.json.
+test("the claude lane caller components all pin one ci-workflows revision", async () => {
+  const pins = new Set();
   for (const { source, body } of await claudeLaneCallerComponents()) {
-    const pins = [...body.matchAll(/melodic-software\/ci-workflows\/[^@\s]+@([0-9a-f]{40})/gu)].map(
-      ([, sha]) => sha,
-    );
-    assert.ok(pins.length > 0, `${source} carries no ci-workflows pin`);
-    assert.deepEqual(
-      [...new Set(pins)],
-      [REPINE_LANE_SHA_V0_22_0],
-      `${source} pins a revision other than the converged wave tag`,
-    );
+    const found = [
+      ...body.matchAll(/melodic-software\/ci-workflows\/[^@\s]+@([0-9a-f]{40})/gu),
+    ].map(([, sha]) => sha);
+    assert.ok(found.length > 0, `${source} carries no ci-workflows pin`);
+    for (const sha of found) pins.add(sha);
   }
+  assert.equal(
+    pins.size,
+    1,
+    `the claude lane caller components disagree on their ci-workflows pin: ${[...pins].join(", ")}`,
+  );
 });
 
 // The managed-files-guard caller is the hosted-only counterpart: a fixed
