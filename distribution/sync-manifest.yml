@@ -269,7 +269,7 @@ components:
   path-detection-tools:
     files:
       components/path-detection/machine-path-patterns.sh: tools/shared/path-detection/machine-path-patterns.sh
-  # Always-loaded PR-body contract rule for every pr-issue-linkage gate caller
+  # Always-loaded PR-body contract rule for every pr-contract composite caller
   # (standards ADR-0008): the one repo-tracked signal that reaches sessions
   # with no plugins installed. The source doubles as this repository's own
   # live rule (standards is manifest source, not a target); the lockstep

@@ -41,7 +41,7 @@ Review owns parameter shape: where a stack toolchain enforces an arity ceiling, 
 - **Lint exclusions instead of fixes**: default to fixing. Never add a suppression to bypass a pre-existing error; a justified exclusion lives in the tool's config with a recorded reason, never inline as a silencer.
 - **Embedded cross-language scripts**: a multi-line script of one language inlined inside another (a shell heredoc of another language, say) belongs in its own co-located file.
 - **Self-executing importable modules**: an entry script that other modules import needs a main guard so its CLI body does not run on import.
-- **PR-title format**: deterministic; tool-owned by the `pr-title` gate (`ci-workflows/.github/workflows/semantic-pr.yml`, wired into each consumer as `.github/workflows/pr-title.yml`), not review prose. See `../engineering/enforceability-tiers.md`.
+- **PR-title format**: deterministic; tool-owned by the `pr-contract` composite (`ci-workflows/.github/actions/pr-contract`, which every consumer pins as a step inside its required `ci-status` job), not review prose. See `../engineering/enforceability-tiers.md`.
 
 ## Sources
 
