@@ -1297,13 +1297,18 @@ for (const managedLabel of [
         "ci.yml": `jobs:\n  test:\n    runs-on: ${managedLabel}\n    steps: []\n`,
       },
     });
-    // Both rules fire and both are wanted: the raw-pin scan says the label is
-    // not consumable here, and the routing gate names the reason. A public
-    // repository can never enable routing, because the repository-policy schema
-    // forces selfHostedCi false when visibility is public.
+    // Every label-shaped string is refused here. A reviewed fleet label draws
+    // the routing gate as well, because it is a routing target the inventory
+    // does not permit; an unreviewed one is not a routing target at all, so
+    // only the raw-pin scan reports it. A public repository can never enable
+    // routing: the repository-policy schema forces selfHostedCi false when
+    // visibility is public.
+    const expected = new Set(BASE_POLICY.approvedManagedRunnerLabels).has(managedLabel)
+      ? ["public-self-hosted-routing", "raw-self-hosted-label"]
+      : ["raw-self-hosted-label"];
     assert.deepEqual(
       (await audit(root)).map(({ rule }) => rule),
-      ["public-self-hosted-routing", "raw-self-hosted-label"],
+      expected,
     );
   });
 }
@@ -8935,6 +8940,52 @@ test("an enrolled private repository may name the governed fleet label with no s
     },
   });
   assert.deepEqual(await audit(root), []);
+});
+
+test("an unreviewed near-miss of the fleet label is not admitted on an enrolled repository", async () => {
+  // managedLabelPatterns is a loose detection surface by design, so it matches
+  // far more than the reviewed labels: an unbounded middle segment, an
+  // unbounded suffix, and unanchored ends that match label-shaped text sitting
+  // next to other characters. Admission is exact set membership instead, so
+  // none of these reach the fleet with the reviewed label's trust.
+  for (const target of [
+    "melodic-totally-unreviewed-ubuntu-24.04-x64",
+    "melodic-review-ubuntu-24.04-x64-shadow",
+    "kyle-ubuntu-24.04-x64",
+    "bogus/melodic-review-ubuntu-24.04-x64",
+    "melodic-review-ubuntu-24.04-x64!",
+  ]) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${JSON.stringify(target)}\n    steps: []\n`,
+      },
+    });
+    const rules = (await audit(root)).map(({ rule }) => rule);
+    // Refused twice over: the raw-pin scan reports the label-shaped string, and
+    // the job is left with no admitted routing target, so it also needs a named
+    // hosted exception it does not have.
+    assert.deepEqual(rules, ["hosted-exception-required", "raw-self-hosted-label"], target);
+  }
+});
+
+test("approvedManagedRunnerLabels cannot admit an arbitrary or hosted target", async () => {
+  for (const [label, pattern] of [
+    ["ubuntu-24.04", /is a GitHub-hosted runner label/],
+    ["definitely-not-a-fleet-label", /must match a managed label pattern/],
+    [" melodic-ubuntu-24.04-x64", /must not carry surrounding whitespace/],
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedManagedRunnerLabels: [...BASE_POLICY.approvedManagedRunnerLabels, label],
+      },
+      workflows: { "ci.yml": "permissions: read-all\njobs:\n  test:\n    steps: []\n" },
+    });
+    await assert.rejects(
+      () => audit(root),
+      (error) => error instanceof ConfigurationError && pattern.test(error.message),
+      label,
+    );
+  }
 });
 
 test("a fleet literal on a public repository is refused as public-self-hosted-routing", async () => {

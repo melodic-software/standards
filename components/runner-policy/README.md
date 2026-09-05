@@ -200,9 +200,9 @@ expression is allowed by the policy.
 
 ## Naming the managed fleet label directly
 
-An enrolled private repository has a second way to reach the fleet: write a
-managed label matching `managedLabelPatterns` as a plain literal, with no
-selector job. The analyzer classifies that target as `managed-literal` and
+An enrolled private repository has a second way to reach the fleet: write one of
+the labels in `approvedManagedRunnerLabels` as a plain literal, with no selector
+job. The analyzer classifies that target as `managed-literal` and
 treats it exactly as it treats an approved selector output. The same
 `localRoutingGrants` inventory admits a write-capable token on it, the same
 `allowedCallerPermissions` waiver admits a reviewed reusable call whose
@@ -218,11 +218,26 @@ repository cannot enrol itself by misdeclaring its own visibility:
 `CI_REPOSITORY_VISIBILITY` from the event is compared against the checked-in
 value and a disagreement is a configuration error, not a finding.
 
+Admission is exact membership in `approvedManagedRunnerLabels`, a reviewed set
+mirroring `approvedHostedRunnerLabels`, and deliberately not a
+`managedLabelPatterns` match. Those patterns are a DETECTION surface: unanchored
+and unbounded on purpose, so `rawManagedLabel` catches every label-shaped string
+and refuses it. Admission needs the opposite bias. Reusing the detection pattern
+as the gate would give an unreviewed near-miss such as
+`melodic-anything-ubuntu-24.04-x64`, or label-shaped text sitting next to other
+characters, the same trust as the real fleet label, including the
+`allowedCallerPermissions` waiver and the grant treatment. Adding a label to the
+fleet is therefore a reviewed, data-only policy change, exactly like adding an
+approved hosted label. Configuration fails closed when an entry carries
+surrounding whitespace, is a known GitHub-hosted label, or does not itself read
+as a managed label.
+
 `raw-self-hosted-label` keeps every case it should still catch: a literal
 containing `self-hosted`, a `vars.CI_SELF_HOSTED_LABEL` or `CI_MANAGED_RUNNER`
-reference, and a managed label on any repository that is not an enrolled
-private consumer. Only the exact label a routing-enabled job resolves to is
-skipped, in `runs-on` and in an approved reusable call's `runner` input alike.
+reference, an unreviewed label in the managed namespace, and a reviewed managed
+label on any repository that is not an enrolled private consumer. Only the exact
+label a routing-enabled job resolves to is skipped, in `runs-on` and in an
+approved reusable call's `runner` input alike.
 
 The literal gives up what the selector provided. There is no hosted recovery
 fallback and no failure sentinel: if no runner in the fleet is online, the job

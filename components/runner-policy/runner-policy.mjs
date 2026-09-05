@@ -135,6 +135,31 @@ export function validatePolicy(value) {
     }
   });
 
+  // `managedLabelPatterns` is a DETECTION surface: deliberately loose so every
+  // label-shaped string is caught and refused. It is the wrong gate for
+  // ADMISSION, which needs the opposite bias, so the labels a job may name
+  // directly are an explicit reviewed set, exactly like the hosted ones. Every
+  // entry must itself read as a managed label and must not be a hosted label,
+  // so this set can never quietly admit an arbitrary or hosted target.
+  const approvedManagedRunnerLabels = new Set(value.approvedManagedRunnerLabels);
+  for (const label of approvedManagedRunnerLabels) {
+    if (label !== label.trim()) {
+      throw new ConfigurationError(
+        `policy.approvedManagedRunnerLabels entry ${JSON.stringify(label)} must not carry surrounding whitespace`,
+      );
+    }
+    if (knownGitHubHostedRunnerLabels.has(label.toLowerCase())) {
+      throw new ConfigurationError(
+        `policy.approvedManagedRunnerLabels entry ${JSON.stringify(label)} is a GitHub-hosted runner label`,
+      );
+    }
+    if (!managedLabelRegexes.some((pattern) => pattern.test(label))) {
+      throw new ConfigurationError(
+        `policy.approvedManagedRunnerLabels entry ${JSON.stringify(label)} must match a managed label pattern`,
+      );
+    }
+  }
+
   const selectorWorkflowPaths = new Set(value.selectorWorkflowPaths);
   const validateSelectorReference = (reference, location) => {
     const parsed = parseReusableWorkflowReference(reference);
@@ -433,6 +458,7 @@ export function validatePolicy(value) {
     hostedExceptionReasons: new Set(value.hostedExceptionReasons),
     localCredentialActions: new Set(value.localCredentialActions),
     managedLabelRegexes,
+    approvedManagedRunnerLabels,
   };
 }
 
@@ -2561,17 +2587,22 @@ function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIn
   }
   // A literal governed fleet label is a first-class routing target on an
   // enrolled private repository: the selector job is no longer the only way to
-  // reach the managed fleet. The check sits AFTER the expression catch-all
-  // above, not before it, because managedLabelPatterns are unanchored and a
-  // `${{ … }}` expression that merely mentions the label is not a literal; an
-  // expression that is a governed route has already been admitted by
-  // routeStatus. Approval is unconditional here and the routing gate below
-  // (`routingEnabled`) refuses it on a public or non-enrolled repository, which
-  // is exactly how selector-output is handled, so the public case keeps
-  // reporting `public-self-hosted-routing` rather than a generic contract
-  // failure.
+  // reach the managed fleet. Admission is exact membership in the reviewed
+  // `approvedManagedRunnerLabels` set, mirroring the hosted-literal check
+  // below, and deliberately NOT a `managedLabelPatterns` match: that pattern is
+  // a deliberately loose detection surface, so reusing it here would admit any
+  // unreviewed near-miss (`melodic-anything-ubuntu-24.04-x64`) or an
+  // adjacent-text string (`bogus/melodic-review-ubuntu-24.04-x64`) with the
+  // same trust as the real fleet label. The check also sits AFTER the
+  // expression catch-all above, so a `${{ … }}` expression that merely mentions
+  // the label is not a literal; an expression that is a governed route has
+  // already been admitted by routeStatus. Approval is unconditional here and
+  // the routing gate below (`routingEnabled`) refuses it on a public or
+  // non-enrolled repository, which is exactly how selector-output is handled,
+  // so the public case keeps reporting `public-self-hosted-routing` rather than
+  // a generic contract failure.
   const managedLiteral = target.trim();
-  if (policy.managedLabelRegexes.some((pattern) => pattern.test(managedLiteral))) {
+  if (policy.approvedManagedRunnerLabels.has(managedLiteral)) {
     return { approved: true, kind: "managed-literal", label: managedLiteral };
   }
   if (policy.approvedHostedRunnerLabels.has(target)) {

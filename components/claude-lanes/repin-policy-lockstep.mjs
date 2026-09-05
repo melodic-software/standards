@@ -337,7 +337,6 @@ async function main() {
   const newSourceByRepoPath = new Map();
   const reasons = [];
   const copyForwards = [];
-  let selectorUnchanged = true;
   let selectorCopiedForward = false;
 
   for (const target of REPIN_TARGETS) {
@@ -358,7 +357,6 @@ async function main() {
       if (target.kind === "selector") {
         const oldSource = fetchUpstreamFile(repoPath, fromSha);
         if (oldSource !== newSource) {
-          selectorUnchanged = false;
           reasons.push(`\`${repoPath}\` changed between ${fromSha.slice(0, 7)} and the new SHA`);
           continue;
         }
@@ -403,7 +401,9 @@ async function main() {
   }
 
   const policyChanged = await updatePolicyJson(copyForwards);
-  const testChanged = await updateTestMjs(newSha, tag, selectorUnchanged && selectorCopiedForward);
+  // A changed selector source already returned above through `reasons`, so a
+  // copy-forward having happened is the whole condition here.
+  const testChanged = await updateTestMjs(newSha, tag, selectorCopiedForward);
   const callerChanged = await rewriteCallerFiles(newSha, tag);
 
   const note =

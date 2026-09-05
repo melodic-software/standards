@@ -1104,6 +1104,7 @@
   "managedLabelPatterns": [
     "(?:^|[^a-z0-9-])(?:melodic|kyle)-(?:[a-z0-9]+-)*ubuntu-24\\.04-x64(?:-[a-z0-9-]+)?(?:$|[^a-z0-9-])"
   ],
+  "approvedManagedRunnerLabels": ["melodic-ubuntu-24.04-x64", "melodic-review-ubuntu-24.04-x64"],
   "hostedExceptionReasons": [
     "dependabot",
     "docker-socket",
