@@ -15,34 +15,54 @@ name: claude-review
 #
 # Fork PRs receive no secrets and a read-only token, so they are simply not
 # reviewed by design (no token-exfiltration surface).
+#
+# RUNNER PLACEMENT: this component names the governed managed fleet review
+# label directly. Every target that manages it is a private repository
+# enrolled for local routing (`selfHostedCi: true`), which is the only
+# inventory the standards `runner-policy` component admits a managed label on;
+# a public consumer would be refused as `public-self-hosted-routing`. A
+# hosted-routed sibling would be a second manifest component pointing at a
+# second file, not a routing input here.
+#
+# The label queues rather than falls back: with the selector job gone there is
+# no hosted recovery path if no runner in the fleet is online. That is
+# deliberate and it is a different control's job. This lane is advisory
+# (github-iac ADR 0011: no organization ruleset may make an agentic review a
+# merge prerequisite), so a queued review blocks no merge, and the fleet's own
+# queue-depth alerting reports a job that has waited too long.
 
 on:
   pull_request:
     # No `synchronize`: this lane reviews on open/ready/reopen only, which
-    # cuts per-PR spend on active branches. The security lane, whose check
-    # certifies execution against the head, keeps `synchronize`.
+    # cuts per-PR spend on active branches.
     #
     # Re-running the job does NOT get a fresh review after a push: a re-run
-    # replays the ORIGINAL event payload, so the reusable's freshness guard —
-    # it compares the payload's `pull_request.head.sha` against the live
-    # head — retires the run as superseded and every review step skips.
+    # replays the ORIGINAL event payload, so the reusable's freshness guard
+    # (it compares the payload's `pull_request.head.sha` against the live
+    # head) retires the run as superseded and every review step skips.
     # Re-running only helps when the head has not moved. To review a newer
-    # head, reopen the PR, or mark it draft and ready again: either emits a
-    # fresh event at the current head.
+    # head: reopen the PR, mark it draft and ready again, or dispatch this
+    # workflow with the PR number.
     types: [opened, ready_for_review, reopened]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: Pull request number to re-review
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 # Per-PR supersede group: a newer event for the same PR cancels the older run,
-# so a rapid open→ready→reopen burst spends one review, not several. Distinct
+# so a rapid open, ready, reopen burst spends one review, not several. Distinct
 # by construction from the reusable's inner job-level group (which appends the
 # head SHA: claude-review-<PR>-<headSHA>), so a caller/inner same-name
-# concurrency deadlock — real under a pre-v0.9.0 reusable whose inner group
-# was claude-review-<PR> exactly — cannot recur. A skipped actor's same-PR
+# concurrency deadlock, real under a pre-v0.9.0 reusable whose inner group
+# was claude-review-<PR> exactly, cannot recur. A skipped actor's same-PR
 # event can cancel an in-flight review through this group; that is accepted
 # as bounded: with no `synchronize` trigger, same-PR events are rare and
-# human-driven. This value is per-LANE and deliberate — the security caller
+# human-driven. This value is per-LANE and deliberate: the security caller
 # must NOT copy it (cancelling a REQUIRED check is not a skip and does not
 # read success).
 #
@@ -59,44 +79,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Resolves the review tier's runner label through the governed selector. On
-  # public repos, and on repos without the CI_RUNNER_* configuration, the
-  # selector routes to the approved hosted runner, so this one shape serves
-  # every consumer. A selector failure skips the review (see the `if` on the
-  # review job) with no marker comment today — caller-side `class=runner`
-  # failure surfacing is planned and exercised by the incident-aggregator
-  # acceptance test (melodic-software/ci-workflows#238).
-  select-review:
-    name: Select runner
-    permissions: {}
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
   review:
-    needs: select-review
-    # !cancelled() overrides GitHub's skip propagation, so selector success
-    # must be required explicitly: a hard-failed selector emits no runner
-    # output and the hosted fallback below would otherwise run this
-    # privileged job.
-    if: ${{ !cancelled() && needs.select-review.result == 'success' }}
+    # A draft is work in progress and does not spend a review; the
+    # ready_for_review trigger above is what delivers one when it is ready. The
+    # event_name clause is load-bearing: a dispatched run has no
+    # `github.event.pull_request` at all, so a bare draft comparison would
+    # never run the review the operator asked for.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
       pull-requests: write   # post review + track_progress tracking comment
-      id-token: write        # OIDC — mints the Claude GitHub App token (required
+      id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    # Repo-wide review queue — a SEPARATE block from the workflow-level
+    # Repo-wide review queue: a SEPARATE block from the workflow-level
     # cancel group above, because `queue: max` cannot be combined with
     # `cancel-in-progress: true`, the value that block sets
-    # (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency)
-    # — and because this group is job-scoped and repo-wide, not per-PR.
+    # (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency),
+    # and because this group is job-scoped and repo-wide, not per-PR.
     # Serializes reviews repo-wide so parallel PRs queue for the shared
     # Claude seat instead of contending for it.
     concurrency:
@@ -104,12 +103,17 @@ jobs:
       queue: max
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
     with:
-      # Hosted fallback per the runner-policy recovery contract (never a
-      # self-hosted label, never vars.CI_HOSTED_RUNNER): if the selector
-      # succeeds but emits an empty runner (ci-workflows#278), a self-hosted
-      # fallback on a public repo would queue forever, while the approved
-      # hosted label is safe everywhere.
-      runner: ${{ needs.select-review.outputs.runner || 'ubuntu-24.04' }}
+      runner: melodic-review-ubuntu-24.04-x64
+      # Empty on a pull_request event, where the payload supplies the number
+      # and head SHA; on a dispatch it is the number the operator typed, and
+      # the reusable resolves the live head from the API.
+      pr-number: ${{ inputs.pr-number }}
+      # Below the reusable's own 30-minute default, which is sized for two
+      # 11-minute attempts plus backoff. This lane is advisory and its runs are
+      # among the largest single lines in a consumer's Actions bill, so it is
+      # capped: a review that has not landed in fifteen minutes is retired
+      # rather than paid for.
+      timeout-minutes: 15
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
     # called workflow.

@@ -275,8 +275,13 @@ async function updatePolicyJson(copyForwards) {
   return changed;
 }
 
-async function updateTestMjs(newSha, tag, selectorUnchanged) {
-  if (!selectorUnchanged) return false;
+// `selectorCopiedForward` is false both when the selector source changed and
+// when no caller pins the selector at all. The callers stopped pinning it in
+// ci-perf Phase 3b, and without this distinction the next tag would insert a
+// selector SHA constant into the test's production allowlist mirror that
+// `policy.json` never gained, because `copySelectorContract` never ran.
+async function updateTestMjs(newSha, tag, selectorCopiedForward) {
+  if (!selectorCopiedForward) return false;
   let text = await readFile(TEST_PATH, "utf8");
   if (text.includes(`@${newSha}`)) return false;
 
@@ -333,6 +338,7 @@ async function main() {
   const reasons = [];
   const copyForwards = [];
   let selectorUnchanged = true;
+  let selectorCopiedForward = false;
 
   for (const target of REPIN_TARGETS) {
     const pins = readCallerPins(target.workflowPath, target.callerFiles);
@@ -356,6 +362,7 @@ async function main() {
           reasons.push(`\`${repoPath}\` changed between ${fromSha.slice(0, 7)} and the new SHA`);
           continue;
         }
+        selectorCopiedForward = true;
         copyForwards.push({
           kind: "selector",
           workflowPath: target.workflowPath,
@@ -396,7 +403,7 @@ async function main() {
   }
 
   const policyChanged = await updatePolicyJson(copyForwards);
-  const testChanged = await updateTestMjs(newSha, tag, selectorUnchanged);
+  const testChanged = await updateTestMjs(newSha, tag, selectorUnchanged && selectorCopiedForward);
   const callerChanged = await rewriteCallerFiles(newSha, tag);
 
   const note =
