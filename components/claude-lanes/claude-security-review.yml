@@ -68,11 +68,14 @@ permissions:
 
 jobs:
   security-review:
-    # A draft is work in progress and does not spend a review. The event_name
-    # clause mirrors the code-review caller's so the two lanes read the same
-    # way; this workflow has no dispatch trigger today, and the clause stays
-    # correct if one is added.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # A draft is work in progress and does not spend a review; the
+    # ready_for_review trigger above is what delivers one when it is ready.
+    # No event guard, unlike the code-review caller: this lane has no
+    # workflow_dispatch trigger, so `pull_request` is the only event that can
+    # start it and `github.event.pull_request` is always present. Adding a
+    # dispatch trigger here would mean adding the guard with it, because a
+    # dispatched run has no pull-request payload to read a draft flag from.
+    if: github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
       pull-requests: write   # post the security review + tracking comment

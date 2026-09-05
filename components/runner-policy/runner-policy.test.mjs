@@ -3871,6 +3871,11 @@ test("policy rejects a selector input contract that names an unregistered option
 });
 
 test("a claude-review caller routes to the review tier through the governed selector without findings", async () => {
+  // The shipped caller now names the fleet review label directly, so this is no
+  // longer that caller's shape; it stays because the selector remains a
+  // supported route until Phase 7 retires it, and a repository may carry both
+  // spellings mid-migration.
+  //
   // Executable spec for the Campaign A flip: a dedicated select-review job
   // resolves the review-tier label, and the claude-review reusable call takes
   // its runner from that selector output under the reviewed #140 caller-perms
