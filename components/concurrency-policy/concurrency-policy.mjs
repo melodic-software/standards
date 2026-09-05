@@ -64,23 +64,91 @@ const CANONICAL_GROUP =
   /^\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.run_id\s*\}\}$/u;
 const CANONICAL_GROUP_TEXT = `\${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}`;
 
-// The ci-perf contract-only shape. A workflow whose required check carries the
-// pull-request contract re-runs on `edited`, `labeled` and `unlabeled`, events
-// that change the contract answer without a new commit. Those runs gate every
-// lane off and carry the recorded lane verdict forward, so they must never
-// cancel the full run they read that verdict from: cancelling it means the
-// verdict is never recorded and the carry-forward can only fail. The predicate
-// is the one the `ci-status` composite in ci-workflows carries as its
-// `contract-only` default at v0.20.0, and it must match that default exactly —
-// a drifted copy would gate lanes off while the composite still aggregates, so
-// the only accepted form here is the byte-identical expression below. Unlike
-// `group`, no whitespace or clause variation is tolerated: this is a
-// fail-closed allow-list of two values, the literal `true` and this string.
-const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}`;
+// The ci-perf contract-only predicate. A workflow whose required check carries
+// the pull-request contract re-runs on `edited`, `labeled` and `unlabeled`,
+// events that change the contract answer without a new commit. Those runs gate
+// every lane off and carry the recorded lane verdict forward. The predicate is
+// the one the `ci-status` composite in ci-workflows carries as its
+// `contract-only` default at v0.20.0, and it must match that default exactly:
+// a drifted copy would gate lanes off while the composite still aggregates.
+// Both places it can appear here, `cancel-in-progress` and the branched
+// `group`, therefore hold it byte for byte, with none of the whitespace
+// tolerance the canonical `group` tokens enjoy.
+const CONTRACT_ONLY_PREDICATE_TEXT = `github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))`;
+
+// The contract-only `cancel-in-progress` text, kept for repositories not yet
+// reshaped onto the branched group. Expressed as `!(<predicate>)`, cancellation
+// stays on for every full-run event and switches off only for the events that
+// carry forward. This is a fail-closed allow-list of two values, the literal
+// `true` and this string.
+const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(${CONTRACT_ONLY_PREDICATE_TEXT}) }}`;
+
+// The ci-perf branched group (github-iac#378, Phase 6b). Two runs of the
+// required workflow on one head SHA share one concurrency group, and GitHub
+// evicts a pending run unconditionally, so `cancel-in-progress: false` does not
+// protect the contract-only run that queues behind the full run it reads. The
+// branched group puts contract-only runs in their own per-run group keyed on
+// github.run_id: no contract-only run can be cancelled, evicted, or evict
+// anything, and the composite's bounded carry-forward wait replaces the queue.
+// The full branch keeps the canonical shape, and its fallback term is the
+// per-repository push decision: `github.ref` keeps push-side burst collapse,
+// `github.run_id` gives none because every push lands in its own group. Exactly
+// those two terms are admitted.
+const FALLBACK_TERMS = ["github.ref", "github.run_id"];
+
+// Escape a literal for embedding in a RegExp source, so the predicate and the
+// two format() calls are matched byte for byte rather than as patterns.
+function literalPattern(text) {
+  return text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+}
+
+// Whitespace is tolerated only where the design's folded scalar puts it: the
+// `${{ }}` delimiters and the two operator joins. Written as `group: >-` with
+// the continuation lines more-indented, the YAML parser preserves a newline and
+// the extra indent at each join, so the folded and single-line spellings differ
+// only there. Everything else, above all the predicate, is exact. One pattern
+// per admitted fallback term, so a match names the term without a capture
+// group and an unlisted term matches nothing.
+const BRANCHED_GROUP_BY_FALLBACK = new Map(
+  FALLBACK_TERMS.map((term) => [
+    term,
+    new RegExp(
+      `^\\$\\{\\{\\s*\\(${literalPattern(CONTRACT_ONLY_PREDICATE_TEXT)}\\)` +
+        `\\s+&&\\s+${literalPattern("format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)")}` +
+        `\\s+\\|\\|\\s+${literalPattern(`format('{0}-{1}', github.workflow, github.event.pull_request.number || ${term})`)}` +
+        `\\s*\\}\\}$`,
+      "u",
+    ),
+  ]),
+);
+const BRANCHED_GROUP_TEXT = `\${{ (<contract-only predicate>) && format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id) || format('{0}-{1}', github.workflow, github.event.pull_request.number || <${FALLBACK_TERMS.join(" or ")}>) }}`;
 const ALLOWED_CONCURRENCY_KEYS = new Set(["group", "cancel-in-progress"]);
 
-function finding(rule, file, message) {
-  return { rule, file, message };
+function finding(rule, file, message, extra = {}) {
+  return { level: "error", rule, file, message, ...extra };
+}
+
+// Classify a conforming group and name the fallback term it carries. The
+// canonical form has one by construction, `github.run_id`; the branched form
+// carries the repository's own decision. A group that matches neither returns
+// undefined and is reported as drift.
+function classifyGroup(group) {
+  if (typeof group !== "string") {
+    return undefined;
+  }
+  if (CANONICAL_GROUP.test(group)) {
+    return { form: "canonical", fallback: "github.run_id" };
+  }
+  for (const [fallback, pattern] of BRANCHED_GROUP_BY_FALLBACK) {
+    if (pattern.test(group)) {
+      return { form: "branched", fallback };
+    }
+  }
+  return undefined;
+}
+
+export function hasBlockingFindings(findings) {
+  return findings.some((item) => item.level !== "info");
 }
 
 function jsonPointerLocation(location, instancePath) {
@@ -220,13 +288,28 @@ function concurrencyFindings(file, workflow) {
     ];
   }
   const findings = [];
-  if (typeof concurrency.group !== "string" || !CANONICAL_GROUP.test(concurrency.group)) {
+  const shape = classifyGroup(concurrency.group);
+  if (shape === undefined) {
     findings.push(
       finding(
         "concurrency-group-drift",
         file,
-        `top-level concurrency.group must be \`${CANONICAL_GROUP_TEXT}\`, found ` +
-          `${JSON.stringify(concurrency.group ?? null)}`,
+        `top-level concurrency.group must be \`${CANONICAL_GROUP_TEXT}\` or the ci-perf branched ` +
+          `form \`${BRANCHED_GROUP_TEXT}\`, found ${JSON.stringify(concurrency.group ?? null)}`,
+      ),
+    );
+  } else {
+    // Informational, never blocking: the fallback term is a per-repository
+    // decision, not drift, and reporting it lets a fleet check list which
+    // repositories keep push-side burst collapse.
+    findings.push(
+      finding(
+        "concurrency-group-fallback",
+        file,
+        `top-level concurrency.group is the ${shape.form} form with fallback term ` +
+          `\`${shape.fallback}\`, so push and schedule runs ` +
+          `${shape.fallback === "github.ref" ? "collapse into one group per ref" : "each land in their own group and are never superseded"}`,
+        { level: "info", fallback: shape.fallback },
       ),
     );
   }
@@ -421,16 +504,25 @@ async function main() {
   try {
     const { json, ...options } = parseArguments(process.argv.slice(2));
     const findings = await auditRepository(options);
+    const blocked = hasBlockingFindings(findings);
     if (json) {
-      process.stdout.write(`${JSON.stringify({ findings, ok: findings.length === 0 }, null, 2)}\n`);
-    } else if (findings.length === 0) {
-      process.stdout.write("Concurrency policy passed.\n");
+      process.stdout.write(`${JSON.stringify({ findings, ok: !blocked }, null, 2)}\n`);
     } else {
+      // Info findings are reported on stdout and never fail the gate; blocking
+      // findings keep the stderr channel and the non-zero exit status.
       for (const item of findings) {
-        process.stderr.write(`${item.file}: ${item.rule}: ${item.message}\n`);
+        const line = `${item.file}: ${item.level}: ${item.rule}: ${item.message}\n`;
+        if (item.level === "info") {
+          process.stdout.write(line);
+        } else {
+          process.stderr.write(line);
+        }
+      }
+      if (!blocked) {
+        process.stdout.write("Concurrency policy passed.\n");
       }
     }
-    process.exitCode = findings.length === 0 ? 0 : 1;
+    process.exitCode = blocked ? 1 : 0;
   } catch (error) {
     const output = error instanceof Error ? error.message : String(error);
     process.stderr.write(`concurrency-policy: ${output}\n`);
