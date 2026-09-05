@@ -340,13 +340,18 @@ targets:
       - typos
   # Adopted 2026-09-05 at repository creation (github-iac governs it; the
   # Pulumi entry and this target land in the same window). A public .NET tool
-  # repo, so the set is github-iac's minus what a public hosted-only target
-  # cannot carry: `claude-settings-github-iac` (per-target settings file),
-  # `runner-policy` (private selector-routed consumers only), and both
-  # `components/claude-lanes/` callers, which name the private fleet's runner
-  # label and are refused on a public repository (see the
-  # `claude-security-review-caller` note above). Hosted lane callers arrive by
-  # repo-local PR, the claude-code-plugins route. Plus the hosted-only
+  # repo, so the set is github-iac's minus three things.
+  # `claude-settings-github-iac` is that target's own settings file.
+  # `runner-policy` is an adoption list, not a visibility class (README
+  # "Runner-policy consumer handoff"; claude-code-plugins is public and
+  # enrolled), and account-rotation is not enrolled yet: enrollment is a
+  # separate consumer change (a repo-local `.github/runner-policy.json` with
+  # `selfHostedCi: false` plus the CI job) to take up with the requires-ci
+  # flip, at which point the component joins this list. Both
+  # `components/claude-lanes/` callers name the private fleet's runner label
+  # and are refused on a public repository (see the
+  # `claude-security-review-caller` note above); hosted lane callers arrive
+  # by repo-local PR, the claude-code-plugins route. Plus the hosted-only
   # `managed-files-guard-caller`, which every public target carries.
   # `automerge: false` because the repository sits outside the org ci-gate
   # ruleset until github-iac flips its requires-ci, so an armed sync PR would
