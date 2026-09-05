@@ -9218,6 +9218,167 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
+// ---------------------------------------------------------------------------
+// The ci-workflows `checks` consolidation reusable. One job, one runner, every
+// content-agnostic hygiene composite as a step: the lane the CI performance
+// program moves five repositories onto. Its contract is drawn at the
+// reusable's whole declared input surface rather than at any one caller's
+// subset, so a later caller needs no second standards round trip.
+// ---------------------------------------------------------------------------
+
+const CHECKS_REFERENCE =
+  "melodic-software/ci-workflows/.github/workflows/checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1";
+const CHECKS_CONTRACT = BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE];
+const CHECKS_POLICY_OVERRIDES = {
+  approvedReusableWorkflowContracts: { [CHECKS_REFERENCE]: CHECKS_CONTRACT },
+};
+
+// A refused contract costs the call its routing target too: the fleet label in
+// a `with:` value is skipped by the raw-pin scan only for an APPROVED call, and
+// a job with no admitted target also needs a hosted exception it does not have.
+// All three rules are asserted so a future change that silently drops one of
+// them is visible, and the contract reason itself is returned for matching.
+async function checksContractRefusal(root) {
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-required", "raw-self-hosted-label", "runner-target-contract"],
+  );
+  return findings.find(({ rule }) => rule === "runner-target-contract").message;
+}
+
+function checksCaller(inputs) {
+  return `permissions: read-all
+jobs:
+  checks:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ${CHECKS_REFERENCE}
+    with:
+${inputs.map((line) => `      ${line}`).join("\n")}
+`;
+}
+
+test("the shipped checks.yml contract is the reusable's whole declared surface", () => {
+  // Pinned so a later narrowing to one caller's subset is a visible diff. The
+  // list is on.workflow_call.inputs at the pinned SHA in declaration order, all
+  // nineteen; the reusable declares no secrets, and its job asks for exactly
+  // the two read scopes the floor names.
+  assert.deepEqual(CHECKS_CONTRACT, {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: [
+      "runner",
+      "filters",
+      "timeout-minutes",
+      "typos",
+      "gitleaks",
+      "editorconfig",
+      "markdown",
+      "shellcheck",
+      "actionlint",
+      "exec-bit",
+      "machine-specific-paths",
+      "eol-renormalize",
+      "comment-hygiene",
+      "lychee-offline",
+      "check-jsonschema",
+      "check-jsonschema-files",
+      "check-jsonschema-builtin-schema",
+      "machine-specific-paths-exclude",
+      "comment-hygiene-exclude",
+    ],
+    allowedSecrets: {},
+    minimumCallerPermissions: {
+      contents: "read",
+      "pull-requests": "read",
+    },
+  });
+});
+
+test("a private fleet caller of the checks reusable at the approved SHA is admitted", async () => {
+  const root = await repository({
+    policyOverrides: CHECKS_POLICY_OVERRIDES,
+    workflows: {
+      "ci.yml": checksCaller([
+        `runner: ${FLEET_LABEL}`,
+        "timeout-minutes: 15",
+        "check-jsonschema: true",
+        "check-jsonschema-files: .github/dependabot.yml",
+        "check-jsonschema-builtin-schema: vendor.dependabot",
+        "filters: |",
+        "  code:",
+        "    - tools/**",
+      ]),
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the checks contract admits every input the reusable declares, not one caller's subset", async () => {
+  // The union argument made executable: a caller passing all nineteen at once
+  // is admitted, so none of the five wave repositories can need a widening.
+  const root = await repository({
+    policyOverrides: CHECKS_POLICY_OVERRIDES,
+    workflows: {
+      "ci.yml": checksCaller(
+        CHECKS_CONTRACT.allowedInputs.map((name) =>
+          name === "runner" ? `runner: ${FLEET_LABEL}` : `${name}: "x"`,
+        ),
+      ),
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("the checks reusable at an unapproved SHA is refused", async () => {
+  // The same workflow path already has a reviewed contract, so this is the
+  // Dependabot-bump shape: the checker fetches both revisions and compares
+  // their surface. The suite's hermetic stub declines every fetch, so the
+  // reference falls back to the fail-closed branch and the reason names the
+  // declined auto-approval rather than passing on an unreviewed revision.
+  const root = await repository({
+    policyOverrides: CHECKS_POLICY_OVERRIDES,
+    workflows: {
+      "ci.yml": checksCaller([`runner: ${FLEET_LABEL}`]).replace(
+        "checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1",
+        `checks.yml@${"c".repeat(40)}`,
+      ),
+    },
+  });
+  assert.match(
+    await checksContractRefusal(root),
+    /has no reviewed runner-input contract \(auto-approval declined: /u,
+  );
+});
+
+test("an input the checks reusable does not declare is refused by name", async () => {
+  const root = await repository({
+    policyOverrides: CHECKS_POLICY_OVERRIDES,
+    workflows: {
+      "ci.yml": checksCaller([`runner: ${FLEET_LABEL}`, "zizmor: true"]),
+    },
+  });
+  assert.match(
+    await checksContractRefusal(root),
+    /inputs absent from its reviewed contract: zizmor/u,
+  );
+});
+
+test("a checks caller that does not grant the contract's read floor is refused", async () => {
+  // pull-requests: read is what change-detection needs to read the pull
+  // request's file list. A called workflow can only narrow the caller's token,
+  // so a caller short of the floor fails here rather than inside the callee.
+  const root = await repository({
+    policyOverrides: CHECKS_POLICY_OVERRIDES,
+    workflows: {
+      "ci.yml": checksCaller([`runner: ${FLEET_LABEL}`]).replace("      pull-requests: read\n", ""),
+    },
+  });
+  assert.match(await checksContractRefusal(root), /pull-requests/u);
+});
+
 test("a repository-local call whose jobs run on the fleet label is audited, not silent", async () => {
   const workflows = {
     "gateway.yml": `permissions: read-all

@@ -742,6 +742,35 @@ and `allow-no-lockfiles` in addition to `runner`; `pulumi-version-drift-check`
 keeps `runner` plus the `contents: read` / `issues: write` caller-permission
 waiver the drift job already exercised. Neither SHA adds a secret or a
 routing surface.
+The `checks` consolidation reusable is registered at
+`b260ba091ca89bb3292eb53abea07ca8f0a51bf1` (v0.21.0), the first contract for
+that workflow path at any SHA.
+`allowedInputs` is the complete set of inputs the reusable declares at that
+revision, all nineteen of them, and not the subset any one caller passes. The
+CI performance program moves five repositories (dotfiles, github-iac,
+provisioning, claude-code-proxy, medley) onto this one reusable, `allowedInputs`
+is an exact allowlist that refuses an unlisted input by name, and widening it
+later is a standards change plus a sync in every consumer, so drawing it at the
+reusable's own declared contract costs nothing and saves four round trips.
+Every input is either a runner label, a `change-detection` filter string, a
+job budget, a composite on/off toggle, or a path argument to a composite; none
+names a credential, an environment, or a routing surface beyond `runner`, so
+the widest possible caller under this contract is still the read-only workload
+the review covered. Routing is `runner-input` on `runner`, which the reusable
+declares required with no default and writes straight into its single job's
+`runs-on`, so a fleet caller passes the managed label as a literal under the
+`managed-literal` rule and a hosted caller passes an approved hosted label; the
+contract admits both and prefers neither. `allowedSecrets` is empty because the
+reusable declares no `on.workflow_call.secrets`. The
+`minimumCallerPermissions` floor of `contents: read` and `pull-requests: read`
+is exactly what the reusable's own job block requests, `pull-requests: read`
+being what `change-detection` needs to read a pull request's file list; a
+caller granting less cannot do the work the contract was reviewed for. Both
+scopes are reads, so the floor is legal and no `allowedCallerPermissions`
+waiver is needed or wanted: the calling job stays on the ordinary read-only
+boundary. A later revision is a second entry keyed at its own SHA, or the
+Dependabot auto-approval path when the compared surface is unchanged, for
+which this contract is eligible because its `allowedSecrets` mapping is empty.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
