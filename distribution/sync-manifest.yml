@@ -356,7 +356,7 @@ targets:
   # `automerge: false` because the repository sits outside the org ci-gate
   # ruleset until github-iac flips its requires-ci, so an armed sync PR would
   # merge ungated; removal trigger: that flip, in the change that lands the
-  # four ci-gate callers.
+  # ci.yml that emits ci-status.
   melodic-software/account-rotation:
     automerge: false
     managed:
