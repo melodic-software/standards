@@ -9699,6 +9699,80 @@ test("both claude lane contracts at the wave tag copy their predecessors forward
   assert.equal(asserted, 2);
 });
 
+// The two reusables the wave-tag convergence stranded. Neither is a claude
+// lane and neither is distributed by this repository, so the first 6b-i pull
+// request did not carry them; the consumers that call them (claude-code-plugins
+// for both, .github and github-iac for link-check) had to hold their old pins
+// because `reusableWorkflowStatus` fails closed on an unreviewed path@SHA and
+// the Dependabot auto-approval path declines any contract naming
+// `allowedCallerPermissions`, which both of these do. The declared surfaces are
+// unchanged at the tag, so equality against the predecessor is the assertion.
+test("link-check and issue-triage-label at the wave tag copy their predecessors forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const previousByPath = {
+    "link-check": GH_FREE_GATE_SHA,
+    "issue-triage-label": "c5e729c0af0e55ffed4675ec85c1b57356fef79e",
+  };
+  let asserted = 0;
+  for (const [reusable, previousSha] of Object.entries(previousByPath)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${previousSha}`];
+    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
+    assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
+    asserted += 1;
+  }
+  assert.equal(asserted, 2);
+});
+
+test("a governed caller of link-check at the wave tag is admitted", async () => {
+  const reference = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${REPINE_LANE_SHA_V0_22_0}`;
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  links:
+    permissions:
+      contents: read
+      issues: write
+    uses: ${reference}
+    with:
+      runner: ${FLEET_LABEL}
+      args: --no-progress
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a governed caller of issue-triage-label at the wave tag is admitted", async () => {
+  const reference = `melodic-software/ci-workflows/.github/workflows/issue-triage-label.yml@${REPINE_LANE_SHA_V0_22_0}`;
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+      },
+    },
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  triage:
+    permissions:
+      issues: write
+    uses: ${reference}
+    with:
+      runner: ${FLEET_LABEL}
+      label: needs-triage
+`,
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on

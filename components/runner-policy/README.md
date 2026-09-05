@@ -795,6 +795,27 @@ is still only
 all, because it calls a composite action rather than a reusable workflow and
 composite actions are not SHA-allowlisted; its `action.yml` is byte-identical
 between `3b2f4eab5b4bb58a150e400613350ede37742ee8` and the tag.
+Two further contracts are registered at the same tag,
+`link-check` and `issue-triage-label`, so the repositories that call them can
+converge too. Those two are neither claude lanes nor distributed by this
+repository, so the first convergence change did not carry them, and their
+callers (claude-code-plugins for both, `.github` and github-iac for
+`link-check`) had to hold their old pins: `reusableWorkflowStatus` fails closed
+on an unreviewed `path@SHA`, and the Dependabot auto-approval path declines any
+contract naming `allowedCallerPermissions`, which both of these do. Each copies
+its predecessor's terms verbatim, `link-check` from
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` and `issue-triage-label` from
+`c5e729c0af0e55ffed4675ec85c1b57356fef79e`, and neither widens. Verified at the
+tag through the contents API: `issue-triage-label.yml` is byte-identical to its
+predecessor, and `link-check.yml`'s `on.workflow_call` declaration, workflow
+permissions, job permissions and `runs-on: ${{ inputs.runner }}` routing are all
+identical, the whole diff being a port of its tracking-issue steps from the `gh`
+CLI to `actions/github-script`. That port is why the surface diff declines: it
+rewrites credential-bearing steps, which the credential-references surface
+records in full. It also removes a dependency on the runner image shipping the
+`gh` CLI, which a self-hosted image is not guaranteed to do, so the caller-side
+effect of the bump is that the lane becomes safe to route to the managed
+fleet.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
