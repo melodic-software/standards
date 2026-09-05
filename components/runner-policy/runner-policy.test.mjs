@@ -36,6 +36,7 @@ const BILLING_AWARE_ROUTING_LANE_SHA = "62bef7bab01e8532fedfa739879034a210e9e67d
 const REPINE_LANE_SHA_V0_14_2 = "7107b34832a7b6db5d08d3b132621c599fbe5e50";
 const REPINE_LANE_SHA_V0_17_0 = "d26c750691b5498fab529d115b63f84aa7aecebe";
 const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
+const REPINE_LANE_SHA_V0_22_0 = "906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -9379,6 +9380,38 @@ test("a checks caller that does not grant the contract's read floor is refused",
   assert.match(await checksContractRefusal(root), /pull-requests/u);
 });
 
+// The same reusable at the ci-perf wave tag. The file is byte-identical
+// between the two revisions, so the contract is a verbatim copy forward and
+// asserting equality (rather than restating nineteen inputs a second time)
+// is what makes a silent divergence at either key a failing test.
+const CHECKS_REFERENCE_WAVE_TAG =
+  "melodic-software/ci-workflows/.github/workflows/checks.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
+
+test("the checks.yml contract at the wave tag copies the first contract forward verbatim", () => {
+  assert.deepEqual(
+    BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE_WAVE_TAG],
+    CHECKS_CONTRACT,
+  );
+});
+
+test("a private fleet caller of the checks reusable at the wave tag is admitted", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [CHECKS_REFERENCE_WAVE_TAG]:
+          BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE_WAVE_TAG],
+      },
+    },
+    workflows: {
+      "ci.yml": checksCaller([`runner: ${FLEET_LABEL}`, "timeout-minutes: 15"]).replace(
+        CHECKS_REFERENCE,
+        CHECKS_REFERENCE_WAVE_TAG,
+      ),
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
 test("a repository-local call whose jobs run on the fleet label is audited, not silent", async () => {
   const workflows = {
     "gateway.yml": `permissions: read-all
@@ -9644,6 +9677,40 @@ test("a fleet-routed claude lane caller is rejected outright on a public consume
     );
   }
   assert.ok(asserted > 0, "expected at least one fleet-routed caller audited on a public consumer");
+});
+
+// The ci-perf wave tag. Both lane reusables keep their whole workflow_call
+// declaration, their job permissions, and their runs-on routing across the
+// bump; the only difference is an action pin inside a credential-consuming
+// step, which the credential-references surface records in full and which is
+// therefore why auto-approval declines and these entries are written by hand.
+// Equality against the predecessor is the assertion, so a widened input,
+// secret, or caller permission smuggled into the new key fails here.
+test("both claude lane contracts at the wave tag copy their predecessors forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  let asserted = 0;
+  for (const lane of ["claude-review", "claude-security-review"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${lane}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_17_2}`];
+    assert.ok(previous, `expected a predecessor contract for ${lane}`);
+    assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
+    asserted += 1;
+  }
+  assert.equal(asserted, 2);
+});
+
+test("every claude lane caller component pins the wave tag", async () => {
+  for (const { source, body } of await claudeLaneCallerComponents()) {
+    const pins = [...body.matchAll(/melodic-software\/ci-workflows\/[^@\s]+@([0-9a-f]{40})/gu)].map(
+      ([, sha]) => sha,
+    );
+    assert.ok(pins.length > 0, `${source} carries no ci-workflows pin`);
+    assert.deepEqual(
+      [...new Set(pins)],
+      [REPINE_LANE_SHA_V0_22_0],
+      `${source} pins a revision other than the converged wave tag`,
+    );
+  }
 });
 
 // The managed-files-guard caller is the hosted-only counterpart: a fixed

@@ -85,7 +85,7 @@ jobs:
     concurrency:
       group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
     with:
       runner: melodic-review-ubuntu-24.04-x64
       paths-file: .github/claude-security-paths
