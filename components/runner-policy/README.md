@@ -771,6 +771,30 @@ waiver is needed or wanted: the calling job stays on the ordinary read-only
 boundary. A later revision is a second entry keyed at its own SHA, or the
 Dependabot auto-approval path when the compared surface is unchanged, for
 which this contract is eligible because its `allowedSecrets` mapping is empty.
+Three contracts are registered at
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0), the ci-perf wave tag the
+distributed components converge on: both claude lanes and `checks`. The lane
+entries copy their `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2) terms
+forward verbatim, and `checks` copies its
+`b260ba091ca89bb3292eb53abea07ca8f0a51bf1` (v0.21.0) terms forward verbatim.
+Nothing widens: no entry gains an input, a secret, a routing surface, or a
+caller permission. `checks.yml` is byte-identical between the two revisions, so
+the second entry exists only so a caller may name the converged SHA. The two
+lanes each changed by exactly three `uses:` lines and nothing else: two
+`anthropics/claude-code-action` pins moving from v1.0.198 to v1.0.215, and one
+`claude-lane-outcome` composite pin moving to the revision v0.22.0 carries.
+Every `on.workflow_call` input, secret, job permission and `runs-on` expression
+is unchanged. Auto-approval declined for the familiar reason: those action pins
+sit inside the steps that pass `claude_code_oauth_token`, which the
+credential-references surface records in full, so an action pin bump on a
+credential-consuming step reads as a `credentialReferences` diff and the
+contract entries are written by human review instead. The secret mapping itself
+is still only
+`claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. The
+`managed-files-guard` caller re-pins to the same tag with no policy entry at
+all, because it calls a composite action rather than a reusable workflow and
+composite actions are not SHA-allowlisted; its `action.yml` is byte-identical
+between `3b2f4eab5b4bb58a150e400613350ede37742ee8` and the tag.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
