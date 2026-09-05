@@ -8954,6 +8954,11 @@ test("an unreviewed near-miss of the fleet label is not admitted on an enrolled 
     "kyle-ubuntu-24.04-x64",
     "bogus/melodic-review-ubuntu-24.04-x64",
     "melodic-review-ubuntu-24.04-x64!",
+    // Padded on either side. The comparison is exact, like the hosted-literal
+    // one, and validatePolicy already refuses a set entry carrying whitespace,
+    // so neither end of that pair can drift into accepting this.
+    " melodic-ubuntu-24.04-x64",
+    "melodic-ubuntu-24.04-x64 ",
   ]) {
     const root = await repository({
       workflows: {
@@ -8965,6 +8970,36 @@ test("an unreviewed near-miss of the fleet label is not admitted on an enrolled 
     // the job is left with no admitted routing target, so it also needs a named
     // hosted exception it does not have.
     assert.deepEqual(rules, ["hosted-exception-required", "raw-self-hosted-label"], target);
+  }
+});
+
+test("a structural requirement on the fleet label never reads as grantable", async () => {
+  // A grant admits a privileged token on the fleet; it never suppresses a
+  // structural requirement (THREAT-MODEL.md). The two rules share this reporting
+  // branch, so the message is pinned here: if the privileged suffix ever leaks
+  // onto the structural rule again, a container author reads "write a grant" and
+  // the inventory grows an entry that cannot work.
+  for (const [shape, description] of [
+    ["    container: node:24\n", "job container"],
+    ["    services:\n      db:\n        image: postgres:18\n", "services"],
+  ]) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n${shape}    steps: []\n`,
+      },
+    });
+    const findings = await audit(root);
+    const structural = findings.find(({ rule }) => rule === "structural-hosted-only");
+    assert.ok(structural, description);
+    assert.equal(
+      structural.message,
+      `${description} cannot use selector or fleet-label routing`,
+      description,
+    );
+    assert.ok(
+      !findings.some(({ rule }) => rule === "privileged-hosted-only"),
+      `${description} is structural, not privileged`,
+    );
   }
 });
 

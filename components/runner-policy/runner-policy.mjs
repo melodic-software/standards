@@ -2601,9 +2601,11 @@ function runnerTargetStatus(jobId, job, jobs, workflow, policy, file, workflowIn
   // non-enrolled repository, which is exactly how selector-output is handled,
   // so the public case keeps reporting `public-self-hosted-routing` rather than
   // a generic contract failure.
-  const managedLiteral = target.trim();
-  if (policy.approvedManagedRunnerLabels.has(managedLiteral)) {
-    return { approved: true, kind: "managed-literal", label: managedLiteral };
+  // Compared without trimming, exactly as the hosted-literal check below is, and
+  // exactly as validatePolicy requires of every set entry: a padded label is a
+  // different string from the reviewed one and is not admitted.
+  if (policy.approvedManagedRunnerLabels.has(target)) {
+    return { approved: true, kind: "managed-literal", label: target };
   }
   if (policy.approvedHostedRunnerLabels.has(target)) {
     return { approved: true, kind: "hosted-literal" };
@@ -3686,11 +3688,7 @@ export async function auditRepository({
         // rawRunnerStrings reads both: without that, an approved reusable call
         // whose runner input is the fleet label would report its own admitted
         // target as a raw pin.
-        if (
-          routingEnabled &&
-          target?.kind === "managed-literal" &&
-          runner.trim() === target.label
-        ) {
+        if (routingEnabled && target?.kind === "managed-literal" && runner === target.label) {
           continue;
         }
         if (rawManagedLabel(runner, policy)) {
@@ -3789,12 +3787,19 @@ export async function auditRepository({
             target?.kind !== "hosted-reusable" &&
             target?.kind !== "hosted-local-reusable")
         ) {
+          // The suffix is per rule, not shared. A grant never suppresses a
+          // structural requirement (THREAT-MODEL.md), so a job container or
+          // services on the fleet must not read as if writing one would satisfy
+          // it; only the privileged category has a grant as an alternative to an
+          // exception.
           findings.push(
             finding(
               hostedRequirement.rule,
               file,
               jobId,
-              `${hostedRequirement.description} requires a reviewed localRoutingGrants entry or a hosted exception`,
+              hostedRequirement.rule === "structural-hosted-only"
+                ? `${hostedRequirement.description} cannot use selector or fleet-label routing`
+                : `${hostedRequirement.description} requires a reviewed localRoutingGrants entry or a hosted exception`,
             ),
           );
         }
