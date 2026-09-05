@@ -5,11 +5,17 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  CONSUMER_REPOSITORIES,
   checkCopies,
+  checkFleet,
+  checkPinnedComposite,
   checkPinnedReusable,
   DriftError,
-  GATE_CALLERS,
+  detectArtifactPin,
   parseCallerPin,
+  parseCompositeRequireScope,
+  parseCompositeSections,
+  parseCompositeTypes,
   parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
@@ -24,6 +30,50 @@ const POLICY = parseUniqueJson(
 );
 
 // Hermetic fixtures mirroring the narrowest parsed surface of each live copy.
+// Written as arrays of plain strings so a backslash in an awk regex stays a
+// backslash without template-literal escaping games.
+const GOOD_COMPOSITE_RUN = [
+  "analyze_body() {",
+  "  awk '",
+  "function scan_line(line,   lower, offset, chunk) {",
+  "  lower = tolower(line)",
+  "  offset = 0",
+  "  while (1) {",
+  "    chunk = substr(lower, offset + 1)",
+  "    if (!match(chunk, /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[ \\t]*:?[ \\t]*([a-z0-9_.-]+\\/[a-z0-9_.-]+)?#[0-9]+/)) break",
+  "    offset = offset + RSTART + RLENGTH - 1",
+  "  }",
+  "}",
+  "END {",
+  '  section_report("Summary")',
+  '  section_report("Fix")',
+  '  section_report("Verification")',
+  '  section_report("Related")',
+  '  if (tolower(body) ~ /(^|[^a-z0-9_])no (linked|related) issue([^a-z0-9_]|$)/) print "no-issue"',
+  "}",
+  "'",
+  "}",
+  "",
+].join("\n");
+
+const GOOD_COMPOSITE_ACTION = [
+  "name: pr-contract",
+  "inputs:",
+  "  require-scope:",
+  "    description: Require a scope to always be present in the title.",
+  "    default: 'false'",
+  "  types:",
+  "    description: >-",
+  "      Comma-separated allowed Conventional Commits types. The default is the",
+  "      twelve types policy.json declares.",
+  "    default: build,chore,ci,docs,feat,fix,perf,refactor,revert,security,style,test",
+  "runs:",
+  "  using: composite",
+  "",
+].join("\n");
+
+// The predecessor reusable. Still live at every consumer that has not taken
+// its Phase 3 pull request yet, so its extractor keeps its own coverage.
 const GOOD_GATE = `
       - name: Validate
         with:
@@ -54,7 +104,8 @@ const GOOD_RULES = [
 
 function goodTexts() {
   return {
-    gate: GOOD_GATE,
+    gateRun: GOOD_COMPOSITE_RUN,
+    gateAction: GOOD_COMPOSITE_ACTION,
     hookValidator: GOOD_VALIDATOR,
     orgTemplate: GOOD_TEMPLATE,
     rulesFile: GOOD_RULES,
@@ -66,6 +117,18 @@ test("policy fixture agreement: every good fixture matches policy.json", () => {
 });
 
 test("parsers extract the narrow surfaces", () => {
+  assert.deepEqual(
+    parseCompositeSections(GOOD_COMPOSITE_RUN, "composite"),
+    POLICY.body.requiredSections,
+  );
+  assert.deepEqual(
+    parseCompositeTypes(GOOD_COMPOSITE_ACTION, "composite"),
+    POLICY.title.allowedTypes,
+  );
+  assert.equal(
+    parseCompositeRequireScope(GOOD_COMPOSITE_ACTION, "composite"),
+    POLICY.title.requireScope,
+  );
   assert.deepEqual(parseGateSections(GOOD_GATE, "gate"), POLICY.body.requiredSections);
   assert.deepEqual(
     parseValidatorSections(GOOD_VALIDATOR, "validator"),
@@ -83,11 +146,67 @@ test("parsers extract the narrow surfaces", () => {
 
 // Mutation probes: one mutated copy per source must produce exactly that
 // source's drift finding (the acceptance criterion's red-under-mutation).
-test("mutated gate section list is reported", () => {
+test("mutated composite section list is reported", () => {
   const texts = goodTexts();
-  texts.gate = texts.gate.replace('"Fix"', '"Patch"');
+  texts.gateRun = texts.gateRun.replace('section_report("Fix")', 'section_report("Patch")');
   const errors = checkCopies(POLICY, texts);
-  assert.equal(errors.filter((e) => e.startsWith("gate reusable:")).length, 1);
+  assert.equal(errors.filter((e) => e.startsWith("gate composite:")).length, 1, errors.join("; "));
+  assert.match(errors[0], /Patch/);
+});
+
+test("a composite type list that drops security is reported", () => {
+  const texts = goodTexts();
+  texts.gateAction = texts.gateAction.replace(",security", "");
+  const errors = checkCopies(POLICY, texts).filter((e) =>
+    e.includes("gate composite (title types"),
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /missing security/);
+});
+
+test("a composite type list that adds a type policy does not allow is reported", () => {
+  const texts = goodTexts();
+  texts.gateAction = texts.gateAction.replace(",style", ",wip,style");
+  const errors = checkCopies(POLICY, texts).filter((e) =>
+    e.includes("gate composite (title types"),
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /unexpected wip/);
+});
+
+// A composite that flipped `require-scope` would reject every unscoped title
+// fleet-wide while the section and type checks still reported agreement.
+test("a composite that flips require-scope away from policy is reported", () => {
+  const texts = goodTexts();
+  texts.gateAction = texts.gateAction.replace("default: 'false'", "default: 'true'");
+  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("require-scope"));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /require-scope is true, policy says false/);
+});
+
+// YAML gives a string for the quoted `'false'` the composite declares and a
+// boolean for a bare `false`; both mean the same thing to Actions, and anything
+// else is drift rather than a coerced guess.
+test("require-scope accepts either YAML spelling and refuses a non-boolean", () => {
+  assert.equal(
+    parseCompositeRequireScope(
+      GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: false"),
+      "composite",
+    ),
+    false,
+  );
+  assert.throws(
+    () =>
+      parseCompositeRequireScope(
+        GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: maybe"),
+        "composite",
+      ),
+    DriftError,
+  );
+  assert.throws(
+    () => parseCompositeRequireScope("name: pr-contract\ninputs:\n  types:\n", "composite"),
+    DriftError,
+  );
 });
 
 test("mutated validator section list is reported", () => {
@@ -114,7 +233,66 @@ test("rules file missing a section or keyword is reported", () => {
   assert.equal(errors.filter((e) => e.startsWith("rules file")).length, 2, errors.join("; "));
 });
 
-test("stale pin enforcing an older contract is reported", () => {
+test("composite keyword/marker regressions are caught functionally, not by mention", () => {
+  // Keyword stem removed from the DECLARED pattern while the word survives in
+  // prose: a mention check would pass; the functional probe must not.
+  const noResolve = goodTexts();
+  noResolve.gateRun = noResolve.gateRun
+    .replace("|resolve|resolves|resolved", "")
+    .concat("# resolve is still mentioned right here\n");
+  assert.equal(
+    checkCopies(POLICY, noResolve).filter((e) => e.includes("gate composite (enforcement")).length,
+    1,
+  );
+  const noMarker = goodTexts();
+  noMarker.gateRun = noMarker.gateRun.replace("(linked|related)", "(linked)");
+  assert.equal(
+    checkCopies(POLICY, noMarker).filter((e) => e.includes('marker "No related issue"')).length,
+    1,
+  );
+});
+
+// The composite's awk patterns are lowercase and match text the analyzer has
+// already lowercased. Probing them with lowercased input is only correct while
+// that lowercasing is there; a composite that dropped it would become
+// case-sensitive against raw text and reject the capitalised keyword forms the
+// contract documents. The extractor must
+// refuse to certify it rather than probe a pattern the gate no longer applies.
+test("a composite that stops lowercasing the line is drift, not a pass", () => {
+  const texts = goodTexts();
+  texts.gateRun = texts.gateRun.replace("lower = tolower(line)", "lower = line");
+  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate composite"));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /no longer lowercases the line/);
+});
+
+test("a composite at a consumer pin passes when it matches policy", () => {
+  assert.deepEqual(
+    checkPinnedComposite(
+      POLICY,
+      "codex-plugins",
+      "d".repeat(40),
+      GOOD_COMPOSITE_RUN,
+      GOOD_COMPOSITE_ACTION,
+    ),
+    [],
+  );
+});
+
+test("a composite pin predating the security type is drift at that pin", () => {
+  const errors = checkPinnedComposite(
+    POLICY,
+    "codex-plugins",
+    "e".repeat(40),
+    GOOD_COMPOSITE_RUN,
+    GOOD_COMPOSITE_ACTION.replace(",security", ""),
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller codex-plugins pin eeeeeee/);
+  assert.match(errors[0], /missing security/);
+});
+
+test("stale reusable pin enforcing an older contract is reported", () => {
   const oldReusable = `
             const requiredSections = [
               { name: "Related", guidance: "r" },
@@ -128,27 +306,8 @@ test("stale pin enforcing an older contract is reported", () => {
   assert.match(errors[1], /caller codex-plugins/);
 });
 
-test("current pinned contract passes", () => {
+test("current pinned reusable contract passes", () => {
   assert.deepEqual(checkPinnedReusable(POLICY, "dotfiles", "a".repeat(40), GOOD_GATE), []);
-});
-
-test("gate keyword/marker regressions are caught functionally, not by mention", () => {
-  // Keyword stem removed from the DECLARED pattern while the word survives
-  // in prose: a mention check would pass; the functional probe must not.
-  const noResolve = goodTexts();
-  noResolve.gate = noResolve.gate
-    .replace("|resolve[sd]?", "")
-    .concat("            // Resolves is still mentioned right here\n");
-  assert.equal(
-    checkCopies(POLICY, noResolve).filter((e) => e.includes("gate reusable (enforcement")).length,
-    1,
-  );
-  const noMarker = goodTexts();
-  noMarker.gate = noMarker.gate.replace("(?:linked|related)", "linked");
-  assert.equal(
-    checkCopies(POLICY, noMarker).filter((e) => e.includes('marker "No related issue"')).length,
-    1,
-  );
 });
 
 test("validator keyword/marker regressions are caught functionally", () => {
@@ -164,7 +323,7 @@ test("validator keyword/marker regressions are caught functionally", () => {
   assert.match(errors[0], /"No related issue"/);
 });
 
-test("stale pin with current sections but stale keyword enforcement is drift", () => {
+test("stale reusable pin with current sections but stale keyword enforcement is drift", () => {
   const staleKeywords = GOOD_GATE.replace("|resolve[sd]?", "");
   const errors = checkPinnedReusable(POLICY, "dotfiles", "b".repeat(40), staleKeywords);
   assert.equal(errors.length, 1);
@@ -172,14 +331,180 @@ test("stale pin with current sections but stale keyword enforcement is drift", (
 });
 
 test("unparsable sources throw DriftError, never pass silently", () => {
+  assert.throws(() => parseCompositeSections("#!/usr/bin/env bash\n", "composite"), DriftError);
+  assert.throws(() => parseCompositeTypes("name: pr-contract\n", "composite"), DriftError);
   assert.throws(() => parseGateSections("jobs: {}", "gate"), DriftError);
   assert.throws(() => parseValidatorSections("echo hi", "validator"), DriftError);
   assert.throws(() => parseCallerPin("uses: something-else", "caller"), DriftError);
 });
 
-test("caller roster covers all ten gate repositories", () => {
-  assert.equal(Object.keys(GATE_CALLERS).length, 10);
-  assert.equal(GATE_CALLERS["ci-workflows"], ".github/workflows/pr-issue-linkage-self.yml");
+// ---------------------------------------------------------------------------
+// Which artifact a consumer runs.
+// ---------------------------------------------------------------------------
+
+const COMPOSITE_STEP =
+  "      - uses: melodic-software/ci-workflows/.github/actions/pr-contract@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0";
+const REUSABLE_CALL =
+  "    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2";
+
+test("a composite consumer is detected at its pin", () => {
+  assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${COMPOSITE_STEP}\n`), {
+    kind: "composite",
+    sha: "449157aaa8e30f7b1457305d8048ebe6168e174a",
+  });
+});
+
+test("a reusable consumer is detected at its pin", () => {
+  assert.deepEqual(detectArtifactPin(`jobs:\n  linkage:\n${REUSABLE_CALL}\n`), {
+    kind: "reusable",
+    sha: "0f8176e87e0be518f382664779655011bf95784a",
+  });
+});
+
+test("the composite wins when a repository carries both mid-transition", () => {
+  const both = `jobs:\n  linkage:\n${REUSABLE_CALL}\n  ci-status:\n${COMPOSITE_STEP}\n`;
+  assert.equal(detectArtifactPin(both).kind, "composite");
+});
+
+// ci-workflows dogfoods its own composite through a local `./` reference,
+// which carries no SHA. The same path appears in that workflow as a lint
+// `paths:` entry and as a `bash .../run.test.sh` command; neither is a call
+// site, so the detector anchors on `uses:`.
+test("a local composite reference resolves to main, and a bare path does not", () => {
+  assert.deepEqual(
+    detectArtifactPin("      - name: Contract\n        uses: ./.github/actions/pr-contract\n"),
+    { kind: "composite", sha: "main" },
+  );
+  assert.equal(
+    detectArtifactPin(
+      "          paths: .github/actions/pr-contract .github/actions/ci-status\n" +
+        "      - run: bash .github/actions/pr-contract/run.test.sh\n",
+    ),
+    null,
+  );
+});
+
+test("a workflow with neither artifact detects nothing", () => {
+  assert.equal(detectArtifactPin("jobs:\n  build:\n    runs-on: ubuntu-24.04\n"), null);
+});
+
+// A migration leaves commented-out call sites behind. Selecting an artifact a
+// repository does not run would suppress detection of the one it does, and a
+// repository that had lost its last live caller would validate an unused
+// artifact instead of reporting that it runs neither.
+test("a commented-out call site is not a call site", () => {
+  assert.equal(detectArtifactPin(`      # ${COMPOSITE_STEP.trim()}\n`), null);
+  assert.equal(detectArtifactPin(`    # ${REUSABLE_CALL.trim()}\n`), null);
+  assert.equal(
+    detectArtifactPin(`      # - uses: ./.github/actions/pr-contract\n${REUSABLE_CALL}\n`).kind,
+    "reusable",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The fleet, mid-transition.
+// ---------------------------------------------------------------------------
+
+function fleetResolutions(overrides = {}) {
+  const resolutions = new Map();
+  for (const repo of CONSUMER_REPOSITORIES) {
+    resolutions.set(repo, { kind: "reusable", sha: "a".repeat(40), reusable: GOOD_GATE });
+  }
+  // ci-workflows dogfoods the composite from its own tree.
+  resolutions.set("ci-workflows", {
+    kind: "composite",
+    sha: "main",
+    runSh: GOOD_COMPOSITE_RUN,
+    actionYml: GOOD_COMPOSITE_ACTION,
+  });
+  for (const [repo, resolution] of Object.entries(overrides)) {
+    resolutions.set(repo, resolution);
+  }
+  return resolutions;
+}
+
+const compositeAt = (sha, runSh = GOOD_COMPOSITE_RUN, actionYml = GOOD_COMPOSITE_ACTION) => ({
+  kind: "composite",
+  sha,
+  runSh,
+  actionYml,
+});
+
+test("a mixed fleet of composite and reusable consumers passes", () => {
+  const errors = checkFleet(
+    POLICY,
+    fleetResolutions({
+      "codex-plugins": compositeAt("4".repeat(40)),
+      "github-iac": compositeAt("5".repeat(40)),
+    }),
+  );
+  assert.deepEqual(errors, []);
+});
+
+// Fail-closed, with no per-repository exemption: github-iac#367 put every
+// repository in the roster under the org `ci-gate` ruleset, so a repository
+// running neither artifact is a gate removal wherever it happens.
+test("a repository running neither artifact fails the fleet, whichever repository it is", () => {
+  for (const repo of ["dotfiles", "agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+    const errors = checkFleet(POLICY, fleetResolutions({ [repo]: { kind: "none" } }));
+    assert.equal(errors.length, 1, `${repo} produces exactly one finding`);
+    assert.match(errors[0], new RegExp(`caller ${repo}: no pr-contract composite step`));
+  }
+});
+
+test("types drift at one composite consumer fails the fleet", () => {
+  const drifted = compositeAt(
+    "6".repeat(40),
+    GOOD_COMPOSITE_RUN,
+    GOOD_COMPOSITE_ACTION.replace(",security", ""),
+  );
+  const errors = checkFleet(POLICY, fleetResolutions({ medley: drifted }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller medley pin 6666666: allowed title types missing security/);
+});
+
+test("require-scope drift at one composite consumer fails the fleet", () => {
+  const drifted = compositeAt(
+    "a1".repeat(20),
+    GOOD_COMPOSITE_RUN,
+    GOOD_COMPOSITE_ACTION.replace("default: 'false'", "default: 'true'"),
+  );
+  const errors = checkFleet(POLICY, fleetResolutions({ dotfiles: drifted }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller dotfiles pin a1a1a1a: require-scope is true, policy says false/);
+});
+
+test("sections drift at one composite consumer fails the fleet", () => {
+  const drifted = compositeAt(
+    "7".repeat(40),
+    GOOD_COMPOSITE_RUN.replace('section_report("Verification")', 'section_report("Evidence")'),
+  );
+  const errors = checkFleet(POLICY, fleetResolutions({ provisioning: drifted }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller provisioning pin 7777777: section list/);
+});
+
+test("sections drift at one reusable consumer still fails the fleet", () => {
+  const drifted = {
+    kind: "reusable",
+    sha: "8".repeat(40),
+    reusable: GOOD_GATE.replace('"Fix"', '"Patch"'),
+  };
+  const errors = checkFleet(POLICY, fleetResolutions({ "ci-runner": drifted }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /caller ci-runner pin 8888888: section list/);
+});
+
+test("a repository whose fetch already failed is not double-reported", () => {
+  const errors = checkFleet(POLICY, fleetResolutions({ standards: { kind: "unresolved" } }));
+  assert.deepEqual(errors, []);
+});
+
+test("consumer roster covers all thirteen repositories", () => {
+  assert.equal(CONSUMER_REPOSITORIES.length, 13);
+  for (const repo of ["agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+    assert.ok(CONSUMER_REPOSITORIES.includes(repo), `${repo} is in the roster`);
+  }
 });
 
 // Regression: ci-workflows made CLOSING_KEYWORD global so every occurrence on a
@@ -203,14 +528,12 @@ test("a global declaration parses and still probes", () => {
 // are lowercase and rely on `i` to accept the documented capitalised keyword
 // forms, so a gate that dropped `i` would silently become case-sensitive.
 // Probing with a hardcoded `i` would pass it; the DECLARED flags catch it.
-test("a gate that drops the i flag is enforcement drift, not a pass", () => {
+test("a reusable that drops the i flag is enforcement drift, not a pass", () => {
   const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
   const patterns = parseGatePatterns(caseSensitiveGate, "gate");
   assert.equal(patterns.keyword.ignoreCase, false, "declared flags are preserved");
   assert.equal(patterns.keyword.test("Closes #12"), false, "capitalised form now rejected");
-  const texts = goodTexts();
-  texts.gate = caseSensitiveGate;
-  const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate reusable (enforcement"));
+  const errors = checkPinnedReusable(POLICY, "dotfiles", "9".repeat(40), caseSensitiveGate);
   assert.equal(errors.length, 1, "drift is reported");
   assert.match(errors[0], /closing keyword "Closes"/);
 });
