@@ -56,3 +56,41 @@ test("rewriteCallerFiles keeps exactly one trailing newline on a rewritten calle
   assert.ok(rewritten.endsWith("\n"), "rewritten caller ends with a final newline");
   assert.ok(!rewritten.endsWith("\n\n"), "rewritten caller does not gain a duplicate newline");
 });
+
+// The lane callers stopped pinning the selector in ci-perf Phase 3b. The
+// selector REPIN_TARGET therefore reads zero pins, skips, and never reaches
+// `copySelectorContract`, and `updateTestMjs` is gated on a selector
+// copy-forward having actually happened so the next tag cannot insert a
+// selector SHA constant that `policy.json` never gained. Assert the premise
+// here: if a caller ever pins the selector again, that gating needs revisiting
+// rather than silently doing nothing.
+test("the shipped lane callers pin no selector, so the repin lane copies no selector contract", async () => {
+  for (const name of ["claude-review.yml", "claude-security-review.yml"]) {
+    const body = await readFile(new URL(`./${name}`, import.meta.url), "utf8");
+    assert.ok(
+      !body.includes("/select-runner.yml@"),
+      `${name} must not pin the governed selector; it names the fleet label directly`,
+    );
+  }
+});
+
+test("rewriteCallerFiles repins a selector-less caller", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "repin-lockstep-"));
+  temporaryRoots.push(root);
+  const rel = "components/claude-lanes/claude-security-review.yml";
+  const abs = path.join(root, rel);
+  await mkdir(path.dirname(abs), { recursive: true });
+  await writeFile(
+    abs,
+    "jobs:\n" +
+      "  security-review:\n" +
+      `    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${oldA} # v0.16.0\n` +
+      "    with:\n" +
+      "      runner: melodic-review-ubuntu-24.04-x64\n",
+  );
+
+  assert.equal(await rewriteCallerFiles(next, "v0.17.0", root), true);
+  const rewritten = await readFile(abs, "utf8");
+  assert.ok(rewritten.includes(`@${next} # v0.17.0`));
+  assert.ok(rewritten.includes("runner: melodic-review-ubuntu-24.04-x64"));
+});
