@@ -90,7 +90,7 @@ assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
 awk_dir="$(mktemp -d)"
 mkdir -p "$awk_dir/bin"
 echo 0 >"$awk_dir/awk"
-real_awk="$(command -v awk)"
+real_awk="$(command -p -v awk)"
 cat >"$awk_dir/bin/awk" <<'SH'
 #!/bin/bash
 COUNT_DIR="${COUNT_DIR:?}"

@@ -185,7 +185,7 @@ done
 git -C "$ch_spawn" commit -qm 'eight todo comments'
 mkdir -p "$ch_spawn/bin"
 echo 0 >"$ch_spawn/awk"
-real_awk="$(command -v awk)"
+real_awk="$(command -p -v awk)"
 cat >"$ch_spawn/bin/awk" <<'SH'
 #!/bin/bash
 COUNT_DIR="${COUNT_DIR:?}"
