@@ -854,6 +854,26 @@ The consequence for consumers is one line of caller change. Because
 only `contents: read` today, this repository, dotfiles and github-iac, must add
 `security-events: write` and nothing else in its convergence pull request;
 provisioning and ci-runner already grant exactly that pair.
+All seven of those reusables are registered a second time at the v0.22.1 patch
+tag `cd2f4e6d500e7923c0db521b4d10034d36331ed3`, so the wave repositories that
+pin the patch can call them: `checks`, `claude-review`,
+`claude-security-review`, `link-check`, `issue-triage-label`, `zizmor` and
+`osv-scanner`. Every entry copies its v0.22.0 terms verbatim, and nothing
+widens. Read at both revisions through the contents API, six of the seven are
+byte-identical, and the seventh, `checks.yml`, differs by exactly thirteen
+`uses:` lines and nothing else: its own composite steps re-pin from
+`449157aaa8e30f7b1457305d8048ebe6168e174a` (v0.20.0) to
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0), the self-referential lag
+the repin lane closes one release behind. No `on.workflow_call` declaration,
+workflow `permissions`, job `permissions`, step `if` or `runs-on` expression
+moved on any of the seven, so the caller-facing contract is unchanged. Those
+thirteen composite pins are also why auto-approval declines rather than a
+widened surface: the credential-references and step surfaces record a
+`uses:` line in full, so a pin bump reads as a diff and the entries are written
+by review instead. The v0.22.0 entries stay as they were reviewed; the patch
+tag is an addition, not a replacement, and the distributed caller templates
+under `components/claude-lanes/` and `managed-files-guard` are deliberately not
+moved here, because the non-wave consumers converge on their own change.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
