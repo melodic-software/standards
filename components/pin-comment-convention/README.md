@@ -78,6 +78,10 @@ in this directory is a minimal driver (file enumeration, path handling,
 exit-code mapping) that this repository's own CI runs against
 `.github/workflows/*.yml` and `*.yaml` as its live consumer, after
 installing the same checksum-pinned yq release the `distribution` job uses.
+It extracts every existing argument in one yq pass on the success path, and
+falls back to per-file `pcc::scan_text` when that pass fails: Mike Farah yq
+`eval` of several files stops at the first parse error and has no
+`try`/`catch`, so batching without a fallback would drop later files.
 
 The pinned 40-character SHA in the `uses:...@<sha>` value is matched
 case-insensitively: it names the same git object regardless of hex letter

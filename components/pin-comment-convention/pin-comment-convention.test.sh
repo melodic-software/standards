@@ -236,4 +236,53 @@ yaml_comment_decoy='jobs:
 pcc::scan_text "$yaml_comment_decoy" >/dev/null
 assert_exit 'uses:-shaped text inside a YAML comment is not scanned' 0 "$?"
 
+# Driver spawn census: N workflow files must not spawn N yq on the success
+# path. PATH-prefix the shim after resolving the version-checked yq — command
+# -p would pick kislyuk yq on this image, which is not Mike Farah v4.
+driver="$root/components/pin-comment-convention/scan-workflow-files.sh"
+spawn_dir="$(mktemp -d)"
+trap 'rm -rf "$spawn_dir"' EXIT
+mkdir -p "$spawn_dir/bin" "$spawn_dir/files"
+echo 0 >"$spawn_dir/yq"
+cat >"$spawn_dir/bin/yq" <<'SH'
+#!/usr/bin/env bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(cat "$COUNT_DIR/yq" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/yq"
+exec "$REAL_YQ" "$@"
+SH
+chmod +x "$spawn_dir/bin/yq"
+real_yq="$(command -v yq)"
+good_fix="$root/components/pin-comment-convention/fixtures/good/workflow.yml"
+i=1
+while [[ $i -le 8 ]]; do
+  cp "$good_fix" "$spawn_dir/files/w$i.yml"
+  i=$((i + 1))
+done
+COUNT_DIR="$spawn_dir" REAL_YQ="$real_yq" PATH="$spawn_dir/bin:$PATH" \
+  bash "$driver" "$spawn_dir"/files/w*.yml >/dev/null
+assert_exit 'driver passes eight conforming workflow files under a yq shim' 0 "$?"
+assert_eq 'driver does not spawn yq per workflow file' '1' "$(cat "$spawn_dir/yq")"
+
+# Parse isolation: multi-file yq eval stops at the first bad file. The driver
+# must still flag a later file's policy miss after a parse error.
+iso="$(mktemp -d)"
+cp "$good_fix" "$iso/a.yml"
+printf ':\n  not yaml\n' >"$iso/b.yml"
+cat >"$iso/c.yml" <<'YAML'
+jobs:
+  a:
+    uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46
+YAML
+iso_err="$(mktemp)"
+echo 0 >"$spawn_dir/yq"
+COUNT_DIR="$spawn_dir" REAL_YQ="$real_yq" PATH="$spawn_dir/bin:$PATH" \
+  bash "$driver" "$iso/a.yml" "$iso/b.yml" "$iso/c.yml" >/dev/null 2>"$iso_err"
+assert_exit 'driver flags a parse error plus a later policy miss' 1 "$?"
+assert_contains 'parse error is reported for the unparsable file' "$(cat "$iso_err")" 'b.yml:0: yaml-parse-error'
+assert_contains 'later file is still scanned after a parse error' "$(cat "$iso_err")" 'c.yml:'
+assert_contains 'later file missing-comment is reported' "$(cat "$iso_err")" 'missing-comment'
+# Fallback is one yq for the failed batch plus one per file.
+assert_eq 'parse-error fallback isolates with one yq per file after the batch' '4' "$(cat "$spawn_dir/yq")"
+rm -rf "$iso" "$iso_err"
+
 [[ $FAILED -eq 0 ]] || exit 1
