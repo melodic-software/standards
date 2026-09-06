@@ -67,6 +67,47 @@ grep -q '>"\$STAMP_FALLBACK"' "$script"
 rc=$?
 assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
+# Fleet plugin list: the settings-shaped file every snapshot installs. It must
+# parse, enable everything it names (a false entry is a per-repo delta, not a
+# fleet decision), keep its keys in byte order so a single entry can be
+# flipped without disturbing the rest, and declare every marketplace its
+# entries name.
+fleet="$root/components/cloud-environment/fleet-plugins.json"
+assert_file_exists 'fleet-plugins.json exists beside setup.sh' "$fleet"
+jq empty "$fleet" 2>/dev/null
+rc=$?
+assert_exit 'fleet-plugins.json parses' 0 "$rc"
+assert_eq 'fleet-plugins.json enables every entry it names' \
+  '0' "$(jq -r '[.enabledPlugins // {} | to_entries[] | select(.value != true)] | length' "$fleet")"
+assert_eq 'fleet-plugins.json keys are in byte order' \
+  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet" | LC_ALL=C sort)" \
+  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet")"
+assert_eq 'fleet-plugins.json declares every marketplace its entries name' \
+  '' "$(jq -r '(.extraKnownMarketplaces // {} | keys) as $mps
+    | [.enabledPlugins // {} | keys[] | split("@") | .[1:] | join("@")] | unique
+    | map(select(IN($mps[]) | not)) | .[]' "$fleet")"
+
+# Fetch lockstep: the URL setup.sh fetches must name the file this repository
+# publishes, at the same host the README's bootstrap already relies on.
+fleet_url="$(sed -n "s/^FLEET_PLUGINS_URL='\(.*\)'\$/\1/p" "$script")"
+assert_eq 'setup.sh fetches the fleet list from its published path' \
+  'https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json' \
+  "$fleet_url"
+fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$script")"
+if [[ -n "$fleet_path" ]]; then
+  pass 'setup.sh declares the snapshot path for the fleet list'
+else
+  fail 'setup.sh declares the snapshot path for the fleet list' "no FLEET_PLUGINS='...' assignment found"
+fi
+# shellcheck disable=SC2016 # the $ is a literal in the grep pattern
+grep -q '>"\$FLEET_PLUGINS_FALLBACK"\|-o "\$FLEET_PLUGINS_FALLBACK"' "$script"
+rc=$?
+assert_exit 'setup.sh falls back when the snapshot path for the fleet list is unwritable' 0 "$rc"
+assert_contains 'README documents the fleet list snapshot path' \
+  "$(cat "$readme")" "$fleet_path"
+assert_contains 'README documents the fleet list file' \
+  "$(cat "$readme")" 'fleet-plugins.json'
+
 # README/script drift guards.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
 if [[ -n "$stamp_path" ]]; then

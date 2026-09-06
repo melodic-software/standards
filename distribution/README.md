@@ -139,16 +139,28 @@ filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 
 ### Plugin-catalog drift report
 
-Each repository's checked-in `.claude/settings.json` is the source of truth
-for the plugins its sessions load (cloud sessions install exactly what it
-declares). This repository's own settings file doubles as the fleet baseline,
-and [`check-plugin-baseline.sh`](check-plugin-baseline.sh) makes divergence
+The fleet cloud plugin list,
+[`components/cloud-environment/fleet-plugins.json`](../components/cloud-environment/fleet-plugins.json),
+is the baseline: every cloud snapshot installs it, and each repository's
+checked-in `.claude/settings.json` carries what that repo declares beyond it
+(cloud sessions install the fleet list, then the repo file).
+[`check-plugin-baseline.sh`](check-plugin-baseline.sh) makes divergence
 visible. It is report-only, never an edit, because a repo may diverge on purpose:
 
 ```sh
 distribution/check-plugin-baseline.sh                  # every manifest target
 distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
+distribution/check-plugin-baseline.sh --compare-seed <claude.json>   # dotfiles seed
 ```
+
+A repository still carrying a full mirrored block reports as matching; one
+that has reduced its block to deltas reports every fleet entry as `missing vs
+baseline`, which is the expected shape during that migration, not drift. The
+`--compare-seed` mode reads a dotfiles data file
+(`claudeSettings.seed.enabledPlugins`) and reports fleet plugins the seed
+never names, fleet plugins the seed opts out of, and seed entries for a fleet
+marketplace that the fleet list lacks; entries for other marketplaces are the
+seed's own.
 
 Fleet mode fetches each target's settings via `gh api`, so it reads private
 repositories with the caller's own auth. Before the per-target diffs it reports

@@ -33,9 +33,18 @@ pinned versions:
   `origin/main` resolve) so base-ref diffs work;
 - runs the repo's committed `.claude/cloud-bootstrap.local.sh` when present
   (the enrich seam, below);
-- registers every marketplace `.claude/settings.json` declares and installs
-  every `enabledPlugins` entry set to `true`, whichever marketplace it names.
-  A repo that declares nothing gets nothing.
+- installs plugins from two settings-shaped sources, fleet list first: the
+  fleet plugin list the
+  [cloud-environment component](../cloud-environment/README.md#plugin-install)
+  wrote into the snapshot at cache build (`/opt/melodic-fleet-plugins.json`,
+  or its `/tmp/melodic-fleet-plugins.json` fallback), then the repo's own
+  `.claude/settings.json`. For each, every declared marketplace is registered
+  and every `enabledPlugins` entry set to `true` is installed, whichever
+  marketplace it names, with one summary line per source so a session log
+  says where each install came from. The repo file is the fallback while it
+  still mirrors the fleet and the carrier of deltas once it does not; a
+  snapshot without the list (an unmanaged environment) logs that and installs
+  from the repo file alone.
 
 Idempotent and best effort throughout: a failed step costs a tool or a
 plugin, never the session, and the cloud-only guard makes the script a no-op

@@ -171,4 +171,69 @@ rc=$?
 assert_exit 'malformed catalog exits 2' 2 "$rc"
 assert_contains 'malformed catalog is named' "$out" 'not valid JSON'
 
+# --- fleet baseline file -----------------------------------------------------
+# Fleet mode's baseline is the cloud plugin list the cloud-environment
+# component installs, not this repository's own settings; it must exist and
+# parse, or every fleet run would be a usage error.
+fleet="$root/components/cloud-environment/fleet-plugins.json"
+assert_file_exists 'the fleet list the baseline points at exists' "$fleet"
+grep -q 'components/cloud-environment/fleet-plugins.json' "$script"
+rc=$?
+assert_exit 'check-plugin-baseline.sh takes its baseline from the fleet list' 0 "$rc"
+
+# --- dotfiles seed comparison (--compare-seed) ------------------------------
+# The personal-machine seed and the cloud list are two files on purpose; this
+# mode is what keeps them from drifting apart unnoticed. Only the fleet's own
+# marketplaces are in scope, and a seed false is reported as an opt-out, not
+# as a missing entry.
+cat >"$tmp/seed.json" <<'JSON'
+{
+  "claudeSettings": {
+    "seed": {
+      "enabledPlugins": {
+        "alpha@melodic-software": true,
+        "beta@melodic-software": false,
+        "delta@third-party": true,
+        "epsilon@melodic-software": true
+      }
+    }
+  }
+}
+JSON
+out="$(bash "$script" --compare-seed "$tmp/seed.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'a diverging seed exits 1' 1 "$rc"
+assert_contains 'a fleet plugin the seed opts out of is reported as an opt-out' \
+  "$out" 'in fleet list, seed opts out: beta@melodic-software'
+assert_contains 'a seed entry for a fleet marketplace the fleet lacks is reported' \
+  "$out" 'in seed, not in fleet list: epsilon@melodic-software'
+assert_not_contains 'a seed entry for another marketplace is out of scope' \
+  "$out" 'delta@third-party'
+assert_not_contains 'a fleet-disabled entry is not demanded of the seed' \
+  "$out" 'gamma@melodic-software'
+assert_contains 'seed report lines carry the seed label' "$out" 'seed.json:'
+
+cat >"$tmp/seed-match.json" <<'JSON'
+{
+  "claudeSettings": {
+    "seed": {
+      "enabledPlugins": {
+        "alpha@melodic-software": true,
+        "beta@melodic-software": true,
+        "delta@third-party": false
+      }
+    }
+  }
+}
+JSON
+out="$(bash "$script" --compare-seed "$tmp/seed-match.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'a seed carrying every fleet entry exits 0' 0 "$rc"
+assert_contains 'a matching seed reports a match' "$out" 'matches the fleet list'
+
+out="$(bash "$script" --compare-seed "$tmp/broken.json" "$tmp/baseline.json" 2>&1)"
+rc=$?
+assert_exit 'malformed seed exits 2' 2 "$rc"
+assert_contains 'malformed seed is named' "$out" 'not valid JSON'
+
 [[ $FAILED -eq 0 ]] || exit 1

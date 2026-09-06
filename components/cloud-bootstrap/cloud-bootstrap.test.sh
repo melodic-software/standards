@@ -70,6 +70,31 @@ fi
 assert_contains 'bootstrap reads the fallback stamp path cloud-environment writes' \
   "$(cat "$script")" "$fallback_path"
 
+# Cross-component lockstep: the fleet plugin list this script installs from is
+# the snapshot path (and /tmp fallback) the cloud-environment component writes
+# at cache build, and the repo declaration stays as the fallback source.
+fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$env_setup")"
+if [[ -n "$fleet_path" ]]; then
+  pass 'cloud-environment setup.sh declares a fleet list snapshot path'
+else
+  fail 'cloud-environment setup.sh declares a fleet list snapshot path' \
+    "no FLEET_PLUGINS='...' assignment found"
+fi
+assert_contains 'bootstrap reads the fleet list path cloud-environment writes' \
+  "$(cat "$script")" "$fleet_path"
+fleet_fallback="$(sed -n "s/^FLEET_PLUGINS_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
+if [[ -n "$fleet_fallback" ]]; then
+  pass 'cloud-environment setup.sh declares a fleet list fallback path'
+else
+  fail 'cloud-environment setup.sh declares a fleet list fallback path' \
+    "no FLEET_PLUGINS_FALLBACK='...' assignment found"
+fi
+assert_contains 'bootstrap reads the fleet list fallback path cloud-environment writes' \
+  "$(cat "$script")" "$fleet_fallback"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'bootstrap keeps the repo enabledPlugins block as a source' \
+  "$(cat "$script")" 'install_plugins_from "$settings"'
+
 # README/script drift guards.
 assert_contains 'README documents the materialized path' \
   "$(cat "$readme")" '.claude/cloud-bootstrap.sh'
