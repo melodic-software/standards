@@ -37,6 +37,7 @@ const REPINE_LANE_SHA_V0_14_2 = "7107b34832a7b6db5d08d3b132621c599fbe5e50";
 const REPINE_LANE_SHA_V0_17_0 = "d26c750691b5498fab529d115b63f84aa7aecebe";
 const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
 const REPINE_LANE_SHA_V0_22_0 = "906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
+const REPINE_LANE_SHA_V0_22_1 = "cd2f4e6d500e7923c0db521b4d10034d36331ed3";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
 const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
@@ -9896,6 +9897,104 @@ ${permissions}
         'reusable workflow caller permissions.security-events must be exactly "write"',
     ),
   );
+});
+
+// The ci-workflows v0.22.1 patch tag. Every reusable already reviewed at
+// v0.22.0 is re-registered at it so the wave repositories that pin the patch
+// can call them. Read at both revisions through the contents API: six of the
+// seven are byte-identical, and the seventh, `checks.yml`, differs only by
+// thirteen `uses:` lines re-pinning its own composite steps from v0.20.0 to
+// the v0.22.0 revision. No `on.workflow_call` declaration, workflow
+// `permissions`, job `permissions`, `if` or `runs-on` expression moved on any
+// of the seven, so the caller-facing contract is unchanged and each entry is a
+// verbatim copy forward. The composite re-pin is why auto-approval declines
+// (`checks.yml` steps are recorded in full by the surface diff), so the entry
+// is written by review instead.
+const OAUTH_SECRET_MAPPING = `CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`;
+const WAVE_PATCH_TAG_CALLERS = [
+  {
+    reusable: "claude-review",
+    job: "review",
+    permissions: ["contents: read", "pull-requests: write", "id-token: write"],
+    secrets: [OAUTH_SECRET_MAPPING],
+  },
+  {
+    reusable: "claude-security-review",
+    job: "security-review",
+    permissions: ["contents: read", "pull-requests: write", "id-token: write"],
+    secrets: [OAUTH_SECRET_MAPPING],
+  },
+  {
+    reusable: "checks",
+    job: "checks",
+    permissions: ["contents: read", "pull-requests: read"],
+  },
+  {
+    reusable: "link-check",
+    job: "links",
+    permissions: ["contents: read", "issues: write"],
+  },
+  {
+    reusable: "issue-triage-label",
+    job: "triage",
+    permissions: ["issues: write"],
+  },
+  {
+    reusable: "osv-scanner",
+    job: "scan",
+    permissions: ["contents: read"],
+  },
+  {
+    reusable: "zizmor",
+    job: "zizmor",
+    permissions: ["contents: read", "security-events: write"],
+  },
+];
+
+test("every reusable contract at the wave patch tag copies its v0.22.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  let asserted = 0;
+  for (const { reusable } of WAVE_PATCH_TAG_CALLERS) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`];
+    assert.ok(previous, `expected a v0.22.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_1}`],
+      previous,
+      `${reusable} at the patch tag is not a verbatim copy of its v0.22.0 entry`,
+    );
+    asserted += 1;
+  }
+  assert.equal(asserted, 7);
+});
+
+test("a governed caller of each reusable at the wave patch tag is admitted", async () => {
+  let asserted = 0;
+  for (const { reusable, job, permissions, secrets } of WAVE_PATCH_TAG_CALLERS) {
+    const reference = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml@${REPINE_LANE_SHA_V0_22_1}`;
+    const block = (keys, indent) => keys.map((key) => `${indent}${key}`).join("\n");
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+        },
+      },
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  ${job}:
+    permissions:
+${block(permissions, "      ")}
+    uses: ${reference}
+    with:
+      runner: ${FLEET_LABEL}
+${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
+      },
+    });
+    assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);
+    asserted += 1;
+  }
+  assert.equal(asserted, 7);
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily
