@@ -816,6 +816,35 @@ records in full. It also removes a dependency on the runner image shipping the
 `gh` CLI, which a self-hosted image is not guaranteed to do, so the caller-side
 effect of the bump is that the lane becomes safe to route to the managed
 fleet.
+Two last reusable contracts are registered at the same tag, `osv-scanner` and
+`zizmor`, the two this repository's own `ci.yml` still called at pre-tag
+revisions and the two that blocked its convergence for the same fail-closed
+reason. `osv-scanner` copies
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` verbatim and nothing widens: its
+`on.workflow_call` declaration, workflow and job `permissions`, and
+`runs-on: ${{ inputs.runner }}` routing are byte-identical at the tag, and
+`allowedInputs` stays `["runner"]`, the whole of what every caller in the fleet
+passes. `zizmor` is the one contract in this wave that is **not** a verbatim
+copy. Its routing, runner input, `allowedInputs`
+(`["runner", "paths", "fail-on-severity"]`) and empty secret map all copy from
+`31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`, and it adds one term: an
+`allowedCallerPermissions` of `contents: read` and `security-events: write`.
+The tag's `zizmor` job declares `security-events: write` unconditionally,
+because the new `upload-sarif` input keeps its upload step gated but
+expressions are not legal in a `permissions:` scope, and a called workflow can
+only narrow the caller's `GITHUB_TOKEN` and never widen it. So every caller has
+to grant that scope for the job to start, and without the waiver the ordinary
+read-only caller boundary rejects it. That waiver is not new ground: the
+contract at `7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2), the last
+revision whose `zizmor` job declared the scope, carries exactly the same term,
+and the tag's entry is term-for-term equal to it. `upload-sarif` stays out of
+`allowedInputs` for the reason recorded at v0.14.2: uploading SARIF is a
+separate review, and no caller passes it.
+The consequence for consumers is one line of caller change. Because
+`allowedCallerPermissions` is an exact match, every `zizmor` caller that grants
+only `contents: read` today, this repository, dotfiles and github-iac, must add
+`security-events: write` and nothing else in its convergence pull request;
+provisioning and ci-runner already grant exactly that pair.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
