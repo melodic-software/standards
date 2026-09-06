@@ -144,11 +144,71 @@ home_root="/ho"'me'"/$user"
 printf 'root = %s/project/src\n' "$home_root" >"$tmpdir/path-bad/config.ini"
 git -C "$tmpdir/path-bad" add config.ini
 git -C "$tmpdir/path-bad" commit -qm 'machine path'
-(
+path_bad_rc=0
+path_bad_out="$(
   cd "$tmpdir/path-bad" || exit 1
-  bash "$DISPATCH" machine-specific-paths >/dev/null 2>&1
+  bash "$DISPATCH" machine-specific-paths 2>&1
+)" || path_bad_rc=$?
+assert_exit 'machine-specific-paths fails a Linux home path' 1 "$path_bad_rc"
+assert_contains 'machine-specific-paths labels a Linux home hit' "$path_bad_out" 'Linux user path'
+
+# Start-of-line home path must still classify: PATH_BOUNDARY's `^` is vs
+# the file line, not the `path:lineno:` prefix git grep prints.
+make_repo "$tmpdir/path-bol"
+printf '%s/project/src\n' "$home_root" >"$tmpdir/path-bol/notes.txt"
+git -C "$tmpdir/path-bol" add notes.txt
+git -C "$tmpdir/path-bol" commit -qm 'bol machine path'
+path_bol_rc=0
+path_bol_out="$(
+  cd "$tmpdir/path-bol" || exit 1
+  bash "$DISPATCH" machine-specific-paths 2>&1
+)" || path_bol_rc=$?
+assert_exit 'machine-specific-paths fails a start-of-line Linux home path' 1 "$path_bol_rc"
+assert_contains 'start-of-line Linux home still labeled' "$path_bol_out" 'Linux user path'
+
+# Spawn census: five OS/repo bodies used to be five git greps. One combined
+# grep classifies hits in-process. Drift-immune PATH shim, same method as
+# the exec-bit census above.
+path_spawn="$tmpdir/path-spawn"
+make_repo "$path_spawn"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf 'root = %s/p%s/src\n' "$home_root" "$i" >"$path_spawn/c$i.ini"
+  git -C "$path_spawn" add "c$i.ini"
+  i=$((i + 1))
+done
+git -C "$path_spawn" commit -qm 'eight machine paths'
+mkdir -p "$path_spawn/bin"
+echo 0 >"$path_spawn/grep"
+echo 0 >"$path_spawn/head"
+real_git="$(command -p -v git)"
+cat >"$path_spawn/bin/git" <<'SH'
+#!/bin/bash
+REAL_GIT="${REAL_GIT:?}"
+COUNT_DIR="${COUNT_DIR:?}"
+for argument in "$@"; do
+  case "$argument" in
+  grep)
+    echo $(($(<"$COUNT_DIR/grep") + 1)) >"$COUNT_DIR/grep"
+    ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+SH
+cat >"$path_spawn/bin/head" <<'SH'
+#!/bin/bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(<"$COUNT_DIR/head") + 1)) >"$COUNT_DIR/head"
+exec "$(command -p -v head)" "$@"
+SH
+chmod +x "$path_spawn/bin/git" "$path_spawn/bin/head"
+(
+  cd "$path_spawn" || exit 1
+  COUNT_DIR="$path_spawn" REAL_GIT="$real_git" PATH="$path_spawn/bin:$PATH" \
+    bash "$DISPATCH" machine-specific-paths >/dev/null 2>&1 || true
 )
-assert_exit 'machine-specific-paths fails a Linux home path' 1 "$?"
+assert_eq 'machine-specific-paths greps the index once' '1' "$(cat "$path_spawn/grep")"
+assert_eq 'machine-specific-paths does not spawn head to cap output' '0' "$(cat "$path_spawn/head")"
 
 # --- comment-hygiene ---
 make_repo "$tmpdir/ch-clean"
