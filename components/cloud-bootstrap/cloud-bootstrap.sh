@@ -179,73 +179,113 @@ fi
 )
 
 # --- Plugins ----------------------------------------------------------------
-# Data-driven from the repo's committed .claude/settings.json — every declared
-# marketplace is registered and every enabledPlugins entry set to true is
-# installed, whichever marketplace it names. A repo that declares nothing gets
-# nothing. Explicit installs also sidestep the platform rule that adding a
-# marketplace never auto-installs externally-sourced plugins.
+# Data-driven from two settings-shaped files, in this order:
+#   1. the fleet list the cloud-environment component fetched into the
+#      snapshot at cache build (same path constants as its setup script; the
+#      /tmp copy is the fallback it writes when /opt is unwritable), so every
+#      repo's session gets the fleet without mirroring the catalog in its own
+#      block. Absent outside a managed environment, in which case this step
+#      is a logged no-op and the repo block below is the only source;
+#   2. the repo's committed .claude/settings.json, whose enabledPlugins block
+#      is the fallback while it still mirrors the fleet and the carrier of
+#      deltas once it does not.
+# Every declared marketplace is registered and every enabledPlugins entry set
+# to true is installed, whichever marketplace it names. Explicit installs also
+# sidestep the platform rule that adding a marketplace never auto-installs
+# externally-sourced plugins.
 command -v claude >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 settings='.claude/settings.json'
-[[ -f "$settings" ]] || exit 0
+fleet_plugins=''
+if [[ -f /opt/melodic-fleet-plugins.json ]]; then
+  fleet_plugins=/opt/melodic-fleet-plugins.json
+elif [[ -f /tmp/melodic-fleet-plugins.json ]]; then
+  fleet_plugins=/tmp/melodic-fleet-plugins.json
+fi
+if [[ -z "$fleet_plugins" ]]; then
+  echo 'cloud-bootstrap: no fleet plugin list in this snapshot; repo declaration is the only source' >&2
+fi
 
-registered="$(claude plugin marketplace list --json 2>/dev/null |
-  jq -r '.[].name' 2>/dev/null || true)"
-declared=$(
-  jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
-    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
-    | @tsv' "$settings" 2>/dev/null || true
-)
-while IFS=$'\t' read -r mp_name mp_target; do
-  [[ -n "$mp_name" ]] || continue
-  if [[ $'\n'"$registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then continue; fi
-  if [[ -z "$mp_target" ]]; then
-    echo "cloud-bootstrap: marketplace $mp_name declares no repo/path/url source; skipped" >&2
-  elif claude plugin marketplace add "$mp_target" --scope user >/dev/null 2>&1; then
-    echo "cloud-bootstrap: marketplace $mp_name registered ($mp_target)" >&2
-  else
-    echo "cloud-bootstrap: WARN marketplace add failed: $mp_name ($mp_target)" >&2
-  fi
-done <<EOF
+# install_plugins_from <settings-shaped json> <label>: register the file's
+# marketplaces and install its true entries at user scope, skipping what is
+# already present, and print one summary line per source so a session log
+# says which list each plugin came from.
+install_plugins_from() {
+  local file="$1" label="$2" registered declared wanted have
+  local mp_name mp_target id enabled installed
+  [[ -f "$file" ]] || return 0
+  registered="$(claude plugin marketplace list --json 2>/dev/null |
+    jq -r '.[].name' 2>/dev/null || true)"
+  declared=$(
+    jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
+      | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
+      | @tsv' "$file" 2>/dev/null || true
+  )
+  while IFS=$'\t' read -r mp_name mp_target; do
+    [[ -n "$mp_name" ]] || continue
+    if [[ $'\n'"$registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then continue; fi
+    if [[ -z "$mp_target" ]]; then
+      echo "cloud-bootstrap: marketplace $mp_name declares no repo/path/url source; skipped" >&2
+    elif claude plugin marketplace add "$mp_target" --scope user >/dev/null 2>&1; then
+      echo "cloud-bootstrap: marketplace $mp_name registered ($mp_target)" >&2
+    else
+      echo "cloud-bootstrap: WARN marketplace add failed: $mp_name ($mp_target)" >&2
+    fi
+  done <<EOF
 $declared
 EOF
 
-wanted=$(
-  jq -r '.enabledPlugins // {} | to_entries[]
-    | select(.value == true) | .key' "$settings" 2>/dev/null || true
-)
-have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
+  wanted=$(
+    jq -r '.enabledPlugins // {} | to_entries[]
+      | select(.value == true) | .key' "$file" 2>/dev/null || true
+  )
+  have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
 
-enabled=0
-installed=0
-while IFS= read -r id; do
-  [[ -n "$id" ]] || continue
-  enabled=$((enabled + 1))
-  if [[ $'\n'"$have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
-  if claude plugin install "$id" --scope user -y >/dev/null 2>&1; then
-    installed=$((installed + 1))
-  else
-    echo "cloud-bootstrap: install failed: $id" >&2
-  fi
-done <<EOF
+  enabled=0
+  installed=0
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    enabled=$((enabled + 1))
+    if [[ $'\n'"$have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
+    if claude plugin install "$id" --scope user -y >/dev/null 2>&1; then
+      installed=$((installed + 1))
+    else
+      echo "cloud-bootstrap: install failed: $id" >&2
+    fi
+  done <<EOF
 $wanted
 EOF
 
-echo "cloud-bootstrap: $enabled enabled, $installed newly installed" >&2
+  echo "cloud-bootstrap: $label: $enabled enabled, $installed newly installed" >&2
+  return 0
+}
 
-# Catalog inventory line. Everything above installs strictly what the repo
-# declares, so a plugin added to a marketplace after this settings.json was
-# written is not installed and nothing says so — the gap surfaces only when
-# someone types a slash command that does not resolve, which is exactly how it
-# has surfaced. Each registered marketplace is already cloned to disk by the
-# `marketplace add` above, so naming the difference costs one jq pass and no
-# network. Deliberately an inventory line and not a WARN: a repo may declare a
-# subset on purpose, and this must not read as a defect on every session.
+if [[ -n "$fleet_plugins" ]]; then
+  install_plugins_from "$fleet_plugins" "fleet list $fleet_plugins"
+fi
+install_plugins_from "$settings" "repo $settings"
+
+# Catalog inventory line. Everything above installs strictly what the fleet
+# list and the repo declare, so a plugin added to a marketplace after both
+# were written is not installed and nothing says so — the gap surfaces only
+# when someone types a slash command that does not resolve, which is exactly
+# how it has surfaced. Each registered marketplace is already cloned to disk
+# by the `marketplace add` above, so naming the difference costs one jq pass
+# and no network. Deliberately an inventory line and not a WARN: a repo may
+# declare a subset on purpose, and this must not read as a defect on every
+# session. Both sources count as "declared", and each stands in for the other
+# when absent: a repo with no committed settings file still reads the fleet
+# list here, and a snapshot without the list reads the repo file twice.
+# `--slurpfile` opens every file before the filter runs, so a missing one
+# would otherwise silence this whole inventory rather than degrade it.
+repo_src="$settings"
+[[ -f "$repo_src" ]] || repo_src="${fleet_plugins:-$settings}"
+declared_from="${fleet_plugins:-$repo_src}"
 registered_dirs=$(claude plugin marketplace list --json 2>/dev/null |
   jq -r '.[] | select((.installLocation // "") != "")
     | [.name, .installLocation] | @tsv' 2>/dev/null || true)
-declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$settings" 2>/dev/null || true)
+declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$repo_src" "$declared_from" 2>/dev/null | sort -u || true)
 while IFS=$'\t' read -r mp_name mp_dir; do
   [[ -n "$mp_name" ]] || continue
   # That listing is machine-global while this question is repo-scoped: the
@@ -261,9 +301,10 @@ while IFS=$'\t' read -r mp_name mp_dir; do
   # The "@<marketplace>" suffix is stripped by length rather than by sub():
   # the name is interpolated text, and sub() would read any regex
   # metacharacter in it as syntax.
-  missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$settings" '
+  missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$repo_src" --slurpfile f "$declared_from" '
     [.plugins[]?.name] as $names
-    | [$s[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key
+    | [(($f[0].enabledPlugins // {}) + ($s[0].enabledPlugins // {}))
+       | to_entries[] | select(.value == true) | .key
        | select(endswith("@" + $mp)) | .[:length - ($mp | length) - 1]] as $declared
     | ($names - $declared) | join(", ")' "$catalog" 2>/dev/null || true)
   if [[ -n "$missing" ]]; then
