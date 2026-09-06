@@ -692,9 +692,16 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      # The reusable's own job declares security-events: write unconditionally
+      # at v0.22.0: its upload-sarif step stays gated on the input, but
+      # expressions are not legal in a permissions scope. A called workflow can
+      # only narrow the caller's GITHUB_TOKEN and never widen it, so the grant
+      # has to be here for the job to start. The lane stays annotations-only
+      # (upload-sarif defaults false), so nothing is written to code scanning.
+      security-events: write
     # Actions security lint. High-severity findings block the lane; lower
     # severities annotate. Gating runs in-lane via the SARIF guard, so it
-    # rides the existing ci-status gate — no code-scanning, no elevated grant.
+    # rides the existing ci-status gate — no code-scanning upload.
     #
     # `.` audits this repo's own workflows only: zizmor discovers workflow
     # definitions by their `.github/workflows` location, so the workflow BYTES
@@ -702,7 +709,7 @@ jobs:
     # which become consumers' .github/workflows/ files — are invisible to a
     # repo-root scan. They are named explicitly so the lane audits what it
     # ships.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
     with:
       runner: ubuntu-24.04
       paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml
@@ -715,7 +722,7 @@ jobs:
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
     with:
       runner: ubuntu-24.04
 
