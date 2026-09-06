@@ -207,16 +207,34 @@ if [[ -z "$fleet_plugins" ]]; then
   echo 'cloud-bootstrap: no fleet plugin list in this snapshot; repo declaration is the only source' >&2
 fi
 
+# Plugin CLI listings are shared across both sources and the catalog
+# inventory. Each `install_plugins_from` used to call `marketplace list` and
+# `plugin list` itself, and inventory listed marketplaces again: five CLI
+# round-trips on every session, including the warm path where everything is
+# already installed. One of each up front is enough to skip; a second
+# marketplace list runs only when this session registered a new marketplace
+# (so inventory can see its installLocation). New installs are recorded in
+# plugin_have so the second source does not re-install them. Bash 3.2: no
+# arrays, newline-delimited strings.
+plugin_registered=''
+plugin_have=''
+plugin_mps=''
+added_mp=0
+
+mp_json=$(claude plugin marketplace list --json 2>/dev/null || true)
+plugin_registered=$(printf '%s' "$mp_json" | jq -r '.[].name' 2>/dev/null || true)
+plugin_mps=$(printf '%s' "$mp_json" | jq -r '.[] | select((.installLocation // "") != "")
+    | [.name, .installLocation] | @tsv' 2>/dev/null || true)
+plugin_have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
+
 # install_plugins_from <settings-shaped json> <label>: register the file's
 # marketplaces and install its true entries at user scope, skipping what is
 # already present, and print one summary line per source so a session log
 # says which list each plugin came from.
 install_plugins_from() {
-  local file="$1" label="$2" registered declared wanted have
+  local file="$1" label="$2" declared wanted
   local mp_name mp_target id enabled installed
   [[ -f "$file" ]] || return 0
-  registered="$(claude plugin marketplace list --json 2>/dev/null |
-    jq -r '.[].name' 2>/dev/null || true)"
   declared=$(
     jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
       | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
@@ -224,11 +242,13 @@ install_plugins_from() {
   )
   while IFS=$'\t' read -r mp_name mp_target; do
     [[ -n "$mp_name" ]] || continue
-    if [[ $'\n'"$registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then continue; fi
+    if [[ $'\n'"$plugin_registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then continue; fi
     if [[ -z "$mp_target" ]]; then
       echo "cloud-bootstrap: marketplace $mp_name declares no repo/path/url source; skipped" >&2
     elif claude plugin marketplace add "$mp_target" --scope user >/dev/null 2>&1; then
       echo "cloud-bootstrap: marketplace $mp_name registered ($mp_target)" >&2
+      plugin_registered="${plugin_registered}${plugin_registered:+$'\n'}$mp_name"
+      added_mp=1
     else
       echo "cloud-bootstrap: WARN marketplace add failed: $mp_name ($mp_target)" >&2
     fi
@@ -240,16 +260,16 @@ EOF
     jq -r '.enabledPlugins // {} | to_entries[]
       | select(.value == true) | .key' "$file" 2>/dev/null || true
   )
-  have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
 
   enabled=0
   installed=0
   while IFS= read -r id; do
     [[ -n "$id" ]] || continue
     enabled=$((enabled + 1))
-    if [[ $'\n'"$have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
+    if [[ $'\n'"$plugin_have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
     if claude plugin install "$id" --scope user -y >/dev/null 2>&1; then
       installed=$((installed + 1))
+      plugin_have="${plugin_have}${plugin_have:+$'\n'}$id"
     else
       echo "cloud-bootstrap: install failed: $id" >&2
     fi
@@ -282,9 +302,11 @@ install_plugins_from "$settings" "repo $settings"
 repo_src="$settings"
 [[ -f "$repo_src" ]] || repo_src="${fleet_plugins:-$settings}"
 declared_from="${fleet_plugins:-$repo_src}"
-registered_dirs=$(claude plugin marketplace list --json 2>/dev/null |
-  jq -r '.[] | select((.installLocation // "") != "")
-    | [.name, .installLocation] | @tsv' 2>/dev/null || true)
+if [[ "$added_mp" -eq 1 ]]; then
+  plugin_mps=$(claude plugin marketplace list --json 2>/dev/null |
+    jq -r '.[] | select((.installLocation // "") != "")
+      | [.name, .installLocation] | @tsv' 2>/dev/null || true)
+fi
 declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$repo_src" "$declared_from" 2>/dev/null | sort -u || true)
 while IFS=$'\t' read -r mp_name mp_dir; do
   [[ -n "$mp_name" ]] || continue
@@ -311,7 +333,7 @@ while IFS=$'\t' read -r mp_name mp_dir; do
     echo "cloud-bootstrap: $mp_name carries plugins this repo does not declare: $missing" >&2
   fi
 done <<EOF
-$registered_dirs
+$plugin_mps
 EOF
 
 # When the SessionStart hook is the caller, stdout is parsed as hook output —
