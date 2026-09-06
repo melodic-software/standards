@@ -117,6 +117,12 @@ assert_exit 'exec-bit passes eight 100755 shebang files under a git shim' 0 "$?"
 assert_eq 'exec-bit greps the index once' '1' "$(cat "$spawn_dir/grep")"
 assert_eq 'exec-bit batches staged-mode reads into one ls-files' '1' "$(cat "$spawn_dir/ls-files")"
 assert_eq 'exec-bit does not cat-file per candidate' '0' "$(cat "$spawn_dir/cat-file")"
+if grep -E '^[[:space:]]*declare[[:space:]]+-A' "$HERE/check-exec-bit.sh" >/dev/null; then
+  fail 'exec-bit stays bash-3.2-safe (no declare -A)' \
+    'found a declare -A assignment (comments may mention the forbidden form)'
+else
+  pass 'exec-bit stays bash-3.2-safe (no declare -A)'
+fi
 
 # --- machine-specific-paths ---
 make_repo "$tmpdir/path-clean"
