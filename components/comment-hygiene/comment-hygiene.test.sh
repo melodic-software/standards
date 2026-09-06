@@ -85,4 +85,29 @@ emu_ref="$(printf '%s\n' '// see mona-cat_octo/scratch#12')"
 chp::scan_text "$emu_ref" >/dev/null
 assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
 
+# Spawn census: the local-lane driver feeds one git-grep hit line per call.
+# N single-line scans must not spawn N awk; multi-line content still uses one.
+awk_dir="$(mktemp -d)"
+mkdir -p "$awk_dir/bin"
+echo 0 >"$awk_dir/awk"
+real_awk="$(command -v awk)"
+cat >"$awk_dir/bin/awk" <<'SH'
+#!/bin/bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(<"$COUNT_DIR/awk") + 1)) >"$COUNT_DIR/awk"
+exec "$REAL_AWK" "$@"
+SH
+chmod +x "$awk_dir/bin/awk"
+i=1
+while [[ "$i" -le 8 ]]; do
+  COUNT_DIR="$awk_dir" REAL_AWK="$real_awk" PATH="$awk_dir/bin:$PATH" \
+    chp::scan_text "# TODO item $i" >/dev/null || true
+  i=$((i + 1))
+done
+assert_eq 'single-line scan_text does not spawn awk' '0' "$(cat "$awk_dir/awk")"
+COUNT_DIR="$awk_dir" REAL_AWK="$real_awk" PATH="$awk_dir/bin:$PATH" \
+  chp::scan_text "$bad" >/dev/null || true
+assert_eq 'multi-line scan_text uses one awk' '1' "$(cat "$awk_dir/awk")"
+rm -rf "$awk_dir"
+
 [[ $FAILED -eq 0 ]] || exit 1

@@ -171,6 +171,35 @@ git -C "$tmpdir/ch-bad" commit -qm 'todo comment'
 )
 assert_exit 'comment-hygiene fails a TODO comment' 1 "$?"
 
+# Spawn census: N git-grep comment hits must not spawn N awk (single-line
+# fast path in the policy library). Drift-immune PATH shim, same method as
+# the exec-bit census above.
+ch_spawn="$tmpdir/ch-spawn"
+make_repo "$ch_spawn"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf '# TODO: item %s\necho %s\n' "$i" "$i" >"$ch_spawn/c$i.sh"
+  git -C "$ch_spawn" add "c$i.sh"
+  i=$((i + 1))
+done
+git -C "$ch_spawn" commit -qm 'eight todo comments'
+mkdir -p "$ch_spawn/bin"
+echo 0 >"$ch_spawn/awk"
+real_awk="$(command -v awk)"
+cat >"$ch_spawn/bin/awk" <<'SH'
+#!/bin/bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(<"$COUNT_DIR/awk") + 1)) >"$COUNT_DIR/awk"
+exec "$REAL_AWK" "$@"
+SH
+chmod +x "$ch_spawn/bin/awk"
+(
+  cd "$ch_spawn" || exit 1
+  COUNT_DIR="$ch_spawn" REAL_AWK="$real_awk" PATH="$ch_spawn/bin:$PATH" \
+    bash "$DISPATCH" comment-hygiene >/dev/null 2>&1 || true
+)
+assert_eq 'comment-hygiene does not spawn awk per git-grep hit' '0' "$(cat "$ch_spawn/awk")"
+
 # --- reference-integrity ---
 make_repo "$tmpdir/ref-clean"
 printf '# Target\n\nBody.\n' >"$tmpdir/ref-clean/target.md"
