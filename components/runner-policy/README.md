@@ -819,12 +819,21 @@ fleet.
 Two last reusable contracts are registered at the same tag, `osv-scanner` and
 `zizmor`, the two this repository's own `ci.yml` still called at pre-tag
 revisions and the two that blocked its convergence for the same fail-closed
-reason. `osv-scanner` copies
-`90f1c54935203fa31b5b3d1f41531228be2c2b7f` verbatim and nothing widens: its
+reason. `osv-scanner` copies its terms from
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` and nothing widens: its
 `on.workflow_call` declaration, workflow and job `permissions`, and
 `runs-on: ${{ inputs.runner }}` routing are byte-identical at the tag, and
 `allowedInputs` stays `["runner"]`, the whole of what every caller in the fleet
-passes. `zizmor` is the one contract in this wave that is **not** a verbatim
+passes. It adds one term the predecessor lacks, a `minimumCallerPermissions`
+floor of `contents: read`, on the pattern the v0.14.2 review used for
+`do-not-merge-gate`, `semantic-pr` and `pr-issue-linkage`: the workflow's own
+`permissions:` block requests `contents: read`, a called workflow can only
+narrow the caller's token, so a caller granting less would pass policy and then
+fail inside the callee with no repository to read. The floor narrows rather
+than widens, it is read-only as the validator requires, and every
+`osv-scanner` caller in the fleet already grants exactly `contents: read`, so
+it blocks nobody. The predecessor entry is left as it was reviewed.
+`zizmor` is the one contract in this wave that is **not** a verbatim
 copy. Its routing, runner input, `allowedInputs`
 (`["runner", "paths", "fail-on-severity"]`) and empty secret map all copy from
 `31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`, and it adds one term: an

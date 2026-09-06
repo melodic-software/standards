@@ -1184,7 +1184,10 @@
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner"],
-      "allowedSecrets": {}
+      "allowedSecrets": {},
+      "minimumCallerPermissions": {
+        "contents": "read"
+      }
     },
     "melodic-software/ci-workflows/.github/workflows/zizmor.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4": {
       "routing": "runner-input",

@@ -9774,14 +9774,21 @@ jobs:
 });
 
 // The last two reusables standards' own `ci.yml` still called at pre-tag
-// revisions. `osv-scanner.yml` is byte-identical at the tag, so its contract
-// copies forward verbatim.
-test("osv-scanner at the wave tag copies its predecessor forward verbatim", () => {
+// revisions. `osv-scanner.yml` is byte-identical at the tag, so its terms copy
+// forward; the one addition is the read floor its own `permissions:` block
+// requests, on the pattern the v0.14.2 review used for `do-not-merge-gate`,
+// `semantic-pr` and `pr-issue-linkage`. A called workflow can only narrow the
+// caller's token, so an under-granted caller would otherwise pass policy and
+// fail inside the callee with no repository to read.
+test("osv-scanner at the wave tag copies its predecessor forward and adds only the contents floor", () => {
   const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
   const workflowPath = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
   const previous = contracts[`${workflowPath}@${GH_FREE_GATE_SHA}`];
   assert.ok(previous, "expected a predecessor contract for osv-scanner");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], {
+    ...previous,
+    minimumCallerPermissions: { contents: "read" },
+  });
 });
 
 // `zizmor.yml` is the one contract in this wave that is not a verbatim copy.
@@ -9810,27 +9817,40 @@ test("zizmor at the wave tag copies its predecessor forward and adds only the re
   );
 });
 
-test("a governed caller of osv-scanner at the wave tag is admitted", async () => {
+test("a governed caller of osv-scanner at the wave tag is admitted only when it clears the contents floor", async () => {
   const reference = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${REPINE_LANE_SHA_V0_22_0}`;
-  const root = await repository({
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
-      },
-    },
-    workflows: {
-      "ci.yml": `permissions: read-all
+  const workflow = (permissions) => `permissions: read-all
 jobs:
   osv-scanner:
     permissions:
-      contents: read
+${permissions}
     uses: ${reference}
     with:
       runner: ${FLEET_LABEL}
-`,
+`;
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
     },
+  };
+  const granted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      contents: read") },
   });
-  assert.deepEqual(await audit(root), []);
+  assert.deepEqual(await audit(granted), []);
+  const ungranted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      pull-requests: read") },
+  });
+  const findings = await audit(ungranted);
+  assert.ok(
+    findings.some(
+      (finding) =>
+        finding.rule === "runner-target-contract" &&
+        /reusable workflow caller permissions.*contents/u.test(finding.message),
+    ),
+    `expected a contents floor finding, got ${JSON.stringify(findings)}`,
+  );
 });
 
 test("a governed caller of zizmor at the wave tag is admitted only with the security-events grant", async () => {
