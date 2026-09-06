@@ -57,6 +57,67 @@ git -C "$tmpdir/exec-bad" commit -qm 'bad shebang'
 )
 assert_exit 'exec-bit fails a 100644 shebang' 1 "$?"
 
+# A `#!` past line 1 is not a shebang file (docs, fenced examples). The
+# previous cat-file byte-0 check skipped these; line-number 1 is the same
+# filter without a per-candidate blob read.
+make_repo "$tmpdir/exec-not-byte0"
+# shellcheck disable=SC2016 # backticks and #! are fixture content, not expansion
+printf 'example:\n```\n#!/usr/bin/env bash\necho demo\n```\n' >"$tmpdir/exec-not-byte0/README.md"
+git -C "$tmpdir/exec-not-byte0" add README.md
+git -C "$tmpdir/exec-not-byte0" commit -qm 'embedded shebang example'
+(
+  cd "$tmpdir/exec-not-byte0" || exit 1
+  bash "$DISPATCH" exec-bit >/dev/null
+)
+assert_exit 'exec-bit ignores a #! that is not at byte 0' 0 "$?"
+
+# Spawn census: N shebang files must not spawn N git ls-files / cat-file.
+# Drift-immune counter, same PATH-shim method as distribution/sync-manifest.test.sh.
+spawn_dir="$tmpdir/exec-spawn"
+make_repo "$spawn_dir"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf '#!/usr/bin/env bash\necho %s\n' "$i" >"$spawn_dir/s$i.sh"
+  git -C "$spawn_dir" add "s$i.sh"
+  git -C "$spawn_dir" update-index --chmod=+x -- "s$i.sh"
+  i=$((i + 1))
+done
+git -C "$spawn_dir" commit -qm 'eight shebang files'
+mkdir -p "$spawn_dir/bin"
+cat >"$spawn_dir/bin/git" <<'SH'
+#!/usr/bin/env bash
+REAL_GIT="${REAL_GIT:?}"
+COUNT_DIR="${COUNT_DIR:?}"
+for argument in "$@"; do
+  case "$argument" in
+  grep)
+    echo $(($(cat "$COUNT_DIR/grep" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/grep"
+    ;;
+  ls-files)
+    echo $(($(cat "$COUNT_DIR/ls-files" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/ls-files"
+    ;;
+  cat-file)
+    echo $(($(cat "$COUNT_DIR/cat-file" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/cat-file"
+    ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$spawn_dir/bin/git"
+: >"$spawn_dir/grep"
+: >"$spawn_dir/ls-files"
+echo 0 >"$spawn_dir/cat-file"
+real_git="$(command -v git)"
+(
+  cd "$spawn_dir" || exit 1
+  COUNT_DIR="$spawn_dir" REAL_GIT="$real_git" PATH="$spawn_dir/bin:$PATH" \
+    bash "$DISPATCH" exec-bit >/dev/null
+)
+assert_exit 'exec-bit passes eight 100755 shebang files under a git shim' 0 "$?"
+assert_eq 'exec-bit greps the index once' '1' "$(cat "$spawn_dir/grep")"
+assert_eq 'exec-bit batches staged-mode reads into one ls-files' '1' "$(cat "$spawn_dir/ls-files")"
+assert_eq 'exec-bit does not cat-file per candidate' '0' "$(cat "$spawn_dir/cat-file")"
+
 # --- machine-specific-paths ---
 make_repo "$tmpdir/path-clean"
 printf 'root = <repo-root>/src\n' >"$tmpdir/path-clean/config.ini"
