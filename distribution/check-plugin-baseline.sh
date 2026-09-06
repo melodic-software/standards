@@ -45,49 +45,34 @@ DIVERGED=0
 compare_settings() {
   local base="$1" cand="$2" label="$3" diverged=0 line
 
-  local missing extra
+  # One jq pass emits every divergence as a tagged line so the two settings
+  # files are parsed once rather than three times (enabledPlugins missing,
+  # enabledPlugins extra, marketplace keys/sources). compare_catalog already
+  # uses this tagged-row shape.
   # tr -d '\r' throughout: a Windows jq emits CRLF, and a carried CR corrupts
   # the reported names (and, in fleet mode, the repo slug handed to gh api).
-  missing=$(jq -r --slurpfile b "$base" '
+  local diff
+  diff=$(jq -r --slurpfile b "$base" '
     ([$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
-     - [.enabledPlugins // {} | to_entries[] | select(.value == true) | .key])[]' \
-    "$cand" 2>/dev/null | tr -d '\r' || true)
-  extra=$(jq -r --slurpfile b "$base" '
-    ([.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
-     - [$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key])[]' \
-    "$cand" 2>/dev/null | tr -d '\r' || true)
-
-  while IFS= read -r line; do
-    [[ -n "$line" ]] || continue
-    printf '%s: missing vs baseline: %s\n' "$label" "$line"
-    diverged=1
-  done <<EOF
-$missing
-EOF
-  while IFS= read -r line; do
-    [[ -n "$line" ]] || continue
-    printf '%s: beyond baseline: %s\n' "$label" "$line"
-    diverged=1
-  done <<EOF
-$extra
-EOF
-
-  local mp_diff
-  mp_diff=$(jq -r --slurpfile b "$base" '
-    (.extraKnownMarketplaces // {}) as $c
-    | ($b[0].extraKnownMarketplaces // {}) as $bm
-    | ( ($bm | keys) - ($c | keys) | map("marketplace missing vs baseline: " + .) )
-      + ( ($c | keys) - ($bm | keys) | map("marketplace beyond baseline: " + .) )
-      + ( [ ($bm | keys)[] as $k
-            | select(($c[$k] != null) and ($c[$k].source != $bm[$k].source))
-            | "marketplace source differs: " + $k ] )
+     - [.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+     | map("missing vs baseline: " + .))
+    + ([.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+       - [$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+       | map("beyond baseline: " + .))
+    + ((.extraKnownMarketplaces // {}) as $c
+       | ($b[0].extraKnownMarketplaces // {}) as $bm
+       | (($bm | keys) - ($c | keys) | map("marketplace missing vs baseline: " + .))
+         + (($c | keys) - ($bm | keys) | map("marketplace beyond baseline: " + .))
+         + ([($bm | keys)[] as $k
+             | select(($c[$k] != null) and ($c[$k].source != $bm[$k].source))
+             | "marketplace source differs: " + $k]))
     | .[]' "$cand" 2>/dev/null | tr -d '\r' || true)
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     printf '%s: %s\n' "$label" "$line"
     diverged=1
   done <<EOF
-$mp_diff
+$diff
 EOF
 
   if [[ "$diverged" -eq 0 ]]; then

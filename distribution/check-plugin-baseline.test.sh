@@ -37,6 +37,24 @@ rc=$?
 assert_exit 'identical settings exit 0' 0 "$rc"
 assert_contains 'identical settings report a match' "$out" 'matches baseline'
 
+# Spawn census: --compare used to run three jq filters over the same pair
+# (missing plugins, extra plugins, marketplace diffs). One tagged pass is
+# enough. require_parses still calls jq empty once per file.
+mkdir -p "$tmp/jq-bin" "$tmp/jq-count"
+cat >"$tmp/jq-bin/jq" <<'SH'
+#!/usr/bin/env bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(cat "$COUNT_DIR/jq" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/jq"
+exec "$REAL_JQ" "$@"
+SH
+chmod +x "$tmp/jq-bin/jq"
+: >"$tmp/jq-count/jq"
+real_jq="$(command -v jq)"
+COUNT_DIR="$tmp/jq-count" REAL_JQ="$real_jq" PATH="$tmp/jq-bin:$PATH" \
+  bash "$script" --compare "$tmp/baseline.json" "$tmp/same.json" >/dev/null
+assert_eq '--compare batches structural jq into one pass plus two parse checks' '3' \
+  "$(cat "$tmp/jq-count/jq")"
+
 cat >"$tmp/drift.json" <<'JSON'
 {
   "extraKnownMarketplaces": {
