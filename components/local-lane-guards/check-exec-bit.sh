@@ -58,9 +58,11 @@ if [[ "$grep_rc" -ne 0 && "$grep_rc" -ne 1 ]]; then
   exit 1
 fi
 
-# Line-1 `^#!` hits are the shebang files. `git grep -z -n` writes
-# path NUL lineno NUL line-text LF (observed on git 2.x; -z NUL-delimits
-# the filename and, with -n, the line number, then the line ends with LF).
+# Line-1 `^#!` hits are the shebang files. Combined `-z -n` writes
+# path NUL lineno NUL line-text LF. git-grep(1) documents `-z` as the
+# pathname delimiter; with `-n` the line-number field (normally `:`) is
+# also NUL-separated, and the matched line still ends in LF. That is the
+# record `read -d ''` / `read -r` below consume — not `path NUL lineno:text LF`.
 # NUL records, not a bash array: stock macOS bash 3.2 errors on an empty
 # "${array[@]}" under `set -u`, and has no `declare -A`.
 n_shebang=0

@@ -57,6 +57,19 @@ git -C "$tmpdir/exec-bad" commit -qm 'bad shebang'
 )
 assert_exit 'exec-bit fails a 100644 shebang' 1 "$?"
 
+# Pin the `git grep -z -n` record git-grep(1) under-specifies: `-z` is
+# documented as delimiting pathnames, but with `-n` the line number is
+# also NUL-separated (`path\0lineno\0text\n`), not `path\0lineno:text\n`.
+# Capture via a pipe — a bash variable cannot hold NUL. `tr` is the
+# identity that makes the two NULs visible to assert_eq.
+layout_vis="$(
+  git -C "$tmpdir/exec-bad" -c core.quotePath=false grep --cached -z -nIE '^#!' -- . \
+    | tr '\0' '|'
+)"
+assert_eq 'git grep -z -n is path NUL lineno NUL text LF' \
+  'bad.sh|1|#!/usr/bin/env bash' \
+  "$layout_vis"
+
 # A `#!` past line 1 is not a shebang file (docs, fenced examples). The
 # previous cat-file byte-0 check skipped these; line-number 1 is the same
 # filter without a per-candidate blob read.
