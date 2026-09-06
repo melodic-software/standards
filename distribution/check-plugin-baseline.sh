@@ -144,10 +144,11 @@ EOF
 # Compares the fleet list with a dotfiles seed (.chezmoidata/claude.json),
 # restricted to the marketplaces the fleet list declares: a fleet plugin the
 # seed never names, a fleet plugin the seed sets to false (a personal opt-out,
-# reported as such, not as drift), and a seed entry for a fleet marketplace
-# that the fleet list does not carry. Entries for other marketplaces are the
-# seed's own business. Always returns 0 (.shellcheckrc's SC2310); divergence
-# signals through DIVERGED.
+# reported as such, not as drift), and a seed entry set to true for a fleet
+# marketplace that the fleet list does not carry. A seed false for a plugin
+# outside the fleet list is an opt-out of nothing and is not reported.
+# Entries for other marketplaces are the seed's own business. Always returns
+# 0 (.shellcheckrc's SC2310); divergence signals through DIVERGED.
 compare_seed() {
   local base="$1" seed="$2" label="$3" diverged=0 line
 
@@ -159,10 +160,11 @@ compare_seed() {
     | ($seed | to_entries
         | map(select(.key | split("@") | .[1:] | join("@") | IN($mps[])))) as $scoped
     | ($scoped | map(.key)) as $seed_keys
+    | ($scoped | map(select(.value == true) | .key)) as $seed_enabled
     | ($scoped | map(select(.value == false) | .key)) as $opted_out
     | (($fleet - $seed_keys) | map("in fleet list, not in seed: " + .))
       + (($fleet - ($fleet - $opted_out)) | map("in fleet list, seed opts out: " + .))
-      + (($seed_keys - $fleet) | map("in seed, not in fleet list: " + .))
+      + (($seed_enabled - $fleet) | map("in seed, not in fleet list: " + .))
     | .[]' "$seed" 2>/dev/null | tr -d '\r' || true)
 
   while IFS= read -r line; do

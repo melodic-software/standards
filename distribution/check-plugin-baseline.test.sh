@@ -194,7 +194,8 @@ cat >"$tmp/seed.json" <<'JSON'
         "alpha@melodic-software": true,
         "beta@melodic-software": false,
         "delta@third-party": true,
-        "epsilon@melodic-software": true
+        "epsilon@melodic-software": true,
+        "zeta@melodic-software": false
       }
     }
   }
@@ -207,6 +208,8 @@ assert_contains 'a fleet plugin the seed opts out of is reported as an opt-out' 
   "$out" 'in fleet list, seed opts out: beta@melodic-software'
 assert_contains 'a seed entry for a fleet marketplace the fleet lacks is reported' \
   "$out" 'in seed, not in fleet list: epsilon@melodic-software'
+assert_not_contains 'a seed opt-out of a plugin outside the fleet list is not a gap' \
+  "$out" 'zeta@melodic-software'
 assert_not_contains 'a seed entry for another marketplace is out of scope' \
   "$out" 'delta@third-party'
 assert_not_contains 'a fleet-disabled entry is not demanded of the seed' \

@@ -274,13 +274,18 @@ install_plugins_from "$settings" "repo $settings"
 # by the `marketplace add` above, so naming the difference costs one jq pass
 # and no network. Deliberately an inventory line and not a WARN: a repo may
 # declare a subset on purpose, and this must not read as a defect on every
-# session. Both sources count as "declared"; when no fleet list is present
-# the repo file stands in for it, so the union is well-formed either way.
-declared_from="${fleet_plugins:-$settings}"
+# session. Both sources count as "declared", and each stands in for the other
+# when absent: a repo with no committed settings file still reads the fleet
+# list here, and a snapshot without the list reads the repo file twice.
+# `--slurpfile` opens every file before the filter runs, so a missing one
+# would otherwise silence this whole inventory rather than degrade it.
+repo_src="$settings"
+[[ -f "$repo_src" ]] || repo_src="${fleet_plugins:-$settings}"
+declared_from="${fleet_plugins:-$repo_src}"
 registered_dirs=$(claude plugin marketplace list --json 2>/dev/null |
   jq -r '.[] | select((.installLocation // "") != "")
     | [.name, .installLocation] | @tsv' 2>/dev/null || true)
-declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$settings" "$declared_from" 2>/dev/null | sort -u || true)
+declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$repo_src" "$declared_from" 2>/dev/null | sort -u || true)
 while IFS=$'\t' read -r mp_name mp_dir; do
   [[ -n "$mp_name" ]] || continue
   # That listing is machine-global while this question is repo-scoped: the
@@ -296,7 +301,7 @@ while IFS=$'\t' read -r mp_name mp_dir; do
   # The "@<marketplace>" suffix is stripped by length rather than by sub():
   # the name is interpolated text, and sub() would read any regex
   # metacharacter in it as syntax.
-  missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$settings" --slurpfile f "$declared_from" '
+  missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$repo_src" --slurpfile f "$declared_from" '
     [.plugins[]?.name] as $names
     | [(($f[0].enabledPlugins // {}) + ($s[0].enabledPlugins // {}))
        | to_entries[] | select(.value == true) | .key
