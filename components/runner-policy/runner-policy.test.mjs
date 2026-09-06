@@ -9773,6 +9773,131 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
+// The last two reusables standards' own `ci.yml` still called at pre-tag
+// revisions. `osv-scanner.yml` is byte-identical at the tag, so its terms copy
+// forward; the one addition is the read floor its own `permissions:` block
+// requests, on the pattern the v0.14.2 review used for `do-not-merge-gate`,
+// `semantic-pr` and `pr-issue-linkage`. A called workflow can only narrow the
+// caller's token, so an under-granted caller would otherwise pass policy and
+// fail inside the callee with no repository to read.
+test("osv-scanner at the wave tag copies its predecessor forward and adds only the contents floor", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const workflowPath = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
+  const previous = contracts[`${workflowPath}@${GH_FREE_GATE_SHA}`];
+  assert.ok(previous, "expected a predecessor contract for osv-scanner");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], {
+    ...previous,
+    minimumCallerPermissions: { contents: "read" },
+  });
+});
+
+// `zizmor.yml` is the one contract in this wave that is not a verbatim copy.
+// Its job at the tag declares `security-events: write` unconditionally (the
+// `upload-sarif` step stays gated on the input, but expressions are illegal in
+// a `permissions:` scope), and a called workflow can only narrow the caller's
+// token and never widen it, so every caller has to grant that scope and the
+// contract needs the write-capable waiver to admit it. Everything else copies
+// from `31a5b76c`: routing, runner input, allowed inputs and the empty secret
+// map. `upload-sarif` stays out of `allowedInputs`, as it did at v0.14.2.
+test("zizmor at the wave tag copies its predecessor forward and adds only the reviewed caller-permission waiver", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const workflowPath = "melodic-software/ci-workflows/.github/workflows/zizmor.yml";
+  const previous = contracts[`${workflowPath}@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`];
+  assert.ok(previous, "expected a predecessor contract for zizmor");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], {
+    ...previous,
+    allowedCallerPermissions: { contents: "read", "security-events": "write" },
+  });
+  // The same waiver was already reviewed at v0.14.2, the last revision whose
+  // zizmor job declared the scope, so the tag's contract restates a reviewed
+  // shape rather than inventing one.
+  assert.deepEqual(
+    contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`],
+    contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_14_2}`],
+  );
+});
+
+test("a governed caller of osv-scanner at the wave tag is admitted only when it clears the contents floor", async () => {
+  const reference = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${REPINE_LANE_SHA_V0_22_0}`;
+  const workflow = (permissions) => `permissions: read-all
+jobs:
+  osv-scanner:
+    permissions:
+${permissions}
+    uses: ${reference}
+    with:
+      runner: ${FLEET_LABEL}
+`;
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+    },
+  };
+  const granted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      contents: read") },
+  });
+  assert.deepEqual(await audit(granted), []);
+  const ungranted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      pull-requests: read") },
+  });
+  const findings = await audit(ungranted);
+  assert.ok(
+    findings.some(
+      (finding) =>
+        finding.rule === "runner-target-contract" &&
+        /reusable workflow caller permissions.*contents/u.test(finding.message),
+    ),
+    `expected a contents floor finding, got ${JSON.stringify(findings)}`,
+  );
+});
+
+test("a governed caller of zizmor at the wave tag is admitted only with the security-events grant", async () => {
+  const reference = `melodic-software/ci-workflows/.github/workflows/zizmor.yml@${REPINE_LANE_SHA_V0_22_0}`;
+  const workflow = (permissions) => `permissions: read-all
+jobs:
+  zizmor:
+    permissions:
+${permissions}
+    uses: ${reference}
+    with:
+      runner: ${FLEET_LABEL}
+      paths: .
+      fail-on-severity: high
+`;
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+    },
+  };
+  const granted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      contents: read\n      security-events: write") },
+  });
+  assert.deepEqual(await audit(granted), []);
+  const ungranted = await repository({
+    policyOverrides,
+    workflows: { "ci.yml": workflow("      contents: read") },
+  });
+  // Dropping the grant fails the contract, and a rejected contract stops
+  // admitting the fleet label with it, so the caller loses its routing
+  // admission too. The caller-permission finding is the cause.
+  const findings = await audit(ungranted);
+  assert.deepEqual(findings.map((finding) => finding.rule).sort(), [
+    "hosted-exception-required",
+    "raw-self-hosted-label",
+    "runner-target-contract",
+  ]);
+  assert.ok(
+    findings.some(
+      (finding) =>
+        finding.message ===
+        'reusable workflow caller permissions.security-events must be exactly "write"',
+    ),
+  );
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
