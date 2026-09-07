@@ -36,14 +36,90 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-05.1'
+SCRIPT_VERSION='2026-09-07.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
+# Fleet plugin list: the one standards-hosted, settings-shaped file every
+# cloud snapshot installs at user scope (fleet-plugins.json beside this
+# script). It arrives through the same raw.githubusercontent.com host this
+# script does, and is written into the snapshot at FLEET_PLUGINS so each
+# repo's session bootstrap can repair drift from it without a network round
+# trip. The per-repo enabledPlugins block stays a fallback and carries only
+# the deltas a repo declares beyond the fleet.
+FLEET_PLUGINS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json'
+FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
+FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
 LOG='/var/log/melodic-env-setup.log'
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
+
+# Plugin CLI listings are shared across the fleet list and the repo block.
+# Each `install_plugins_from` used to call `marketplace list` and `plugin list`
+# itself (and spawn `grep -qxF` per entry): four CLI round-trips on a warm
+# cache build that installs from both sources, plus one grep per plugin.
+# One of each list, lazily on the first source that actually installs, is
+# enough to skip; new registers/installs are recorded in-process so the
+# second source does not re-query. Same shape as cloud-bootstrap.sh.
+plugin_listings_ready=0
+plugin_registered=''
+plugin_have=''
+
+ensure_plugin_listings() {
+  [[ "$plugin_listings_ready" -eq 1 ]] && return 0
+  plugin_registered="$(claude plugin marketplace list --json 2>/dev/null |
+    jq -r '.[].name' 2>/dev/null || true)"
+  plugin_have="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)"
+  plugin_listings_ready=1
+}
+
+# install_plugins_from <settings-shaped json> <label>: register every
+# declared marketplace and install every enabledPlugins entry set to true at
+# user scope, skipping what is already present. Idempotence-check formats
+# verified against claude CLI 2.1.241 (2026-08-23): `claude plugin list
+# --json` ids are name@marketplace, exactly the enabledPlugins key shape, and
+# `claude plugin marketplace list --json` names match extraKnownMarketplaces
+# keys, so these exact membership checks are true already-installed checks,
+# not format mismatches.
+install_plugins_from() {
+  local file="$1" label="$2" mp_name mp_target plugin_id
+  ensure_plugin_listings
+  while IFS=$'\t' read -r mp_name mp_target; do
+    [[ -n "$mp_name" ]] || continue
+    if [[ $'\n'"$plugin_registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then
+      log "plugins ($label): marketplace $mp_name already registered"
+    elif [[ -z "$mp_target" ]]; then
+      log "WARN plugins ($label): marketplace $mp_name declares no repo/path/url source; skipped"
+    elif claude plugin marketplace add "$mp_target" >>"$LOG" 2>&1; then
+      log "plugins ($label): marketplace $mp_name registered ($mp_target)"
+      plugin_registered="${plugin_registered}${plugin_registered:+$'\n'}$mp_name"
+    else
+      log "WARN plugins ($label): marketplace add failed: $mp_name ($mp_target)"
+    fi
+  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
+    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
+    | @tsv' "$file" 2>/dev/null)
+
+  while IFS= read -r plugin_id; do
+    [[ -n "$plugin_id" ]] || continue
+    if [[ $'\n'"$plugin_have"$'\n' == *$'\n'"$plugin_id"$'\n'* ]]; then
+      log "plugins ($label): $plugin_id already installed"
+    elif claude plugin install "$plugin_id" --scope user -y >>"$LOG" 2>&1; then
+      log "plugins ($label): installed $plugin_id"
+      plugin_have="${plugin_have}${plugin_have:+$'\n'}$plugin_id"
+    else
+      log "WARN plugins ($label): install failed: $plugin_id"
+    fi
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
+    | select(.value == true) | .key' "$file" 2>/dev/null)
+}
+
+# Sourced by setup.test.sh for the plugin-list helpers only.
+if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
+  return 0
+fi
+
 if ! touch "$LOG" 2>/dev/null; then
   LOG='/tmp/melodic-env-setup.log'
 fi
-log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
 export DEBIAN_FRONTEND=noninteractive
 rm -f "$STAMP" "$STAMP_FALLBACK" 2>/dev/null
@@ -263,62 +339,62 @@ else
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
 
-# Generic plugin install — data-driven from the checkout's .claude/settings.json
-# (extraKnownMarketplaces + enabledPlugins); no repo-specific logic, and a repo
-# that declares nothing gets nothing. This must happen here, at cache build:
-# Claude Code reads its plugin registry at process start and never re-reads it,
-# so only snapshot-baked installs are loaded at a session's first turn.
-# Consumer repos use github-source marketplaces, whose install/update semantics
-# already handle versions — no snapshot-refresh logic here (the commit-drift
-# refresh in claude-code-plugins' own hook is specific to its directory-source
-# dogfooding).
-settings="$REPO_ROOT/.claude/settings.json"
-if [[ -z "$REPO_ROOT" ]]; then
-  log 'plugins: repo root unresolved; skipping'
-elif ! command -v claude >/dev/null 2>&1; then
+# Generic plugin install, data-driven from two settings-shaped files
+# (extraKnownMarketplaces + enabledPlugins), in this order:
+#   1. the fleet list (FLEET_PLUGINS_URL), which every snapshot installs
+#      whatever repo it was built for, so a repo's committed block no longer
+#      has to mirror the whole catalog to get the fleet in the cloud;
+#   2. the checkout's own .claude/settings.json, as the fallback while repos
+#      still carry a full block, and afterwards as the carrier of deltas.
+# No repo-specific logic; a repo that declares nothing beyond the fleet gets
+# the fleet. This must happen here, at cache build: Claude Code reads its
+# plugin registry at process start and never re-reads it, so only
+# snapshot-baked installs are loaded at a session's first turn. Github-source
+# marketplaces' install/update semantics already handle versions — no
+# snapshot-refresh logic here (the commit-drift refresh in
+# claude-code-plugins' own hook is specific to its directory-source
+# dogfooding). Listings are shared across both sources (see
+# ensure_plugin_listings).
+if ! command -v claude >/dev/null 2>&1; then
   log 'plugins: claude CLI not on PATH; skipping'
 elif ! command -v jq >/dev/null 2>&1; then
   log 'plugins: jq not available; skipping'
-elif [[ ! -f "$settings" ]]; then
-  log "plugins: no $settings; skipping"
-elif ! jq -e '(.extraKnownMarketplaces // {}) != {} or (.enabledPlugins // {}) != {}' \
-  "$settings" >/dev/null 2>&1; then
-  log 'plugins: settings declare no marketplaces or plugins; skipping'
 else
-  # Idempotence-check formats verified against claude CLI 2.1.241
-  # (2026-08-23): `claude plugin list --json` ids are name@marketplace —
-  # exactly the enabledPlugins key shape — and `claude plugin marketplace
-  # list --json` names match extraKnownMarketplaces keys, so these exact
-  # greps are true already-installed checks, not format mismatches.
-  registered="$(claude plugin marketplace list --json 2>/dev/null |
-    jq -r '.[].name' 2>/dev/null)"
-  while IFS=$'\t' read -r mp_name mp_target; do
-    [[ -n "$mp_name" ]] || continue
-    if grep -qxF "$mp_name" <<<"$registered"; then
-      log "plugins: marketplace $mp_name already registered"
-    elif [[ -z "$mp_target" ]]; then
-      log "WARN plugins: marketplace $mp_name declares no repo/path/url source; skipped"
-    elif claude plugin marketplace add "$mp_target" >>"$LOG" 2>&1; then
-      log "plugins: marketplace $mp_name registered ($mp_target)"
+  # Fleet list first. The fetched copy lands in the snapshot (FLEET_PLUGINS,
+  # or its /tmp fallback with a WARN, mirroring the stamp) so the per-repo
+  # bootstrap's drift repair reads the same list offline. A fetch failure
+  # costs the fleet install for this build, never the build: the repo block
+  # below still installs what the checkout declares.
+  rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
+  if curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
+    "$FLEET_PLUGINS_URL" -o "$FLEET_PLUGINS_FALLBACK" >>"$LOG" 2>&1 &&
+    jq -e '(.enabledPlugins // {}) != {}' "$FLEET_PLUGINS_FALLBACK" >/dev/null 2>&1; then
+    fleet_file="$FLEET_PLUGINS_FALLBACK"
+    if cp "$FLEET_PLUGINS_FALLBACK" "$FLEET_PLUGINS" 2>/dev/null; then
+      rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
+      fleet_file="$FLEET_PLUGINS"
     else
-      log "WARN plugins: marketplace add failed: $mp_name ($mp_target)"
+      log "WARN plugins (fleet): $FLEET_PLUGINS unwritable; list kept at $FLEET_PLUGINS_FALLBACK"
     fi
-  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
-    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
-    | @tsv' "$settings" 2>/dev/null)
+    log "plugins (fleet): list fetched to $fleet_file ($(jq -r '.enabledPlugins | length' "$fleet_file") entries)"
+    install_plugins_from "$fleet_file" fleet
+  else
+    rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
+    log 'WARN plugins (fleet): list fetch failed or empty; only the repo declaration installs this build'
+  fi
 
-  installed="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null)"
-  while IFS= read -r plugin_id; do
-    [[ -n "$plugin_id" ]] || continue
-    if grep -qxF "$plugin_id" <<<"$installed"; then
-      log "plugins: $plugin_id already installed"
-    elif claude plugin install "$plugin_id" --scope user -y >>"$LOG" 2>&1; then
-      log "plugins: installed $plugin_id"
-    else
-      log "WARN plugins: install failed: $plugin_id"
-    fi
-  done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
-    | select(.value == true) | .key' "$settings" 2>/dev/null)
+  # Repo block: fallback while a repo still mirrors the fleet, deltas after.
+  settings="$REPO_ROOT/.claude/settings.json"
+  if [[ -z "$REPO_ROOT" ]]; then
+    log 'plugins (repo): repo root unresolved; skipping'
+  elif [[ ! -f "$settings" ]]; then
+    log "plugins (repo): no $settings; skipping"
+  elif ! jq -e '(.extraKnownMarketplaces // {}) != {} or (.enabledPlugins // {}) != {}' \
+    "$settings" >/dev/null 2>&1; then
+    log 'plugins (repo): settings declare no marketplaces or plugins; skipping'
+  else
+    install_plugins_from "$settings" repo
+  fi
 fi
 
 # Temp-file hygiene: without this the fetched installers — and this script

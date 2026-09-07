@@ -2,10 +2,11 @@
 
 This module is the enforceable contract for GitHub Actions workflow
 concurrency. It parses workflow YAML and checks that every
-pull-request-triggered workflow carries the canonical top-level `concurrency`
+pull-request-triggered workflow carries an accepted top-level `concurrency`
 block, so a superseding push to a pull request cancels the in-flight run before
-it consumes a runner slot, while pushes to the default branch and scheduled
-runs are never cancelled.
+it consumes a runner slot. Whether a push to the default branch or a scheduled
+run can be superseded is the fallback term's job, and that term is a
+per-repository decision the analyzer reports rather than dictates.
 
 It is read-only: it reports findings and sets the process exit status. It never
 edits a workflow, opens a pull request, or changes any GitHub setting.
@@ -27,10 +28,17 @@ npm ci --prefix .github/standards/concurrency-policy
 node .github/standards/concurrency-policy/concurrency-policy.mjs --root .
 ```
 
-## The canonical block
+## The two accepted group forms
 
 Every pull-request-triggered workflow (`on:` includes `pull_request` or
-`pull_request_target`) must declare exactly this top-level block:
+`pull_request_target`) must declare a top-level `concurrency` block whose
+`group` is one of exactly two forms: the canonical form below, or the ci-perf
+branched form in the section after it. `cancel-in-progress` is checked
+independently of which form the `group` takes.
+
+## The canonical block
+
+The canonical form is:
 
 ```yaml
 concurrency:
@@ -60,6 +68,60 @@ example; this standard tightens it to the number for that reason.
 Internal expression whitespace is tolerated in the `group` (`${{github.workflow}}`
 and `${{ github.workflow }}` are equivalent), and YAML quoting is transparent
 after parsing. The token order and identity are exact.
+
+## The ci-perf branched group
+
+The second accepted form branches the group on the contract-only predicate:
+
+```yaml
+concurrency:
+  group: >-
+    ${{ (github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base)))
+        && format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)
+        || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}
+  cancel-in-progress: true
+```
+
+Two runs of one required workflow on one head SHA otherwise share a single
+concurrency group, and GitHub cancels a pending run in that group
+unconditionally when a newer run arrives, whatever `cancel-in-progress` says. A
+contract-only run evicted while pending starts no job, so its check suite never
+receives the required check run and the pull request stops reporting until
+someone re-runs that specific run. The branched group removes that: the
+contract-only branch carries `github.run_id`, so every contract-only run has a
+group of its own and can neither be evicted nor evict anything. It costs a burst
+of one-job runs when labels flip repeatedly.
+
+The full branch keeps the canonical shape, and its **fallback term is a
+per-repository decision** rather than drift. Only two terms are admitted, and
+they mean different things for `push` and `schedule` runs, where the
+pull-request number is empty:
+
+| Fallback term | Meaning |
+| --- | --- |
+| `github.ref` | Push-side burst collapse is kept: consecutive pushes to one ref land in one group, and with `cancel-in-progress: true` a newer push supersedes the in-flight run. |
+| `github.run_id` | No push-side collapse: every push and scheduled run lands in its own group and is never superseded. |
+
+Because both are legitimate, the analyzer reports the term it found as an
+**informational** finding (`concurrency-group-fallback`, `level: "info"`) that
+never fails the gate, so a fleet check can list which repositories keep push
+collapse. The canonical form reports the same finding with `github.run_id`,
+which is the fallback it carries by construction.
+
+Whitespace is tolerated only at the two operator joins and inside the `${{ }}`
+delimiters, which is exactly where the folded scalar above differs from the same
+expression written on one line. Written as `group: >-` with the continuation
+lines more-indented, the YAML parser preserves a newline and the continuation
+indent at each join, so both spellings reach the analyzer as one string and both
+are accepted. Everything else is exact: the predicate is compared byte for byte
+against the same canonical string `cancel-in-progress` uses, the contract branch
+must carry `github.run_id`, and a fallback term outside the two above is
+`concurrency-group-drift`.
+
+This form is the Phase 6b decision of the ci-perf program, tracked at
+[melodic-software/github-iac#378](https://github.com/melodic-software/github-iac/issues/378).
+It is admitted here before the consumer repositories adopt it, because this
+component is the gate every one of those changes has to pass.
 
 ## The ci-perf contract-only shape
 
@@ -91,15 +153,28 @@ any other expression, including a reformatted or reordered copy of this one, is
 `concurrency-cancel-missing` as before. The accepted set is exactly two values:
 the literal `true` and the string above.
 
+This text is kept for repositories that have not yet been reshaped onto the
+branched group. A repository that has moves to a plain `cancel-in-progress: true`,
+because the branched group already isolates every contract-only run and a
+non-literal flag no longer buys anything. Both remain accepted, so the fleet can
+migrate one repository at a time.
+
 ## What it checks
 
 For each pull-request-triggered workflow that is not excepted:
 
 - `concurrency-missing`: no top-level `concurrency` block.
-- `concurrency-group-drift`: the `group` is not the canonical expression (for
-  example `${{ github.workflow }}-${{ github.ref }}`, which lets two
-  default-branch or scheduled runs cancel each other, or the `head_ref` variant
-  above).
+- `concurrency-group-drift`: the `group` is neither the canonical expression nor
+  the ci-perf branched form (for example `${{ github.workflow }}-${{ github.ref }}`,
+  which lets two default-branch or scheduled runs cancel each other; the
+  `head_ref` variant above; a branched group whose predicate differs from the
+  canonical string by one byte; a fallback term other than `github.ref` or
+  `github.run_id`; or a contract branch that omits `github.run_id`).
+- `concurrency-group-fallback`: informational, never blocking. Names the group
+  form and the fallback term the workflow carries, so a fleet check can list
+  which repositories keep push-side burst collapse. It is the only `info`-level
+  finding; the command line prints it on stdout and still exits `0`, and
+  `--json` reports `"ok": true`.
 - `concurrency-cancel-missing`: `cancel-in-progress` is neither the literal
   `true` nor the ci-perf contract-only expression above.
 - `concurrency-malformed`: `concurrency` is neither a group string nor a

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Report-only fleet drift check for the plugin catalog each repo declares.
 #
-# The baseline is this repository's own committed .claude/settings.json —
-# standards dogfoods the fleet-standard catalog, so its enabledPlugins set and
+# The baseline is the fleet cloud plugin list,
+# components/cloud-environment/fleet-plugins.json — the settings-shaped file
+# every cloud snapshot installs at user scope, so its enabledPlugins set and
 # marketplace declarations are the reference. Each target repository's checked
-# in .claude/settings.json is the per-repo source of truth (cloud sessions
-# install exactly what it declares); this script only makes divergence from
-# the baseline visible, it never edits anything. A repo may diverge on
-# purpose — the signal is the diff existing, not the diff being wrong.
+# in .claude/settings.json carries what that repo declares beyond the fleet
+# (and, until it drops its mirrored block, the whole fleet again); this script
+# only makes divergence from the baseline visible, it never edits anything. A
+# repo may diverge on purpose — the signal is the diff existing, not the diff
+# being wrong.
 #
 # Usage:
 #   distribution/check-plugin-baseline.sh [owner/repo ...]
@@ -17,13 +19,21 @@
 #   distribution/check-plugin-baseline.sh --compare <baseline.json> <candidate.json>
 #     Offline single comparison between two settings files (also what the
 #     test exercises).
+#   distribution/check-plugin-baseline.sh --compare-catalog <catalog.json> <settings.json> <marketplace>
+#     Offline coverage of one marketplace catalog by one settings file.
+#   distribution/check-plugin-baseline.sh --compare-seed <seed.json> [baseline.json]
+#     Offline comparison of the fleet list against a dotfiles seed
+#     (.chezmoidata/claude.json, claudeSettings.seed.enabledPlugins): the
+#     personal-machine list and the cloud list are two files on purpose, and
+#     this is what keeps them from drifting apart unnoticed.
 #
 # Exit status: 0 always in report mode (drift is a signal, not a failure);
-# --compare exits 1 when the candidate diverges, so callers can script it.
+# the --compare* modes exit 1 when the candidate diverges, so callers can
+# script them.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
-baseline="$root/.claude/settings.json"
+baseline="$root/components/cloud-environment/fleet-plugins.json"
 
 # compare_settings <baseline.json> <candidate.json> <label>
 # Prints the candidate's divergence from the baseline: enabledPlugins entries
@@ -35,49 +45,34 @@ DIVERGED=0
 compare_settings() {
   local base="$1" cand="$2" label="$3" diverged=0 line
 
-  local missing extra
+  # One jq pass emits every divergence as a tagged line so the two settings
+  # files are parsed once rather than three times (enabledPlugins missing,
+  # enabledPlugins extra, marketplace keys/sources). compare_catalog already
+  # uses this tagged-row shape.
   # tr -d '\r' throughout: a Windows jq emits CRLF, and a carried CR corrupts
   # the reported names (and, in fleet mode, the repo slug handed to gh api).
-  missing=$(jq -r --slurpfile b "$base" '
+  local diff
+  diff=$(jq -r --slurpfile b "$base" '
     ([$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
-     - [.enabledPlugins // {} | to_entries[] | select(.value == true) | .key])[]' \
-    "$cand" 2>/dev/null | tr -d '\r' || true)
-  extra=$(jq -r --slurpfile b "$base" '
-    ([.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
-     - [$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key])[]' \
-    "$cand" 2>/dev/null | tr -d '\r' || true)
-
-  while IFS= read -r line; do
-    [[ -n "$line" ]] || continue
-    printf '%s: missing vs baseline: %s\n' "$label" "$line"
-    diverged=1
-  done <<EOF
-$missing
-EOF
-  while IFS= read -r line; do
-    [[ -n "$line" ]] || continue
-    printf '%s: beyond baseline: %s\n' "$label" "$line"
-    diverged=1
-  done <<EOF
-$extra
-EOF
-
-  local mp_diff
-  mp_diff=$(jq -r --slurpfile b "$base" '
-    (.extraKnownMarketplaces // {}) as $c
-    | ($b[0].extraKnownMarketplaces // {}) as $bm
-    | ( ($bm | keys) - ($c | keys) | map("marketplace missing vs baseline: " + .) )
-      + ( ($c | keys) - ($bm | keys) | map("marketplace beyond baseline: " + .) )
-      + ( [ ($bm | keys)[] as $k
-            | select(($c[$k] != null) and ($c[$k].source != $bm[$k].source))
-            | "marketplace source differs: " + $k ] )
+     - [.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+     | map("missing vs baseline: " + .))
+    + ([.enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+       - [$b[0].enabledPlugins // {} | to_entries[] | select(.value == true) | .key]
+       | map("beyond baseline: " + .))
+    + ((.extraKnownMarketplaces // {}) as $c
+       | ($b[0].extraKnownMarketplaces // {}) as $bm
+       | (($bm | keys) - ($c | keys) | map("marketplace missing vs baseline: " + .))
+         + (($c | keys) - ($bm | keys) | map("marketplace beyond baseline: " + .))
+         + ([($bm | keys)[] as $k
+             | select(($c[$k] != null) and ($c[$k].source != $bm[$k].source))
+             | "marketplace source differs: " + $k]))
     | .[]' "$cand" 2>/dev/null | tr -d '\r' || true)
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     printf '%s: %s\n' "$label" "$line"
     diverged=1
   done <<EOF
-$mp_diff
+$diff
 EOF
 
   if [[ "$diverged" -eq 0 ]]; then
@@ -130,7 +125,50 @@ EOF
   return 0
 }
 
-# Both modes judge with jq; a missing jq or an unparsable settings file must
+# compare_seed <baseline.json> <seed.json> <label>
+# Compares the fleet list with a dotfiles seed (.chezmoidata/claude.json),
+# restricted to the marketplaces the fleet list declares: a fleet plugin the
+# seed never names, a fleet plugin the seed sets to false (a personal opt-out,
+# reported as such, not as drift), and a seed entry set to true for a fleet
+# marketplace that the fleet list does not carry. A seed false for a plugin
+# outside the fleet list is an opt-out of nothing and is not reported.
+# Entries for other marketplaces are the seed's own business. Always returns
+# 0 (.shellcheckrc's SC2310); divergence signals through DIVERGED.
+compare_seed() {
+  local base="$1" seed="$2" label="$3" diverged=0 line
+
+  local diff
+  diff=$(jq -r --slurpfile b "$base" '
+    ($b[0].extraKnownMarketplaces // {} | keys) as $mps
+    | ($b[0].enabledPlugins // {} | to_entries | map(select(.value == true) | .key)) as $fleet
+    | (.claudeSettings.seed.enabledPlugins // {}) as $seed
+    | ($seed | to_entries
+        | map(select(.key | split("@") | .[1:] | join("@") | IN($mps[])))) as $scoped
+    | ($scoped | map(.key)) as $seed_keys
+    | ($scoped | map(select(.value == true) | .key)) as $seed_enabled
+    | ($scoped | map(select(.value == false) | .key)) as $opted_out
+    | (($fleet - $seed_keys) | map("in fleet list, not in seed: " + .))
+      + (($fleet - ($fleet - $opted_out)) | map("in fleet list, seed opts out: " + .))
+      + (($seed_enabled - $fleet) | map("in seed, not in fleet list: " + .))
+    | .[]' "$seed" 2>/dev/null | tr -d '\r' || true)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    printf '%s: %s\n' "$label" "$line"
+    diverged=1
+  done <<EOF
+$diff
+EOF
+
+  if [[ "$diverged" -eq 0 ]]; then
+    printf '%s: matches the fleet list\n' "$label"
+  else
+    DIVERGED=1
+  fi
+  return 0
+}
+
+# Every mode judges with jq; a missing jq or an unparsable settings file must
 # be a loud usage error, never an empty diff read as "matches baseline".
 command -v jq >/dev/null 2>&1 || {
   echo 'check-plugin-baseline: jq is required' >&2
@@ -153,6 +191,18 @@ if [[ "${1:-}" == "--compare-catalog" ]]; then
   require_parses "$2" 'catalog'
   require_parses "$3" 'settings'
   compare_catalog "$2" "$3" "$4" "$(basename "$3")"
+  exit "$DIVERGED"
+fi
+
+if [[ "${1:-}" == "--compare-seed" ]]; then
+  [[ $# -eq 2 || $# -eq 3 ]] || {
+    echo 'usage: check-plugin-baseline.sh --compare-seed <seed.json> [baseline.json]' >&2
+    exit 2
+  }
+  seed_base="${3:-$baseline}"
+  require_parses "$2" 'seed'
+  require_parses "$seed_base" 'baseline'
+  compare_seed "$seed_base" "$2" "$(basename "$2")"
   exit "$DIVERGED"
 fi
 

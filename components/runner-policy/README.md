@@ -771,6 +771,155 @@ waiver is needed or wanted: the calling job stays on the ordinary read-only
 boundary. A later revision is a second entry keyed at its own SHA, or the
 Dependabot auto-approval path when the compared surface is unchanged, for
 which this contract is eligible because its `allowedSecrets` mapping is empty.
+Three contracts are registered at
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0), the ci-perf wave tag the
+distributed components converge on: both claude lanes and `checks`. The lane
+entries copy their `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2) terms
+forward verbatim, and `checks` copies its
+`b260ba091ca89bb3292eb53abea07ca8f0a51bf1` (v0.21.0) terms forward verbatim.
+Nothing widens: no entry gains an input, a secret, a routing surface, or a
+caller permission. `checks.yml` is byte-identical between the two revisions, so
+the second entry exists only so a caller may name the converged SHA. The two
+lanes each changed by exactly three `uses:` lines and nothing else: two
+`anthropics/claude-code-action` pins moving from v1.0.198 to v1.0.215, and one
+`claude-lane-outcome` composite pin moving to the revision v0.22.0 carries.
+Every `on.workflow_call` input, secret, job permission and `runs-on` expression
+is unchanged. Auto-approval declined for the familiar reason: those action pins
+sit inside the steps that pass `claude_code_oauth_token`, which the
+credential-references surface records in full, so an action pin bump on a
+credential-consuming step reads as a `credentialReferences` diff and the
+contract entries are written by human review instead. The secret mapping itself
+is still only
+`claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. The
+`managed-files-guard` caller re-pins to the same tag with no policy entry at
+all, because it calls a composite action rather than a reusable workflow and
+composite actions are not SHA-allowlisted; its `action.yml` is byte-identical
+between `3b2f4eab5b4bb58a150e400613350ede37742ee8` and the tag.
+Two further contracts are registered at the same tag,
+`link-check` and `issue-triage-label`, so the repositories that call them can
+converge too. Those two are neither claude lanes nor distributed by this
+repository, so the first convergence change did not carry them, and their
+callers (claude-code-plugins for both, `.github` and github-iac for
+`link-check`) had to hold their old pins: `reusableWorkflowStatus` fails closed
+on an unreviewed `path@SHA`, and the Dependabot auto-approval path declines any
+contract naming `allowedCallerPermissions`, which both of these do. Each copies
+its predecessor's terms verbatim, `link-check` from
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` and `issue-triage-label` from
+`c5e729c0af0e55ffed4675ec85c1b57356fef79e`, and neither widens. Verified at the
+tag through the contents API: `issue-triage-label.yml` is byte-identical to its
+predecessor, and `link-check.yml`'s `on.workflow_call` declaration, workflow
+permissions, job permissions and `runs-on: ${{ inputs.runner }}` routing are all
+identical, the whole diff being a port of its tracking-issue steps from the `gh`
+CLI to `actions/github-script`. That port is why the surface diff declines: it
+rewrites credential-bearing steps, which the credential-references surface
+records in full. It also removes a dependency on the runner image shipping the
+`gh` CLI, which a self-hosted image is not guaranteed to do, so the caller-side
+effect of the bump is that the lane becomes safe to route to the managed
+fleet.
+Two last reusable contracts are registered at the same tag, `osv-scanner` and
+`zizmor`, the two this repository's own `ci.yml` still called at pre-tag
+revisions and the two that blocked its convergence for the same fail-closed
+reason. `osv-scanner` copies its terms from
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f` and nothing widens: its
+`on.workflow_call` declaration, workflow and job `permissions`, and
+`runs-on: ${{ inputs.runner }}` routing are byte-identical at the tag, and
+`allowedInputs` stays `["runner"]`, the whole of what every caller in the fleet
+passes. It adds one term the predecessor lacks, a `minimumCallerPermissions`
+floor of `contents: read`, on the pattern the v0.14.2 review used for
+`do-not-merge-gate`, `semantic-pr` and `pr-issue-linkage`: the workflow's own
+`permissions:` block requests `contents: read`, a called workflow can only
+narrow the caller's token, so a caller granting less would pass policy and then
+fail inside the callee with no repository to read. The floor narrows rather
+than widens, it is read-only as the validator requires, and every
+`osv-scanner` caller in the fleet already grants exactly `contents: read`, so
+it blocks nobody. The predecessor entry is left as it was reviewed.
+`zizmor` is the one contract in this wave that is **not** a verbatim
+copy. Its routing, runner input, `allowedInputs`
+(`["runner", "paths", "fail-on-severity"]`) and empty secret map all copy from
+`31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`, and it adds one term: an
+`allowedCallerPermissions` of `contents: read` and `security-events: write`.
+The tag's `zizmor` job declares `security-events: write` unconditionally,
+because the new `upload-sarif` input keeps its upload step gated but
+expressions are not legal in a `permissions:` scope, and a called workflow can
+only narrow the caller's `GITHUB_TOKEN` and never widen it. So every caller has
+to grant that scope for the job to start, and without the waiver the ordinary
+read-only caller boundary rejects it. That waiver is not new ground: the
+contract at `7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2), the last
+revision whose `zizmor` job declared the scope, carries exactly the same term,
+and the tag's entry is term-for-term equal to it. `upload-sarif` stays out of
+`allowedInputs` for the reason recorded at v0.14.2: uploading SARIF is a
+separate review, and no caller passes it.
+The consequence for consumers is one line of caller change. Because
+`allowedCallerPermissions` is an exact match, every `zizmor` caller that grants
+only `contents: read` today, this repository, dotfiles and github-iac, must add
+`security-events: write` and nothing else in its convergence pull request;
+provisioning and ci-runner already grant exactly that pair.
+All seven of those reusables are registered a second time at the v0.22.1 patch
+tag `cd2f4e6d500e7923c0db521b4d10034d36331ed3`, so the wave repositories that
+pin the patch can call them: `checks`, `claude-review`,
+`claude-security-review`, `link-check`, `issue-triage-label`, `zizmor` and
+`osv-scanner`. Every entry copies its v0.22.0 terms verbatim, and nothing
+widens. Read at both revisions through the contents API, six of the seven are
+byte-identical, and the seventh, `checks.yml`, differs by exactly thirteen
+`uses:` lines and nothing else: its own composite steps re-pin from
+`449157aaa8e30f7b1457305d8048ebe6168e174a` (v0.20.0) to
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0), the self-referential lag
+the repin lane closes one release behind. No `on.workflow_call` declaration,
+workflow `permissions`, job `permissions`, step `if` or `runs-on` expression
+moved on any of the seven, so the caller-facing contract is unchanged. Those
+thirteen composite pins are also why auto-approval declines rather than a
+widened surface: the credential-references and step surfaces record a
+`uses:` line in full, so a pin bump reads as a diff and the entries are written
+by review instead. The v0.22.0 entries stay as they were reviewed; the patch
+tag is an addition, not a replacement, and the distributed caller templates
+under `components/claude-lanes/` and `managed-files-guard` are deliberately not
+moved here, because the non-wave consumers converge on their own change.
+Those same seven are registered a third time at the v0.22.2 patch tag
+`5776760254f8b63cba44e896f51604cb755350d9`, and this time the distributed
+caller templates move with them, because this is the change that converges the
+non-wave consumers. `compare/cd2f4e6d500e7923c0db521b4d10034d36331ed3...5776760254f8b63cba44e896f51604cb755350d9`
+touches only `.claude/cloud-bootstrap.sh`, `.github/actionlint.yaml`, the
+`ci-status` composite, and ci-workflows' own `ci.yml` and `README.md`, so every
+one of the seven is **byte-identical** at the two revisions, read at both
+through the contents API and compared with `diff`. `checks.yml` is byte-identical
+this time as well, unlike at v0.22.1: its thirteen composite steps stayed at
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4`, because the repin lane closes that
+self-referential lag one release behind and v0.22.2 is a patch on the same
+composites. Every entry copies its v0.22.1 terms verbatim and nothing widens.
+The v0.22.1 and older entries stay as they were reviewed: this allowlist is
+historical, and an older approved revision for the same path is what lets a
+consumer that has not yet converged keep passing.
+An eighth entry registers `pulumi-version-drift-check` at the same tag, and it
+is the one contract here that is **not** a copy of a v0.22.x predecessor,
+because none exists: the newest approved revision for that path is
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f`, which github-iac's caller still
+pins. It is derived rather than copied, and the derivation is that the
+caller-facing surface did not move. `on.workflow_call.inputs` is `runner` alone
+at both revisions, with the same `type: string` and `default: ubuntu-24.04`;
+there is no `on.workflow_call.secrets` block at either; workflow `permissions`
+is `{}` at both; the `drift-check` job declares `contents: read` plus
+`issues: write` at both; and `runs-on` is `${{ inputs.runner }}` at both. The
+whole diff between the two revisions is inside one step body: the drift
+detection and tracking-issue lifecycle port from a generated bash script driving
+the `gh` CLI onto `actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3`
+(v9.0.0), which also drops the runner-image dependency on `gh`, `jq`, `date`,
+`timeout` and `mktemp`, plus an `actions/checkout` bump from v7.0.0 to v7.0.1.
+That port is exactly why auto-approval cannot carry it: the credential-references
+surface records a credential-bearing step in full, so a rewritten step reads as a
+diff and the entry is written by review. The derived terms are therefore
+term-for-term equal to the `90f1c54935203fa31b5b3d1f41531228be2c2b7f` entry,
+including its `allowedCallerPermissions` exact match of `contents: read` plus
+`issues: write`, and nothing widens.
+Two reusables that a v0.22.2 entry would otherwise be expected to cover are
+deliberately absent: `standards-sync` and `standards-sync-stuck-automerge-alert`.
+Neither has a v0.22.x entry at any revision, and this repository's own callers
+stay at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2). The
+`repin-policy-lockstep` decline reason for the first of them,
+"`standards-sync.yml` old revision job `sync` references `needs` in a
+routing-relevant field, which cannot be safely diffed for auto-approval", is
+still unanswered, and bumping the sync reusable inside a change whose own merge
+triggers the fan-out would put an untested sync engine on the critical path.
+Both wait for a later decision that answers the `needs` question first.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling

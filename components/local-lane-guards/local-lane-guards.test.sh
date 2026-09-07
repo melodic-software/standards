@@ -57,6 +57,86 @@ git -C "$tmpdir/exec-bad" commit -qm 'bad shebang'
 )
 assert_exit 'exec-bit fails a 100644 shebang' 1 "$?"
 
+# Pin the `git grep -z -n` record git-grep(1) under-specifies: `-z` is
+# documented as delimiting pathnames, but with `-n` the line number is
+# also NUL-separated (`path\0lineno\0text\n`), not `path\0lineno:text\n`.
+# Capture via a pipe — a bash variable cannot hold NUL. `tr` is the
+# identity that makes the two NULs visible to assert_eq.
+layout_vis="$(
+  git -C "$tmpdir/exec-bad" -c core.quotePath=false grep --cached -z -nIE '^#!' -- . \
+    | tr '\0' '|'
+)"
+assert_eq 'git grep -z -n is path NUL lineno NUL text LF' \
+  'bad.sh|1|#!/usr/bin/env bash' \
+  "$layout_vis"
+
+# A `#!` past line 1 is not a shebang file (docs, fenced examples). The
+# previous cat-file byte-0 check skipped these; line-number 1 is the same
+# filter without a per-candidate blob read.
+make_repo "$tmpdir/exec-not-byte0"
+# shellcheck disable=SC2016 # backticks and #! are fixture content, not expansion
+printf 'example:\n```\n#!/usr/bin/env bash\necho demo\n```\n' >"$tmpdir/exec-not-byte0/README.md"
+git -C "$tmpdir/exec-not-byte0" add README.md
+git -C "$tmpdir/exec-not-byte0" commit -qm 'embedded shebang example'
+(
+  cd "$tmpdir/exec-not-byte0" || exit 1
+  bash "$DISPATCH" exec-bit >/dev/null
+)
+assert_exit 'exec-bit ignores a #! that is not at byte 0' 0 "$?"
+
+# Spawn census: N shebang files must not spawn N git ls-files / cat-file.
+# Drift-immune counter, same PATH-shim method as distribution/sync-manifest.test.sh.
+spawn_dir="$tmpdir/exec-spawn"
+make_repo "$spawn_dir"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf '#!/usr/bin/env bash\necho %s\n' "$i" >"$spawn_dir/s$i.sh"
+  git -C "$spawn_dir" add "s$i.sh"
+  git -C "$spawn_dir" update-index --chmod=+x -- "s$i.sh"
+  i=$((i + 1))
+done
+git -C "$spawn_dir" commit -qm 'eight shebang files'
+mkdir -p "$spawn_dir/bin"
+cat >"$spawn_dir/bin/git" <<'SH'
+#!/usr/bin/env bash
+REAL_GIT="${REAL_GIT:?}"
+COUNT_DIR="${COUNT_DIR:?}"
+for argument in "$@"; do
+  case "$argument" in
+  grep)
+    echo $(($(cat "$COUNT_DIR/grep" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/grep"
+    ;;
+  ls-files)
+    echo $(($(cat "$COUNT_DIR/ls-files" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/ls-files"
+    ;;
+  cat-file)
+    echo $(($(cat "$COUNT_DIR/cat-file" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/cat-file"
+    ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$spawn_dir/bin/git"
+: >"$spawn_dir/grep"
+: >"$spawn_dir/ls-files"
+echo 0 >"$spawn_dir/cat-file"
+real_git="$(command -v git)"
+(
+  cd "$spawn_dir" || exit 1
+  COUNT_DIR="$spawn_dir" REAL_GIT="$real_git" PATH="$spawn_dir/bin:$PATH" \
+    bash "$DISPATCH" exec-bit >/dev/null
+)
+assert_exit 'exec-bit passes eight 100755 shebang files under a git shim' 0 "$?"
+assert_eq 'exec-bit greps the index once' '1' "$(cat "$spawn_dir/grep")"
+assert_eq 'exec-bit batches staged-mode reads into one ls-files' '1' "$(cat "$spawn_dir/ls-files")"
+assert_eq 'exec-bit does not cat-file per candidate' '0' "$(cat "$spawn_dir/cat-file")"
+if grep -E '^[[:space:]]*declare[[:space:]]+-A' "$HERE/check-exec-bit.sh" >/dev/null; then
+  fail 'exec-bit stays bash-3.2-safe (no declare -A)' \
+    'found a declare -A assignment (comments may mention the forbidden form)'
+else
+  pass 'exec-bit stays bash-3.2-safe (no declare -A)'
+fi
+
 # --- machine-specific-paths ---
 make_repo "$tmpdir/path-clean"
 printf 'root = <repo-root>/src\n' >"$tmpdir/path-clean/config.ini"
@@ -77,11 +157,71 @@ home_root="/ho"'me'"/$user"
 printf 'root = %s/project/src\n' "$home_root" >"$tmpdir/path-bad/config.ini"
 git -C "$tmpdir/path-bad" add config.ini
 git -C "$tmpdir/path-bad" commit -qm 'machine path'
-(
+path_bad_rc=0
+path_bad_out="$(
   cd "$tmpdir/path-bad" || exit 1
-  bash "$DISPATCH" machine-specific-paths >/dev/null 2>&1
+  bash "$DISPATCH" machine-specific-paths 2>&1
+)" || path_bad_rc=$?
+assert_exit 'machine-specific-paths fails a Linux home path' 1 "$path_bad_rc"
+assert_contains 'machine-specific-paths labels a Linux home hit' "$path_bad_out" 'Linux user path'
+
+# Start-of-line home path must still classify: PATH_BOUNDARY's `^` is vs
+# the file line, not the `path:lineno:` prefix git grep prints.
+make_repo "$tmpdir/path-bol"
+printf '%s/project/src\n' "$home_root" >"$tmpdir/path-bol/notes.txt"
+git -C "$tmpdir/path-bol" add notes.txt
+git -C "$tmpdir/path-bol" commit -qm 'bol machine path'
+path_bol_rc=0
+path_bol_out="$(
+  cd "$tmpdir/path-bol" || exit 1
+  bash "$DISPATCH" machine-specific-paths 2>&1
+)" || path_bol_rc=$?
+assert_exit 'machine-specific-paths fails a start-of-line Linux home path' 1 "$path_bol_rc"
+assert_contains 'start-of-line Linux home still labeled' "$path_bol_out" 'Linux user path'
+
+# Spawn census: five OS/repo bodies used to be five git greps. One combined
+# grep classifies hits in-process. Drift-immune PATH shim, same method as
+# the exec-bit census above.
+path_spawn="$tmpdir/path-spawn"
+make_repo "$path_spawn"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf 'root = %s/p%s/src\n' "$home_root" "$i" >"$path_spawn/c$i.ini"
+  git -C "$path_spawn" add "c$i.ini"
+  i=$((i + 1))
+done
+git -C "$path_spawn" commit -qm 'eight machine paths'
+mkdir -p "$path_spawn/bin"
+echo 0 >"$path_spawn/grep"
+echo 0 >"$path_spawn/head"
+real_git="$(command -p -v git)"
+cat >"$path_spawn/bin/git" <<'SH'
+#!/bin/bash
+REAL_GIT="${REAL_GIT:?}"
+COUNT_DIR="${COUNT_DIR:?}"
+for argument in "$@"; do
+  case "$argument" in
+  grep)
+    echo $(($(<"$COUNT_DIR/grep") + 1)) >"$COUNT_DIR/grep"
+    ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+SH
+cat >"$path_spawn/bin/head" <<'SH'
+#!/bin/bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(<"$COUNT_DIR/head") + 1)) >"$COUNT_DIR/head"
+exec "$(command -p -v head)" "$@"
+SH
+chmod +x "$path_spawn/bin/git" "$path_spawn/bin/head"
+(
+  cd "$path_spawn" || exit 1
+  COUNT_DIR="$path_spawn" REAL_GIT="$real_git" PATH="$path_spawn/bin:$PATH" \
+    bash "$DISPATCH" machine-specific-paths >/dev/null 2>&1 || true
 )
-assert_exit 'machine-specific-paths fails a Linux home path' 1 "$?"
+assert_eq 'machine-specific-paths greps the index once' '1' "$(cat "$path_spawn/grep")"
+assert_eq 'machine-specific-paths does not spawn head to cap output' '0' "$(cat "$path_spawn/head")"
 
 # --- comment-hygiene ---
 make_repo "$tmpdir/ch-clean"
@@ -103,6 +243,35 @@ git -C "$tmpdir/ch-bad" commit -qm 'todo comment'
   bash "$DISPATCH" comment-hygiene >/dev/null 2>&1
 )
 assert_exit 'comment-hygiene fails a TODO comment' 1 "$?"
+
+# Spawn census: N git-grep comment hits must not spawn N awk (single-line
+# fast path in the policy library). Drift-immune PATH shim, same method as
+# the exec-bit census above.
+ch_spawn="$tmpdir/ch-spawn"
+make_repo "$ch_spawn"
+i=1
+while [[ "$i" -le 8 ]]; do
+  printf '# TODO: item %s\necho %s\n' "$i" "$i" >"$ch_spawn/c$i.sh"
+  git -C "$ch_spawn" add "c$i.sh"
+  i=$((i + 1))
+done
+git -C "$ch_spawn" commit -qm 'eight todo comments'
+mkdir -p "$ch_spawn/bin"
+echo 0 >"$ch_spawn/awk"
+real_awk="$(command -p -v awk)"
+cat >"$ch_spawn/bin/awk" <<'SH'
+#!/bin/bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(<"$COUNT_DIR/awk") + 1)) >"$COUNT_DIR/awk"
+exec "$REAL_AWK" "$@"
+SH
+chmod +x "$ch_spawn/bin/awk"
+(
+  cd "$ch_spawn" || exit 1
+  COUNT_DIR="$ch_spawn" REAL_AWK="$real_awk" PATH="$ch_spawn/bin:$PATH" \
+    bash "$DISPATCH" comment-hygiene >/dev/null 2>&1 || true
+)
+assert_eq 'comment-hygiene does not spawn awk per git-grep hit' '0' "$(cat "$ch_spawn/awk")"
 
 # --- reference-integrity ---
 make_repo "$tmpdir/ref-clean"

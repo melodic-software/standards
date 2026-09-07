@@ -70,6 +70,90 @@ fi
 assert_contains 'bootstrap reads the fallback stamp path cloud-environment writes' \
   "$(cat "$script")" "$fallback_path"
 
+# Cross-component lockstep: the fleet plugin list this script installs from is
+# the snapshot path (and /tmp fallback) the cloud-environment component writes
+# at cache build, and the repo declaration stays as the fallback source.
+fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$env_setup")"
+if [[ -n "$fleet_path" ]]; then
+  pass 'cloud-environment setup.sh declares a fleet list snapshot path'
+else
+  fail 'cloud-environment setup.sh declares a fleet list snapshot path' \
+    "no FLEET_PLUGINS='...' assignment found"
+fi
+assert_contains 'bootstrap reads the fleet list path cloud-environment writes' \
+  "$(cat "$script")" "$fleet_path"
+fleet_fallback="$(sed -n "s/^FLEET_PLUGINS_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
+if [[ -n "$fleet_fallback" ]]; then
+  pass 'cloud-environment setup.sh declares a fleet list fallback path'
+else
+  fail 'cloud-environment setup.sh declares a fleet list fallback path' \
+    "no FLEET_PLUGINS_FALLBACK='...' assignment found"
+fi
+assert_contains 'bootstrap reads the fleet list fallback path cloud-environment writes' \
+  "$(cat "$script")" "$fleet_fallback"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'bootstrap keeps the repo enabledPlugins block as a source' \
+  "$(cat "$script")" 'install_plugins_from "$settings"'
+
+# Runtime behaviour of the catalog inventory with the repo settings file
+# absent: the fleet list alone must still name the catalog gap. Driven with a
+# stub `claude` on PATH, a fleet list at the /tmp fallback path, and a
+# scratch repo with no .claude/settings.json.
+inv_tmp="$(mktemp -d)"
+mkdir -p "$inv_tmp/bin" "$inv_tmp/mp/.claude-plugin" "$inv_tmp/repo"
+cat >"$inv_tmp/mp/.claude-plugin/marketplace.json" <<'JSON'
+{ "plugins": [ { "name": "alpha" }, { "name": "beta" }, { "name": "newcomer" } ] }
+JSON
+cat >"$inv_tmp/fleet.json" <<'JSON'
+{
+  "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
+  "enabledPlugins": { "alpha@stub-market": true, "beta@stub-market": true }
+}
+JSON
+cat >"$inv_tmp/bin/claude" <<STUB
+#!/usr/bin/env bash
+COUNT_DIR="${inv_tmp}/counts"
+mkdir -p "\$COUNT_DIR"
+case "\$1 \$2 \$3" in
+  "plugin marketplace list")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    printf '[{"name":"stub-market","installLocation":"%s"}]\n' "$inv_tmp/mp"
+    ;;
+  "plugin list "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    printf '[{"id":"alpha@stub-market"},{"id":"beta@stub-market"}]\n'
+    ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$inv_tmp/bin/claude"
+# The fleet list path is the /opt constant when writable, else the /tmp
+# fallback; the test uses whichever it can write, and cleans up after.
+inv_fleet=''
+for candidate in "$fleet_path" "$fleet_fallback"; do
+  if [[ ! -e "$candidate" ]] && cp "$inv_tmp/fleet.json" "$candidate" 2>/dev/null; then
+    inv_fleet="$candidate"
+    break
+  fi
+done
+if [[ -n "$inv_fleet" ]]; then
+  inv_out="$(cd "$inv_tmp/repo" && git init -q . && PATH="$inv_tmp/bin:$PATH" \
+    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/repo" bash "$script" 2>&1 >/dev/null)"
+  rm -f "$inv_fleet"
+  assert_contains 'fleet list installs are summarised when the repo settings file is absent' \
+    "$inv_out" 'fleet list'
+  assert_contains 'catalog gap is still named from the fleet list alone' \
+    "$inv_out" 'stub-market carries plugins this repo does not declare: newcomer'
+  assert_eq 'warm catalog inventory lists marketplaces once' '1' \
+    "$(cat "$inv_tmp/counts/marketplace-list")"
+  assert_eq 'warm catalog inventory lists plugins once' '1' \
+    "$(cat "$inv_tmp/counts/plugin-list")"
+else
+  fail 'catalog inventory without repo settings is exercised' \
+    "neither $fleet_path nor $fleet_fallback was free and writable"
+fi
+rm -rf "$inv_tmp"
+
 # README/script drift guards.
 assert_contains 'README documents the materialized path' \
   "$(cat "$readme")" '.claude/cloud-bootstrap.sh'

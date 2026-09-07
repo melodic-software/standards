@@ -76,13 +76,17 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-The admitted pin is `3b2f4eab5b4bb58a150e400613350ede37742ee8`
-(2026-08-30, ci-workflows#530), the commit that closed the guard's fail-open
-on an unreadable diff: before it, an unfetched or bogus ref produced an empty
-change list and the guard passed precisely when it could not see the diff.
-No release carried that commit when this component was admitted (the newest,
-v0.17.2, is 2026-08-21), so the comment takes the convention's fallback form
-`# 3b2f4ea 2026-08-30` rather than a release tag.
+The admitted pin is `906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0). It
+supersedes `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
+ci-workflows#530), the commit that closed the guard's fail-open on an
+unreadable diff: before it, an unfetched or bogus ref produced an empty change
+list and the guard passed precisely when it could not see the diff. No release
+carried that commit when this component was admitted (the newest, v0.17.2, is
+2026-08-21), so the comment took the convention's short-SHA fallback form until
+a release contained it. v0.22.0 is that release, and
+`.github/actions/managed-files-guard/action.yml` is byte-identical between the
+two revisions, so the pin now carries the release-tag comment form and nothing
+the guard executes changed.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
@@ -117,9 +121,9 @@ Two properties of that ride are deliberate:
   string. Without that fence the very next scheduled run would have proposed
   moving this file from `3b2f4ea` (2026-08-30) back to v0.17.2 (2026-08-21),
   behind the fail-open fix. The pin advances to the tag form on the first
-  release that contains it; until then the re-pin pull request names the
-  file in its version note and moves the lane callers only. A failed
-  compare is a hard failure, not a rewrite.
+  release that contains it, which v0.22.0 is, so the fence has now released
+  the file and it re-pins with the lane callers on every later release. A
+  failed compare is a hard failure, not a rewrite.
 - **Not in `repin-policy-lockstep.mjs`'s `REPIN_TARGETS`.** Every `kind` that
   table expresses (`selector`, `lane`, `reusable`) copies a
   `components/runner-policy/policy.json` contract forward from the old SHA to

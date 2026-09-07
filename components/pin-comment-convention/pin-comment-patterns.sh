@@ -111,6 +111,54 @@ pcc::_check_comment() {
   return 1
 }
 
+# pcc::_extract_uses [file...]
+#
+# One Mike Farah yq v4 pass over the given files (or `-` for stdin). Each
+# record is filename TAB lineno TAB line_comment TAB uses-value. `--no-doc`
+# is required: without it, multi-file `eval` prints `---` between documents
+# (yq --help; measured on this repo's 11 CI workflows), and those separators
+# would be misread as records.
+#
+# `filename` is the documented file operator
+# (https://mikefarah.gitbook.io/yq/operators/file-operators). Multi-file
+# `eval` still stops at the first parse error (yq 4.53.3), so callers that
+# must report every file's isolation fall back per-file on a non-zero exit.
+pcc::_extract_uses() {
+  yq eval --no-doc --yaml-fix-merge-anchor-to-spec=true -r '
+      explode(.) | .jobs[]
+      | (
+          (select(has("uses")) | .uses),
+          (select(has("steps")) | .steps[] | select(has("uses")) | .uses)
+        )
+      | (filename // "") + "\t" + (line | tostring) + "\t" + line_comment + "\t" + .
+    ' "$@"
+}
+
+# pcc::_classify_one <lineno> <raw_comment> <uses-value>
+#
+# Apply the pin-comment policy to one extracted `uses:` scalar. Prints
+# "lineno:kind:detail" and returns 1 on a violation; prints nothing and
+# returns 0 when the node is out of scope or already conforming.
+# Private to pcc::scan_text and scan-workflow-files.sh.
+pcc::_classify_one() {
+  local lineno="$1" comment="$2" value="$3" pinned_sha
+  local value_re='^melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-fA-F]{40}$'
+  [[ -n "$value" ]] || return 0
+  [[ "$value" =~ $value_re ]] || return 0
+  # The path segment excludes '@' (value_re), so the last '@' unambiguously
+  # separates the workflow/action path from the pinned SHA.
+  pinned_sha="${value##*@}"
+  pcc::_check_comment "$comment" "$pinned_sha" && return 0
+  if [[ -z "$comment" ]]; then
+    printf '%s:%s:%s\n' "$lineno" missing-comment "$value"
+  elif [[ "$comment" == \#* ]]; then
+    printf '%s:%s:%s\n' "$lineno" invalid-form "$comment"
+  else
+    printf '%s:%s:%s\n' "$lineno" invalid-form "# ${comment}"
+  fi
+  return 1
+}
+
 # pcc::scan_text <content>
 #
 # Scan the YAML document <content> for every `uses:` scalar node whose value
@@ -126,17 +174,9 @@ pcc::_check_comment() {
 pcc::scan_text() {
   local content="$1"
   local lineno comment value violations=0
-  local value_re='^melodic-software/ci-workflows/\.github/(workflows|actions)/[^@[:space:]]+@[0-9a-fA-F]{40}$'
-  local records
+  local records rec rest out
 
-  if ! records="$(yq eval --yaml-fix-merge-anchor-to-spec=true -r '
-      explode(.) | .jobs[]
-      | (
-          (select(has("uses")) | .uses),
-          (select(has("steps")) | .steps[] | select(has("uses")) | .uses)
-        )
-      | (line | tostring) + "\t" + line_comment + "\t" + .
-    ' - <<<"$content" 2>&1)"; then
+  if ! records="$(pcc::_extract_uses - <<<"$content" 2>&1)"; then
     pcc::_record_violation 0 yaml-parse-error "$records"
     return 1
   fi
@@ -145,31 +185,21 @@ pcc::scan_text() {
   # bash's `read` treats tab as "IFS whitespace" regardless of what IFS is
   # set to, so it coalesces the two adjacent tabs an empty comment field
   # produces and silently shifts every later field left — parameter
-  # expansion has no such collapsing behavior.
-  local rec rest pinned_sha
+  # expansion has no such collapsing behavior. The leading filename field
+  # is "-" on stdin; scan_text ignores it (the driver uses it when batching).
   while IFS= read -r rec; do
     [[ -n "$rec" ]] || continue
-    lineno="${rec%%$'\t'*}"
     rest="${rec#*$'\t'}"
+    lineno="${rest%%$'\t'*}"
+    rest="${rest#*$'\t'}"
     comment="${rest%%$'\t'*}"
     value="${rest#*$'\t'}"
 
-    [[ -n "$value" ]] || continue
-    [[ "$value" =~ $value_re ]] || continue
-    # The path segment excludes '@' (value_re), so the last '@' unambiguously
-    # separates the workflow/action path from the pinned SHA.
-    pinned_sha="${value##*@}"
-    pcc::_check_comment "$comment" "$pinned_sha" && continue
-
-    if [[ -z "$comment" ]]; then
-      pcc::_record_violation "$lineno" missing-comment "$value"
+    if out="$(pcc::_classify_one "$lineno" "$comment" "$value")"; then
       continue
     fi
-    if [[ "$comment" == \#* ]]; then
-      pcc::_record_violation "$lineno" invalid-form "$comment"
-    else
-      pcc::_record_violation "$lineno" invalid-form "# ${comment}"
-    fi
+    printf '%s\n' "$out"
+    violations=$((violations + 1))
   done <<<"$records"
 
   if [[ $violations -gt 0 ]]; then

@@ -67,6 +67,47 @@ grep -q '>"\$STAMP_FALLBACK"' "$script"
 rc=$?
 assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
+# Fleet plugin list: the settings-shaped file every snapshot installs. It must
+# parse, enable everything it names (a false entry is a per-repo delta, not a
+# fleet decision), keep its keys in byte order so a single entry can be
+# flipped without disturbing the rest, and declare every marketplace its
+# entries name.
+fleet="$root/components/cloud-environment/fleet-plugins.json"
+assert_file_exists 'fleet-plugins.json exists beside setup.sh' "$fleet"
+jq empty "$fleet" 2>/dev/null
+rc=$?
+assert_exit 'fleet-plugins.json parses' 0 "$rc"
+assert_eq 'fleet-plugins.json enables every entry it names' \
+  '0' "$(jq -r '[.enabledPlugins // {} | to_entries[] | select(.value != true)] | length' "$fleet")"
+assert_eq 'fleet-plugins.json keys are in byte order' \
+  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet" | LC_ALL=C sort)" \
+  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet")"
+assert_eq 'fleet-plugins.json declares every marketplace its entries name' \
+  '' "$(jq -r '(.extraKnownMarketplaces // {} | keys) as $mps
+    | [.enabledPlugins // {} | keys[] | split("@") | .[1:] | join("@")] | unique
+    | map(select(IN($mps[]) | not)) | .[]' "$fleet")"
+
+# Fetch lockstep: the URL setup.sh fetches must name the file this repository
+# publishes, at the same host the README's bootstrap already relies on.
+fleet_url="$(sed -n "s/^FLEET_PLUGINS_URL='\(.*\)'\$/\1/p" "$script")"
+assert_eq 'setup.sh fetches the fleet list from its published path' \
+  'https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json' \
+  "$fleet_url"
+fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$script")"
+if [[ -n "$fleet_path" ]]; then
+  pass 'setup.sh declares the snapshot path for the fleet list'
+else
+  fail 'setup.sh declares the snapshot path for the fleet list' "no FLEET_PLUGINS='...' assignment found"
+fi
+# shellcheck disable=SC2016 # the $ is a literal in the grep pattern
+grep -q '>"\$FLEET_PLUGINS_FALLBACK"\|-o "\$FLEET_PLUGINS_FALLBACK"' "$script"
+rc=$?
+assert_exit 'setup.sh falls back when the snapshot path for the fleet list is unwritable' 0 "$rc"
+assert_contains 'README documents the fleet list snapshot path' \
+  "$(cat "$readme")" "$fleet_path"
+assert_contains 'README documents the fleet list file' \
+  "$(cat "$readme")" 'fleet-plugins.json'
+
 # README/script drift guards.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
 if [[ -n "$stamp_path" ]]; then
@@ -111,5 +152,71 @@ assert_contains 'README documents the gh version the script installs' \
 assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
+
+# Spawn census: fleet + repo installs must share one marketplace list and one
+# plugin list. Sourced via MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks
+# do not run. Membership is in-process (no grep -qxF per entry).
+plug_tmp="$(mktemp -d)"
+# Do not `shellcheck source=` this: LIBONLY returns immediately, and following
+# it marks the census body unreachable (SC2317).
+# shellcheck disable=SC1090,SC1091
+MELODIC_SETUP_LIBONLY=1 source "$script"
+mkdir -p "$plug_tmp/bin" "$plug_tmp/counts"
+cat >"$plug_tmp/bin/claude" <<STUB
+#!/usr/bin/env bash
+COUNT_DIR="${plug_tmp}/counts"
+mkdir -p "\$COUNT_DIR"
+case "\$1 \$2 \$3" in
+  "plugin marketplace list")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    printf '[{"name":"stub-market"}]\n'
+    ;;
+  "plugin list "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    printf '[{"id":"alpha@stub-market"}]\n'
+    ;;
+  "plugin marketplace add")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-add" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-add"
+    ;;
+  "plugin install "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-install" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-install"
+    ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$plug_tmp/bin/claude"
+echo 0 >"$plug_tmp/counts/marketplace-list"
+echo 0 >"$plug_tmp/counts/plugin-list"
+echo 0 >"$plug_tmp/counts/marketplace-add"
+echo 0 >"$plug_tmp/counts/plugin-install"
+cat >"$plug_tmp/fleet.json" <<'JSON'
+{
+  "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
+  "enabledPlugins": { "alpha@stub-market": true, "beta@stub-market": true }
+}
+JSON
+cat >"$plug_tmp/repo.json" <<'JSON'
+{
+  "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
+  "enabledPlugins": { "alpha@stub-market": true, "gamma@stub-market": true }
+}
+JSON
+LOG="$plug_tmp/setup.log"
+PATH="$plug_tmp/bin:$PATH"
+install_plugins_from "$plug_tmp/fleet.json" fleet
+install_plugins_from "$plug_tmp/repo.json" repo
+assert_eq 'setup.sh lists marketplaces once across fleet+repo' '1' \
+  "$(cat "$plug_tmp/counts/marketplace-list")"
+assert_eq 'setup.sh lists plugins once across fleet+repo' '1' \
+  "$(cat "$plug_tmp/counts/plugin-list")"
+assert_eq 'already-registered marketplace is not added again' '0' \
+  "$(cat "$plug_tmp/counts/marketplace-add")"
+assert_eq 'missing plugins from either source are installed' '2' \
+  "$(cat "$plug_tmp/counts/plugin-install")"
+assert_contains 'warm fleet pass logs already-installed alpha' \
+  "$(cat "$LOG")" 'plugins (fleet): alpha@stub-market already installed'
+assert_contains 'repo pass installs gamma without a second plugin list' \
+  "$(cat "$LOG")" 'plugins (repo): installed gamma@stub-market'
+rm -rf "$plug_tmp"
 
 [[ $FAILED -eq 0 ]] || exit 1

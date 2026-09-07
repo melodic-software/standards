@@ -30,15 +30,14 @@ jq empty "$base" >/dev/null 2>&1 || {
 # Always returns 0 so callers under set -e need no condition context
 # (.shellcheckrc's SC2310). Signals through CHECK_RC: 0 conform, 1 missing
 # shared keys, 2 unparsable JSON.
+# One jq pass on the success path parses the candidate and checks the shared
+# keys. A failing pass falls back to `jq empty` so a parse error (exit 2)
+# stays distinct from a false policy result (exit 1), including valid JSON
+# that is not an object (jq -e then exits 5, the same code as a parse error).
 CHECK_RC=0
 check_one() {
-  local cand="$1" label="$2"
+  local cand="$1" label="$2" jq_rc=0
   CHECK_RC=0
-  jq empty "$cand" >/dev/null 2>&1 || {
-    echo "check-claude-settings-targets: $label is not valid JSON: $cand" >&2
-    CHECK_RC=2
-    return 0
-  }
   jq -e --slurpfile b "$base" '
       (.extraKnownMarketplaces.["melodic-software"].source.repo
         == $b[0].extraKnownMarketplaces.["melodic-software"].source.repo)
@@ -53,11 +52,17 @@ check_one() {
                             | test("^bash[[:space:]]+\"\\$CLAUDE_PROJECT_DIR/\\.claude/cloud-bootstrap\\.sh\""))
                         )] | length > 0)
               )] | length > 0)
-    ' "$cand" >/dev/null || {
-    echo "$label: missing shared marketplace or SessionStart bootstrap hook" >&2
-    CHECK_RC=1
+    ' "$cand" >/dev/null 2>&1 || jq_rc=$?
+  if [[ "$jq_rc" -eq 0 ]]; then
+    return 0
+  fi
+  jq empty "$cand" >/dev/null 2>&1 || {
+    echo "check-claude-settings-targets: $label is not valid JSON: $cand" >&2
+    CHECK_RC=2
     return 0
   }
+  echo "$label: missing shared marketplace or SessionStart bootstrap hook" >&2
+  CHECK_RC=1
   return 0
 }
 

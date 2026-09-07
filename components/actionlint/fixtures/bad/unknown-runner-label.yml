@@ -1,0 +1,10 @@
+# A fleet-shaped label the config does not declare, proving the allowlist is
+# exact rather than a blanket amnesty for anything named `melodic-*`.
+name: unknown-runner-label fixture
+on: push
+jobs:
+  noop:
+    runs-on: melodic-undeclared-ubuntu-24.04-x64
+    steps:
+      - name: No-op
+        run: exit 0

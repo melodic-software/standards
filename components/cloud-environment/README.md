@@ -58,16 +58,40 @@ its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 
 ## Plugin install
 
-After the repo bootstrap, a generic, data-driven stage installs the plugins
-the checkout declares, nothing more. If the resolved checkout's
-`.claude/settings.json` exists, its
-`extraKnownMarketplaces` entries are registered (`claude plugin marketplace
-add`, skipping ones already registered) and every `enabledPlugins` entry set
-to `true` is installed (`claude plugin install <id> --scope user -y`,
-skipping ones already installed). Every step is best-effort with a `WARN`
-line to the log; the whole stage skips cleanly when the `claude` CLI or `jq`
-is unavailable or the file declares no plugin keys. A repo that declares
-nothing gets nothing.
+After the repo bootstrap, a generic, data-driven stage installs plugins from
+two settings-shaped files, in this order:
+
+1. **The fleet list**, [`fleet-plugins.json`](fleet-plugins.json) beside this
+   script: the one place the organization's cloud plugin set is declared.
+   The script fetches it from the same `raw.githubusercontent.com` path the
+   bootstrap fetches this script from, writes it into the snapshot at
+   `/opt/melodic-fleet-plugins.json` (falling back to
+   `/tmp/melodic-fleet-plugins.json` with a logged `WARN` when `/opt` is
+   unwritable, mirroring the stamp), and installs it. Every snapshot gets the
+   fleet whatever repo it was built for, so a repo's committed block no
+   longer has to mirror the whole catalog.
+2. **The checkout's `.claude/settings.json`**: the fallback while a repo still
+   carries a full mirrored block, and the carrier of that repo's deltas once
+   it does not (an extra marketplace, a plugin beyond the fleet, or a `false`
+   opt-out, which project scope applies over the user-scope install).
+
+For each file, `extraKnownMarketplaces` entries are registered (`claude
+plugin marketplace add`, skipping ones already registered) and every
+`enabledPlugins` entry set to `true` is installed (`claude plugin install
+<id> --scope user -y`, skipping ones already installed). Every step is
+best-effort with a `WARN` line to the log; the whole stage skips cleanly
+when the `claude` CLI or `jq` is unavailable, a failed fleet fetch leaves
+the repo declaration as the only source for that build, and a repo that
+declares nothing beyond the fleet gets the fleet.
+
+The fleet list is settings-shaped on purpose: `jq` expressions written for a
+repo's settings file read it unchanged, and
+[`distribution/check-plugin-baseline.sh`](../../distribution/check-plugin-baseline.sh)
+uses it as the baseline every repo and the dotfiles seed are compared
+against. Every entry in it is `true`; a `false` is a per-repo decision and
+belongs in that repo's own file. To add a plugin to the fleet, add its entry
+here in byte order (`setup.test.sh` checks both), then force a snapshot
+rebuild (see [Update lifecycle](#update-lifecycle)).
 
 The timing is load-bearing: Claude Code builds its plugin registry at
 process start and never re-reads it, so only installs already in the
@@ -176,6 +200,7 @@ the snapshot.
   instead of `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
-the shared environment baseline only. Repo-specific dependencies and plugin
-installs belong to each repo's committed `.claude/cloud-bootstrap.sh`
-(templates in the fleet guide above), never to this script.
+the shared environment baseline, which now includes the fleet plugin list.
+Repo-specific dependencies and plugin deltas belong to each repo's committed
+`.claude/cloud-bootstrap.sh` and `.claude/settings.json` (templates in the
+fleet guide above), never to this script.

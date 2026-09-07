@@ -9,7 +9,7 @@ on:
     # required check has to re-evaluate. Whether such an event is
     # CONTRACT-ONLY (lanes gated off, ci-status carrying the recorded
     # `ci-lanes` verdict forward) is decided by one predicate, repeated
-    # verbatim in `cancel-in-progress` and in every job's `if:` except
+    # verbatim in `concurrency.group` and in every job's `if:` except
     # `ci-status`:
     #
     #   github.event.pull_request.head.repo.full_name == github.repository &&
@@ -27,20 +27,47 @@ on:
 permissions:
   contents: read
 
-# The PR number keys pull_request runs, so a new push supersedes that PR's
-# in-flight run without colliding with same-named branches from other head
-# repos; main pushes fall back to the unique run_id and are never cancelled.
+# The concurrency GROUP branches on the contract-only predicate (ci-perf Phase
+# 6b); `cancel-in-progress` is a plain `true` because it takes one value per
+# workflow and cannot branch.
 #
-# A contract-only event never cancels: it must queue behind an in-flight full
-# run so the `ci-lanes` status it reads is already written. GitHub keeps one
-# running and one pending run per group and the newest pending wins, so the
-# carry-forward always executes after the full run it depends on. A
-# `synchronize` still cancels everything on the old SHA, and on a push the
-# predicate is false, so this stays `true` there exactly as before (a no-op
-# against the unique run_id key).
+# Contract-only branch: `ci-contract-<pr>-<run_id>`, unique per run. No
+# contract-only run can be cancelled, evict anything, or be evicted. That is
+# deliberate. Eviction of a *pending* run is unconditional in GitHub's queueing
+# ("any existing pending job or workflow in the same concurrency group will be
+# canceled") and is NOT governed by `cancel-in-progress`, so the old shared
+# group let one contract-only event evict another and leave a check suite on the
+# current head with no `ci-status` check run at all, a required check that stops
+# reporting until someone re-runs that specific run (dotfiles#647, 2h14m
+# silent). Uniqueness costs a burst of one-job runs when labels flip repeatedly,
+# seconds each, writing nothing.
+#
+# Full branch: `<workflow>-<pr number || run_id>` with cancel-in-progress true,
+# so a `synchronize` still cancels the run it supersedes. Keying PRs on the
+# number (not head_ref) keeps fork PRs that share a branch name from cancelling
+# each other's required runs. The fallback term stays `github.run_id`, which
+# this repository has always used: every push gets its own group and no push run
+# is ever cancelled.
+#
+# The cost of the branch: a contract-only run no longer queues behind the full
+# run whose `ci-lanes` status it carries forward, so the two race. The
+# `ci-status` composite closes that with a bounded wait on EARLIER incomplete
+# runs on the same head SHA; see `carry-forward-wait-seconds` on the job below.
+#
+# One hazard the branch does not remove, because no concurrency setting both
+# removes it and keeps supersession: the full branch is keyed on the pull
+# request number, which does not vary with the head SHA, so re-running a STALE
+# run on a superseded head SHA lands in the CURRENT head's group and cancels the
+# run that is actually reporting. Re-run the run on the current head instead.
+# Contract-only runs are immune, being unique per `github.run_id`.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+  group: >-
+    ${{ (github.event.pull_request.head.repo.full_name == github.repository &&
+    (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) ||
+    (github.event.action == 'edited' && !github.event.changes.base)))
+    && format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)
+    || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}
+  cancel-in-progress: true
 
 # Public repository: every lane runs on GitHub-hosted ubuntu-24.04 (free for
 # public repositories); the local-runner selector is not permitted here. The
@@ -64,7 +91,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/markdown@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: .markdownlint-cli2.jsonc
           globs: '**/*.md !components/**/fixtures/bad/**'
@@ -81,7 +108,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/powershell@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           settings: PSScriptAnalyzerSettings.psd1
           exclude: components/psscriptanalyzer/fixtures/bad
@@ -98,7 +125,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           rcfile: .shellcheckrc
           exclude: components/shellcheck/fixtures/bad
@@ -115,7 +142,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: lychee.toml
           exclude: 'components/[^/]+/fixtures/bad'
@@ -132,7 +159,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/editorconfig@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/editorconfig@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: .editorconfig-checker.json
           exclude: 'components/[^/]+/fixtures/bad/'
@@ -151,7 +178,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
-        uses: melodic-software/ci-workflows/.github/actions/gitleaks@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/gitleaks@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: .gitleaks.toml
       - name: Gitleaks contract test
@@ -169,7 +196,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/typos@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/typos@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: _typos.toml
           exclude: 'components/*/fixtures/bad/'
@@ -478,7 +505,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/ruff@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: ruff.toml
           exclude: components/ruff/fixtures/bad
@@ -498,7 +525,7 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/pyright@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: components/pyright/pyrightconfig.json
           paths: components/pyright/fixtures/good
@@ -518,7 +545,7 @@ jobs:
         # Scope at authored runtime surfaces and the conforming fixture. Bad
         # fixtures are non-conforming by design; node_modules and locks are
         # excluded by Biome's normal traversal rules.
-        uses: melodic-software/ci-workflows/.github/actions/biome@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/biome@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           config: components/biome/biome.json
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/runner-policy distribution harness/packages
@@ -573,7 +600,7 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -591,7 +618,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -607,7 +634,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
       - name: Test actionlint component
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
       # The lane caller test materializes each target through the distribution
@@ -665,9 +692,16 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      # The reusable's own job declares security-events: write unconditionally
+      # at v0.22.0: its upload-sarif step stays gated on the input, but
+      # expressions are not legal in a permissions scope. A called workflow can
+      # only narrow the caller's GITHUB_TOKEN and never widen it, so the grant
+      # has to be here for the job to start. The lane stays annotations-only
+      # (upload-sarif defaults false), so nothing is written to code scanning.
+      security-events: write
     # Actions security lint. High-severity findings block the lane; lower
     # severities annotate. Gating runs in-lane via the SARIF guard, so it
-    # rides the existing ci-status gate — no code-scanning, no elevated grant.
+    # rides the existing ci-status gate — no code-scanning upload.
     #
     # `.` audits this repo's own workflows only: zizmor discovers workflow
     # definitions by their `.github/workflows` location, so the workflow BYTES
@@ -675,7 +709,7 @@ jobs:
     # which become consumers' .github/workflows/ files — are invisible to a
     # repo-root scan. They are named explicitly so the lane audits what it
     # ships.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46 # 31a5b76 2026-07-21
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
     with:
       runner: ubuntu-24.04
       paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml
@@ -688,7 +722,7 @@ jobs:
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@90f1c54935203fa31b5b3d1f41531228be2c2b7f # 90f1c54 2026-07-18
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
     with:
       runner: ubuntu-24.04
 
@@ -932,7 +966,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/exec-bit@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/exec-bit@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
 
   machine-specific-paths:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -946,7 +980,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
-        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           exclude: ':(exclude)components/path-detection/**'
       - name: Path-detection contract test
@@ -964,7 +998,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
 
   comment-hygiene:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -978,7 +1012,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan comment hygiene (excludes contract fixtures and policy source)
-        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@f2d5e06757201f2fce187096a2c6fa805836c3d2 # f2d5e06 2026-07-14
+        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
       - name: Comment-hygiene contract test
@@ -1082,6 +1116,10 @@ jobs:
   ci-status:
     if: ${{ !cancelled() }}
     permissions:
+      # `actions: read` lets the carry-forward wait list the workflow runs on
+      # this head SHA, so it can block on an EARLIER incomplete run instead of
+      # reading a `ci-lanes` status the full run has not written yet.
+      actions: read
       contents: read
       # pr-contract upserts the advisory linkage comment and moves the linkage
       # label; ci-status records the `ci-lanes` commit status the carry-forward
@@ -1132,7 +1170,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check the pull-request contract
-        uses: melodic-software/ci-workflows/.github/actions/pr-contract@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0
+        uses: melodic-software/ci-workflows/.github/actions/pr-contract@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
         with:
           token: ${{ github.token }}
           # Carried over from the pr-issue-linkage.yml caller this step
@@ -1146,10 +1184,16 @@ jobs:
         # and the `ci-lanes` status is on the SHA for the next contract-only
         # run.
         if: ${{ !cancelled() }}
-        uses: melodic-software/ci-workflows/.github/actions/ci-status@449157aaa8e30f7b1457305d8048ebe6168e174a # v0.20.0
+        uses: melodic-software/ci-workflows/.github/actions/ci-status@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           treat-skipped-as: fail
           token: ${{ github.token }}
+          # The job's `timeout-minutes: 15` minus 60 s, so the wait always
+          # loses to the job timeout and a stuck earlier run cannot turn this
+          # into a silent 15-minute hang. The ceiling has to cover the full
+          # run it waits on: this repository's `ci` p95 wall is ~2 minutes
+          # (last 20 pull-request runs, 79-127 s), so 840 s is generous.
+          carry-forward-wait-seconds: '840'
           results: >-
             ${{ needs.markdown.result }}
             ${{ needs.powershell.result }}
