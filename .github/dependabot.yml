@@ -25,12 +25,7 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # The runner-policy allowlist pins ci-workflows reusable-workflow refs to
-    # independently reviewed SHAs, so a Dependabot bump to an unreviewed main
-    # commit can only fail the Runner policy lane. Those pins move through
-    # deliberate reviewed PRs after a standards allowlist update; composite
-    # actions (melodic-software/ci-workflows/.github/actions/*) are not
-    # SHA-allowlisted and stay Dependabot-managed.
+    # Reusable bumps to an unreviewed SHA fail the Runner policy contract fleet-wide; composites move by hand in the convergence pass so the fleet stays on one ci-workflows SHA; see melodic-software/github-iac#378 Phase 6b-ii item L.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
   # Keep the npm dev-dependencies current — the root devDependency pins
