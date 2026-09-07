@@ -34,30 +34,31 @@ component promotes. The soak and the promotion decisions are operator-owned
 after the admitting pull request (standards#496); that issue is the record
 until each target's promotion lands.
 
-**Hosted-only first hop.** The caller runs on `ubuntu-24.04` directly, with
-no `select-runner` indirection. `runner-policy` admits that shape on a public
-repository and on a private repository not enrolled for local CI routing, so
-one file serves both without a per-visibility variant. This hop is therefore
-managed for exactly the hosted-only-eligible targets:
+**Hosted-only first hop.** The caller runs on `ubuntu-24.04` directly, naming
+the approved hosted label and nothing else. `runner-policy` admits that shape
+on a public repository and on a private repository not enrolled for local CI
+routing, so one file serves both without a per-visibility variant. This hop is
+therefore managed for exactly the hosted-only-eligible targets:
 
 - `melodic-software/.github`, `agent-plugins`, `ci-runner`,
   `claude-code-account-rotation`, `claude-code-plugins`, `codex-plugins`,
   `cursor-plugins` (public), and `claude-code-proxy` (private, not enrolled for
-  selector routing).
+  local CI routing).
 
 `claude-code-plugins` is the one consumer here that also executes the
 `runner-policy` gate; `components/runner-policy/runner-policy.test.mjs`
 asserts this caller audits clean under a public hosted-only inventory so
 the sync cannot red that target's `ci-status`.
 
-**Excluded this hop: the selector-routed targets.** `dotfiles`,
+**Excluded this hop: the fleet-routed targets.** `dotfiles`,
 `github-iac`, `medley`, and `provisioning` are private targets enrolled for
-local CI routing (each manages `runner-policy` and a selector-routed Claude
-lane caller). There, `runner-policy` requires every independently scheduled
-read-only job to route through the governed selector, and a fixed
-`runs-on: ubuntu-24.04` job fails the gate. A public-safe hosted caller
-cannot be made selector-routed without becoming a different file, so those
-four take a **selector-routed sibling component** in a second hop. Removal
+local CI routing (each manages `runner-policy` and a
+`components/claude-lanes/`-sourced Claude lane caller). There,
+`runner-policy` requires every eligible read-only job either to name the
+managed fleet label or to carry a reviewed hosted exception, and a fixed
+`runs-on: ubuntu-24.04` job with neither fails the gate. A public-safe hosted
+caller cannot name the fleet label without becoming a different file, so those
+four take a **fleet-label sibling component** in a second hop. Removal
 trigger: that sibling landing; this component's target list does not grow to
 include them. The contract test holds the boundary mechanically: no target
 may manage this caller and a `components/claude-lanes/`-sourced caller at
@@ -76,17 +77,17 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-The admitted pin is `906ae7ef379ea4d2b8497f64475dce1d3d8715c4` (v0.22.0). It
+The admitted pin is `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2). It
 supersedes `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
 ci-workflows#530), the commit that closed the guard's fail-open on an
 unreadable diff: before it, an unfetched or bogus ref produced an empty change
 list and the guard passed precisely when it could not see the diff. No release
 carried that commit when this component was admitted (the newest, v0.17.2, is
 2026-08-21), so the comment took the convention's short-SHA fallback form until
-a release contained it. v0.22.0 is that release, and
-`.github/actions/managed-files-guard/action.yml` is byte-identical between the
-two revisions, so the pin now carries the release-tag comment form and nothing
-the guard executes changed.
+a release contained it. v0.22.2 is a release that contains it, and
+`.github/actions/managed-files-guard/` is untouched between the two revisions
+(verified through the compare API), so the pin now carries the release-tag
+comment form and nothing the guard executes changed.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
@@ -119,15 +120,16 @@ Two properties of that ride are deliberate:
   consulted: a pin landed later on the same UTC day as the release, or on
   another line of history, cannot be proven contained by a `YYYY-MM-DD`
   string. Without that fence the very next scheduled run would have proposed
-  moving this file from `3b2f4ea` (2026-08-30) back to v0.17.2 (2026-08-21),
+  moving this file from `3b2f4eab5b4bb58a150e400613350ede37742ee8`
+  (2026-08-30) back to v0.17.2 (2026-08-21),
   behind the fail-open fix. The pin advances to the tag form on the first
-  release that contains it, which v0.22.0 is, so the fence has now released
-  the file and it re-pins with the lane callers on every later release. A
-  failed compare is a hard failure, not a rewrite.
+  release that contains it, and the file now sits on that tag form, so the
+  fence has released it and it re-pins with the lane callers on every later
+  release. A failed compare is a hard failure, not a rewrite.
 - **Not in `repin-policy-lockstep.mjs`'s `REPIN_TARGETS`.** Every `kind` that
-  table expresses (`selector`, `lane`, `reusable`) copies a
-  `components/runner-policy/policy.json` contract forward from the old SHA to
-  the new one and diffs the reusable workflow's `workflow_call` surface.
+  table expresses and that still has a contract to copy (`lane`, `reusable`)
+  copies a `components/runner-policy/policy.json` contract forward from the old
+  SHA to the new one and diffs the reusable workflow's `workflow_call` surface.
   Composite actions are not SHA-allowlisted by runner-policy
   (`components/runner-policy/README.md`), so there is no contract to copy and
   no `workflow_call` surface to diff; an entry would either invent a kind the
@@ -180,8 +182,8 @@ Two properties of that ride are deliberate:
 `managed-files-guard.test.sh` asserts, against the parsed YAML: the
 `pull_request` trigger; `contents: read` as the whole grant; the canonical
 `concurrency-policy` block and nothing else in it; one job on the literal
-approved hosted label with a 10-minute timeout and no selector or reusable
-call; a full-history, credential-free checkout pinned like the sibling
+approved hosted label with a 10-minute timeout, calling no reusable
+workflow; a full-history, credential-free checkout pinned like the sibling
 workflows; the action pinned by full SHA with a comment the
 `pin-comment-convention` library accepts; and `standards-ref: main`. It then
 checks the manifest wiring (destination path, hosted-only targets only,
