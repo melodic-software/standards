@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-07.1'
+SCRIPT_VERSION='2026-09-07.2'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -44,21 +44,21 @@ STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # script). It arrives through the same raw.githubusercontent.com host this
 # script does, and is written into the snapshot at FLEET_PLUGINS so each
 # repo's session bootstrap can repair drift from it without a network round
-# trip. The per-repo enabledPlugins block stays a fallback and carries only
-# the deltas a repo declares beyond the fleet.
+# trip. It is the only install source at cache build; a repo's own
+# enabledPlugins block carries deltas beyond the fleet, which the session
+# bootstrap applies as an overlay on top of this list.
 FLEET_PLUGINS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json'
 FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
 FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
-# Plugin CLI listings are shared across the fleet list and the repo block.
-# Each `install_plugins_from` used to call `marketplace list` and `plugin list`
-# itself (and spawn `grep -qxF` per entry): four CLI round-trips on a warm
-# cache build that installs from both sources, plus one grep per plugin.
-# One of each list, lazily on the first source that actually installs, is
-# enough to skip; new registers/installs are recorded in-process so the
-# second source does not re-query. Same shape as cloud-bootstrap.sh.
+# Plugin CLI listings are fetched once, lazily, on the first source that
+# actually installs. `install_plugins_from` used to call `marketplace list`
+# and `plugin list` itself (and spawn `grep -qxF` per entry): two CLI
+# round-trips per source plus one grep per plugin. New registers and installs
+# are recorded in-process, so a caller that installs from more than one source
+# does not re-query. Same shape as cloud-bootstrap.sh, which reads two.
 plugin_listings_ready=0
 plugin_registered=''
 plugin_have=''
@@ -339,32 +339,29 @@ else
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
 
-# Generic plugin install, data-driven from two settings-shaped files
-# (extraKnownMarketplaces + enabledPlugins), in this order:
-#   1. the fleet list (FLEET_PLUGINS_URL), which every snapshot installs
-#      whatever repo it was built for, so a repo's committed block no longer
-#      has to mirror the whole catalog to get the fleet in the cloud;
-#   2. the checkout's own .claude/settings.json, as the fallback while repos
-#      still carry a full block, and afterwards as the carrier of deltas.
-# No repo-specific logic; a repo that declares nothing beyond the fleet gets
-# the fleet. This must happen here, at cache build: Claude Code reads its
-# plugin registry at process start and never re-reads it, so only
-# snapshot-baked installs are loaded at a session's first turn. Github-source
-# marketplaces' install/update semantics already handle versions — no
-# snapshot-refresh logic here (the commit-drift refresh in
+# Generic plugin install from one settings-shaped file (extraKnownMarketplaces
+# + enabledPlugins): the fleet list at FLEET_PLUGINS_URL, which every snapshot
+# installs whatever repo it was built for. No repo-specific logic — a repo's
+# own enabledPlugins block declares deltas beyond the fleet and the session
+# bootstrap applies them as an overlay, so the snapshot itself stays the same
+# for every repo built against it. This must happen here, at cache build:
+# Claude Code reads its plugin registry at process start and never re-reads
+# it, so only snapshot-baked installs are loaded at a session's first turn.
+# Github-source marketplaces' install/update semantics already handle
+# versions — no snapshot-refresh logic here (the commit-drift refresh in
 # claude-code-plugins' own hook is specific to its directory-source
-# dogfooding). Listings are shared across both sources (see
-# ensure_plugin_listings).
+# dogfooding).
 if ! command -v claude >/dev/null 2>&1; then
   log 'plugins: claude CLI not on PATH; skipping'
 elif ! command -v jq >/dev/null 2>&1; then
   log 'plugins: jq not available; skipping'
 else
-  # Fleet list first. The fetched copy lands in the snapshot (FLEET_PLUGINS,
-  # or its /tmp fallback with a WARN, mirroring the stamp) so the per-repo
-  # bootstrap's drift repair reads the same list offline. A fetch failure
-  # costs the fleet install for this build, never the build: the repo block
-  # below still installs what the checkout declares.
+  # The fetched copy lands in the snapshot (FLEET_PLUGINS, or its /tmp
+  # fallback with a WARN, mirroring the stamp) so the per-repo bootstrap's
+  # drift repair reads the same list offline. A fetch failure costs this
+  # build's plugin install, never the build: the next rebuild fetches again,
+  # and a session on a snapshot without the list installs nothing rather than
+  # guessing at a set.
   rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
   if curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
     "$FLEET_PLUGINS_URL" -o "$FLEET_PLUGINS_FALLBACK" >>"$LOG" 2>&1 &&
@@ -380,20 +377,7 @@ else
     install_plugins_from "$fleet_file" fleet
   else
     rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
-    log 'WARN plugins (fleet): list fetch failed or empty; only the repo declaration installs this build'
-  fi
-
-  # Repo block: fallback while a repo still mirrors the fleet, deltas after.
-  settings="$REPO_ROOT/.claude/settings.json"
-  if [[ -z "$REPO_ROOT" ]]; then
-    log 'plugins (repo): repo root unresolved; skipping'
-  elif [[ ! -f "$settings" ]]; then
-    log "plugins (repo): no $settings; skipping"
-  elif ! jq -e '(.extraKnownMarketplaces // {}) != {} or (.enabledPlugins // {}) != {}' \
-    "$settings" >/dev/null 2>&1; then
-    log 'plugins (repo): settings declare no marketplaces or plugins; skipping'
-  else
-    install_plugins_from "$settings" repo
+    log 'WARN plugins (fleet): list fetch failed or empty; no plugins install this build'
   fi
 fi
 

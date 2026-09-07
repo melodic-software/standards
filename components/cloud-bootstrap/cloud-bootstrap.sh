@@ -178,16 +178,31 @@ fi
   exit 0
 )
 
+# --- Session-start hook output ----------------------------------------------
+# When the SessionStart hook is the caller, stdout is parsed as hook output —
+# that is why every summary in this script goes to stderr — and this line asks
+# for a skills re-scan for whatever the harness can pick up mid-session (the
+# plugin registry itself is only rebuilt at the next process start). From the
+# pre-launch caller it lands harmlessly in the setup log.
+#
+# Emitted here, before the plugin stage, because the toolchain subshell and
+# the repo's own cloud-bootstrap.local.sh above may already have materialized
+# skills worth rescanning, and every way the plugin stage can end early — no
+# `claude`, no `jq`, no fleet list, or an unexpected failure under `set -e` —
+# would otherwise swallow the request along with the installs. Nothing below
+# writes to stdout, so this stays the only line the harness parses.
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'
+
 # --- Plugins ----------------------------------------------------------------
 # Data-driven from two settings-shaped files, in this order:
 #   1. the fleet list the cloud-environment component fetched into the
-#      snapshot at cache build, so every repo's session gets the fleet
-#      without mirroring the catalog in its own block. Absent outside a
-#      managed environment, in which case this step is a logged no-op and
-#      the repo block below is the only source;
-#   2. the repo's committed .claude/settings.json, whose enabledPlugins block
-#      is the fallback while it still mirrors the fleet and the carrier of
-#      deltas once it does not.
+#      snapshot at cache build. It is the required source: it defines the set
+#      this drift repair repairs against, so a session without it installs
+#      nothing at all rather than treating some other file as the whole set;
+#   2. the repo's committed .claude/settings.json, an overlay of the deltas
+#      that repo declares beyond the fleet. A true entry outside the list
+#      installs; a false entry is native project-scope precedence over the
+#      user-scope install and needs nothing here.
 # Every declared marketplace is registered and every enabledPlugins entry set
 # to true is installed, whichever marketplace it names. Explicit installs also
 # sidestep the platform rule that adding a marketplace never auto-installs
@@ -200,23 +215,26 @@ settings='.claude/settings.json'
 # leaves a copy under /tmp when /opt was unwritable at cache build, but /tmp
 # is world-writable and a list at a predictable path there is an input any
 # code running in the session could plant to enable a plugin with no settings
-# diff; a snapshot whose /opt was unwritable simply gets the settings-only
-# path. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
+# diff; a snapshot whose /opt was unwritable keeps the fleet the cache build
+# installed from that /tmp copy and simply gets no drift repair or repo
+# overlay until it is rebuilt. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
 fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
 # A list that is absent, unparsable (a partial write at cache build), or valid
-# JSON of the wrong shape (a bare array, enabledPlugins as an array) must
-# degrade to repo-declaration-only rather than silently empty this source:
-# every read below is a jq expression that expects the settings shape, and an
-# existence check alone lets a wrong-shaped file through to fail there. The
+# JSON of the wrong shape (a bare array, enabledPlugins as an array) ends the
+# plugin stage: every read below is a jq expression that expects the settings
+# shape, and an existence check alone lets a wrong-shaped file through to fail
+# there. Skipping is the whole answer — drift repair has no set to repair
+# against without the list, and the repo file declares deltas, not a set. The
 # gate is a shape test, not a content test: an object carrying no
-# enabledPlugins at all is a valid empty source and passes.
+# enabledPlugins at all is a valid empty source and passes. Exiting here
+# matches the CLI guards above, which also leave the plugin stage undone.
 if [[ ! -f "$fleet_plugins" ]]; then
-  fleet_plugins=''
-  echo 'cloud-bootstrap: no fleet plugin list in this snapshot; repo declaration is the only source' >&2
+  echo 'cloud-bootstrap: no fleet plugin list in this snapshot; plugin install skipped' >&2
+  exit 0
 elif ! jq -e 'type == "object" and ((.enabledPlugins // {}) | type == "object")' \
   "$fleet_plugins" >/dev/null 2>&1; then
-  echo "cloud-bootstrap: fleet plugin list $fleet_plugins is not a settings-shaped object; repo declaration is the only source" >&2
-  fleet_plugins=''
+  echo "cloud-bootstrap: fleet plugin list $fleet_plugins is not a settings-shaped object; plugin install skipped" >&2
+  exit 0
 fi
 
 # Plugin CLI listings are shared across both sources and the catalog
@@ -293,9 +311,7 @@ EOF
   return 0
 }
 
-if [[ -n "$fleet_plugins" ]]; then
-  install_plugins_from "$fleet_plugins" "fleet list $fleet_plugins"
-fi
+install_plugins_from "$fleet_plugins" "fleet list $fleet_plugins"
 install_plugins_from "$settings" "repo $settings"
 
 # Catalog inventory line. Everything above installs strictly what the fleet
@@ -306,14 +322,14 @@ install_plugins_from "$settings" "repo $settings"
 # by the `marketplace add` above, so naming the difference costs one jq pass
 # and no network. Deliberately an inventory line and not a WARN: a repo may
 # declare a subset on purpose, and this must not read as a defect on every
-# session. Both sources count as "declared", and each stands in for the other
-# when absent: a repo with no committed settings file still reads the fleet
-# list here, and a snapshot without the list reads the repo file twice.
-# `--slurpfile` opens every file before the filter runs, so a missing one
-# would otherwise silence this whole inventory rather than degrade it.
+# session. Both sources count as "declared"; the fleet list stands in for a
+# repo with no committed settings file, which is the only absence reachable
+# here (the stage exits above without the list). `--slurpfile` opens every
+# file before the filter runs, so a missing one would otherwise silence this
+# whole inventory rather than degrade it.
 repo_src="$settings"
-[[ -f "$repo_src" ]] || repo_src="${fleet_plugins:-$settings}"
-declared_from="${fleet_plugins:-$repo_src}"
+[[ -f "$repo_src" ]] || repo_src="$fleet_plugins"
+declared_from="$fleet_plugins"
 if [[ "$added_mp" -eq 1 ]]; then
   plugin_mps=$(claude plugin marketplace list --json 2>/dev/null |
     jq -r '.[] | select((.installLocation // "") != "")
@@ -347,10 +363,3 @@ while IFS=$'\t' read -r mp_name mp_dir; do
 done <<EOF
 $plugin_mps
 EOF
-
-# When the SessionStart hook is the caller, stdout is parsed as hook output —
-# that is why every summary above goes to stderr — and this line asks for a
-# skills re-scan for whatever the harness can pick up mid-session (the plugin
-# registry itself is only rebuilt at the next process start). From the
-# pre-launch caller it lands harmlessly in the setup log.
-printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'

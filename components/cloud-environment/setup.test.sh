@@ -153,9 +153,23 @@ assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
 
-# Spawn census: fleet + repo installs must share one marketplace list and one
-# plugin list. Sourced via MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks
-# do not run. Membership is in-process (no grep -qxF per entry).
+# The build installs from the fleet list alone. A repo's enabledPlugins block
+# is a deltas overlay applied by the session bootstrap's drift repair, so no
+# call here may install from the checkout's settings file: reintroducing one
+# would make the snapshot repo-specific again and resurrect the block as a
+# whole-set install source.
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_not_contains 'setup.sh does not install from the checkout settings block' \
+  "$(cat "$script")" 'install_plugins_from "$settings"'
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_not_contains 'setup.sh does not resolve the checkout settings block for install' \
+  "$(cat "$script")" 'settings="$REPO_ROOT/.claude/settings.json"'
+
+# Spawn census for install_plugins_from: two sources must share one
+# marketplace list and one plugin list, the memoization cloud-bootstrap.sh
+# relies on when it reads the fleet list and then the repo overlay. Sourced
+# via MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks do not run.
+# Membership is in-process (no grep -qxF per entry).
 plug_tmp="$(mktemp -d)"
 # Do not `shellcheck source=` this: LIBONLY returns immediately, and following
 # it marks the census body unreachable (SC2317).
