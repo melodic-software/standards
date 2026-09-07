@@ -149,17 +149,19 @@ assert_eq 'warm catalog inventory lists plugins once' '1' \
 
 # A fleet list that is absent, unparsable, or valid JSON of the wrong shape
 # must degrade to the repo declaration, never empty the enabled set: an
-# existence-and-parse check alone lets an error body, a bare array, or an
-# `enabledPlugins` array through to fail inside every jq read below it. Each
-# case runs against a scratch repo that DOES declare one plugin, so the
-# assertion is that the repo source still reports its entry.
+# existence-and-parse check alone lets a bare array or an `enabledPlugins`
+# array through to fail inside every jq read below it. Each case runs against
+# a scratch repo that DOES declare one plugin, so the assertion is that the
+# repo source still reports its entry.
 mkdir -p "$inv_tmp/degrade/.claude"
 cat >"$inv_tmp/degrade/.claude/settings.json" <<'JSON'
 { "enabledPlugins": { "alpha@stub-market": true } }
 JSON
 (cd "$inv_tmp/degrade" && git init -q .)
 degrade_case() {
-  # degrade_case <label> <fleet-file-or-empty> <expected-stderr-fragment>
+  # degrade_case <label> <fleet-file> <expected-stderr-fragment>
+  # The fleet file must be a non-empty path: an empty value would fall through
+  # the seam's default and read the host's real snapshot list.
   local label="$1" fleet="$2" expected="$3" out
   out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
     CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \

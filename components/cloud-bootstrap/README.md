@@ -47,10 +47,10 @@ pinned versions:
   environment component also leaves a world-writable fallback copy when
   `/opt` was unwritable at cache build, and a list at a predictable path
   there is an input any code running in a session could plant to enable a
-  plugin with no settings diff. The list is also gated on shape: valid JSON
-  that is not a settings-shaped object is refused with a logged reason, so a
-  wrong-shaped file degrades to the repo declaration instead of silently
-  emptying that source.
+  plugin with no settings diff. The list is also gated on shape: JSON that is
+  not an object, or whose `enabledPlugins` is not an object, is refused with a
+  logged reason, so a wrong-shaped file degrades to the repo declaration
+  instead of silently emptying that source.
 
 Idempotent and best effort throughout: a failed step costs a tool or a
 plugin, never the session, and the cloud-only guard makes the script a no-op

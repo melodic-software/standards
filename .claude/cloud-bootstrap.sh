@@ -204,10 +204,12 @@ settings='.claude/settings.json'
 # path. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
 fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
 # A list that is absent, unparsable (a partial write at cache build), or valid
-# JSON of the wrong shape (an error body, a bare array, enabledPlugins as an
-# array) must degrade to repo-declaration-only rather than silently empty this
-# source: every read below is a jq expression that expects the settings shape,
-# and an existence check alone lets a wrong-shaped file through to fail there.
+# JSON of the wrong shape (a bare array, enabledPlugins as an array) must
+# degrade to repo-declaration-only rather than silently empty this source:
+# every read below is a jq expression that expects the settings shape, and an
+# existence check alone lets a wrong-shaped file through to fail there. The
+# gate is a shape test, not a content test: an object carrying no
+# enabledPlugins at all is a valid empty source and passes.
 if [[ ! -f "$fleet_plugins" ]]; then
   fleet_plugins=''
   echo 'cloud-bootstrap: no fleet plugin list in this snapshot; repo declaration is the only source' >&2
