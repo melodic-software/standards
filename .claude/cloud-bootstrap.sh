@@ -181,11 +181,10 @@ fi
 # --- Plugins ----------------------------------------------------------------
 # Data-driven from two settings-shaped files, in this order:
 #   1. the fleet list the cloud-environment component fetched into the
-#      snapshot at cache build (same path constants as its setup script; the
-#      /tmp copy is the fallback it writes when /opt is unwritable), so every
-#      repo's session gets the fleet without mirroring the catalog in its own
-#      block. Absent outside a managed environment, in which case this step
-#      is a logged no-op and the repo block below is the only source;
+#      snapshot at cache build, so every repo's session gets the fleet
+#      without mirroring the catalog in its own block. Absent outside a
+#      managed environment, in which case this step is a logged no-op and
+#      the repo block below is the only source;
 #   2. the repo's committed .claude/settings.json, whose enabledPlugins block
 #      is the fallback while it still mirrors the fleet and the carrier of
 #      deltas once it does not.
@@ -197,14 +196,27 @@ command -v claude >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 settings='.claude/settings.json'
-fleet_plugins=''
-if [[ -f /opt/melodic-fleet-plugins.json ]]; then
-  fleet_plugins=/opt/melodic-fleet-plugins.json
-elif [[ -f /tmp/melodic-fleet-plugins.json ]]; then
-  fleet_plugins=/tmp/melodic-fleet-plugins.json
-fi
-if [[ -z "$fleet_plugins" ]]; then
+# Only the snapshot path under /opt is read. The environment component also
+# leaves a copy under /tmp when /opt was unwritable at cache build, but /tmp
+# is world-writable and a list at a predictable path there is an input any
+# code running in the session could plant to enable a plugin with no settings
+# diff; a snapshot whose /opt was unwritable simply gets the settings-only
+# path. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
+fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
+# A list that is absent, unparsable (a partial write at cache build), or valid
+# JSON of the wrong shape (a bare array, enabledPlugins as an array) must
+# degrade to repo-declaration-only rather than silently empty this source:
+# every read below is a jq expression that expects the settings shape, and an
+# existence check alone lets a wrong-shaped file through to fail there. The
+# gate is a shape test, not a content test: an object carrying no
+# enabledPlugins at all is a valid empty source and passes.
+if [[ ! -f "$fleet_plugins" ]]; then
+  fleet_plugins=''
   echo 'cloud-bootstrap: no fleet plugin list in this snapshot; repo declaration is the only source' >&2
+elif ! jq -e 'type == "object" and ((.enabledPlugins // {}) | type == "object")' \
+  "$fleet_plugins" >/dev/null 2>&1; then
+  echo "cloud-bootstrap: fleet plugin list $fleet_plugins is not a settings-shaped object; repo declaration is the only source" >&2
+  fleet_plugins=''
 fi
 
 # Plugin CLI listings are shared across both sources and the catalog
