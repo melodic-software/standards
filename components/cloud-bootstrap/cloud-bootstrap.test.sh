@@ -71,8 +71,8 @@ assert_contains 'bootstrap reads the fallback stamp path cloud-environment write
   "$(cat "$script")" "$fallback_path"
 
 # Cross-component lockstep: the fleet plugin list this script installs from is
-# the snapshot path (and /tmp fallback) the cloud-environment component writes
-# at cache build, and the repo declaration stays as the fallback source.
+# the snapshot path the cloud-environment component writes at cache build, and
+# the repo declaration stays as the fallback source.
 fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$env_setup")"
 if [[ -n "$fleet_path" ]]; then
   pass 'cloud-environment setup.sh declares a fleet list snapshot path'
@@ -82,6 +82,12 @@ else
 fi
 assert_contains 'bootstrap reads the fleet list path cloud-environment writes' \
   "$(cat "$script")" "$fleet_path"
+# The fallback copy the environment still writes when the snapshot path is
+# unwritable at cache build is deliberately NOT read here: it lands in a
+# world-writable directory at a predictable path, so any code running in a
+# session could plant a list there and have the next drift-repair run install
+# and enable a plugin with no settings diff. Such a snapshot gets the
+# repo-declaration-only path instead.
 fleet_fallback="$(sed -n "s/^FLEET_PLUGINS_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
 if [[ -n "$fleet_fallback" ]]; then
   pass 'cloud-environment setup.sh declares a fleet list fallback path'
@@ -89,7 +95,7 @@ else
   fail 'cloud-environment setup.sh declares a fleet list fallback path' \
     "no FLEET_PLUGINS_FALLBACK='...' assignment found"
 fi
-assert_contains 'bootstrap reads the fleet list fallback path cloud-environment writes' \
+assert_not_contains 'bootstrap does not read the world-writable fleet list fallback path' \
   "$(cat "$script")" "$fleet_fallback"
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'bootstrap keeps the repo enabledPlugins block as a source' \
@@ -97,8 +103,10 @@ assert_contains 'bootstrap keeps the repo enabledPlugins block as a source' \
 
 # Runtime behaviour of the catalog inventory with the repo settings file
 # absent: the fleet list alone must still name the catalog gap. Driven with a
-# stub `claude` on PATH, a fleet list at the /tmp fallback path, and a
-# scratch repo with no .claude/settings.json.
+# stub `claude` on PATH, a fleet list handed to the script through its
+# CLOUD_BOOTSTRAP_FLEET_LIST seam (so no case ever reads, or needs to write,
+# a real snapshot path on the host), and a scratch repo with no
+# .claude/settings.json.
 inv_tmp="$(mktemp -d)"
 mkdir -p "$inv_tmp/bin" "$inv_tmp/mp/.claude-plugin" "$inv_tmp/repo"
 cat >"$inv_tmp/mp/.claude-plugin/marketplace.json" <<'JSON'
@@ -127,31 +135,52 @@ case "\$1 \$2 \$3" in
 esac
 STUB
 chmod +x "$inv_tmp/bin/claude"
-# The fleet list path is the /opt constant when writable, else the /tmp
-# fallback; the test uses whichever it can write, and cleans up after.
-inv_fleet=''
-for candidate in "$fleet_path" "$fleet_fallback"; do
-  if [[ ! -e "$candidate" ]] && cp "$inv_tmp/fleet.json" "$candidate" 2>/dev/null; then
-    inv_fleet="$candidate"
-    break
-  fi
-done
-if [[ -n "$inv_fleet" ]]; then
-  inv_out="$(cd "$inv_tmp/repo" && git init -q . && PATH="$inv_tmp/bin:$PATH" \
-    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/repo" bash "$script" 2>&1 >/dev/null)"
-  rm -f "$inv_fleet"
-  assert_contains 'fleet list installs are summarised when the repo settings file is absent' \
-    "$inv_out" 'fleet list'
-  assert_contains 'catalog gap is still named from the fleet list alone' \
-    "$inv_out" 'stub-market carries plugins this repo does not declare: newcomer'
-  assert_eq 'warm catalog inventory lists marketplaces once' '1' \
-    "$(cat "$inv_tmp/counts/marketplace-list")"
-  assert_eq 'warm catalog inventory lists plugins once' '1' \
-    "$(cat "$inv_tmp/counts/plugin-list")"
-else
-  fail 'catalog inventory without repo settings is exercised' \
-    "neither $fleet_path nor $fleet_fallback was free and writable"
-fi
+inv_out="$(cd "$inv_tmp/repo" && git init -q . && PATH="$inv_tmp/bin:$PATH" \
+  CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/repo" \
+  CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/fleet.json" bash "$script" 2>&1 >/dev/null)"
+assert_contains 'fleet list installs are summarised when the repo settings file is absent' \
+  "$inv_out" 'fleet list'
+assert_contains 'catalog gap is still named from the fleet list alone' \
+  "$inv_out" 'stub-market carries plugins this repo does not declare: newcomer'
+assert_eq 'warm catalog inventory lists marketplaces once' '1' \
+  "$(cat "$inv_tmp/counts/marketplace-list")"
+assert_eq 'warm catalog inventory lists plugins once' '1' \
+  "$(cat "$inv_tmp/counts/plugin-list")"
+
+# A fleet list that is absent, unparsable, or valid JSON of the wrong shape
+# must degrade to the repo declaration, never empty the enabled set: an
+# existence-and-parse check alone lets an error body, a bare array, or an
+# `enabledPlugins` array through to fail inside every jq read below it. Each
+# case runs against a scratch repo that DOES declare one plugin, so the
+# assertion is that the repo source still reports its entry.
+mkdir -p "$inv_tmp/degrade/.claude"
+cat >"$inv_tmp/degrade/.claude/settings.json" <<'JSON'
+{ "enabledPlugins": { "alpha@stub-market": true } }
+JSON
+(cd "$inv_tmp/degrade" && git init -q .)
+degrade_case() {
+  # degrade_case <label> <fleet-file-or-empty> <expected-stderr-fragment>
+  local label="$1" fleet="$2" expected="$3" out
+  out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
+    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
+    CLOUD_BOOTSTRAP_FLEET_LIST="$fleet" bash "$script" 2>&1 >/dev/null)"
+  assert_contains "$label is refused with a reason" "$out" "$expected"
+  assert_contains "$label still installs from the repo declaration" \
+    "$out" 'repo .claude/settings.json: 1 enabled'
+  assert_not_contains "$label does not summarise a fleet list source" \
+    "$out" 'fleet list'
+}
+degrade_case 'an absent fleet list' "$inv_tmp/no-such-fleet.json" \
+  'no fleet plugin list in this snapshot'
+printf 'not json at all\n' >"$inv_tmp/malformed.json"
+degrade_case 'an unparsable fleet list' "$inv_tmp/malformed.json" \
+  'is not a settings-shaped object'
+printf '%s\n' '{"enabledPlugins":["alpha@stub-market"]}' >"$inv_tmp/wrong-shape.json"
+degrade_case 'a fleet list whose enabledPlugins is an array' "$inv_tmp/wrong-shape.json" \
+  'is not a settings-shaped object'
+printf '%s\n' '[]' >"$inv_tmp/bare-array.json"
+degrade_case 'a fleet list that is a bare array' "$inv_tmp/bare-array.json" \
+  'is not a settings-shaped object'
 rm -rf "$inv_tmp"
 
 # README/script drift guards.
