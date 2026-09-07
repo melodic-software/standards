@@ -112,9 +112,17 @@ cat >"$inv_tmp/fleet.json" <<'JSON'
 JSON
 cat >"$inv_tmp/bin/claude" <<STUB
 #!/usr/bin/env bash
+COUNT_DIR="${inv_tmp}/counts"
+mkdir -p "\$COUNT_DIR"
 case "\$1 \$2 \$3" in
-  "plugin marketplace list") printf '[{"name":"stub-market","installLocation":"%s"}]\n' "$inv_tmp/mp" ;;
-  "plugin list "*) printf '[{"id":"alpha@stub-market"},{"id":"beta@stub-market"}]\n' ;;
+  "plugin marketplace list")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    printf '[{"name":"stub-market","installLocation":"%s"}]\n' "$inv_tmp/mp"
+    ;;
+  "plugin list "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    printf '[{"id":"alpha@stub-market"},{"id":"beta@stub-market"}]\n'
+    ;;
   *) exit 0 ;;
 esac
 STUB
@@ -136,6 +144,10 @@ if [[ -n "$inv_fleet" ]]; then
     "$inv_out" 'fleet list'
   assert_contains 'catalog gap is still named from the fleet list alone' \
     "$inv_out" 'stub-market carries plugins this repo does not declare: newcomer'
+  assert_eq 'warm catalog inventory lists marketplaces once' '1' \
+    "$(cat "$inv_tmp/counts/marketplace-list")"
+  assert_eq 'warm catalog inventory lists plugins once' '1' \
+    "$(cat "$inv_tmp/counts/plugin-list")"
 else
   fail 'catalog inventory without repo settings is exercised' \
     "neither $fleet_path nor $fleet_fallback was free and writable"

@@ -121,4 +121,70 @@ assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
 
+# Spawn census: fleet + repo installs must share one marketplace list and one
+# plugin list. Sourced via MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks
+# do not run. Membership is in-process (no grep -qxF per entry).
+plug_tmp="$(mktemp -d)"
+# Do not `shellcheck source=` this: LIBONLY returns immediately, and following
+# it marks the census body unreachable (SC2317).
+# shellcheck disable=SC1090,SC1091
+MELODIC_SETUP_LIBONLY=1 source "$script"
+mkdir -p "$plug_tmp/bin" "$plug_tmp/counts"
+cat >"$plug_tmp/bin/claude" <<STUB
+#!/usr/bin/env bash
+COUNT_DIR="${plug_tmp}/counts"
+mkdir -p "\$COUNT_DIR"
+case "\$1 \$2 \$3" in
+  "plugin marketplace list")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    printf '[{"name":"stub-market"}]\n'
+    ;;
+  "plugin list "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    printf '[{"id":"alpha@stub-market"}]\n'
+    ;;
+  "plugin marketplace add")
+    echo \$(( \$(cat "\$COUNT_DIR/marketplace-add" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-add"
+    ;;
+  "plugin install "*)
+    echo \$(( \$(cat "\$COUNT_DIR/plugin-install" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-install"
+    ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$plug_tmp/bin/claude"
+echo 0 >"$plug_tmp/counts/marketplace-list"
+echo 0 >"$plug_tmp/counts/plugin-list"
+echo 0 >"$plug_tmp/counts/marketplace-add"
+echo 0 >"$plug_tmp/counts/plugin-install"
+cat >"$plug_tmp/fleet.json" <<'JSON'
+{
+  "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
+  "enabledPlugins": { "alpha@stub-market": true, "beta@stub-market": true }
+}
+JSON
+cat >"$plug_tmp/repo.json" <<'JSON'
+{
+  "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
+  "enabledPlugins": { "alpha@stub-market": true, "gamma@stub-market": true }
+}
+JSON
+LOG="$plug_tmp/setup.log"
+PATH="$plug_tmp/bin:$PATH"
+install_plugins_from "$plug_tmp/fleet.json" fleet
+install_plugins_from "$plug_tmp/repo.json" repo
+assert_eq 'setup.sh lists marketplaces once across fleet+repo' '1' \
+  "$(cat "$plug_tmp/counts/marketplace-list")"
+assert_eq 'setup.sh lists plugins once across fleet+repo' '1' \
+  "$(cat "$plug_tmp/counts/plugin-list")"
+assert_eq 'already-registered marketplace is not added again' '0' \
+  "$(cat "$plug_tmp/counts/marketplace-add")"
+assert_eq 'missing plugins from either source are installed' '2' \
+  "$(cat "$plug_tmp/counts/plugin-install")"
+assert_contains 'warm fleet pass logs already-installed alpha' \
+  "$(cat "$LOG")" 'plugins (fleet): alpha@stub-market already installed'
+assert_contains 'repo pass installs gamma without a second plugin list' \
+  "$(cat "$LOG")" 'plugins (repo): installed gamma@stub-market'
+rm -rf "$plug_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1

@@ -28,35 +28,56 @@ LINUX_PATTERN="${PATH_BOUNDARY}${HPP_LINUX_USER_BODY}"
 read -ra scan_paths <<<"${EXTENSIONS:-}"
 read -ra excludes <<<"${EXCLUDE:-}"
 
+# One index walk for the union of the five bodies, then classify hits in-process
+# so labels stay per-OS without a second git grep (or a display-cap `head`).
+combined="(${HPP_WIN_USER_BODY})|(${MACOS_PATTERN})|(${LINUX_PATTERN})|(${HPP_WIN_REPO_BODY})|(${HPP_ESCAPED_WIN_REPO_BODY})"
+
 failed=0
+rc=0
+# Capture git grep's status separately so a fatal error (bad pathspec, blob
+# read failure: exit >=2) fails the gate CLOSED instead of looking like a
+# clean "no match". Exit 1 (no match) is the only non-zero treated as clean.
+all_matches=$(git grep -nIE "$combined" -- "${scan_paths[@]}" "${excludes[@]}") || rc=$?
+if [[ "$rc" -ne 0 && "$rc" -ne 1 ]]; then
+  echo "::error::git grep failed (exit $rc) scanning for machine-specific paths — refusing to pass without a full scan." >&2
+  exit 1
+fi
+
 run_check() {
-  local label=$1 pattern=$2 matches rc=0
-  # Capture git grep's status separately so a fatal error (bad pathspec, blob
-  # read failure: exit >=2) fails the gate CLOSED instead of looking like a
-  # clean "no match". Exit 1 (no match) is the only non-zero treated as clean.
-  # Piping straight to head would lose that status under pipefail + `|| true`.
-  matches=$(git grep -nIE "$pattern" -- "${scan_paths[@]}" "${excludes[@]}") || rc=$?
-  if [[ "$rc" -ne 0 && "$rc" -ne 1 ]]; then
-    echo "::error::git grep failed (exit $rc) scanning for ${label} — refusing to pass without a full scan." >&2
-    exit 1
-  fi
-  if [[ -n "$matches" ]]; then
-    echo "Machine-specific path detected (${label}):" >&2
-    # head caps display noise only; the scan status is already validated above.
-    echo "$matches" | head -20 >&2 || true
+  local label=$1 pattern=$2
+  local line rest content n=0 found=0
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    rest="${line#*:}"
+    content="${rest#*:}"
+    # Unquoted `$pattern`: bash 3.2 =~ treats a quoted RHS as a literal.
+    if [[ "$content" =~ $pattern ]]; then
+      if [[ $found -eq 0 ]]; then
+        echo "Machine-specific path detected (${label}):" >&2
+        found=1
+      fi
+      if [[ $n -lt 20 ]]; then
+        echo "$line" >&2
+        n=$((n + 1))
+      fi
+    fi
+  done <<<"$all_matches"
+  if [[ $found -eq 1 ]]; then
     echo "" >&2
     failed=1
   fi
 }
 
-# OS home paths (placeholders excluded by the character class).
-run_check "Windows user path" "$HPP_WIN_USER_BODY"
-run_check "macOS user path" "$MACOS_PATTERN"
-run_check "Linux user path" "$LINUX_PATTERN"
+if [[ -n "$all_matches" ]]; then
+  # OS home paths (placeholders excluded by the character class).
+  run_check "Windows user path" "$HPP_WIN_USER_BODY"
+  run_check "macOS user path" "$MACOS_PATTERN"
+  run_check "Linux user path" "$LINUX_PATTERN"
 
-# Repo checkout roots (plain and escaped backslash forms).
-run_check "Windows repo path" "$HPP_WIN_REPO_BODY"
-run_check "Escaped Windows repo path" "$HPP_ESCAPED_WIN_REPO_BODY"
+  # Repo checkout roots (plain and escaped backslash forms).
+  run_check "Windows repo path" "$HPP_WIN_REPO_BODY"
+  run_check "Escaped Windows repo path" "$HPP_ESCAPED_WIN_REPO_BODY"
+fi
 
 if [[ "$failed" -ne 0 ]]; then
   echo "Use portable placeholders (<repo-root>, <user>) or relative paths." >&2

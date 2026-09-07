@@ -50,6 +50,25 @@ out="$(bash "$script" --file "$tmp/good.json")"
 rc=$?
 assert_exit 'fixture with marketplace and bootstrap hook exits 0' 0 "$rc"
 
+# Spawn census: --file used to run jq empty on the base, jq empty on the
+# candidate, then jq -e for the policy. The success path is now one policy
+# pass plus the base parse check; jq empty on the candidate runs only when
+# the policy pass fails.
+mkdir -p "$tmp/jq-bin" "$tmp/jq-count"
+cat >"$tmp/jq-bin/jq" <<'SH'
+#!/usr/bin/env bash
+COUNT_DIR="${COUNT_DIR:?}"
+echo $(($(cat "$COUNT_DIR/jq" 2>/dev/null || echo 0) + 1)) >"$COUNT_DIR/jq"
+exec "$REAL_JQ" "$@"
+SH
+chmod +x "$tmp/jq-bin/jq"
+echo 0 >"$tmp/jq-count/jq"
+real_jq="$(command -p -v jq)"
+COUNT_DIR="$tmp/jq-count" REAL_JQ="$real_jq" PATH="$tmp/jq-bin:$PATH" \
+  bash "$script" --file "$tmp/good.json" >/dev/null
+assert_eq '--file batches candidate parse and policy into one jq pass plus the base check' '2' \
+  "$(cat "$tmp/jq-count/jq")"
+
 cat >"$tmp/no-hook.json" <<'JSON'
 {
   "extraKnownMarketplaces": {

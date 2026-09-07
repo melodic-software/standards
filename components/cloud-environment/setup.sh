@@ -32,7 +32,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-06.1'
+SCRIPT_VERSION='2026-09-06.2'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -46,10 +46,76 @@ FLEET_PLUGINS_URL='https://raw.githubusercontent.com/melodic-software/standards/
 FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
 FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
 LOG='/var/log/melodic-env-setup.log'
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
+
+# Plugin CLI listings are shared across the fleet list and the repo block.
+# Each `install_plugins_from` used to call `marketplace list` and `plugin list`
+# itself (and spawn `grep -qxF` per entry): four CLI round-trips on a warm
+# cache build that installs from both sources, plus one grep per plugin.
+# One of each list, lazily on the first source that actually installs, is
+# enough to skip; new registers/installs are recorded in-process so the
+# second source does not re-query. Same shape as cloud-bootstrap.sh.
+plugin_listings_ready=0
+plugin_registered=''
+plugin_have=''
+
+ensure_plugin_listings() {
+  [[ "$plugin_listings_ready" -eq 1 ]] && return 0
+  plugin_registered="$(claude plugin marketplace list --json 2>/dev/null |
+    jq -r '.[].name' 2>/dev/null || true)"
+  plugin_have="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)"
+  plugin_listings_ready=1
+}
+
+# install_plugins_from <settings-shaped json> <label>: register every
+# declared marketplace and install every enabledPlugins entry set to true at
+# user scope, skipping what is already present. Idempotence-check formats
+# verified against claude CLI 2.1.241 (2026-08-23): `claude plugin list
+# --json` ids are name@marketplace, exactly the enabledPlugins key shape, and
+# `claude plugin marketplace list --json` names match extraKnownMarketplaces
+# keys, so these exact membership checks are true already-installed checks,
+# not format mismatches.
+install_plugins_from() {
+  local file="$1" label="$2" mp_name mp_target plugin_id
+  ensure_plugin_listings
+  while IFS=$'\t' read -r mp_name mp_target; do
+    [[ -n "$mp_name" ]] || continue
+    if [[ $'\n'"$plugin_registered"$'\n' == *$'\n'"$mp_name"$'\n'* ]]; then
+      log "plugins ($label): marketplace $mp_name already registered"
+    elif [[ -z "$mp_target" ]]; then
+      log "WARN plugins ($label): marketplace $mp_name declares no repo/path/url source; skipped"
+    elif claude plugin marketplace add "$mp_target" >>"$LOG" 2>&1; then
+      log "plugins ($label): marketplace $mp_name registered ($mp_target)"
+      plugin_registered="${plugin_registered}${plugin_registered:+$'\n'}$mp_name"
+    else
+      log "WARN plugins ($label): marketplace add failed: $mp_name ($mp_target)"
+    fi
+  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
+    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
+    | @tsv' "$file" 2>/dev/null)
+
+  while IFS= read -r plugin_id; do
+    [[ -n "$plugin_id" ]] || continue
+    if [[ $'\n'"$plugin_have"$'\n' == *$'\n'"$plugin_id"$'\n'* ]]; then
+      log "plugins ($label): $plugin_id already installed"
+    elif claude plugin install "$plugin_id" --scope user -y >>"$LOG" 2>&1; then
+      log "plugins ($label): installed $plugin_id"
+      plugin_have="${plugin_have}${plugin_have:+$'\n'}$plugin_id"
+    else
+      log "WARN plugins ($label): install failed: $plugin_id"
+    fi
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
+    | select(.value == true) | .key' "$file" 2>/dev/null)
+}
+
+# Sourced by setup.test.sh for the plugin-list helpers only.
+if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
+  return 0
+fi
+
 if ! touch "$LOG" 2>/dev/null; then
   LOG='/tmp/melodic-env-setup.log'
 fi
-log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
 export DEBIAN_FRONTEND=noninteractive
 rm -f "$STAMP" "$STAMP_FALLBACK" 2>/dev/null
@@ -253,49 +319,8 @@ fi
 # marketplaces' install/update semantics already handle versions — no
 # snapshot-refresh logic here (the commit-drift refresh in
 # claude-code-plugins' own hook is specific to its directory-source
-# dogfooding).
-#
-# install_plugins_from <settings-shaped json> <label>: register every
-# declared marketplace and install every enabledPlugins entry set to true at
-# user scope, skipping what is already present. Idempotence-check formats
-# verified against claude CLI 2.1.241 (2026-08-23): `claude plugin list
-# --json` ids are name@marketplace, exactly the enabledPlugins key shape, and
-# `claude plugin marketplace list --json` names match extraKnownMarketplaces
-# keys, so these exact greps are true already-installed checks, not format
-# mismatches.
-install_plugins_from() {
-  local file="$1" label="$2" registered installed mp_name mp_target plugin_id
-  registered="$(claude plugin marketplace list --json 2>/dev/null |
-    jq -r '.[].name' 2>/dev/null)"
-  while IFS=$'\t' read -r mp_name mp_target; do
-    [[ -n "$mp_name" ]] || continue
-    if grep -qxF "$mp_name" <<<"$registered"; then
-      log "plugins ($label): marketplace $mp_name already registered"
-    elif [[ -z "$mp_target" ]]; then
-      log "WARN plugins ($label): marketplace $mp_name declares no repo/path/url source; skipped"
-    elif claude plugin marketplace add "$mp_target" >>"$LOG" 2>&1; then
-      log "plugins ($label): marketplace $mp_name registered ($mp_target)"
-    else
-      log "WARN plugins ($label): marketplace add failed: $mp_name ($mp_target)"
-    fi
-  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
-    | [.key, (.value.source.repo // .value.source.path // .value.source.url // "")]
-    | @tsv' "$file" 2>/dev/null)
-
-  installed="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null)"
-  while IFS= read -r plugin_id; do
-    [[ -n "$plugin_id" ]] || continue
-    if grep -qxF "$plugin_id" <<<"$installed"; then
-      log "plugins ($label): $plugin_id already installed"
-    elif claude plugin install "$plugin_id" --scope user -y >>"$LOG" 2>&1; then
-      log "plugins ($label): installed $plugin_id"
-    else
-      log "WARN plugins ($label): install failed: $plugin_id"
-    fi
-  done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
-    | select(.value == true) | .key' "$file" 2>/dev/null)
-}
-
+# dogfooding). Listings are shared across both sources (see
+# ensure_plugin_listings).
 if ! command -v claude >/dev/null 2>&1; then
   log 'plugins: claude CLI not on PATH; skipping'
 elif ! command -v jq >/dev/null 2>&1; then
