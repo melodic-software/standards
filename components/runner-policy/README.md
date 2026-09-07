@@ -874,6 +874,52 @@ by review instead. The v0.22.0 entries stay as they were reviewed; the patch
 tag is an addition, not a replacement, and the distributed caller templates
 under `components/claude-lanes/` and `managed-files-guard` are deliberately not
 moved here, because the non-wave consumers converge on their own change.
+Those same seven are registered a third time at the v0.22.2 patch tag
+`5776760254f8b63cba44e896f51604cb755350d9`, and this time the distributed
+caller templates move with them, because this is the change that converges the
+non-wave consumers. `compare/cd2f4e6d500e7923c0db521b4d10034d36331ed3...5776760254f8b63cba44e896f51604cb755350d9`
+touches only `.claude/cloud-bootstrap.sh`, `.github/actionlint.yaml`, the
+`ci-status` composite, and ci-workflows' own `ci.yml` and `README.md`, so every
+one of the seven is **byte-identical** at the two revisions, read at both
+through the contents API and compared with `diff`. `checks.yml` is byte-identical
+this time as well, unlike at v0.22.1: its thirteen composite steps stayed at
+`906ae7ef379ea4d2b8497f64475dce1d3d8715c4`, because the repin lane closes that
+self-referential lag one release behind and v0.22.2 is a patch on the same
+composites. Every entry copies its v0.22.1 terms verbatim and nothing widens.
+The v0.22.1 and older entries stay as they were reviewed: this allowlist is
+historical, and an older approved revision for the same path is what lets a
+consumer that has not yet converged keep passing.
+An eighth entry registers `pulumi-version-drift-check` at the same tag, and it
+is the one contract here that is **not** a copy of a v0.22.x predecessor,
+because none exists: the newest approved revision for that path is
+`90f1c54935203fa31b5b3d1f41531228be2c2b7f`, which github-iac's caller still
+pins. It is derived rather than copied, and the derivation is that the
+caller-facing surface did not move. `on.workflow_call.inputs` is `runner` alone
+at both revisions, with the same `type: string` and `default: ubuntu-24.04`;
+there is no `on.workflow_call.secrets` block at either; workflow `permissions`
+is `{}` at both; the `drift-check` job declares `contents: read` plus
+`issues: write` at both; and `runs-on` is `${{ inputs.runner }}` at both. The
+whole diff between the two revisions is inside one step body: the drift
+detection and tracking-issue lifecycle port from a generated bash script driving
+the `gh` CLI onto `actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3`
+(v9.0.0), which also drops the runner-image dependency on `gh`, `jq`, `date`,
+`timeout` and `mktemp`, plus an `actions/checkout` bump from v7.0.0 to v7.0.1.
+That port is exactly why auto-approval cannot carry it: the credential-references
+surface records a credential-bearing step in full, so a rewritten step reads as a
+diff and the entry is written by review. The derived terms are therefore
+term-for-term equal to the `90f1c54935203fa31b5b3d1f41531228be2c2b7f` entry,
+including its `allowedCallerPermissions` exact match of `contents: read` plus
+`issues: write`, and nothing widens.
+Two reusables that a v0.22.2 entry would otherwise be expected to cover are
+deliberately absent: `standards-sync` and `standards-sync-stuck-automerge-alert`.
+Neither has a v0.22.x entry at any revision, and this repository's own callers
+stay at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2). The
+`repin-policy-lockstep` decline reason for the first of them,
+"`standards-sync.yml` old revision job `sync` references `needs` in a
+routing-relevant field, which cannot be safely diffed for auto-approval", is
+still unanswered, and bumping the sync reusable inside a change whose own merge
+triggers the fan-out would put an untested sync engine on the critical path.
+Both wait for a later decision that answers the `needs` question first.
 Nineteen selector revisions remain approved for an ordered consumer rollout.
 GitHub does not allow a reusable workflow to target a self-hosted runner group
 owned by a different repository owner, so these sixteen strict-scheduling
