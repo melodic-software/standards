@@ -200,8 +200,9 @@ settings='.claude/settings.json'
 # leaves a copy under /tmp when /opt was unwritable at cache build, but /tmp
 # is world-writable and a list at a predictable path there is an input any
 # code running in the session could plant to enable a plugin with no settings
-# diff; a snapshot whose /opt was unwritable simply installs no plugins until
-# it is rebuilt. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
+# diff; a snapshot whose /opt was unwritable keeps the fleet the cache build
+# installed from that /tmp copy and simply gets no drift repair or repo
+# overlay until it is rebuilt. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
 fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
 # A list that is absent, unparsable (a partial write at cache build), or valid
 # JSON of the wrong shape (a bare array, enabledPlugins as an array) ends the
