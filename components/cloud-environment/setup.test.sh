@@ -117,6 +117,38 @@ else
 fi
 assert_contains 'README documents the stamp path the script writes' \
   "$(cat "$readme")" "$stamp_path"
+
+# gh install contract: the fleet runs one gh across three lanes (this script,
+# the ci-runner image, dotfiles/mise). Ubuntu's archive gh is years stale, so
+# an apt install here silently reopens that gap — guard the pinned,
+# checksum-verified release asset instead.
+grep -q 'apt-get install -y gh' "$script"
+rc=$?
+assert_exit 'setup.sh does not install gh from the Ubuntu archive' 1 "$rc"
+
+gh_pin="$(sed -n "s/^GH_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
+if [[ -n "$gh_pin" ]]; then
+  pass "setup.sh declares a gh pin (GH_VERSION='<version>')"
+else
+  fail "setup.sh declares a gh pin (GH_VERSION='<version>')" \
+    "no GH_VERSION='<version>' assignment found"
+fi
+
+gh_sha="$(sed -n "s/^GH_SHA256='\([0-9a-f]\{64\}\)'\$/\1/p" "$script" | head -n 1)"
+if [[ -n "$gh_sha" ]]; then
+  pass 'setup.sh declares a 64-hex gh asset checksum (GH_SHA256)'
+else
+  fail 'setup.sh declares a 64-hex gh asset checksum (GH_SHA256)' \
+    "no GH_SHA256='<64 hex chars>' assignment found"
+fi
+
+# shellcheck disable=SC2016 # the ${GH_VERSION} is literal text being searched for
+assert_contains 'setup.sh fetches gh from the pinned upstream release asset' \
+  "$(cat "$script")" 'https://github.com/cli/cli/releases/download/v${GH_VERSION}/'
+assert_contains 'setup.sh verifies the gh asset before installing it' \
+  "$(cat "$script")" 'sha256sum --check --strict'
+assert_contains 'README documents the gh version the script installs' \
+  "$(cat "$readme")" "$gh_pin"
 assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'

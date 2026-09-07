@@ -26,13 +26,17 @@
 # builds.dotnet.microsoft.com / download.visualstudio.microsoft.com) is
 # 403-blocked under Trusted network access. The environment must use Custom
 # network access with "Also include default list of common package managers"
-# checked plus those four hosts added.
+# checked plus those four hosts added. github.com is already on the default
+# allowlist, so the pinned gh release asset needs no host of its own; the
+# residual risk it carries is the GitHub proxy's repository scope, which can
+# 403 release assets from repositories not attached to the session. That is
+# why the gh step is best-effort and logs a WARN like every other step.
 # shellcheck disable=SC2030,SC2031 # each parallel track deliberately
 # reassigns LOG subshell-locally to its own temp log so track output never
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-06.2'
+SCRIPT_VERSION='2026-09-07.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -191,6 +195,18 @@ if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/.node-version" ]]; then
   fi
 fi
 
+# gh pin: a fleet pin with no in-repo manifest to read, so it is declared here
+# and held in lockstep with the other two lanes by hand — the CI runner image
+# (melodic-software/ci-runner, Dockerfile ARG GH_VERSION/GH_SHA256) and local
+# dev machines (melodic-software/dotfiles, mise). All three must carry the same
+# gh, or a script that passes on one lane fails on another. The hash is the
+# sha256 of the exact release asset the install below names; bump version and
+# hash together, and authenticate a new asset against the checksums cli/cli
+# publishes for that release before recording its hash here.
+GH_VERSION='2.98.0'
+GH_SHA256='3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de'
+GH_TARBALL='/tmp/gh.tar.gz'
+
 # Each parallel track writes to its own temp log (LOG is reassigned
 # subshell-locally, so the log() calls and command output inside a track all
 # land in its file); the tracks are concatenated into $LOG after the wait
@@ -199,24 +215,42 @@ track_a_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-a.$$")"
 track_b_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-b.$$")"
 track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
 
-# Track A: apt tools — gh CLI + PowerShell (packages.microsoft.com is on the
-# default allowlist).
+# Track A: gh CLI (pinned upstream release tarball) + PowerShell (apt;
+# packages.microsoft.com is on the default allowlist).
 (
   LOG="$track_a_log"
-  if apt-get update -y >>"$LOG" 2>&1; then
-    log 'apt-get update ok'
+  # gh comes from its checksummed upstream release asset, at the version and
+  # hash the CI runner image and local dev machines pin. Ubuntu's own archive
+  # ships a years-stale gh (2.45.0 observed live in a cloud session, 53 minor
+  # versions behind the other two lanes), and cli.github.com — the upstream
+  # apt repo — is NOT on the default allowlist, so the release tarball is the
+  # only install that keeps the three lanes at one version. Direct
+  # /releases/download/ asset URLs do resolve from this build (the repo
+  # bootstrap this script bakes in fetches its own hygiene binaries the same
+  # way); a silent miss is caught by the verification checklist.
+  # amd64 only, mirroring ci-runner's Dockerfile: the pin above is the hash of
+  # that one asset, and substituting an unverified hash for another
+  # architecture would defeat the check it exists to perform.
+  gh_arch="$(uname -m)"
+  if [[ "$gh_arch" != 'x86_64' ]]; then
+    log "WARN gh install skipped: no pinned asset for $gh_arch (amd64 only)"
+  elif ! curl --fail --location --proto '=https' --tlsv1.2 \
+    --output "$GH_TARBALL" \
+    "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+    >>"$LOG" 2>&1; then
+    log "WARN gh $GH_VERSION download failed"
+  elif ! printf '%s  %s\n' "$GH_SHA256" "$GH_TARBALL" |
+    sha256sum --check --strict >>"$LOG" 2>&1; then
+    log "WARN gh $GH_VERSION checksum mismatch; refusing to install"
+  elif ! tar --extract --gzip --file="$GH_TARBALL" --directory=/usr/local/bin \
+    --strip-components=2 "gh_${GH_VERSION}_linux_amd64/bin/gh" >>"$LOG" 2>&1; then
+    log "WARN gh $GH_VERSION extract failed"
+  elif ! chmod 0755 /usr/local/bin/gh 2>>"$LOG"; then
+    log "WARN gh $GH_VERSION installed but chmod failed"
   else
-    log 'WARN apt-get update failed'
+    log "gh $GH_VERSION installed"
   fi
-  # gh comes from Ubuntu's own archives: the official cloud-environments
-  # worked example is exactly `apt update && apt install -y gh`, and
-  # cli.github.com (the newer upstream apt repo) is NOT on the default
-  # allowlist. A silent miss is caught by the verification checklist.
-  if apt-get install -y gh >>"$LOG" 2>&1; then
-    log 'gh installed'
-  else
-    log 'WARN gh install failed'
-  fi
+  rm -f "$GH_TARBALL" 2>/dev/null
   ubuntu_ver="$(sed -n 's/^VERSION_ID="\{0,1\}\([0-9.]*\).*/\1/p' /etc/os-release)"
   if curl -fsSL "https://packages.microsoft.com/config/ubuntu/${ubuntu_ver}/packages-microsoft-prod.deb" \
     -o /tmp/msprod.deb >>"$LOG" 2>&1 &&
@@ -274,7 +308,7 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
 
 wait
 
-for track in "A apt tools (gh + powershell)|$track_a_log" \
+for track in "A gh + powershell|$track_a_log" \
   "B .NET SDKs|$track_b_log" "C node|$track_c_log"; do
   track_file="${track#*|}"
   printf -- '--- track %s ---\n' "${track%%|*}" >>"$LOG"
@@ -368,7 +402,8 @@ fi
 # snapshot and show up in every live session. Runs after the repo bootstrap,
 # which reuses /tmp/dotnet-install.sh. Unlinking the running script is safe:
 # bash holds its open file descriptor.
-rm -f /tmp/msprod.deb /tmp/dotnet-install.sh /tmp/melodic-env-setup.sh 2>/dev/null
+rm -f /tmp/msprod.deb /tmp/dotnet-install.sh "$GH_TARBALL" \
+  /tmp/melodic-env-setup.sh 2>/dev/null
 
 log "done version=$SCRIPT_VERSION"
 # Stamp write mirrors the $LOG fallback: /opt unwritable must not present as
