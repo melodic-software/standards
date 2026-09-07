@@ -763,7 +763,7 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
     '[.targets | to_entries[] | select(.value.managed[]? == "go-analysis") | .key]' \
     "$actual_manifest")"
 
-expected_review_instructions_targets='["melodic-software/account-rotation","melodic-software/ci-workflows","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
+expected_review_instructions_targets='["melodic-software/ci-workflows","melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
 actual_review_instructions_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "review-instructions") | .key]' \
