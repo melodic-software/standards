@@ -16,23 +16,10 @@ import {
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
-const FAIL_CLOSED_SEMANTIC_PR_SHA = "51012e2c7b8bf74bc26e08c6446b488254a8770f";
-const LATEST_SELECTOR_SHA = "029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1";
-const SELF_HOSTED_ONLY_SELECTOR_SHA = "3cb83c9502da0b210c335785e250023508c4b8e3";
 const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
-const LIVENESS_SELECTOR_SHA = "3415de3ff2fafee40e4d087eb6073d2f6952b595";
 const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
-const DEPENDABOT_ROUTING_SHA = "3931f91ccba9bfe97500196091ae2cc039672952";
-const REVIEW_TIER_SELECTOR_SHA = "cdc5917c15aade1995bd810b60d818cadc635b52";
-const MERGE_GROUP_ROUTING_SHA = "ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5";
 const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
-const ANCILLARY_OPT_IN_SELECTOR_SHA = "e77f0126b474144708719f99795e44d0ffe2541d";
-const PATHS_FILE_LANE_SHA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
-const INLINE_COMMENT_LANE_SHA = "e94438746c300b02385a7f8a2a2dcd19a7f4ad4a";
-const DROP_PROOF_GRANT_LANE_SHA = "ee96bd28a43eebfa06b61aee8b518cc5b1b195b3";
-const AVAILABILITY_RULING_LANE_SHA = "734158c4cb6e67b0b99fd703045ac0f7f9f042d5";
-const BILLING_AWARE_ROUTING_LANE_SHA = "62bef7bab01e8532fedfa739879034a210e9e67d";
 const REPINE_LANE_SHA_V0_14_2 = "7107b34832a7b6db5d08d3b132621c599fbe5e50";
 const REPINE_LANE_SHA_V0_17_0 = "d26c750691b5498fab529d115b63f84aa7aecebe";
 const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
@@ -40,12 +27,8 @@ const REPINE_LANE_SHA_V0_22_0 = "906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 const REPINE_LANE_SHA_V0_22_1 = "cd2f4e6d500e7923c0db521b4d10034d36331ed3";
 const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
-const PREREQUISITE_GATE_RUNNER_SHA = "380612ae1d4e0cc9741efbac7b6ffb3d3da63a04";
-const SELECTOR_PATH = "melodic-software/ci-workflows/.github/workflows/select-runner.yml";
-const SELECTOR_REFERENCE = `${SELECTOR_PATH}@${SHA}`;
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
-const FAIL_CLOSED_SEMANTIC_PR_REFERENCE = `melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${FAIL_CLOSED_SEMANTIC_PR_SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
@@ -58,7 +41,7 @@ const ALTERNATE_REUSABLE_REFERENCE = `${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}
 const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 // A hypothetical runner-input revision of the standards-sync workflow: the
 // secret-capable contract shape a statically read-only caller uses to route
-// the sync lane through the governed selector.
+// the sync lane to the managed fleet.
 const SYNC_RUNNER_INPUT_SHA = "2223456789abcdef0123456789abcdef01234567";
 const SYNC_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${SYNC_RUNNER_INPUT_SHA}`;
 const SYNC_RUNNER_INPUT_CONTRACT = {
@@ -75,12 +58,12 @@ const SYNC_RUNNER_INPUT_CONTRACT = {
 const WAVE1_FLOOR_CONVERSION_SHA = "3dfb18452a8c6059a22e62456390d84feb10b42f";
 const LINK_CHECK_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
 const PULUMI_DRIFT_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
-const CANONICAL_POLICY_EXPRESSION = `\${{ vars.CI_RUNNER_POLICY }}`;
-const ARBITRARY_POLICY_EXPRESSION = `\${{ vars.ARBITRARY_POLICY }}`;
+// The governed fleet labels: the only routing targets that reach the managed
+// fleet, written literally in `runs-on` (or in a reviewed reusable's runner
+// input). `FLEET_REVIEW_LABEL` is the review tier of the same fleet.
+const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
+const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
-const CANONICAL_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_SELF_HOSTED_LABEL }}`;
-const REVIEW_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}`;
-const ARBITRARY_SELF_HOSTED_LABEL_EXPRESSION = `\${{ vars.ARBITRARY_SELF_HOSTED_LABEL }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
 const temporaryRoots = [];
 
@@ -103,20 +86,6 @@ test("duplicate JSON object members fail closed with their policy or schema path
     );
   }
 });
-const SELECTOR = `    uses: ${SELECTOR_REFERENCE}
-    secrets:
-      observer-private-key: \${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: \${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: \${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: \${{ vars.CI_HOSTED_RUNNER }}
-      scope: \${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: \${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: \${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-`;
-const TEST_SELECTOR_INPUT_CONTRACT = {
-  allowedInputs: ["self-hosted-labels-json", "admits-ancillary-events", "admits-comment-events"],
-};
 
 async function repository({
   repositoryOwner,
@@ -152,11 +121,6 @@ async function repository({
     `${JSON.stringify(
       {
         ...BASE_POLICY,
-        approvedSelectorReferences: [SELECTOR_REFERENCE],
-        approvedSelectorReferencesByRepositoryOwner: {},
-        approvedSelectorInputContracts: {
-          [SELECTOR_REFERENCE]: TEST_SELECTOR_INPUT_CONTRACT,
-        },
         approvedReusableWorkflowContracts: {
           [REUSABLE_REFERENCE]: {
             routing: "runner-input",
@@ -1328,73 +1292,10 @@ test("moving ubuntu-latest alias is forbidden", async () => {
   );
 });
 
-test("private job can consume a full-SHA-pinned selector output", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("same-contract workloads can share one selector decision", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  lint:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("selector recovery accepts any allowlisted literal fallback", async () => {
-  const alternateDefault = "ubuntu-22.04";
-  const policyOverrides = {
-    approvedHostedRunnerLabels: [...BASE_POLICY.approvedHostedRunnerLabels, alternateDefault],
-    fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, alternateDefault],
-    governedReusableRunnerInput: {
-      ...BASE_POLICY.governedReusableRunnerInput,
-      default: alternateDefault,
-    },
-  };
-  const workflow = (fallback) => `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || '${fallback}' }}
-    steps: []
-`;
-
-  for (const allowlisted of [alternateDefault, ...BASE_POLICY.fallbackLabelAllowlist]) {
-    const acceptedRoot = await repository({
-      policyOverrides,
-      workflows: { "ci.yml": workflow(allowlisted) },
-    });
-    assert.deepEqual(await audit(acceptedRoot), []);
-  }
-
-  const unlistedRoot = await repository({
-    policyOverrides,
-    workflows: { "ci.yml": workflow("ubuntu-20.04") },
-  });
-  const findings = await audit(unlistedRoot);
-  assert.deepEqual(
-    findings.map(({ rule, job }) => ({ rule, job })),
-    [{ rule: "selector-contract", job: "test" }],
-  );
-  const selectorFinding = findings.find(({ rule }) => rule === "selector-contract");
-  assert.match(
-    selectorFinding.message,
-    /a fallback from policy\.fallbackLabelAllowlist \('ubuntu-24\.04', 'melodic-ubuntu-24\.04-x64', 'ubuntu-22\.04'\)/,
-  );
-});
-
 test("an allowlisted managed fallback routes without a raw-self-hosted-label finding", async () => {
-  const managedFallback = "melodic-ubuntu-24.04-x64";
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || '${managedFallback}' }}\n    steps: []\n`,
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -1403,23 +1304,19 @@ test("an allowlisted managed fallback routes without a raw-self-hosted-label fin
 test("a managed fallback outside the allowlist stays a raw self-hosted pin", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'kyle-ubuntu-24.04-x64' }}\n    steps: []\n`,
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: kyle-ubuntu-24.04-x64\n    steps: []\n`,
     },
   });
   const rules = (await audit(root)).map(({ rule }) => rule).sort();
-  assert.deepEqual(rules, ["raw-self-hosted-label", "selector-contract"]);
+  assert.deepEqual(rules, ["hosted-exception-required", "raw-self-hosted-label"]);
 });
 
 test("omitted permissions keep a full-SHA untrusted action off the local fleet", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - uses: attacker/untrusted-action@0123456789abcdef0123456789abcdef01234567
 `,
@@ -1442,11 +1339,8 @@ test("empty and read-or-none permission mappings are explicit local-safe boundar
       workflows: {
         "ci.yml": `${declaration}
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
       },
@@ -1469,12 +1363,8 @@ test("omitted local permissions require the precise privileged hosted exception"
       },
       workflows: {
         "ci.yml": `jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
       },
@@ -1487,117 +1377,15 @@ ${SELECTOR}  test:
   }
 });
 
-test("selector recovery accepts cancellation-safe conditions with a nested disjunction", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-    steps: []
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("selector recovery rejects noncanonical or variable-controlled hosted fallbacks", async () => {
-  const targets = [
-    `\${{ needs.choose.outputs.runner }}`,
-    `\${{ needs.choose.outputs.runner || vars.CI_HOSTED_RUNNER }}`,
-    `\${{ needs.choose.outputs.runner || vars.CI_HOSTED_RUNNER || 'ubuntu-24.04' }}`,
-    `\${{ needs.choose.outputs.runner || 'windows-2025' }}`,
-    `\${{ needs.choose.outputs.runner || "ubuntu-24.04" }}`,
-    `\${{ needs.choose.outputs.runner || format('{0}', 'ubuntu-24.04') }}`,
-  ];
-  for (const target of targets) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: ${target}
-    steps: []
-`,
-      },
-    });
-    const finding = (await audit(root)).find(({ rule }) => rule === "selector-contract");
-    assert.ok(finding, target);
-    assert.match(finding.message, /exactly needs\.<selector-job>\.outputs\.runner/);
-  }
-});
-
-test("selector recovery rejects conditions that can start work after cancellation", async () => {
-  const conditions = [
-    undefined,
-    `always()`,
-    `\${{ always() }}`,
-    `\${{ !cancelled() || github.ref == 'refs/heads/main' }}`,
-    `\${{ github.ref == 'refs/heads/main' && !cancelled() }}`,
-    `\${{ !cancelled() && github.ref == 'refs/heads/main' || github.actor == 'octocat' }}`,
-  ];
-  for (const condition of conditions) {
-    const conditionLine = condition === undefined ? "" : `    if: ${condition}\n`;
-    const root = await repository({
-      workflows: {
-        "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-${conditionLine}    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-    steps: []
-`,
-      },
-    });
-    const finding = (await audit(root)).find(({ rule }) => rule === "selector-contract");
-    assert.ok(finding, String(condition));
-    assert.match(finding.message, /cancel|condition/i);
-  }
-});
-
-test("selector recovery validates the exact selector dependency and job identity", async () => {
-  for (const [needs, selectorId, message] of [
-    ["[]", "choose", /must declare choose in needs/],
-    ["missing", "missing", /missing is not a workflow job/],
-  ]) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: ${needs}
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.${selectorId}.outputs.runner || 'ubuntu-24.04' }}
-    steps: []
-`,
-      },
-    });
-    const finding = (await audit(root)).find(({ rule }) => rule === "selector-contract");
-    assert.ok(finding, selectorId);
-    assert.match(finding.message, message);
-  }
-});
-
 test("read-only permissions and the selector's exact observer secret remain locally routable", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
+  test:
     permissions:
       contents: read
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     },
@@ -1610,14 +1398,10 @@ test("job permissions replace inherited workflow permissions", async () => {
     workflows: {
       "ci.yml": `permissions: write-all
 jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  test:
-    needs: choose
+  test:
     permissions:
       contents: read
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     },
@@ -1631,12 +1415,8 @@ test("workflow permissions are inherited when a workload has no job override", a
       "ci.yml": `permissions:
   contents: write
 jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     },
@@ -1674,12 +1454,9 @@ test("write-all and every write-capable GITHUB_TOKEN scope require privileged ho
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
+  test:
 ${declaration}
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
       },
@@ -1697,11 +1474,8 @@ test("deployment environments cannot run on the local fleet", async () => {
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  deploy:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  deploy:
+    runs-on: ${FLEET_LABEL}
     environment: production
     steps: []
 `,
@@ -1718,11 +1492,8 @@ test("explicit secret credentials cannot run on the local fleet", async () => {
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: ./test.sh
         env:
@@ -1743,11 +1514,8 @@ test("workflow-level secret environment values are inherited by local workloads"
 env:
   TOKEN: \${{ secrets['CROSS_REPOSITORY_TOKEN'] }}
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     },
@@ -1763,11 +1531,8 @@ test("credential-minting actions cannot run on the local fleet", async () => {
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  mint:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  mint:
+    runs-on: ${FLEET_LABEL}
     steps:
       - uses: actions/create-github-app-token@v2
 `,
@@ -1790,11 +1555,8 @@ test("exact GitHub-provided token expressions are allowed only in read-only step
   contents: read
   packages: read
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm ci
         env:
@@ -1814,12 +1576,8 @@ test("GitHub token expressions require statically read-only effective permission
     const root = await repository({
       workflows: {
         "ci.yml": `jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  test:
-    needs: choose
-${permissions}    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+${permissions}    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm ci
         env:
@@ -1854,11 +1612,8 @@ test("GitHub token aliases, case variants, and transformed expressions fail clos
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm ci
         env:
@@ -1899,11 +1654,8 @@ test("whole credential contexts and direct credential properties remain hosted",
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm test
         env:
@@ -1947,11 +1699,8 @@ test("non-credential expression lookalikes remain eligible for the local fleet",
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm test
         env:
@@ -1969,11 +1718,8 @@ test("long repeated expression prefixes without credentials remain eligible", as
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: npm test
         env:
@@ -2001,11 +1747,9 @@ test("implicit job conditions keep credential contexts off the local fleet", asy
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: ${expression} && !cancelled()
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    if: ${expression}
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
       },
@@ -2035,11 +1779,8 @@ test("implicit step conditions keep credential contexts off the local fleet", as
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - if: ${expression}
         run: npm test
@@ -2065,11 +1806,9 @@ test("implicit conditions allow static noncredential GitHub fields and quoted te
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: ${condition} && !cancelled()
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    if: ${condition}
+    runs-on: ${FLEET_LABEL}
     steps:
       - if: ${condition}
         run: npm test
@@ -2078,7 +1817,7 @@ ${SELECTOR}  test:
     });
     assert.deepEqual(
       (await audit(root)).map(({ rule }) => rule),
-      ["selector-contract"],
+      [],
       `benign implicit condition must add no credential finding: ${condition}`,
     );
   }
@@ -2090,31 +1829,22 @@ test("GitHub-provided tokens are rejected outside narrow step env/with values", 
 env:
   NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     env:
       NODE_AUTH_TOKEN: \${{ github.token }}
     steps: []
 `,
     `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     steps:
       - run: echo \${{ secrets.GITHUB_TOKEN }}
 `,
@@ -2567,13 +2297,10 @@ test("a local-routing grant admits an exactly matching environment job to select
     workflows: {
       "deploy.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  apply:
-    needs: choose
-    if: \${{ !cancelled() }}
+  apply:
     permissions:
       contents: read
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     environment: production
     steps: []
 `,
@@ -2594,14 +2321,11 @@ test("a local-routing grant admits an exactly declared write-token workload", as
     workflows: {
       "maintenance.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  check:
-    needs: choose
-    if: \${{ !cancelled() }}
+  check:
     permissions:
       contents: read
       issues: write
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     env:
       GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -2628,14 +2352,11 @@ test("a local-routing grant admits exact named secrets and credential-minting ac
     workflows: {
       "deploy.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  apply:
-    needs: choose
-    if: \${{ !cancelled() }}
+  apply:
     permissions:
       contents: read
       id-token: write
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     environment: github-iac-production
     steps:
       - id: app-token
@@ -2693,14 +2414,11 @@ test("a local-routing grant naming unexercised allowances is inventory drift", a
       workflows: {
         "deploy.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  apply:
-    needs: choose
-    if: \${{ !cancelled() }}
+  apply:
     permissions:
       contents: read
       id-token: write
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     environment: github-iac-production
 ${scenario.steps}`,
       },
@@ -2838,11 +2556,8 @@ test("a local-routing grant rejects every privilege outside its exact reviewed t
       workflows: {
         "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  workload:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  workload:
+    runs-on: ${FLEET_LABEL}
 ${scenario.job}`,
       },
     });
@@ -2868,14 +2583,11 @@ test("a local-routing grant keeps workflow-level credential env privileged", asy
 env:
   TOKEN: \${{ secrets.APP_PRIVATE_KEY }}
 jobs:
-  choose:
-${SELECTOR}  workload:
-    needs: choose
-    if: \${{ !cancelled() }}
+  workload:
     permissions:
       contents: read
       issues: write
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     steps: []
 `,
     },
@@ -2922,14 +2634,11 @@ jobs:
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  workload:
-    needs: choose
-    if: \${{ !cancelled() }}
+  workload:
     permissions:
       contents: read
       issues: write
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${FLEET_LABEL}
     container: ghcr.io/melodic-software/builder:1
     steps: []
 `,
@@ -2963,17 +2672,14 @@ test("a local-routing grant never applies to a reusable-call job", async () => {
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot]
 `,
     },
@@ -3140,155 +2846,8 @@ test("local-routing grant structure rejects malformed permission maps and fields
   }
 });
 
-test("obsolete full selector SHA is rejected unless that exact path@SHA is approved", async () => {
-  const obsolete = "fedcba9876543210fedcba9876543210fedcba98";
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, obsolete)}`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /path@SHA.*allowlist/);
-});
-
-test("production selector allowlist contains only independently reviewed commits", async () => {
-  const selectorShas = [PRODUCTION_SHA, LATEST_SELECTOR_SHA, SELF_HOSTED_ONLY_SELECTOR_SHA];
-  assert.deepEqual(
-    BASE_POLICY.approvedSelectorReferences,
-    selectorShas.map((sha) => `${SELECTOR_PATH}@${sha}`),
-  );
-  assert.deepEqual(BASE_POLICY.approvedSelectorReferencesByRepositoryOwner, {
-    "melodic-software": [
-      `${SELECTOR_PATH}@${LOCAL_SELECTOR_SHA}`,
-      `${SELECTOR_PATH}@${LIVENESS_SELECTOR_SHA}`,
-      `${SELECTOR_PATH}@${SECURITY_HARDENING_SHA}`,
-      `${SELECTOR_PATH}@${DEPENDABOT_ROUTING_SHA}`,
-      `${SELECTOR_PATH}@${REVIEW_TIER_SELECTOR_SHA}`,
-      `${SELECTOR_PATH}@${MERGE_GROUP_ROUTING_SHA}`,
-      `${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`,
-      `${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`,
-      `${SELECTOR_PATH}@${PATHS_FILE_LANE_SHA}`,
-      `${SELECTOR_PATH}@${INLINE_COMMENT_LANE_SHA}`,
-      `${SELECTOR_PATH}@${DROP_PROOF_GRANT_LANE_SHA}`,
-      `${SELECTOR_PATH}@${AVAILABILITY_RULING_LANE_SHA}`,
-      `${SELECTOR_PATH}@${BILLING_AWARE_ROUTING_LANE_SHA}`,
-      `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_14_2}`,
-      `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_17_0}`,
-      `${SELECTOR_PATH}@${REPINE_LANE_SHA_V0_17_2}`,
-    ],
-  });
-  for (const sha of selectorShas) {
-    const reference = `${SELECTOR_PATH}@${sha}`;
-    assert.deepEqual(BASE_POLICY.approvedSelectorInputContracts[reference], {
-      allowedInputs: ["self-hosted-labels-json"],
-    });
-  }
-  for (const sha of [
-    ANCILLARY_OPT_IN_SELECTOR_SHA,
-    PATHS_FILE_LANE_SHA,
-    INLINE_COMMENT_LANE_SHA,
-    DROP_PROOF_GRANT_LANE_SHA,
-    AVAILABILITY_RULING_LANE_SHA,
-    BILLING_AWARE_ROUTING_LANE_SHA,
-    REPINE_LANE_SHA_V0_14_2,
-    REPINE_LANE_SHA_V0_17_0,
-    REPINE_LANE_SHA_V0_17_2,
-  ]) {
-    const reference = `${SELECTOR_PATH}@${sha}`;
-    assert.deepEqual(BASE_POLICY.approvedSelectorInputContracts[reference], {
-      allowedInputs: [
-        "self-hosted-labels-json",
-        "admits-ancillary-events",
-        "admits-comment-events",
-      ],
-    });
-  }
-  for (const sha of selectorShas) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, sha)}`,
-      },
-    });
-    await writeFile(
-      path.join(root, "runner-policy-policy.json"),
-      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-    );
-    assert.deepEqual(await audit(root), []);
-  }
-  for (const sha of [
-    LOCAL_SELECTOR_SHA,
-    LIVENESS_SELECTOR_SHA,
-    SECURITY_HARDENING_SHA,
-    DEPENDABOT_ROUTING_SHA,
-    REVIEW_TIER_SELECTOR_SHA,
-    MERGE_GROUP_ROUTING_SHA,
-    GH_FREE_GATE_SHA,
-    ANCILLARY_OPT_IN_SELECTOR_SHA,
-    PATHS_FILE_LANE_SHA,
-  ]) {
-    const root = await repository({
-      repositoryOwner: "melodic-software",
-      workflows: {
-        "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(SHA, sha)}`,
-      },
-    });
-    await writeFile(
-      path.join(root, "runner-policy-policy.json"),
-      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-    );
-    assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
-  }
-});
-
-test("owner-scoped selector approval requires external repository identity", async () => {
-  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
-  const melodicRoot = await repository({
-    repositoryOwner: "melodic-software",
-    workflows: { "ci.yml": workflow },
-  });
-  await writeFile(
-    path.join(melodicRoot, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-  );
-  const selfDeclaredFindings = await audit(melodicRoot);
-  assert.equal(selfDeclaredFindings.length, 1);
-  assert.equal(selfDeclaredFindings[0].rule, "selector-pin");
-  assert.match(selfDeclaredFindings[0].message, /owner-scoped.*owner evidence is unavailable/);
-  assert.deepEqual(
-    await audit(melodicRoot, { githubRepository: "melodic-software/standards" }),
-    [],
-  );
-
-  const personalRoot = await repository({
-    repositoryOwner: "kyle-sexton",
-    workflows: { "ci.yml": workflow },
-  });
-  await writeFile(
-    path.join(personalRoot, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-  );
-  const personalFindings = await audit(personalRoot, {
-    githubRepository: "kyle-sexton/standards",
-  });
-  assert.equal(personalFindings.length, 1);
-  assert.equal(personalFindings[0].rule, "selector-pin");
-  assert.match(personalFindings[0].message, /not approved for repository owner kyle-sexton/);
-
-  const ownerlessRoot = await repository({ workflows: { "ci.yml": workflow } });
-  await writeFile(
-    path.join(ownerlessRoot, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-  );
-  assert.deepEqual(
-    await audit(ownerlessRoot, { githubRepository: "melodic-software/standards" }),
-    [],
-  );
-});
-
 test("GITHUB_REPOSITORY owner evidence must match reviewed inventory", async () => {
-  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, LOCAL_SELECTOR_SHA)}`;
+  const workflow = `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`;
   const root = await repository({
     repositoryOwner: "melodic-software",
     workflows: { "ci.yml": workflow },
@@ -3328,59 +2887,6 @@ test("malformed repository ownership evidence fails closed", async () => {
       () => audit(root, { githubRepository }),
       /GITHUB_REPOSITORY evidence must be an owner\/repository name/,
     );
-  }
-});
-
-test("global selector approvals remain owner-independent", async () => {
-  const workflow = `jobs:\n  choose:\n${SELECTOR.replace(SHA, PRODUCTION_SHA)}`;
-  const root = await repository({
-    repositoryOwner: "kyle-sexton",
-    workflows: { "ci.yml": workflow },
-  });
-  await writeFile(
-    path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-  );
-  assert.deepEqual(await audit(root), []);
-});
-
-test("policy schema rejects malformed or ambiguous owner-scoped approvals", async () => {
-  const invalidPolicies = [
-    {
-      approvedSelectorReferencesByRepositoryOwner: {
-        "Melodic-Software": [SELECTOR_REFERENCE],
-      },
-    },
-    {
-      approvedSelectorReferencesByRepositoryOwner: {
-        "owner-": [SELECTOR_REFERENCE],
-      },
-    },
-    {
-      approvedSelectorReferencesByRepositoryOwner: {
-        "owner--name": [SELECTOR_REFERENCE],
-      },
-    },
-    {
-      approvedSelectorReferencesByRepositoryOwner: {
-        "melodic-software": [],
-      },
-    },
-    {
-      approvedSelectorReferencesByRepositoryOwner: {
-        "melodic-software": [`${SELECTOR_PATH}@main`],
-      },
-    },
-    {
-      approvedSelectorReferences: [SELECTOR_REFERENCE],
-      approvedSelectorReferencesByRepositoryOwner: {
-        "melodic-software": [SELECTOR_REFERENCE],
-      },
-    },
-  ];
-  for (const policyOverrides of invalidPolicies) {
-    const root = await repository({ policyOverrides });
-    await assert.rejects(() => audit(root), ConfigurationError);
   }
 });
 
@@ -3430,21 +2936,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     ].allowedInputs,
     [],
   );
-  assert.deepEqual(
-    contracts[`melodic-software/ci-workflows/.github/workflows/pester.yml@${PRODUCTION_SHA}`],
-    {
-      routing: "hosted-only",
-      allowedInputs: [
-        "run",
-        "pester-version",
-        "working-directory",
-        "sparse-checkout",
-        "sparse-checkout-cone-mode",
-      ],
-      allowedSecrets: {},
-      fixedRunsOn: ["windows-2025"],
-    },
-  );
   assert.deepEqual(contracts[PULUMI_DRIFT_REUSABLE_REFERENCE], {
     routing: "hosted-only",
     allowedInputs: [],
@@ -3460,15 +2951,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     },
     fixedRunsOn: ["ubuntu-24.04"],
   });
-  assert.deepEqual(
-    contracts[`melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${PRODUCTION_SHA}`],
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      allowedInputs: ["runner"],
-      allowedSecrets: {},
-    },
-  );
   assert.deepEqual(
     contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
     {
@@ -3497,18 +2979,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       routing: "runner-input",
       runnerInput: "runner",
       allowedInputs: ["runner", "paths"],
-      allowedSecrets: {},
-    },
-  );
-  assert.deepEqual(
-    contracts[
-      `melodic-software/ci-workflows/.github/workflows/semantic-pr.yml@${FAIL_CLOSED_SEMANTIC_PR_SHA}`
-    ],
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      selectorResultInput: "prerequisite-result",
-      allowedInputs: ["runner", "prerequisite-result"],
       allowedSecrets: {},
     },
   );
@@ -3549,346 +3019,13 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       },
     );
   }
-  for (const [workflow, allowedInputs] of [
-    ["semantic-pr.yml", ["runner", "prerequisite-result"]],
-    ["do-not-merge-gate.yml", ["runner", "prerequisite-result", "label"]],
-    ["pr-issue-linkage.yml", ["runner", "prerequisite-result", "exempt-authors"]],
-  ]) {
-    assert.deepEqual(
-      contracts[
-        `melodic-software/ci-workflows/.github/workflows/${workflow}@${PREREQUISITE_GATE_RUNNER_SHA}`
-      ],
-      {
-        routing: "runner-input",
-        runnerInput: "runner",
-        selectorResultInput: "prerequisite-result",
-        allowedInputs,
-        allowedSecrets: {},
-      },
-    );
-  }
 });
 
-test("policy rejects invalid selector-result contract shapes", async () => {
-  for (const contract of [
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      selectorResultInput: "runner",
-      allowedInputs: ["runner"],
-      allowedSecrets: {},
-    },
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      selectorResultInput: "prerequisite-result",
-      allowedInputs: ["runner"],
-      allowedSecrets: {},
-    },
-    {
-      routing: "hosted-only",
-      selectorResultInput: "prerequisite-result",
-      allowedInputs: ["prerequisite-result"],
-      allowedSecrets: {},
-      fixedRunsOn: ["ubuntu-24.04"],
-    },
-  ]) {
-    const root = await repository({
-      policyOverrides: {
-        approvedReusableWorkflowContracts: {
-          [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: contract,
-        },
-      },
-    });
-    await assert.rejects(() => audit(root), ConfigurationError);
-  }
-});
-
-test("selector policy must use the governed variable expression, not hosted-only", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(CANONICAL_POLICY_EXPRESSION, "hosted-only")}`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /selector inputs\.policy must be exactly/);
-});
-
-test("selector policy rejects arbitrary variable indirection", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        CANONICAL_POLICY_EXPRESSION,
-        ARBITRARY_POLICY_EXPRESSION,
-      )}`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /selector inputs\.policy must be exactly/);
-});
-
-test("selector self-hosted-label accepts the governed review-tier variable", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
-        REVIEW_SELF_HOSTED_LABEL_EXPRESSION,
-      )}`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("selector self-hosted-label rejects an ungoverned variable expression", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
-        ARBITRARY_SELF_HOSTED_LABEL_EXPRESSION,
-      )}`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /selector inputs\.self-hosted-label must be one of/);
-});
-
-test("selector accepts the admits-ancillary-events boolean opt-in", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: true\n`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("selector accepts the deprecated admits-comment-events alias", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-comment-events: true\n`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("selector rejects a boolean opt-in set to a non-reviewed value", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: false\n`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(
-    findings[0].message,
-    /selector inputs\.admits-ancillary-events must be exactly true/,
-  );
-});
-
-test("selector rejects a boolean opt-in passed as a quoted string", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-ancillary-events: "true"\n`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(
-    findings[0].message,
-    /selector inputs\.admits-ancillary-events must be exactly true/,
-  );
-});
-
-test("selector rejects an unregistered boolean opt-in input", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR}      admits-unknown-events: true\n`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /has unapproved properties: admits-unknown-events/);
-});
-
-test("selector accepts admits-ancillary-events on the owner-scoped v0.8.0 revision", async () => {
-  const root = await repository({
-    repositoryOwner: "melodic-software",
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        SHA,
-        ANCILLARY_OPT_IN_SELECTOR_SHA,
-      )}      admits-ancillary-events: true\n`,
-    },
-    policyOverrides: {
-      approvedSelectorReferences: [],
-      approvedSelectorReferencesByRepositoryOwner: {
-        "melodic-software": [`${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`],
-      },
-      approvedSelectorInputContracts: {
-        [`${SELECTOR_PATH}@${ANCILLARY_OPT_IN_SELECTOR_SHA}`]: {
-          allowedInputs: [
-            "self-hosted-labels-json",
-            "admits-ancillary-events",
-            "admits-comment-events",
-          ],
-        },
-      },
-    },
-  });
-  assert.deepEqual(await audit(root, { githubRepository: "melodic-software/standards" }), []);
-});
-
-test("admits-ancillary-events on an unapproved selector revision fails closed", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        SHA,
-        "abcabcabcabcabcabcabcabcabcabcabcabcabca",
-      )}      admits-ancillary-events: true\n`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /not in the reviewed approval allowlist/);
-});
-
-test("admits-ancillary-events on a pre-v0.8.0 approved selector revision fails closed", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        SHA,
-        PRODUCTION_SHA,
-      )}      admits-ancillary-events: true\n`,
-    },
-    policyOverrides: {
-      approvedSelectorReferences: [`${SELECTOR_PATH}@${PRODUCTION_SHA}`],
-      approvedSelectorInputContracts: {
-        [`${SELECTOR_PATH}@${PRODUCTION_SHA}`]: {
-          allowedInputs: ["self-hosted-labels-json"],
-        },
-      },
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /has unapproved properties: admits-ancillary-events/);
-});
-
-test("admits-ancillary-events on a pre-v0.8.0 owner-scoped revision fails closed", async () => {
-  const root = await repository({
-    repositoryOwner: "melodic-software",
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        SHA,
-        GH_FREE_GATE_SHA,
-      )}      admits-ancillary-events: true\n`,
-    },
-    policyOverrides: {
-      approvedSelectorReferences: [],
-      approvedSelectorReferencesByRepositoryOwner: {
-        "melodic-software": [`${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`],
-      },
-      approvedSelectorInputContracts: {
-        [`${SELECTOR_PATH}@${GH_FREE_GATE_SHA}`]: {
-          allowedInputs: ["self-hosted-labels-json"],
-        },
-      },
-    },
-  });
-  const findings = await audit(root, { githubRepository: "melodic-software/standards" });
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /has unapproved properties: admits-ancillary-events/);
-});
-
-test("policy schema rejects a boolean opt-in value other than true", async () => {
-  const root = await repository({
-    policyOverrides: { optionalBooleanSelectorInputs: { "admits-ancillary-events": false } },
-  });
-  await assert.rejects(() => audit(root), ConfigurationError);
-});
-
-test("policy rejects a boolean opt-in input that duplicates an optional string input", async () => {
-  const root = await repository({
-    policyOverrides: { optionalBooleanSelectorInputs: { "self-hosted-labels-json": true } },
-  });
-  await assert.rejects(() => audit(root), ConfigurationError);
-});
-
-test("policy rejects a boolean opt-in input that duplicates a canonical input", async () => {
-  const root = await repository({
-    policyOverrides: { optionalBooleanSelectorInputs: { "self-hosted-label": true } },
-  });
-  await assert.rejects(() => audit(root), ConfigurationError);
-});
-
-test("policy rejects an approved selector reference without an input contract", async () => {
-  const root = await repository({
-    policyOverrides: {
-      approvedSelectorInputContracts: {},
-    },
-  });
-  await assert.rejects(
-    () => audit(root),
-    (error) =>
-      error instanceof ConfigurationError &&
-      error.message.includes("missing an approvedSelectorInputContracts entry"),
-  );
-});
-
-test("policy rejects a selector input contract for an unapproved reference", async () => {
-  const orphanReference = `${SELECTOR_PATH}@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`;
-  const root = await repository({
-    policyOverrides: {
-      approvedSelectorInputContracts: {
-        [SELECTOR_REFERENCE]: TEST_SELECTOR_INPUT_CONTRACT,
-        [orphanReference]: { allowedInputs: [] },
-      },
-    },
-  });
-  await assert.rejects(
-    () => audit(root),
-    (error) =>
-      error instanceof ConfigurationError &&
-      error.message.includes("is not an approved selector reference"),
-  );
-});
-
-test("policy rejects a selector input contract that names an unregistered optional input", async () => {
-  const root = await repository({
-    policyOverrides: {
-      approvedSelectorInputContracts: {
-        [SELECTOR_REFERENCE]: { allowedInputs: ["admits-unknown-events"] },
-      },
-    },
-  });
-  await assert.rejects(
-    () => audit(root),
-    (error) =>
-      error instanceof ConfigurationError && error.message.includes("unregistered optional inputs"),
-  );
-});
-
-test("a claude-review caller routes to the review tier through the governed selector without findings", async () => {
-  // The shipped caller now names the fleet review label directly, so this is no
-  // longer that caller's shape; it stays because the selector remains a
-  // supported route until Phase 7 retires it, and a repository may carry both
-  // spellings mid-migration.
-  //
-  // Executable spec for the Campaign A flip: a dedicated select-review job
-  // resolves the review-tier label, and the claude-review reusable call takes
-  // its runner from that selector output under the reviewed #140 caller-perms
-  // waiver. Zero findings proves the review label threads end to end and never
-  // trips the hardcoded default-label routing-condition guards.
+test("a claude-review caller routes to the review tier without findings", async () => {
+  // Executable spec for the Campaign A flip: the claude-review reusable call
+  // names the review-tier fleet label as its runner input under the reviewed
+  // #140 caller-perms waiver. Zero findings proves the review label threads end
+  // to end and never trips the hardcoded default-label routing guards.
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
@@ -3908,10 +3045,7 @@ test("a claude-review caller routes to the review tier through the governed sele
       },
     },
     workflows: {
-      "claude-review.yml": `jobs:\n  select-review:\n${SELECTOR.replace(
-        CANONICAL_SELF_HOSTED_LABEL_EXPRESSION,
-        REVIEW_SELF_HOSTED_LABEL_EXPRESSION,
-      )}  review:\n    needs: select-review\n    if: \${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}\n    with:\n      runner: \${{ needs.select-review.outputs.runner || 'ubuntu-24.04' }}\n      skip-actors: "dependabot[bot]"\n    secrets:\n      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n`,
+      "claude-review.yml": `jobs:\n  review:\n    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}\n    with:\n      runner: ${FLEET_REVIEW_LABEL}\n      skip-actors: "dependabot[bot]"\n    secrets:\n      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n`,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -3945,17 +3079,14 @@ test("repository-required reusable inputs fail when a configured input is absent
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `,
@@ -3998,17 +3129,14 @@ test("repository-required reusable inputs are presence-only", async () => {
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot],claude[bot],melodic-ai[bot],melodic-standards-sync[bot]
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -4046,17 +3174,14 @@ test("repository-required reusable inputs pass when every configured input is pr
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot],melodic-standards-sync[bot]
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -4077,13 +3202,10 @@ test("required reusable call input inventory drift fails", async () => {
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
+  test:
     uses: ${REUSABLE_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
     },
   });
@@ -4114,13 +3236,10 @@ test("required reusable call inputs must name inputs admitted by the reviewed co
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot]
 `,
     },
@@ -4184,13 +3303,10 @@ jobs:
 `,
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     uses: ./.github/workflows/review-wrapper.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot],melodic-standards-sync[bot]
 `,
     },
@@ -4206,25 +3322,10 @@ ${SELECTOR}  review:
   );
 });
 
-test("selector observer key must use the exact governed secret expression", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n${SELECTOR.replace(
-        CANONICAL_OBSERVER_SECRET_EXPRESSION,
-        "literal-private-key",
-      )}`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /selector secrets\.observer-private-key must be exactly/);
-});
-
 test("reusable workflow caller passes the approved runner input", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: [choose]\n    if: \${{ !cancelled() }}\n    uses: ${REUSABLE_REFERENCE}\n    with:\n      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n`,
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    uses: ${REUSABLE_REFERENCE}\n    with:\n      runner: ${FLEET_LABEL}\n`,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -4253,17 +3354,14 @@ test("reviewed runner-input workflow may receive one exact local permission boun
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot]
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -4300,13 +3398,10 @@ test("the reviewed caller permission waiver applies only to selector-routed call
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
 ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot]
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -4430,15 +3525,12 @@ test("runner-input local permission boundary rejects every caller permission dri
       workflows: {
         "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       ${permissions}
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `,
@@ -4456,14 +3548,14 @@ test("reviewed caller permissions do not authorize other credential surfaces", a
     {
       label: "write-all",
       allowedInputs: ["runner", "skip-actors"],
-      condition: `    if: \${{ !cancelled() }}\n`,
+      condition: "",
       permissions: "    permissions: write-all\n",
       input: "",
     },
     {
       label: "secret-bearing input",
       allowedInputs: ["runner", "skip-actors", "prompt"],
-      condition: `    if: \${{ !cancelled() }}\n`,
+      condition: "",
       permissions:
         "    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n",
       input: `      prompt: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n`,
@@ -4471,7 +3563,7 @@ test("reviewed caller permissions do not authorize other credential surfaces", a
     {
       label: "credential condition",
       allowedInputs: ["runner", "skip-actors"],
-      condition: `    if: \${{ !cancelled() && secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}\n`,
+      condition: `    if: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}\n`,
       permissions:
         "    permissions:\n      contents: read\n      pull-requests: write\n      id-token: write\n",
       input: "",
@@ -4498,12 +3590,10 @@ test("reviewed caller permissions do not authorize other credential surfaces", a
       workflows: {
         "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
+  review:
 ${scenario.condition}${scenario.permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       skip-actors: dependabot[bot]
 ${scenario.input}    secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -4536,17 +3626,14 @@ test("reviewed caller secret mapping remains exact", async () => {
     workflows: {
       "claude-review.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  review:
-    needs: choose
-    if: \${{ !cancelled() }}
+  review:
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}-suffix
 `,
@@ -4678,13 +3765,10 @@ const MINIMUM_PERMISSION_CONTRACT = (minimumCallerPermissions, overrides = {}) =
 
 function minimumPermissionCaller(jobPermissions, { workflowPermissions = "read-all" } = {}) {
   return `${workflowPermissions === null ? "" : `permissions: ${workflowPermissions}\n`}jobs:
-  choose:
-${SELECTOR}  gate:
-    needs: choose
-    if: \${{ !cancelled() }}
+  gate:
 ${jobPermissions}    uses: ${REUSABLE_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `;
 }
 
@@ -4855,13 +3939,10 @@ test("a secret-capable runner-input contract admits a statically read-only selec
       "sync.yml": `permissions:
   contents: read
 jobs:
-  choose:
-${SELECTOR}  sync:
-    needs: choose
-    if: \${{ !cancelled() }}
+  sync:
     uses: ${SYNC_RUNNER_INPUT_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
       dry-run: false
     secrets:
       app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
@@ -4883,13 +3964,10 @@ test("a secret-capable runner-input caller must pass the exact reviewed secret m
       "sync.yml": `permissions:
   contents: read
 jobs:
-  choose:
-${SELECTOR}  sync:
-    needs: choose
-    if: \${{ !cancelled() }}
+  sync:
     uses: ${SYNC_RUNNER_INPUT_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
     secrets:
       app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: \${{ secrets.OTHER_PRIVATE_KEY }}
@@ -4897,9 +3975,18 @@ ${SELECTOR}  sync:
     },
   });
   const findings = await audit(root);
+  // The mismatched secret mapping takes the call outside its reviewed
+  // contract, so the fleet label it passes as the runner input is no longer an
+  // admitted routing target: it reads as a raw managed pin alongside the
+  // contract failure.
   assert.deepEqual(
     findings.map(({ rule }) => rule),
-    ["hosted-exception-required", "privileged-hosted-only", "runner-target-contract"],
+    [
+      "hosted-exception-required",
+      "privileged-hosted-only",
+      "raw-self-hosted-label",
+      "runner-target-contract",
+    ],
   );
   assert.ok(
     findings.some(({ message }) =>
@@ -4919,16 +4006,13 @@ test("a secret-capable runner-input contract does not waive caller write permiss
       "sync.yml": `permissions:
   contents: read
 jobs:
-  choose:
-${SELECTOR}  sync:
-    needs: choose
-    if: \${{ !cancelled() }}
+  sync:
     permissions:
       contents: read
       issues: write
     uses: ${SYNC_RUNNER_INPUT_REFERENCE}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
     secrets:
       app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
       app-private-key: \${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
@@ -4985,280 +4069,21 @@ jobs:
   );
 });
 
-test("fail-closed reusable gate reports every selector result", async () => {
-  const root = await repository({
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          selectorResultInput: "prerequisite-result",
-          allowedInputs: ["runner", "prerequisite-result"],
-          allowedSecrets: {},
-        },
-      },
-    },
-    workflows: {
-      "pr-title.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  pr-title:
-    needs: choose
-    if: \${{ always() }}
-    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
-    with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: \${{ needs.choose.result }}
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("fail-closed reusable gate requires exact always and selector-result mapping", async () => {
-  for (const [condition, result] of [
-    [`\${{ !cancelled() }}`, `\${{ needs.choose.result }}`],
-    [`\${{ always() }}`, `\${{ needs.other.result }}`],
-    [`\${{ always() }}`, undefined],
-  ]) {
-    const resultMapping = result === undefined ? "" : `      prerequisite-result: ${result}\n`;
-    const root = await repository({
-      policyOverrides: {
-        approvedReusableWorkflowContracts: {
-          [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
-            routing: "runner-input",
-            runnerInput: "runner",
-            selectorResultInput: "prerequisite-result",
-            allowedInputs: ["runner", "prerequisite-result"],
-            allowedSecrets: {},
-          },
-        },
-      },
-      workflows: {
-        "pr-title.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  pr-title:
-    needs: choose
-    if: ${condition}
-    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
-    with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-${resultMapping}`,
-      },
-    });
-    assert.ok((await audit(root)).some(({ rule }) => rule === "selector-contract"));
-  }
-});
-
-test("fail-closed reusable gate rejects additional prerequisites", async () => {
-  const root = await repository({
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          selectorResultInput: "prerequisite-result",
-          allowedInputs: ["runner", "prerequisite-result"],
-          allowedSecrets: {},
-        },
-      },
-    },
-    workflows: {
-      "pr-title.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  setup:
-    runs-on: ubuntu-24.04
-    steps:
-      - run: exit 1
-  pr-title:
-    needs: [choose, setup]
-    if: \${{ always() }}
-    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
-    with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: \${{ needs.choose.result }}
-`,
-    },
-  });
-  const findings = await audit(root);
-  assert.ok(
-    findings.some(
-      ({ rule, message }) =>
-        rule === "selector-contract" && /must declare exactly needs: choose/.test(message),
-    ),
-  );
-});
-
-test("repository-local workflows cannot wrap fail-closed selector-result gates", async () => {
-  const root = await repository({
-    exceptions: {
-      ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "docker-socket",
-        justification:
-          "An exception cannot make a wrapper around a selector-result contract trustworthy.",
-      },
-    },
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          selectorResultInput: "prerequisite-result",
-          allowedInputs: ["runner", "prerequisite-result"],
-          allowedSecrets: {},
-        },
-      },
-    },
-    workflows: {
-      "semantic-wrapper.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        default: ubuntu-24.04
-      prerequisite-result:
-        type: string
-        default: success
-jobs:
-  wrapped:
-    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
-    with:
-      runner: \${{ inputs.runner }}
-      prerequisite-result: \${{ inputs.prerequisite-result }}
-`,
-      "pr-title.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  pr-title:
-    needs: choose
-    if: \${{ !cancelled() }}
-    uses: ./.github/workflows/semantic-wrapper.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: success
-`,
-    },
-  });
-  const findings = await audit(root);
-  assert.ok(
-    findings.some(
-      ({ rule, message }) =>
-        rule === "runner-target-contract" &&
-        /cannot wrap a selector-result reporting contract/.test(message),
-    ),
-  );
-});
-
-test("co-triggered repository-local workflows cannot wrap fail-closed selector-result gates", async () => {
-  const root = await repository({
-    exceptions: {
-      ".github/workflows/semantic-wrapper.yml#wrapped": {
-        reason: "docker-socket",
-        justification:
-          "An exception cannot make a co-triggered wrapper around a selector-result contract trustworthy.",
-      },
-    },
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [FAIL_CLOSED_SEMANTIC_PR_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          selectorResultInput: "prerequisite-result",
-          allowedInputs: ["runner", "prerequisite-result"],
-          allowedSecrets: {},
-        },
-      },
-    },
-    workflows: {
-      "semantic-wrapper.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        default: ubuntu-24.04
-      prerequisite-result:
-        type: string
-        default: success
-  workflow_dispatch:
-jobs:
-  wrapped:
-    uses: ${FAIL_CLOSED_SEMANTIC_PR_REFERENCE}
-    with:
-      runner: \${{ inputs.runner }}
-      prerequisite-result: \${{ inputs.prerequisite-result }}
-`,
-      "pr-title.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  pr-title:
-    needs: choose
-    if: \${{ !cancelled() }}
-    uses: ./.github/workflows/semantic-wrapper.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-      prerequisite-result: success
-`,
-    },
-  });
-  const findings = await audit(root);
-  assert.ok(
-    findings.some(
-      ({ rule, message }) =>
-        rule === "runner-target-contract" &&
-        /cannot wrap a selector-result reporting contract/.test(message),
-    ),
-  );
-});
-
-test("reusable workflow callers use the same literal fallback and cancellation contract", async () => {
-  for (const [condition, runner] of [
-    [`\${{ always() }}`, `\${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}`],
-    [
-      `\${{ !cancelled() }}`,
-      `\${{ needs.choose.outputs.runner || vars.CI_HOSTED_RUNNER || 'ubuntu-24.04' }}`,
-    ],
-  ]) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: ${condition}
-    uses: ${REUSABLE_REFERENCE}
-    with:
-      runner: ${runner}
-`,
-      },
-    });
-    assert.ok(
-      (await audit(root)).some(({ rule }) => rule === "selector-contract"),
-      `${condition} / ${runner}`,
-    );
-  }
-});
-
 test("unreviewed reusable workflow cannot forward an approved selector output", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  attack:
-    needs: choose
-    if: \${{ !cancelled() }}
+  attack:
     uses: attacker/unreviewed/.github/workflows/arbitrary.yml@${SHA}
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
     },
   });
   assert.deepEqual(
     (await audit(root)).map(({ rule }) => rule),
-    ["hosted-exception-required", "runner-target-contract"],
+    ["hosted-exception-required", "raw-self-hosted-label", "runner-target-contract"],
   );
 });
 
@@ -6681,78 +5506,6 @@ test("Dependabot SHA bump that resolves run defaults through a needs indirection
   );
 });
 
-// Regression test: the compared auto-approval surface (workflow_call,
-// permissions, routing, credentials) proves a bumped SHA's caller-facing
-// contract and execution boundary are unchanged, but a selectorResultInput
-// contract is trusted for something outside that surface entirely: that the
-// called workflow's own steps still fail the job when the forwarded
-// needs.<selector>.result did not succeed. Nothing in the compared surface
-// inspects the reusable workflow's steps, so a bumped SHA could silently
-// stop honoring that input (always exiting 0) while every compared field
-// stays identical, defeating the fail-closed guarantee a required check
-// relies on. Auto-approval must decline every selector-result contract.
-test("Dependabot SHA bump of a selector-result reporter contract is declined regardless of surface match", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [REUSABLE_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          selectorResultInput: "prerequisite-result",
-          allowedInputs: ["runner", "prerequisite-result"],
-          allowedSecrets: {},
-        },
-      },
-    },
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-      prerequisite-result: success
-`,
-    },
-  });
-  const selectorResultBasisSource = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-      prerequisite-result:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    if: \${{ inputs.prerequisite-result == 'success' }}
-    steps: []
-`;
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: selectorResultBasisSource,
-      [DEPENDABOT_BUMP_SHA]: selectorResultBasisSource,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: ${REUSABLE_PATH} is a fail-closed selector-result reporter; its required-check behavior cannot be proven unchanged by this surface diff, so auto-approval is declined`,
-    ),
-  );
-});
-
 // Regression test: allowedCallerPermissions is trusted for something the
 // compared auto-approval surface (workflow_call, permissions, routing,
 // credential references) cannot observe -- that the called workflow's steps
@@ -6806,7 +5559,7 @@ test("Dependabot SHA bump of an allowedCallerPermissions contract is declined re
 // mapping lets a statically read-only caller forward those exact reviewed
 // secrets to a workflow executing on a caller-chosen runner. What a bumped
 // SHA's steps do with a forwarded secret sits outside the compared surface,
-// exactly like selectorResultInput and allowedCallerPermissions, so
+// exactly like allowedCallerPermissions, so
 // auto-approval must decline every secret-capable runner-input contract even
 // when the structural surface is otherwise unchanged.
 test("Dependabot SHA bump of a secret-capable runner-input contract is declined regardless of surface match", async () => {
@@ -7285,13 +6038,10 @@ test("repository-local runner-input workflow accepts the governed selector outpu
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() }}
+  build:
     uses: ./.github/workflows/build.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
       "build.yml": `on:
   workflow_call:
@@ -7307,162 +6057,6 @@ jobs:
     },
   });
   assert.deepEqual(await audit(root), []);
-});
-
-test("required repository-local runner input accepts only a proven self-hosted selector output", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-${selectorFailureJob()}
-`,
-      "build.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("required no-default local runner calls require a matching failure sentinel", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-`,
-      "build.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`,
-    },
-  });
-  assert.deepEqual(
-    (await audit(root))
-      .filter(({ rule }) => rule === "selector-failure-sentinel-required")
-      .map(({ job }) => job),
-    ["build"],
-  );
-});
-
-test("a failure sentinel in another workflow cannot satisfy required routing", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-`,
-      "guard.yml": selectorFailureWorkflow(),
-      "build.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`,
-    },
-  });
-  assert.ok(
-    (await audit(root)).some(
-      ({ rule, file, job }) =>
-        rule === "selector-failure-sentinel-required" &&
-        file === ".github/workflows/ci.yml" &&
-        job === "build",
-    ),
-  );
-});
-
-test("required local runner input rejects weak routes and ambiguous declarations", async () => {
-  const caller = (condition) => `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: ${condition}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-`;
-  const called = (declaration) => `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-${declaration}
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-  const validCondition = `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}`;
-  for (const [label, condition, declaration] of [
-    ["weak condition", `\${{ !cancelled() }}`, "        required: true"],
-    [
-      "missing nonempty proof",
-      `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}`,
-      "        required: true",
-    ],
-    [
-      "required input with a default",
-      validCondition,
-      "        required: true\n        default: ubuntu-24.04",
-    ],
-    ["non-boolean required value", validCondition, '        required: "true"'],
-    ["optional input without its governed default", validCondition, "        required: false"],
-  ]) {
-    const root = await repository({
-      workflows: { "ci.yml": caller(condition), "build.yml": called(declaration) },
-    });
-    const findings = await audit(root);
-    assert.ok(findings.length > 0, `${label} must fail closed`);
-    assert.ok(
-      findings.some(
-        ({ message }) =>
-          message.includes("required no-default") ||
-          message.includes("required string with no default") ||
-          message.includes("required local runner inputs"),
-      ),
-      `${label} must report the runner-input contract`,
-    );
-  }
 });
 
 test("required repository-local runner input must be supplied by every caller", async () => {
@@ -7489,263 +6083,6 @@ jobs:
   assert.ok(
     (await audit(root)).some(({ message }) => message.includes("omits required inputs: runner")),
   );
-});
-
-function selectorFailureJob({
-  jobId = "reject-route",
-  selectorId = "choose",
-  needs = selectorId,
-  condition = `\${{ !cancelled() && (needs.${selectorId}.result != 'success' || !(needs.${selectorId}.outputs.route == 'self-hosted' && needs.${selectorId}.outputs.runner != '' && needs.${selectorId}.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}`,
-  target = BASE_POLICY.governedReusableRunnerInput.failureSentinel,
-  stepName = BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
-  timeout = 1,
-  permissions = "{}",
-  extra = "",
-  run = 'echo "::error::A governed self-hosted route is required"\n          exit 1',
-} = {}) {
-  return `  ${jobId}:
-    needs: ${needs}
-    if: ${condition}
-    runs-on: ${target}
-    timeout-minutes: ${timeout}
-    permissions: ${permissions}
-${extra}    steps:
-      - name: ${stepName}
-        shell: bash
-        run: |
-          ${run}
-`;
-}
-
-function selectorFailureWorkflow(options = {}) {
-  return `jobs:
-  choose:
-${SELECTOR}${selectorFailureJob(options)}`;
-}
-
-test("hosted selector failure sentinel accepts only the exact selector rejection topology", async () => {
-  const root = await repository({ workflows: { "ci.yml": selectorFailureWorkflow() } });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("one matching sentinel covers multiple required callers sharing a selector", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build-one:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-  build-two:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-${selectorFailureJob()}
-`,
-      "build.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-test("a sentinel for another selector or duplicate sentinels cannot satisfy pairing", async () => {
-  const called = `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-  const caller = (sentinels) => `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  alternate:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-${sentinels}`;
-
-  for (const [label, sentinels] of [
-    ["wrong selector", selectorFailureJob({ selectorId: "alternate" })],
-    [
-      "duplicates",
-      selectorFailureJob({ jobId: "reject-one" }) + selectorFailureJob({ jobId: "reject-two" }),
-    ],
-  ]) {
-    const root = await repository({
-      workflows: { "ci.yml": caller(sentinels), "build.yml": called },
-    });
-    assert.ok(
-      (await audit(root)).some(
-        ({ rule, job }) => rule === "selector-failure-sentinel-required" && job === "build",
-      ),
-      `${label} must fail pairing`,
-    );
-  }
-});
-
-test("an invalid sentinel leaves required no-default routing unpaired", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL }}
-    uses: ./.github/workflows/build.yml
-    with:
-      runner: \${{ needs.choose.outputs.runner }}
-${selectorFailureJob({ condition: `\${{ !cancelled() }}` })}
-`,
-      "build.yml": `on:
-  workflow_call:
-    inputs:
-      runner:
-        type: string
-        required: true
-jobs:
-  test:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`,
-    },
-  });
-  const findings = await audit(root);
-  assert.ok(findings.some(({ rule }) => rule === "selector-failure-sentinel-required"));
-  assert.ok(
-    findings.some(({ rule, job }) => rule === "selector-contract" && job === "reject-route"),
-  );
-});
-
-test("hosted selector failure sentinel rejects every widened execution surface", async () => {
-  for (const [label, overrides] of [
-    ["wrong literal", { target: "another-unmatched-label" }],
-    ["wrong marker", { stepName: "Reject non-governed route" }],
-    ["multiple needs", { needs: "[choose, choose]" }],
-    ["weak condition", { condition: `\${{ !cancelled() }}` }],
-    [
-      "selector-failure skip",
-      {
-        condition: `\${{ !cancelled() && needs.choose.result == 'success' && !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL) }}`,
-      },
-    ],
-    [
-      "noncomplementary condition",
-      {
-        condition: `\${{ !cancelled() && needs.choose.result == 'success' && needs.choose.outputs.route != 'self-hosted' }}`,
-      },
-    ],
-    ["long timeout", { timeout: 2 }],
-    ["read permission", { permissions: "{ contents: read }" }],
-    ["environment", { extra: "    env:\n      VALUE: present\n" }],
-    ["action call", { extra: "    uses: owner/workflow/.github/workflows/a.yml@main\n" }],
-    ["secret mapping", { extra: "    secrets: inherit\n" }],
-    [
-      "extra command",
-      {
-        run: 'echo "::error::A governed self-hosted route is required"\n          echo unsafe\n          exit 1',
-      },
-    ],
-    ["nonfailing command", { run: 'echo "::error::A governed self-hosted route is required"' }],
-  ]) {
-    const root = await repository({
-      workflows: { "ci.yml": selectorFailureWorkflow(overrides) },
-    });
-    const findings = await audit(root);
-    assert.ok(findings.length > 0, `${label} must fail closed`);
-  }
-});
-
-test("sentinel requires an approved selector and private self-hosted enrollment", async () => {
-  const unapprovedSelector = await repository({
-    policyOverrides: { approvedSelectorReferences: [], approvedSelectorInputContracts: {} },
-    workflows: { "ci.yml": selectorFailureWorkflow() },
-  });
-  assert.ok((await audit(unapprovedSelector)).length > 0);
-
-  const publicRepository = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: { "ci.yml": selectorFailureWorkflow() },
-  });
-  assert.ok(
-    (await audit(publicRepository)).some(({ rule }) => rule === "public-self-hosted-routing"),
-  );
-
-  const routingDisabled = await repository({
-    visibility: "private",
-    selfHostedCi: false,
-    workflows: { "ci.yml": selectorFailureWorkflow() },
-  });
-  assert.ok(
-    (await audit(routingDisabled)).some(({ rule }) => rule === "self-hosted-routing-disabled"),
-  );
-});
-
-test("legacy unroutable sentinel shape remains accepted during migration", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": selectorFailureWorkflow({
-        target: BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker,
-        stepName: "Reject non-governed route",
-      }),
-    },
-  });
-  const findings = await audit(root);
-  assert.ok(
-    findings.some(
-      ({ rule, job }) => rule === "selector-failure-sentinel-legacy" && job === "reject-route",
-    ),
-  );
-});
-
-test("hosted selector failure sentinel rejects workflow defaults that syntax-check only", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `defaults:
-  run:
-    shell: bash -n {0}
-jobs:
-  choose:
-${SELECTOR}  reject-route:
-    needs: choose
-    if: \${{ !cancelled() && (needs.choose.result != 'success' || !(needs.choose.outputs.route == 'self-hosted' && needs.choose.outputs.runner != '' && needs.choose.outputs.runner == vars.CI_SELF_HOSTED_LABEL)) }}
-    runs-on: ${BASE_POLICY.governedReusableRunnerInput.failureSentinel}
-    timeout-minutes: 1
-    permissions: {}
-    steps:
-      - name: ${BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker}
-        run: |
-          echo "::error::A governed self-hosted route is required"
-          exit 1
-`,
-    },
-  });
-  assert.ok((await audit(root)).some(({ message }) => message.includes("pin shell: bash")));
 });
 
 test("policy schema fixes the hosted sentinel label and declared marker", async () => {
@@ -7897,7 +6234,7 @@ test("an allowlist entry that is neither hosted-approved nor managed fails confi
 test("the shipped fallback default satisfies the fallback label allowlist", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -7913,7 +6250,7 @@ test("the fallback label allowlist can be extended to admit another approved def
       },
     },
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  choose:\n${SELECTOR}  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'windows-2025' }}\n    steps: []\n`,
+      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -7924,10 +6261,7 @@ test("sentinel marker is not a general local reusable runner value", async () =>
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() && needs.choose.result == 'success' }}
+  build:
     uses: ./.github/workflows/build.yml
     with:
       runner: ${BASE_POLICY.governedReusableRunnerInput.failureSentinelMarker}
@@ -7997,15 +6331,12 @@ test("local reusable calls may pass write permission only when every local job n
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  shell:
-    needs: choose
-    if: \${{ !cancelled() }}
+  shell:
     permissions:
       pull-requests: write
     uses: ./.github/workflows/mixed.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
       "mixed.yml": `on:
   workflow_call:
@@ -8033,15 +6364,12 @@ test("local reusable workflow permissions can explicitly narrow a caller write g
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() }}
+  build:
     permissions:
       pull-requests: write
     uses: ./.github/workflows/build.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
       "build.yml": `on:
   workflow_call:
@@ -8064,16 +6392,12 @@ test("local reusable dynamic jobs reject inherited write when they omit a read-o
   const root = await repository({
     workflows: {
       "ci.yml": `jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  build:
-    needs: choose
-    if: \${{ !cancelled() }}
+  build:
     permissions:
       pull-requests: write
     uses: ./.github/workflows/build.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
       "build.yml": `on:
   workflow_call:
@@ -8127,16 +6451,12 @@ test("local reusable permission narrowing is preserved through nested calls", as
   const root = await repository({
     workflows: {
       "ci.yml": `jobs:
-  choose:
-    permissions: read-all
-${SELECTOR}  call:
-    needs: choose
-    if: \${{ !cancelled() }}
+  call:
     permissions:
       pull-requests: write
     uses: ./.github/workflows/middle.yml
     with:
-      runner: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+      runner: ${FLEET_LABEL}
 `,
       "middle.yml": `on:
   workflow_call:
@@ -8517,11 +6837,8 @@ test("selector-routed job container is rejected and requires matching hosted exc
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     container: node:24
     steps: []
 `,
@@ -8544,11 +6861,8 @@ test("selector-routed services are rejected even with matching hosted exception"
     workflows: {
       "ci.yml": `permissions: read-all
 jobs:
-  choose:
-${SELECTOR}  test:
-    needs: choose
-    if: \${{ !cancelled() }}
-    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
+  test:
+    runs-on: ${FLEET_LABEL}
     services:
       postgres:
         image: postgres:18
@@ -8698,28 +7012,6 @@ test("managed label is forbidden even when listed in a matrix", async () => {
   });
   const rules = (await audit(root)).map(({ rule }) => rule);
   assert.deepEqual(rules, ["hosted-exception-required", "raw-self-hosted-label"]);
-});
-
-test("selector ref must be a full SHA", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@main\n  test:\n    needs: choose\n    if: \${{ !cancelled() }}\n    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}\n    steps: []\n`,
-    },
-  });
-  const rules = (await audit(root)).map(({ rule }) => rule);
-  assert.deepEqual(rules, ["selector-pin", "selector-contract"]);
-});
-
-test("selector cannot inherit all caller secrets", async () => {
-  const root = await repository({
-    workflows: {
-      "ci.yml": `jobs:\n  choose:\n    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@${SHA}\n    secrets: inherit\n    with:\n      policy: prefer-self-hosted\n      self-hosted-label: melodic-ubuntu-24.04-x64\n      hosted-runner: ubuntu-24.04\n      scope: organization\n      managed-runner-prefix: ci-runner-melo-\n      observer-client-id: Iv23example\n`,
-    },
-  });
-  const findings = await audit(root);
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0].rule, "selector-pin");
-  assert.match(findings[0].message, /secrets: inherit/);
 });
 
 test("unrecognized hosted reason is a configuration error", async () => {
@@ -8920,8 +7212,6 @@ test("anchored uses scalars retain provenance enforcement", async () => {
 // gate refuses it under its existing rule id.
 // ---------------------------------------------------------------------------
 
-const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
-const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
 const FLEET_LANE_CONTRACT = {
   routing: "runner-input",
   runnerInput: "runner",
@@ -8994,11 +7284,7 @@ test("a structural requirement on the fleet label never reads as grantable", asy
     const findings = await audit(root);
     const structural = findings.find(({ rule }) => rule === "structural-hosted-only");
     assert.ok(structural, description);
-    assert.equal(
-      structural.message,
-      `${description} cannot use selector or fleet-label routing`,
-      description,
-    );
+    assert.equal(structural.message, `${description} cannot use fleet-label routing`, description);
     assert.ok(
       !findings.some(({ rule }) => rule === "privileged-hosted-only"),
       `${description} is structural, not privileged`,
@@ -9469,11 +7755,12 @@ jobs:
 });
 
 test("a Phase 3.2 ci-status grant applies unchanged when the literal replaces the selector", async () => {
-  // The four github-iac/dotfiles/provisioning/medley `ci-status` grants are
-  // written against a selector-routed job. Phase 4 replaces the expression with
-  // the label and changes nothing else, so the same grant JSON must admit both
-  // spellings; if it admitted only the first, every one of those repositories
-  // would fire an unconsumed-grant drift the moment its wave landed.
+  // The four github-iac/dotfiles/provisioning/medley `ci-status` grants were
+  // written before the fleet label replaced the routing expression, and their
+  // JSON did not change when it did. The same grant must still admit the
+  // fleet-literal `ci-status` job; if it did not, every one of those
+  // repositories would fire an unconsumed-grant drift the moment its wave
+  // landed.
   const grants = {
     ".github/workflows/ci.yml#ci-status": {
       permissions: { contents: "read", "pull-requests": "write", statuses: "write" },
@@ -9486,22 +7773,6 @@ test("a Phase 3.2 ci-status grant applies unchanged when the literal replaces th
       pull-requests: write
       statuses: write
 `;
-  const selectorRouted = await repository({
-    localRoutingGrants: grants,
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  choose:
-${SELECTOR}  ci-status:
-    needs: choose
-    if: \${{ !cancelled() }}
-${jobBody}    runs-on: \${{ needs.choose.outputs.runner || 'ubuntu-24.04' }}
-    steps: []
-`,
-    },
-  });
-  assert.deepEqual(await audit(selectorRouted), []);
-
   const fleetLiteral = await repository({
     localRoutingGrants: grants,
     workflows: {
