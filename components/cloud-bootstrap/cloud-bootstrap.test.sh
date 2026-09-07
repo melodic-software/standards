@@ -183,6 +183,22 @@ degrade_case 'a fleet list whose enabledPlugins is an array' "$inv_tmp/wrong-sha
 printf '%s\n' '[]' >"$inv_tmp/bare-array.json"
 degrade_case 'a fleet list that is a bare array' "$inv_tmp/bare-array.json" \
   'is not a settings-shaped object'
+
+# The permissive side of the same gate: it is a shape test, not a content
+# test, so a settings-shaped object that declares no enabledPlugins is a valid
+# empty source and must pass. Pinned here because it is the one branch a later
+# tightening (requiring the key to be present) would silently turn into a
+# refusal, and the refusal cases above would all still pass.
+printf '%s\n' '{"extraKnownMarketplaces":{}}' >"$inv_tmp/no-enabled.json"
+empty_out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
+  CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
+  CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/no-enabled.json" bash "$script" 2>&1 >/dev/null)"
+assert_not_contains 'a fleet list with no enabledPlugins is not refused' \
+  "$empty_out" 'is not a settings-shaped object'
+assert_contains 'a fleet list with no enabledPlugins is summarised as a source' \
+  "$empty_out" 'fleet list'
+assert_contains 'a fleet list with no enabledPlugins still installs the repo declaration' \
+  "$empty_out" 'repo .claude/settings.json: 1 enabled'
 rm -rf "$inv_tmp"
 
 # README/script drift guards.
