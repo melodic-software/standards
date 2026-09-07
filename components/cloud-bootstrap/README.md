@@ -40,17 +40,20 @@ pinned versions:
   then the repo's own `.claude/settings.json`. For each, every declared
   marketplace is registered and every `enabledPlugins` entry set to `true` is
   installed, whichever marketplace it names, with one summary line per source
-  so a session log says where each install came from. The repo file is the
-  fallback while it still mirrors the fleet and the carrier of deltas once it
-  does not; a snapshot without the list (an unmanaged environment) logs that
-  and installs from the repo file alone. Only the `/opt` copy is read — the
-  environment component also leaves a world-writable fallback copy when
-  `/opt` was unwritable at cache build, and a list at a predictable path
-  there is an input any code running in a session could plant to enable a
-  plugin with no settings diff. The list is also gated on shape: JSON that is
-  not an object, or whose `enabledPlugins` is not an object, is refused with a
-  logged reason, so a wrong-shaped file degrades to the repo declaration
-  instead of silently emptying that source.
+  so a session log says where each install came from. The fleet list is the
+  required source, because it is the set this drift repair repairs against;
+  the repo file is the overlay of the deltas that repo declares beyond it (a
+  `true` entry outside the list installs, a `false` is native project-scope
+  precedence and needs nothing here). A snapshot without the list (an
+  unmanaged environment, or one whose `/opt` was unwritable at cache build)
+  logs that and skips the plugin install entirely — a deltas file is not a
+  set to install. Only the `/opt` copy is read — the environment component
+  also leaves a world-writable fallback copy when `/opt` was unwritable at
+  cache build, and a list at a predictable path there is an input any code
+  running in a session could plant to enable a plugin with no settings diff.
+  The list is also gated on shape: JSON that is not an object, or whose
+  `enabledPlugins` is not an object, is refused with a logged reason and the
+  same skip, so a wrong-shaped file never reaches the `jq` reads below it.
 
 Idempotent and best effort throughout: a failed step costs a tool or a
 plugin, never the session, and the cloud-only guard makes the script a no-op

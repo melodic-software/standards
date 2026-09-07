@@ -59,30 +59,30 @@ its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 ## Plugin install
 
 After the repo bootstrap, a generic, data-driven stage installs plugins from
-two settings-shaped files, in this order:
+one settings-shaped file: **the fleet list**,
+[`fleet-plugins.json`](fleet-plugins.json) beside this script, the one place
+the organization's cloud plugin set is declared. The script fetches it from
+the same `raw.githubusercontent.com` path the bootstrap fetches this script
+from, writes it into the snapshot at `/opt/melodic-fleet-plugins.json`
+(falling back to `/tmp/melodic-fleet-plugins.json` with a logged `WARN` when
+`/opt` is unwritable, mirroring the stamp), and installs it. Every snapshot
+gets the fleet whatever repo it was built for, and the snapshot stays
+repo-agnostic.
 
-1. **The fleet list**, [`fleet-plugins.json`](fleet-plugins.json) beside this
-   script: the one place the organization's cloud plugin set is declared.
-   The script fetches it from the same `raw.githubusercontent.com` path the
-   bootstrap fetches this script from, writes it into the snapshot at
-   `/opt/melodic-fleet-plugins.json` (falling back to
-   `/tmp/melodic-fleet-plugins.json` with a logged `WARN` when `/opt` is
-   unwritable, mirroring the stamp), and installs it. Every snapshot gets the
-   fleet whatever repo it was built for, so a repo's committed block no
-   longer has to mirror the whole catalog.
-2. **The checkout's `.claude/settings.json`**: the fallback while a repo still
-   carries a full mirrored block, and the carrier of that repo's deltas once
-   it does not (an extra marketplace, a plugin beyond the fleet, or a `false`
-   opt-out, which project scope applies over the user-scope install).
+A repo's own `.claude/settings.json` carries only the deltas it declares
+beyond the fleet (an extra marketplace, a plugin beyond the fleet, or a
+`false` opt-out, which project scope applies over the user-scope install).
+Those are not installed here: each repo's session bootstrap applies them as
+an overlay on top of this list, from the snapshot copy, at session start (see
+the [cloud-bootstrap component](../cloud-bootstrap/README.md)).
 
-For each file, `extraKnownMarketplaces` entries are registered (`claude
-plugin marketplace add`, skipping ones already registered) and every
-`enabledPlugins` entry set to `true` is installed (`claude plugin install
-<id> --scope user -y`, skipping ones already installed). Every step is
-best-effort with a `WARN` line to the log; the whole stage skips cleanly
-when the `claude` CLI or `jq` is unavailable, a failed fleet fetch leaves
-the repo declaration as the only source for that build, and a repo that
-declares nothing beyond the fleet gets the fleet.
+`extraKnownMarketplaces` entries are registered (`claude plugin marketplace
+add`, skipping ones already registered) and every `enabledPlugins` entry set
+to `true` is installed (`claude plugin install <id> --scope user -y`,
+skipping ones already installed). Every step is best-effort with a `WARN`
+line to the log; the whole stage skips cleanly when the `claude` CLI or `jq`
+is unavailable, and a failed fleet fetch installs no plugins that build (the
+next rebuild fetches the list again).
 
 The fleet list is settings-shaped on purpose: `jq` expressions written for a
 repo's settings file read it unchanged, and
