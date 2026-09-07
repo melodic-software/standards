@@ -20,7 +20,8 @@ node components/runner-policy/runner-policy.mjs --root .
 
 The distributed component lives at `.github/standards/runner-policy/` and owns
 its own `package.json` and lockfile with exact `ajv@8.20.0` and `yaml@2.9.0`
-runtime pins. `policy.schema.json` and `repository-policy.schema.json` are the
+runtime pins. `policy.schema.json` (central policy, `schemaVersion` 4) and
+`repository-policy.schema.json` are the
 Draft 2020-12 structural authorities. Ajv compiles them in strict mode; the
 runtime retains only cross-record semantics and workflow/path checks that JSON
 Schema cannot express.
@@ -61,22 +62,21 @@ runner-policy:
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
-In a private repository with `selfHostedCi: true`, the gate job instead
-routes through the governed selector like any other eligible read-only job,
-with the approved allowlisted fallback covering selector failure. No dedicated
-category pins read-only work to hosted infrastructure: the remaining reasons
+In a private repository with `selfHostedCi: true`, the gate job instead names a
+label from `approvedManagedRunnerLabels` like any other eligible read-only job.
+No dedicated category pins read-only work to hosted infrastructure: the remaining reasons
 describe structural constraints (Windows, containers, Docker socket access),
 and while the analyzer consumes any allowlisted reason for an eligible
 read-only fixed-hosted job without validating that constraint, declaring a
 structural reason the job does not exercise is a review-time inventory
 defect, not an admitted route. A hosted-only repository sets
-`selfHostedCi: false` and keeps `exceptions` empty: selector routing is disabled,
+`selfHostedCi: false` and keeps `exceptions` empty: local routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
 fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
 event as shown so checked-in inventory cannot claim that a public repository is
 private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
-variable independently of the checked-out repository, so owner-scoped selector
-approval remains available without another workflow-controlled input.
+variable independently of the checked-out repository, so the owner-mismatch
+tripwire reads identity that no workflow-controlled input can forge.
 
 Consumers must not add an npm Dependabot entry for
 `/.github/standards/runner-policy`. That lockfile is byte-exact sync-managed
@@ -105,116 +105,26 @@ Each adopting repository carries `.github/runner-policy.json`:
 
 `repositoryOwner`, `visibility`, and `selfHostedCi` are governed inventory, not
 runtime switches. `repositoryOwner` is inventory and a mismatch tripwire only;
-it never authorizes an owner-scoped selector revision. Authorization evidence
-must come from the externally supplied `GITHUB_REPOSITORY` context. When both
-sources are present, their owners must match or analysis fails closed. Owner
-names are lowercase GitHub logins. Missing external owner evidence does not
-change globally approved selector behavior, but it cannot authorize an
-owner-scoped selector revision even when checked-in inventory declares an owner.
-
-Public repositories and repositories not enrolled for local CI cannot call the
-selector. Enrolled private repositories must route each independently scheduled
-job through a selector whose complete workflow path and 40-character commit SHA
-appear in policy schema v3's global `approvedSelectorReferences` or in the
-current owner entry under `approvedSelectorReferencesByRepositoryOwner`. The
-allowlists contain only independently reviewed production selector commits.
-Owner-scoped entries cannot also be globally approved, and malformed owners,
-malformed refs, or ownership mismatches fail closed. Updating a path@SHA or its
-owner scope remains a reviewed, data-only policy change.
-
-Workloads with the same selector inputs and secret mapping may share one
-selector job in the same workflow. Each workload still follows the direct
-dependency, runner-output, and cancellation-safe condition contract below.
-
-An approved selector call has an exact contract. Alternate variables, literals,
-extra inputs, extra secrets, and `secrets: inherit` are rejected:
-
-```yaml
-permissions: read-all
-
-jobs:
-  select-runner:
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@<APPROVED_40_CHARACTER_SHA>
-    secrets:
-      observer-private-key: ${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}
-    with:
-      policy: ${{ vars.CI_RUNNER_POLICY }}
-      self-hosted-label: ${{ vars.CI_SELF_HOSTED_LABEL }}
-      hosted-runner: ${{ vars.CI_HOSTED_RUNNER }}
-      scope: ${{ vars.CI_RUNNER_SCOPE }}
-      managed-runner-prefix: ${{ vars.CI_MANAGED_RUNNER_PREFIX }}
-      observer-client-id: ${{ vars.CI_RUNNER_OBSERVER_CLIENT_ID }}
-
-  test:
-    needs: select-runner
-    if: ${{ !cancelled() }}
-    runs-on: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
-```
-
-The workload contract deliberately has two parts. Its target is exactly
-`${{ needs.<selector-job>.outputs.runner || 'ubuntu-24.04' }}`, and the same
-selector job ID must appear in `needs`. Its job condition is exactly
-`${{ !cancelled() }}`, or begins with that status check as the first top-level
-`&&` operand when the workload already has a condition. A nested disjunction is
-safe only when the outer expression remains cancellation-gated. Missing status
-checks, `always()`, top-level `||`, a different selector dependency, a different
-hosted literal, and arbitrary target expressions fail closed.
-
-This explicit literal is the recovery path if the selector itself fails before
-producing an output. It must not use `vars.CI_HOSTED_RUNNER`: on selector
-failure, that operational value has not passed the selector's approved-hosted-
-label validation. The selector still receives `CI_HOSTED_RUNNER` as its normal
-validated input; only the caller's failure fallback is frozen to a literal from
-`fallbackLabelAllowlist`.
-
-The frozen literal must appear in `fallbackLabelAllowlist`, a set deliberately
-narrower than `approvedHostedRunnerLabels`. A label may be an approved explicit
-`runs-on` target yet still be barred from becoming the silent recovery
-fallback, so a costlier hosted tier cannot slip in as the recovery label that
-fires whenever the selector fails. The governed `default` must itself be in the
-allowlist; configuration fails closed when it is absent. The allowlist also
-admits the managed fleet label: a repository whose CI is a hard dependency on
-the self-hosted fleet (routing policy `self-hosted-only`) may freeze its
-recovery fallback to that managed label instead of a hosted one, trading the
-hosted scheduling-availability hedge for zero hosted spend: when the fleet is
-down, that repository's workloads are queued either way, so the reporter
-stalling in the queue adds no marginal harm.
-
-The `self-hosted-label` input may be either `${{ vars.CI_SELF_HOSTED_LABEL }}`
-(the default fleet tier) or `${{ vars.CI_REVIEW_SELF_HOSTED_LABEL }}` (the
-dedicated capped review tier). A review-lane caller passes the latter from a
-separate selector job so its review workload routes to that tier while the
-repository's other self-hosted jobs keep the default. Personal-repository
-callers may additionally pass
-`self-hosted-labels-json: ${{ vars.CI_SELF_HOSTED_LABELS_JSON }}`.
-
-A caller whose ancillary-event jobs, meaning `issue_comment`, `pull_request_review`,
-`pull_request_review_comment`, and `issues`, perform no checkout of PR or
-issue content may pass `admits-ancillary-events: true` (or the deprecated alias
-`admits-comment-events: true`) to opt those events into fleet routing. Only the
-literal `true` is accepted; the default is not written. The policy permits the
-input but does not verify the no-checkout premise the caller declares. That
-declaration is trusted under the same job-step review that backs a local-routing
-grant (see [`THREAT-MODEL.md`](THREAT-MODEL.md)). No other selector input or
-expression is allowed by the policy.
+it authorizes nothing. When it and the externally supplied `GITHUB_REPOSITORY`
+context are both present, their owners must match or analysis fails closed.
+Owner names are lowercase GitHub logins.
 
 ## Naming the managed fleet label directly
 
-An enrolled private repository has a second way to reach the fleet: write one of
-the labels in `approvedManagedRunnerLabels` as a plain literal, with no selector
-job. The analyzer classifies that target as `managed-literal` and
-treats it exactly as it treats an approved selector output. The same
-`localRoutingGrants` inventory admits a write-capable token on it, the same
+An enrolled private repository reaches the fleet exactly one way: write one of
+the labels in `approvedManagedRunnerLabels` as a plain literal, either directly
+in `runs-on:` or as the `runner` input of a reviewed reusable call. The analyzer
+classifies that target as `managed-literal`. The
+`localRoutingGrants` inventory admits a write-capable token on it, the
 `allowedCallerPermissions` waiver admits a reviewed reusable call whose
-`runner` input carries the label, and the same explicit-read-only floor applies
+`runner` input carries the label, and the explicit-read-only floor applies
 so an omitted or non-explicit permission mapping is still a finding.
 
 The literal is admitted only where routing is enabled, that is a repository
 whose inventory says `visibility: private` and `selfHostedCi: true`. On a
 public repository it reports `public-self-hosted-routing`, and on a private
-repository with `selfHostedCi: false` it reports `self-hosted-routing-disabled`,
-which are the same rule ids a selector call gets in those inventories. A
-repository cannot enrol itself by misdeclaring its own visibility:
+repository with `selfHostedCi: false` it reports `self-hosted-routing-disabled`.
+A repository cannot enrol itself by misdeclaring its own visibility:
 `CI_REPOSITORY_VISIBILITY` from the event is compared against the checked-in
 value and a disagreement is a configuration error, not a finding.
 
@@ -232,25 +142,22 @@ approved hosted label. Configuration fails closed when an entry carries
 surrounding whitespace, is a known GitHub-hosted label, or does not itself read
 as a managed label.
 
-`raw-self-hosted-label` keeps every case it should still catch: a literal
-containing `self-hosted`, a `vars.CI_SELF_HOSTED_LABEL` or `CI_MANAGED_RUNNER`
-reference, an unreviewed label in the managed namespace, and a reviewed managed
-label on any repository that is not an enrolled private consumer. Only the exact
+`raw-self-hosted-label` catches every case it must: any string containing
+`self-hosted`, an unreviewed label in the managed namespace, and a reviewed
+managed label on any repository that is not an enrolled private consumer. Its
+message is `raw managed runner target "<value>" is forbidden; name a label from
+policy.approvedManagedRunnerLabels`. Only the exact
 label a routing-enabled job resolves to is skipped, in `runs-on` and in an
-approved reusable call's `runner` input alike.
+approved reusable call's `runner` input alike. It is the one guard standing on
+`approvedManagedRunnerLabels`, which is why it is a rule of its own.
 
-The literal gives up what the selector provided. There is no hosted recovery
-fallback and no failure sentinel: if no runner in the fleet is online, the job
-queues instead of skipping or falling back, and no rule in this component
-changes that. The controls that answer it are elsewhere: the fleet's
+The literal has no hosted recovery path: if no runner in the fleet is online,
+the job queues instead of skipping or falling back, and no rule in this
+component changes that. The controls that answer it are elsewhere: the fleet's
 queue-depth alerting reports a managed-runner job that has waited too long, and
-bringing a second host online is an operational task, not a policy one. A lane
-where queueing is unacceptable keeps a hosted literal and a named exception.
-
-The selector remains a first-class routing target and its allowlists,
-input contracts and `selector-pin` and `selector-contract` rules are unchanged.
-A repository may carry both spellings in different workflows during a
-migration.
+bringing a second host online is an operational task, not a policy one. A job
+that must not fail hard on fleet unavailability names a hosted label or takes a
+reviewed exception instead.
 
 Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an exact path@40-character-SHA entry in
@@ -268,7 +175,7 @@ unknown secret names, and alternate expressions:
   must match every scope and access level exactly; missing scopes, additional
   scopes, `write-all`, and access drift fail closed. Omitting this field keeps
   the ordinary read-only local-workload boundary. This waiver applies only
-  while the call's runner input is genuinely selector-routed; a caller that
+  while the call's runner input carries the managed fleet label; a caller that
   instead pins a fixed hosted runner literal through the same input gets no
   permission waiver and still needs proven hosted execution under the
   `privileged-control-plane` exception category like any other write- or
@@ -311,18 +218,12 @@ unknown secret names, and alternate expressions:
   still meets the ordinary `privileged-control-plane` rules below.
   A runner-input contract whose reviewed `allowedSecrets` mapping is nonempty
   is secret-capable on its own: a statically read-only caller may forward
-  exactly that named secret mapping while selector-routed, because the
-  immutable contract, not the caller, owns the secret boundary, the same
-  way a hosted-only contract's mapping does. The caller's permissions keep
+  exactly that named secret mapping while the call routes to the managed fleet,
+  because the immutable contract, not the caller, owns the secret boundary, the
+  same way a hosted-only contract's mapping does. The caller's permissions keep
   the ordinary explicit read-only requirement unless the contract also names
   `allowedCallerPermissions`, and every secret-capable runner-input contract
   is excluded from the Dependabot auto-approval extension below.
-  A reviewed `selectorResultInput` additionally requires exact `if: ${{ always() }}`
-  and the matching `${{ needs.<selector>.result }}` mapping so a required gate
-  can report every selector outcome without authorizing general workloads to
-  run after cancellation. Repository-local reusable workflows cannot wrap this
-  contract; the selector-owning workflow must call the reviewed immutable
-  workflow directly so no wrapper can default or forge the result.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
@@ -414,23 +315,18 @@ mention `needs` at all: any occurrence of the `needs` context followed by a
 property or index accessor, matched case-insensitively because GitHub's
 expression evaluator treats context and property names case-insensitively,
 declines auto-approval regardless of what follows or how it is spelled.
-Second, a reviewed contract with `selectorResultInput` declines
-auto-approval unconditionally, even on an otherwise identical surface: that
-contract is trusted for a fail-closed guarantee, that the called workflow's
-own steps still honor the forwarded `needs.<selector>.result`, which sits
-entirely outside the compared workflow_call/permissions/routing/credential
-surface, so a bump could silently defeat it without moving anything this
-diff inspects. Third, for that same unobservable-trust reason, a reviewed
+Second, a reviewed
 contract carrying `allowedCallerPermissions`, and likewise any secret-capable
 runner-input contract (one whose reviewed `allowedSecrets` mapping is
-nonempty), declines unconditionally: each is trusted for what the called
+nonempty), declines unconditionally, even on an otherwise identical surface:
+each is trusted for what the called
 workflow's steps do with a privileged caller grant or a forwarded caller
 secret, content the compared surface never inspects. `minimumCallerPermissions`
 deliberately does not join those categories: it says nothing about what the
 called workflow's steps do, only what its `permissions:` block requests, and
 that block is itself part of the compared surface: a bump that changes it is
 already declined by the diff, and one that does not carries the same floor.
-Fourth, a called
+Third, a called
 workflow containing any commit-relative `uses:` reference, a job-level
 `./.github/workflows/<file>.yml` nested reusable workflow or a step-level
 `./…` local action, declines auto-approval on both the candidate and every
@@ -464,73 +360,20 @@ exceptions live on the actual called job instead of becoming a blanket caller
 exception.
 
 The approved production contracts at
-`99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` and the label-less scale-set
-selector fix at `029a1c37a9b86f8200ef03f6f0c54fb1e7e6cdb1` were independently
-reviewed. The self-hosted-only selector at
-`3cb83c9502da0b210c335785e250023508c4b8e3` was independently reviewed as
-well. The strict-selector scheduling fix at
-`de50a08b6093d231519ee7a4c9371db76c0a7e1e` keeps the selector control-plane
-job on the managed fleet for `self-hosted-only` while preserving the hosted
-selector for adaptive policies. The liveness-routing revision at
-`3415de3ff2fafee40e4d087eb6073d2f6952b595` routes to the managed fleet
-whenever a matching runner is online, with busy runners queueing instead of
-falling back to hosted; removes the rerun-to-hosted branch so a re-run keeps
-its original route; and reports `online-runner-count`. The revision at
-`f2d5e06757201f2fce187096a2c6fa805836c3d2` carries that selector
-byte-identical; it is approved so consumer pins adopting the repository's
-non-shallow Gitleaks scan fix keep a reviewed selector reference. The
-Dependabot-routing revision at `3931f91ccba9bfe97500196091ae2cc039672952`
-retires the Dependabot hosted-only guard with the owner's named approval:
-same-repository Dependabot runs route like pushes, sourcing the observer key
-from the organization's Dependabot secrets store, while fork and public guards
-are unchanged and the key stays confined to the selector job. Until
-`CI_RUNNER_OBSERVER_PRIVATE_KEY` is mirrored in that store, Dependabot runs
-keep falling back hosted (`missing-secret`), so rollout is fail-safe. The
-review-tier admission revision at `cdc5917c15aade1995bd810b60d818cadc635b52`
-adds `melodic-review-ubuntu-24.04-x64` to the strict `self-hosted-only`
-allowlist so a review-lane caller routes `claude-review` to the dedicated
-capped tier, while the selector control-plane job itself still runs on the
-default fleet label. A review lane must pin this revision: older approved
-revisions do not admit the review-tier label, and a `self-hosted-only` selector
-at an older pin fails closed on it (`unapproved-label`).
-The gate-event routing revision at
-`ec91c3433a8c3c0a7ebbdd239286e5a6a25eeec5` admits `merge_group` and
-`pull_request_target` to the selector's local event allowlist for
-metadata-only required gates: `merge_group` has no fork variant and only
-write-access users can enqueue one, and `pull_request_target` executes the
-trusted base-ref workflow definition. The fork guard is extended to cover
-both pull-request event names, so every fork-origin pull-request context
-still routes off the managed fleet.
-The gh-free gate revision at
-`90f1c54935203fa31b5b3d1f41531228be2c2b7f` carries the do-not-merge-gate
-label refetch rewritten onto github-script's bundled Node runtime
-(ci-workflows#144) and the hosted fallback label moved from the retired
-`ubuntu-slim` to `ubuntu-24.04` (ci-workflows#141), so metadata-only
-required gates no longer shell out to a `gh` binary the fleet image does
-not carry. Its selector diff against `ec91c343` is limited to that
-fallback-label change plus comments, and the eight reusable contracts
-registered at this revision were copied from each workflow's newest
-previously approved SHA after byte-level comparison: `claude-review`,
-`link-check`, `osv-scanner`, `pester`, and `pulumi-version-drift-check`
-are byte-identical; `semantic-pr` and `pr-issue-linkage` differ only by
-the same fallback-label change plus comments; and `zizmor` adds a
+`99ac2f8c5b09dbb785d4eaf18465cbd96c30290c` were independently reviewed. The
+revision at `f2d5e06757201f2fce187096a2c6fa805836c3d2` is approved so consumer
+pins adopting the repository's non-shallow Gitleaks scan fix keep reviewed
+reusable references.
+The revision at `90f1c54935203fa31b5b3d1f41531228be2c2b7f` registers five
+reusable contracts, each copied from that workflow's newest previously approved
+SHA after byte-level comparison: `claude-review`, `link-check`, `osv-scanner`,
+and `pulumi-version-drift-check` are byte-identical, and `zizmor` adds a
 version-pin default bump (v1.26.1 to v1.27.0) and curl timeout hardening
 with its input surface unchanged.
 No contract changes its input, secret, routing, or caller-permission
 surface.
-The ancillary-events opt-in revision at
-`e77f0126b474144708719f99795e44d0ffe2541d` (select-runner v0.8.0) adds the
-`admits-ancillary-events` selector input, with the deprecated
-`admits-comment-events` alias, which a caller sets `true` to route its
-no-checkout `issue_comment`, `pull_request_review`,
-`pull_request_review_comment`, and `issues` jobs onto the managed fleet;
-without it the selector routes those events to the hosted fallback. It carries
-no other routing-surface change and, like the other fleet-routing revisions, is
-owner-scoped to `melodic-software`.
 The Claude lane revision at `c136b27f404dd32ce3873f39a6f3443891d1c16e`
-(v0.9.1) carries the selector byte-identical to `e77f0126`; it is approved so
-the review and security lane callers pinning that revision keep a reviewed
-selector reference. Like the other fleet-routing revisions it is owner-scoped
+(v0.9.1) is owner-scoped
 to `melodic-software`. Its two lane contracts are additive against each
 workflow's newest previously approved SHA: `claude-review` (`e2951077`) gains
 the `max-reviews-per-pr` and `retry-delay-seconds` inputs, and
@@ -552,30 +395,8 @@ which already admitted it: a consumer whose ruleset makes the security check
 required needs the input to narrow the reusable's four-actor default, and
 inheriting that default silently widens a review-bypass exception
 (melodic-software/claude-code-plugins#1767).
-The PR-linkage revision at `2b14f0c06e497e4bfbe14f2792b222822b789a65`
-([v0.10.0 release][14]; parser change [ci-workflows#354][15]) preserves the
-reviewed `runner`, `prerequisite-result`, and
-`exempt-authors` input surface and declares no secrets or caller permissions.
-Its scheduling change removes the reusable's implicit hosted fallback when a
-prerequisite fails: every outcome now honors the caller-provided `runner`, while
-direct callers that omit it retain the declared `ubuntu-24.04` default. The
-required check still rejects every non-success prerequisite before body
-validation. The remaining delta replaces regex-only HTML-comment stripping
-with a tested Markdown-aware parser so literal comment markers in code spans
-and fences do not hide live linkage metadata, while unmatched code spans and
-unterminated comments continue to fail closed.
-The follow-up revision at `d25b689c1b8509c63d6516bcbe72cedb8511cc2f`
-([v0.10.1 release][16]) carries `pr-issue-linkage.yml` byte-identical to
-v0.10.0; the release contains only the independently reviewed aggregator
-documentation correction from ci-workflows#334.
-The code-masking revision at `e94438746c300b02385a7f8a2a2dcd19a7f4ad4a`
-([v0.10.2 release][17]) preserves the same workflow-call contract and runner
-routing. It masks inline, fenced, and indented Markdown code before validating
-linkage markers, so example-only metadata cannot satisfy the required check;
-24 focused parser regressions cover the resulting fail-closed behavior.
-The same revision also carries the Claude lanes, whose selector is
-byte-identical to `c136b27f`; it is approved so the review and security lane
-callers pinning it keep a reviewed selector reference, and like the other
+The revision at `e94438746c300b02385a7f8a2a2dcd19a7f4ad4a`
+([v0.10.2 release][17]) carries the Claude lanes; like the other
 fleet-routing revisions it is owner-scoped to `melodic-software`. Both lane
 contracts are byte-identical to their `c136b27f` predecessors: neither adds nor
 removes an input, changes its secret key set, changes `allowedCallerPermissions`,
@@ -593,9 +414,9 @@ security lane already drives the same tool, so it widens an existing surface
 rather than opening a new one, and no caller-visible input or permission
 changes.
 The drop-proof grant revision at `ee96bd28a43eebfa06b61aee8b518cc5b1b195b3`
-([v0.11.0 release][18]) carries the selector byte-identical to `e9443874`; it
-is approved so the review and security lane callers pinning it keep a reviewed
-selector reference, and like the other fleet-routing revisions it is
+([v0.11.0 release][18]) is
+approved so the review and security lane callers pinning it keep reviewed
+contracts, and like the other fleet-routing revisions it is
 owner-scoped to `melodic-software`. Neither lane contract adds or removes an
 input, changes its secret key set, changes `allowedCallerPermissions`, or
 changes its routing surface (`runs-on: ${{ inputs.runner }}` in both). One
@@ -615,27 +436,17 @@ from 1.0.185 to 1.0.187. No privilege widens: the appended grant drives the
 same inline-comment tool both lanes already used, and the fail-closed change
 alters check conclusions, not permissions.
 The revision at `734158c4cb6e67b0b99fd703045ac0f7f9f042d5` (v0.12.0) is
-approved on the same basis: `select-runner.yml` is byte-identical to the prior
-revision, and neither lane contract changes an input, secret, caller
-permission, or routing surface. Its payload is the security lane's two-tier
+approved on the same basis: neither lane contract changes an input, secret,
+caller permission, or routing surface. Its payload is the security lane's two-tier
 availability ruling (ci-workflows#397, docs in #398): the required check stays
 red only for the caller-drift validation skip, the shape the PR itself
 clears, while every classified external failure (auth, billing, rate-limit,
 server, `other`) concludes green with a warning annotation, the failure marker
 comment, and the incident aggregator's conclusion-independent escalation as
 the compensating alarm chain. Check conclusions change; permissions do not.
-The revision at `62bef7bab01e8532fedfa739879034a210e9e67d` (v0.14.0) is the
-first in this sequence whose selector is NOT byte-identical to its
-predecessor, so it is approved on a narrower reading. `select-runner.yml`
-gains one optional input, `billing-minutes-state` (default empty), and a new
-`prefer-hosted-while-free` policy value that routes the selector job itself
-onto the managed runner and treats an empty selection as an error rather than
-silently falling back to hosted (ci-workflows#439). Neither reaches a caller
-here: the lane components' `with:` blocks are unchanged, and
-`billing-minutes-state` is absent from both `canonicalSelectorInputs` and
-`optionalCanonicalSelectorInputs`, so a caller cannot begin passing it without
-its own review. Both lane contracts copy forward unchanged for the same
-reason. The lanes gain only additive optional inputs: `plugins`,
+The revision at `62bef7bab01e8532fedfa739879034a210e9e67d` (v0.14.0) is
+approved on a narrow reading: the lanes gain only additive optional inputs,
+`plugins`,
 `plugin-marketplaces`, `plugin-command`, `pr-number`. None is required, none
 is passed by the components, and the secret key sets, `allowedCallerPermissions`,
 and routing surface (`runs-on: ${{ inputs.runner }}` in both) stay identical.
@@ -663,10 +474,10 @@ keep `allowedInputs: ["runner"]` until a repin review re-approves the two
 inputs at that SHA, so a consumer that moves off
 `62bef7bab01e8532fedfa739879034a210e9e67d` must expect the narrower contract.
 The revision at `7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2) is
-approved on the byte-identical-selector basis: `select-runner.yml` matches
-`62bef7bab01e8532fedfa739879034a210e9e67d` exactly, and both lane reusable
-security surfaces (inputs, secrets, caller permissions, routing) are unchanged,
-so the selector input contract and both lane contracts copy forward. The
+approved on the byte-identical-surface basis: both lane reusable
+security surfaces (inputs, secrets, caller permissions, routing) are unchanged
+against `62bef7bab01e8532fedfa739879034a210e9e67d`,
+so both lane contracts copy forward. The
 caller-visible payload since v0.14.0 is the security lane declaring its
 execution verdict as `workflow_call` outputs (ci-workflows#460 / #461) so
 consumers stop grepping job logs; the bot-actor association guard on both
@@ -676,10 +487,11 @@ alignment for the disabled org security-review gate (ci-workflows#448). No
 privilege widens: no lane adds a secret, a caller permission, or a routing
 surface.
 The revision at `d26c750691b5498fab529d115b63f84aa7aecebe` (v0.17.0) is
-approved the same way: `select-runner.yml` is byte-identical to `7107b348`,
-and both lane `workflow_call` inputs, secrets, caller permissions, and
-routing (`runs-on: ${{ inputs.runner }}`) are unchanged, so the selector
-input contract and both lane contracts copy forward verbatim. Auto-approval
+approved the same way: both lane `workflow_call` inputs, secrets, caller
+permissions, and
+routing (`runs-on: ${{ inputs.runner }}`) are unchanged against
+`7107b34832a7b6db5d08d3b132621c599fbe5e50`, so
+both lane contracts copy forward verbatim. Auto-approval
 declined because both lanes bump `anthropics/claude-code-action` from
 `239e3a73` (v1.0.191) to `d40ddef4` (v1.0.195) inside the steps that pass
 `claude_code_oauth_token`; the credential-references surface records those
@@ -697,11 +509,12 @@ allowed input, or a routing surface. The shared contracts still omit
 `standards-ref` and the `STANDARDS_REVIEW_APP_*` secrets while public
 repositories execute the gate.
 The revision at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2) repeats
-that shape exactly. `select-runner.yml` is byte-identical to `d26c750`, and
-so are `standards-sync.yml` and `standards-sync-stuck-automerge-alert.yml`;
+that shape exactly. `standards-sync.yml` and
+`standards-sync-stuck-automerge-alert.yml` are byte-identical to
+`d26c750691b5498fab529d115b63f84aa7aecebe`;
 both lanes keep their `workflow_call` inputs, secrets, caller permissions,
-and `runs-on: ${{ inputs.runner }}` routing, so all four contracts and the
-selector input contract copy forward verbatim. Auto-approval declined for
+and `runs-on: ${{ inputs.runner }}` routing, so all four contracts
+copy forward verbatim. Auto-approval declined for
 the same reason again: both lanes bump `anthropics/claude-code-action` from
 `d40ddef4` (v1.0.195) to `3f854a8f` (v1.0.198) inside the steps that pass
 `claude_code_oauth_token`, which the credential-references surface records in
@@ -711,30 +524,24 @@ action pin lines and nothing else; the secret mapping is still only
 `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`. No
 privilege widens: no lane adds a secret, a caller permission, an allowed
 input, or a routing surface.
-Five further reusable contracts are registered at this revision so consumers
-still pinned to older SHAs can converge: `link-check`, `semantic-pr`,
-`do-not-merge-gate`, `pr-issue-linkage`, and `zizmor`. Each copies its terms
-forward from that workflow's newest previously approved SHA, the first four
-term-for-term and `zizmor` from `31a5b76c`, so none widens its input, secret,
-routing, or caller-permission surface. The callee-side changes the surface
-diff declined to carry are: `do-not-merge-gate`, `semantic-pr`, and
-`pr-issue-linkage` add `actions: read` for the timed-out-prerequisite
-resolver (ci-workflows#458); `link-check` reimplements its rolling-issue
+`link-check` and `zizmor` are also registered at
+`7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2) so consumers
+still pinned to older SHAs can converge. Each copies its terms
+forward from that workflow's newest previously approved SHA, `link-check`
+term-for-term and `zizmor` from
+`31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`, so neither widens its input,
+secret, routing, or caller-permission surface. The callee-side changes the
+surface diff declined to carry are: `link-check` reimplements its rolling-issue
 steps on `actions/github-script` in place of the `gh` CLI, changing only its
 credential-bearing step surface while its `workflow_call` declaration stays
 byte-identical; and `zizmor` adds an `upload-sarif` input. That input is
 deliberately absent from `allowedInputs`: uploading SARIF needs a caller
 `security-events: write` grant, which is a write-capable waiver owing its own
-review. A called workflow can only downgrade the caller's `GITHUB_TOKEN`
-permissions and never elevate them, so `do-not-merge-gate`, `semantic-pr`, and
-`pr-issue-linkage` each carry a `minimumCallerPermissions` floor of
-`pull-requests: read` and `actions: read`, the whole of what each declares at
-this revision, and a caller repinning here without granting both fails policy
-instead of failing inside the callee. The three stay on the ordinary read-only
-boundary: the floor grants nothing and every scope they request is read, so
-none names `allowedCallerPermissions`.
-Two further reusable contracts are registered at both `7107b348` (v0.14.2)
-and `d26c750` (v0.17.0) so github-iac can leave `90f1c549` (v0.6.1):
+review.
+Two further reusable contracts are registered at both
+`7107b34832a7b6db5d08d3b132621c599fbe5e50` (v0.14.2)
+and `d26c750691b5498fab529d115b63f84aa7aecebe` (v0.17.0) so github-iac can
+leave `90f1c54935203fa31b5b3d1f41531228be2c2b7f` (v0.6.1):
 `osv-scanner` and `pulumi-version-drift-check`. Each is derived from that
 workflow's `workflow_call` declaration at the admitted SHA, not copied from
 the v0.6.1 contract. `osv-scanner` now declares `scan-args`, `fail-on-vuln`,
@@ -825,8 +632,8 @@ reason. `osv-scanner` copies its terms from
 `runs-on: ${{ inputs.runner }}` routing are byte-identical at the tag, and
 `allowedInputs` stays `["runner"]`, the whole of what every caller in the fleet
 passes. It adds one term the predecessor lacks, a `minimumCallerPermissions`
-floor of `contents: read`, on the pattern the v0.14.2 review used for
-`do-not-merge-gate`, `semantic-pr` and `pr-issue-linkage`: the workflow's own
+floor of `contents: read`, on the pattern the `checks` contract already uses:
+the workflow's own
 `permissions:` block requests `contents: read`, a called workflow can only
 narrow the caller's token, so a caller granting less would pass policy and then
 fail inside the callee with no repository to read. The floor narrows rather
@@ -920,25 +727,10 @@ routing-relevant field, which cannot be safely diffed for auto-approval", is
 still unanswered, and bumping the sync reusable inside a change whose own merge
 triggers the fan-out would put an untested sync engine on the critical path.
 Both wait for a later decision that answers the `needs` question first.
-Nineteen selector revisions remain approved for an ordered consumer rollout.
-GitHub does not allow a reusable workflow to target a self-hosted runner group
-owned by a different repository owner, so these sixteen strict-scheduling
-revisions are approved only for `melodic-software`; `kyle-sexton` repositories
-cannot select them. The three older revisions remain globally approved until
-compatible consumers migrate.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
-strict consumers may route that advisory lane through the approved selector
-without Docker-socket access.
-The fail-closed required-check revision of `semantic-pr` at
-`51012e2c7b8bf74bc26e08c6446b488254a8770f` was independently reviewed. Its
-contract permits only the governed `runner` input plus `prerequisite-result`,
-which lets a caller report selector failure without making the required check
-disappear. A fail-closed caller must declare the selector as its only `needs`
-prerequisite so the forwarded result covers every dependency outcome. The
-selector and `semantic-pr` workflow expose only the governed
-runner contract; Windows Pester remains fixed to an explicit GitHub-hosted
-image. The production Claude review
+enrolled consumers may route that advisory lane onto the managed fleet
+without Docker-socket access. The production Claude review
 contract permits its general `skip-actors` string input without constraining the
 caller-owned value; every other input name remains denied by default. The
 earlier hosted-only contracts
@@ -962,25 +754,14 @@ unchanged.
 The link-check and Pulumi version-drift monitor contracts were converted to
 `runner-input` at `3dfb18452a8c6059a22e62456390d84feb10b42f`, the reviewed
 ci-workflows floor-conversion merge (Wave 1 of the private-repo hosted-floor
-elimination, melodic-software/github-iac#78), so strict consumers route these
-privileged scheduled maintenance lanes through the approved selector instead of a
+elimination, melodic-software/github-iac#78), so enrolled consumers route these
+privileged scheduled maintenance lanes onto the managed fleet instead of a
 fixed hosted image. Each names an exact `allowedCallerPermissions` of
 `contents: read` plus `issues: write`, the narrow write-capable caller token its
-rolling tracking-issue lane needs, which the policy honors only while the call is
-genuinely selector-routed; the reusables' own permissions are unchanged. Their
+rolling tracking-issue lane needs, which the policy honors only while the call's
+runner input carries the fleet label; the reusables' own permissions are
+unchanged. Their
 earlier hosted-only contracts stay registered until every consumer migrates.
-
-The prerequisite-gate contracts at
-`380612ae1d4e0cc9741efbac7b6ffb3d3da63a04`, the reviewed ci-workflows#177
-merge, move `semantic-pr`, `do-not-merge-gate`, and `pr-issue-linkage` to the
-caller-selected `runner` for every prerequisite outcome. Each retains the
-reviewed `prerequisite-result` selector-result input so an exact `always()`
-caller can report selector failure without losing its required check;
-`do-not-merge-gate` additionally permits `label`, and `pr-issue-linkage`
-additionally permits `exempt-authors`. All three secret maps remain empty.
-Private self-hosted-only callers must result-gate their fallback so the
-selector's non-empty `ci-runner-selection-failed` fallback value cannot become the
-requested runner label.
 
 The standards-sync contract was bumped to
 `ac223bbe652137cd5f3a899fac9eb42d9a7c65d4`. Its diff against the reviewed
@@ -1140,9 +921,9 @@ visibility evidence is supplied. This closes the gap where a well-intentioned
 `policy.json` edit could enable a sensitive mount for private consumers while
 simultaneously enabling it for public ones.
 
-## Selector revision lockstep
+## Contract revision lockstep
 
-A selector or approved-contract revision is never a one-repository change.
+An approved-contract revision is never a one-repository change.
 Shipping one requires every step below in order; skipping any of them is a
 known failure mode, not a shortcut:
 
@@ -1151,27 +932,26 @@ known failure mode, not a shortcut:
    squash merge; GitHub then refuses reusable-workflow resolution at that SHA,
    the pin passes review and sync, and the break surfaces only as a
    `startup_failure` on the first live dispatch.
-2. Append the new `path@SHA` to the correct allowlist scope in `policy.json`
-   (owner-scoped for strict-scheduling revisions, global otherwise), record
-   its review note above, and distribute through the normal component sync.
+2. Append the new `path@SHA` entry to `approvedReusableWorkflowContracts` in
+   `policy.json`, record its review note above, and distribute through the
+   normal component sync.
 3. Repin **every** consumer caller. Enumerate them with an org-wide code
    search for the previous SHA rather than trusting a remembered list, and
    remember that a single repository can fetch the pin in more than one
    workflow (for example a CI lane and a conformance lane); a missed
    pin-fetch step stays hidden while the PR ref keeps the old commit
    reachable and fails only after merge.
-4. Remove superseded allowlist entries once every consumer has migrated, so
-   the allowlist keeps expressing only what production may run.
+4. Retire a superseded contract entry only once every consumer has migrated
+   off it. Until then the older entry is what keeps an unconverged consumer
+   passing, which is why the allowlist reads as a history rather than a
+   snapshot.
 
-A production fleet relabel is the same class of event plus its own sites: the
-selector's label constant and strict-policy `runs-on` (gated red by the
-`ci-workflows` fleet-label-agreement tests), the `CI_SELF_HOSTED_LABEL`
-organization variable in `github-iac`, and each host's scale-set labels in
-`provisioning`. Changing the selector constant mints a new selector revision,
-so a relabel always implies the full lockstep above; live-state drift between
-those layers is not detected by any repository check and shows up as the
-selector routing hosted (adaptive policies) or refusing the label
-(`self-hosted-only`) while runner inventory looks healthy.
+A production fleet relabel is the same class of event plus its own sites:
+`approvedManagedRunnerLabels` and `managedLabelPatterns` in `policy.json`,
+every `runs-on:` and reviewed `runner` input naming the old label, and each
+host's scale-set labels in `provisioning`. Live-state drift between those
+layers is not detected by any repository check and shows up as an admitted job
+queueing against a label no host answers to.
 
 The analyzer also reports `pin-provenance-drift`: when the trailing comment on
 a 40-character `uses:` pin contains a token that reads as a short commit SHA
@@ -1194,51 +974,35 @@ whole-repository `isShaClaim` classification) and remains complementary,
 format-only for the tag form and for the exclusion boundary this analyzer
 does not have (any non-ci-workflows pin stays this heuristic's alone).
 
-For an approved reusable workflow call, pass the same cancellation-safe,
-literal-fallback expression through its canonical `runner` input:
+For a reusable workflow call, name the target through its canonical `runner`
+input:
 
 ```yaml
   test:
-    needs: select-runner
-    if: ${{ !cancelled() }}
     uses: ./.github/workflows/test.yml
     with:
-      runner: ${{ needs.select-runner.outputs.runner || 'ubuntu-24.04' }}
+      runner: melodic-ubuntu-24.04-x64
 ```
 
 The exact contract applies equally to cross-repository and repository-local
 reusable callers. Reusable workflow definitions may use
 `runs-on: ${{ inputs.runner }}` only when `workflow_call` is the file's exclusive
 trigger. The runner input must be either an optional string with the governed
-`ubuntu-24.04` default, or `required: true` with no `default`. The required form
-accepts only the raw selector output and requires the caller condition to prove
-selector success, the `self-hosted` route, a non-empty runner, and equality with
-`vars.CI_SELF_HOSTED_LABEL`. The required no-default form therefore routes only
-to the default fleet tier; the capped review tier is reached through the
-optional-default runner form above. The same caller workflow must also contain
-exactly one approved selector failure sentinel for that selector; one sentinel
-may
-cover multiple required calls sharing the selector, but a sentinel in another
-workflow or for another selector does not satisfy the contract. Optional calls
-with a governed allowlisted fallback do not require this guard. A
+`ubuntu-24.04` default, or `required: true` with no `default`; the required
+form obliges every caller to name its own target. That governed default must
+itself appear in `fallbackLabelAllowlist`, which admits fewer hosted labels
+than `approvedHostedRunnerLabels` does and additionally admits the managed
+fleet label: a label may be an approved explicit `runs-on`
+target and still be barred from becoming the label a caller lands on by
+omission, so a costlier hosted tier cannot slip in silently. Configuration
+fails closed when the default is absent from the allowlist, and when an
+allowlist entry is neither an approved hosted label nor a managed-label
+match. A
 `workflow_dispatch`, schedule, push, or other co-trigger invalidates either
 routing contract because those entry points share the workflow's `inputs`
 context. GitHub documents required reusable-workflow inputs; separately, an
-optional string without a default becomes `""`, which is why the no-fallback
-form is required rather than merely omitting `default`.[9]
-
-Required no-default routing pairs with a selector failure sentinel that runs on
-the approved hosted label `ubuntu-24.04` and fails explicitly through one shell
-step named `ci-runner-selection-failed`. That marker name is not a general
-runner target or fallback. The analyzer accepts the sentinel only for a
-selector-dependent rejection job with one selector in `needs`, the exact
-complement of a successful governed self-hosted route (including an explicit
-selector-failure arm), `timeout-minutes: 1`, `permissions: {}`, no environment,
-secrets, action, or other executable surface, and one static error annotation
-followed by `exit 1`. The legacy unroutable `runs-on: ci-runner-selection-failed`
-shape remains accepted during consumer migration, but new workflows must use the
-hosted label plus declared marker step. A condition-skipped job reports Success
-and cannot by itself make a required check fail.[11]
+optional string without a default becomes `""`, which is why the required form
+is spelled `required: true` rather than merely omitting `default`.[9]
 
 The only other dynamic `runs-on` form is a configured hosted matrix expression
 (`matrix.os` or `matrix.runner`) backed by a non-empty, static array containing
@@ -1271,12 +1035,12 @@ A job declaring `container` must use a proven hosted target and an exception
 whose reason is `job-container`. A job declaring `services` without a job
 container similarly requires `service-container`. When both are present,
 `job-container` is the governing category. An exception records why the job is
-hosted; it never authorizes selector output or a reusable `inputs.runner` value
+hosted; it never authorizes a fleet label or a reusable `inputs.runner` value
 for these structurally excluded jobs.
 
 `localRoutingGrants` is the reviewed inventory for the opposite direction: it
-admits one directly declared job that routes to the managed fleet, either
-through the approved selector output or by naming the fleet label directly,
+admits one directly declared job that reaches the managed fleet by naming the
+fleet label,
 while that job holds an exactly pinned privilege surface that would otherwise
 require hosted execution. A grant is keyed by
 `<workflow path>#<job id>`, requires a non-empty `justification`, and names:
@@ -1308,15 +1072,11 @@ require hosted execution. A grant is keyed by
   credential-minting code; a tag, branch, or other SHA stays
   privileged-hosted, and actions outside the central list cannot be granted.
 
-A grant applies only while the job genuinely routes to the managed fleet:
-either consuming the approved selector output under the unchanged
-cancellation-safe condition and literal-fallback contract, or naming the fleet
+A grant applies only while the job genuinely routes to the managed fleet, that
+is while it names the fleet
 label as a literal on a repository enrolled for local routing. A fixed hosted
 target keeps the ordinary privileged exception inventory, and job/service
-containers remain structurally hosted regardless. A grant written against a
-selector-routed job admits the same job unchanged after the expression is
-replaced by the label, which is what lets a repository move a job to the
-literal without editing its reviewed grant.
+containers remain structurally hosted regardless.
 A reusable-call (`uses:`) job never takes the grant path: its caller
 permissions flow into an external workflow whose behavior at the pinned SHA
 only the central contract review sees, so `allowedCallerPermissions` remains
@@ -1336,7 +1096,7 @@ GitHub's workflow-then-job precedence: a job-level declaration replaces the
 workflow declaration, and omitted permissions in a mapping become `none`.
 Omitting both the workflow and direct workload declaration is different:
 GitHub derives that token from repository or organization defaults, so the
-policy cannot prove it read-only. Every directly selector-routed workload must
+policy cannot prove it read-only. Every directly fleet-routed workload must
 therefore resolve explicitly to `read-all`, `{}`, or a mapping containing only
 `read`/`none`. A wholly omitted declaration, `write-all`, any individual
 `write`, and `id-token: write` require proven hosted execution plus a precise
@@ -1369,15 +1129,14 @@ statically read-only effective permissions, or under a packages-only write
 map, where the token carries exactly the `publication`-categorized authority
 per the packages-only rule above. Workflow/job environment values,
 run-script interpolation, bracket aliases, case variants, transformations, and
-user secrets remain privileged-hosted. The selector's one exact observer-secret
-mapping remains allowed because the selector is a reviewed hosted reusable
-workflow. Exact hosted-only reusable secret mappings remain governed by their
+user secrets remain privileged-hosted.
+Exact hosted-only reusable secret mappings remain governed by their
 immutable `approvedReusableWorkflowContracts` entry. GitHub notes that actions
 can access `github.token` implicitly, so full-SHA action policy and least token
 permissions remain the actual boundary; banning only one equivalent spelling
 would add no isolation.
 
-Any approved selector-routed runner-input call may carry only its exact
+Any approved fleet-routed runner-input call may carry only its exact
 reviewed named `secrets` mapping, with or without `allowedCallerPermissions`.
 After that mapping passes the reusable-workflow contract, the generic
 credential scan omits only the caller's `secrets` property; the caller's own
@@ -1388,11 +1147,12 @@ as do transformed secret expressions and `secrets: inherit`. Deployment
 environments, credential-minting actions, job containers, and services retain
 their existing hosted-only rules.
 
-The policy also forbids `ubuntu-latest`, direct `self-hosted` use, owner-prefixed
-managed scale-set labels (including tiered forms), unknown literal
+The policy also forbids `ubuntu-latest`, direct `self-hosted` use, unreviewed
+labels in the managed namespace (including tiered forms), unknown literal
 labels, and arbitrary expression/variable indirection. Hosted targets must come
-from the policy's explicit label allowlist. A policy exception permits hosted
-execution; it does not suppress the runner-target, selector-contract, or
+from the policy's explicit label allowlist, and managed targets from
+`approvedManagedRunnerLabels`. A policy exception permits hosted
+execution; it does not suppress the runner-target, reusable-contract, or
 image-version rules.
 
 The contract follows GitHub's documentation for [choosing runners for jobs][1],
@@ -1410,11 +1170,7 @@ default `GITHUB_TOKEN` permissions][7].
 [7]: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#setting-the-permissions-of-the-github_token-for-your-repository
 [8]: https://json-schema.org/draft/2020-12/json-schema-validation#section-6.4.2
 [9]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow
-[11]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions
 [12]: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow
 [13]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
-[14]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.0
-[15]: https://github.com/melodic-software/ci-workflows/pull/354
-[16]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.1
 [17]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.10.2
 [18]: https://github.com/melodic-software/ci-workflows/releases/tag/v0.11.0
