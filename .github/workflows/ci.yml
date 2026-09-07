@@ -91,7 +91,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/markdown@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: .markdownlint-cli2.jsonc
           globs: '**/*.md !components/**/fixtures/bad/**'
@@ -108,7 +108,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/powershell@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           settings: PSScriptAnalyzerSettings.psd1
           exclude: components/psscriptanalyzer/fixtures/bad
@@ -125,7 +125,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           rcfile: .shellcheckrc
           exclude: components/shellcheck/fixtures/bad
@@ -142,7 +142,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: lychee.toml
           exclude: 'components/[^/]+/fixtures/bad'
@@ -159,7 +159,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/editorconfig@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/editorconfig@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: .editorconfig-checker.json
           exclude: 'components/[^/]+/fixtures/bad/'
@@ -178,7 +178,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
-        uses: melodic-software/ci-workflows/.github/actions/gitleaks@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/gitleaks@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: .gitleaks.toml
       - name: Gitleaks contract test
@@ -196,7 +196,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/typos@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/typos@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: _typos.toml
           exclude: 'components/*/fixtures/bad/'
@@ -505,7 +505,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/ruff@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: ruff.toml
           exclude: components/ruff/fixtures/bad
@@ -525,7 +525,7 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/pyright@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: components/pyright/pyrightconfig.json
           paths: components/pyright/fixtures/good
@@ -545,7 +545,7 @@ jobs:
         # Scope at authored runtime surfaces and the conforming fixture. Bad
         # fixtures are non-conforming by design; node_modules and locks are
         # excluded by Biome's normal traversal rules.
-        uses: melodic-software/ci-workflows/.github/actions/biome@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/biome@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           config: components/biome/biome.json
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/runner-policy distribution harness/packages
@@ -600,7 +600,7 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -618,7 +618,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -634,7 +634,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
       - name: Test actionlint component
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
       # The lane caller test materializes each target through the distribution
@@ -709,7 +709,7 @@ jobs:
     # which become consumers' .github/workflows/ files — are invisible to a
     # repo-root scan. They are named explicitly so the lane audits what it
     # ships.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
     with:
       runner: ubuntu-24.04
       paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml
@@ -722,7 +722,7 @@ jobs:
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
     with:
       runner: ubuntu-24.04
 
@@ -966,7 +966,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/exec-bit@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/exec-bit@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
 
   machine-specific-paths:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -980,7 +980,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
-        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           exclude: ':(exclude)components/path-detection/**'
       - name: Path-detection contract test
@@ -998,7 +998,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
 
   comment-hygiene:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -1012,7 +1012,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan comment hygiene (excludes contract fixtures and policy source)
-        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
       - name: Comment-hygiene contract test
@@ -1170,7 +1170,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check the pull-request contract
-        uses: melodic-software/ci-workflows/.github/actions/pr-contract@906ae7ef379ea4d2b8497f64475dce1d3d8715c4 # v0.22.0
+        uses: melodic-software/ci-workflows/.github/actions/pr-contract@5776760254f8b63cba44e896f51604cb755350d9 # v0.22.2
         with:
           token: ${{ github.token }}
           # Carried over from the pr-issue-linkage.yml caller this step
