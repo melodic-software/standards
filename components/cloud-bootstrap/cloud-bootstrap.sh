@@ -178,6 +178,21 @@ fi
   exit 0
 )
 
+# --- Session-start hook output ----------------------------------------------
+# When the SessionStart hook is the caller, stdout is parsed as hook output —
+# that is why every summary in this script goes to stderr — and this line asks
+# for a skills re-scan for whatever the harness can pick up mid-session (the
+# plugin registry itself is only rebuilt at the next process start). From the
+# pre-launch caller it lands harmlessly in the setup log.
+#
+# Emitted here, before the plugin stage, because the toolchain subshell and
+# the repo's own cloud-bootstrap.local.sh above may already have materialized
+# skills worth rescanning, and every way the plugin stage can end early — no
+# `claude`, no `jq`, no fleet list, or an unexpected failure under `set -e` —
+# would otherwise swallow the request along with the installs. Nothing below
+# writes to stdout, so this stays the only line the harness parses.
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'
+
 # --- Plugins ----------------------------------------------------------------
 # Data-driven from two settings-shaped files, in this order:
 #   1. the fleet list the cloud-environment component fetched into the
@@ -348,10 +363,3 @@ while IFS=$'\t' read -r mp_name mp_dir; do
 done <<EOF
 $plugin_mps
 EOF
-
-# When the SessionStart hook is the caller, stdout is parsed as hook output —
-# that is why every summary above goes to stderr — and this line asks for a
-# skills re-scan for whatever the harness can pick up mid-session (the plugin
-# registry itself is only rebuilt at the next process start). From the
-# pre-launch caller it lands harmlessly in the setup log.
-printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'

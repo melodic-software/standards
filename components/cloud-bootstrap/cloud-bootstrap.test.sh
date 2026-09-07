@@ -167,11 +167,19 @@ degrade_case() {
   # degrade_case <label> <fleet-file> <expected-stderr-fragment>
   # The fleet file must be a non-empty path: an empty value would fall through
   # the seam's default and read the host's real snapshot list.
-  local label="$1" fleet="$2" expected="$3" out
+  local label="$1" fleet="$2" expected="$3" out hook_out
   rm -f "$inv_tmp/counts/plugin-install"
   out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
     CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
     CLOUD_BOOTSTRAP_FLEET_LIST="$fleet" bash "$script" 2>&1 >/dev/null)"
+  # Ending the plugin stage must not end the hook: the toolchain steps and the
+  # repo's own cloud-bootstrap.local.sh ran before it and may have
+  # materialized skills, so the re-scan request still has to reach stdout.
+  hook_out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
+    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
+    CLOUD_BOOTSTRAP_FLEET_LIST="$fleet" bash "$script" 2>/dev/null)"
+  assert_contains "$label still emits the SessionStart reloadSkills output" \
+    "$hook_out" '"reloadSkills":true'
   assert_contains "$label is refused with a reason" "$out" "$expected"
   assert_contains "$label skips the plugin install" "$out" 'plugin install skipped'
   assert_not_contains "$label does not install from the repo declaration" \
