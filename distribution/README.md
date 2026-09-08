@@ -397,8 +397,8 @@ Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
 constraint, now stated over the fleet literal rather than the retired selector:
 "fleet-routed claude lane callers are not managed for a public sync target",
 "claude lane caller components pass runner policy for a private self-hosted
-consumer", and "a fleet literal on a public repository is refused as
-public-self-hosted-routing".
+consumer", and "a fleet-routed claude lane caller is rejected outright on a
+public consumer".
 
 Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
