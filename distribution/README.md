@@ -151,6 +151,7 @@ visible. It is report-only, never an edit, because a repo may diverge on purpose
 distribution/check-plugin-baseline.sh                  # every manifest target
 distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
 distribution/check-plugin-baseline.sh --compare-seed <claude.json>   # dotfiles seed
+distribution/check-plugin-baseline.sh --compare-seed-strict <claude.json>  # gateable
 ```
 
 A repository still carrying a full mirrored block reports as matching; one
@@ -160,7 +161,14 @@ baseline`, which is the expected shape during that migration, not drift. The
 (`claudeSettings.seed.enabledPlugins`) and reports fleet plugins the seed
 never names, fleet plugins the seed opts out of, and seed entries for a fleet
 marketplace that the fleet list lacks; entries for other marketplaces are the
-seed's own.
+seed's own. Any of those exits 1. The steady state carries deliberate
+opt-outs, so a gate wants only the first class:
+`--compare-seed-strict` runs the same comparison and prints the same report,
+but exits 3 when the seed is missing a fleet plugin, so a caller keys on an
+exit code rather than on a report line it would have to keep in step by hand.
+Either mode exits 2 on a seed that parses but carries no
+`claudeSettings.seed.enabledPlugins` object, which a comparison would
+otherwise read as an empty seed or as a match.
 
 Fleet mode fetches each target's settings via `gh api`, so it reads private
 repositories with the caller's own auth. Before the per-target diffs it reports

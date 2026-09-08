@@ -26,10 +26,16 @@
 #     (.chezmoidata/claude.json, claudeSettings.seed.enabledPlugins): the
 #     personal-machine list and the cloud list are two files on purpose, and
 #     this is what keeps them from drifting apart unnoticed.
+#   distribution/check-plugin-baseline.sh --compare-seed-strict <seed.json> [baseline.json]
+#     The same comparison, with one divergence class raised to its own exit
+#     code: a fleet plugin the seed never names exits 3. Opt-in, so callers of
+#     --compare-seed keep today's semantics; a gate uses this instead of
+#     grepping the report's prose for a message that is free to be reworded.
 #
 # Exit status: 0 always in report mode (drift is a signal, not a failure);
-# the --compare* modes exit 1 when the candidate diverges, so callers can
-# script them.
+# the --compare* modes exit 1 when the candidate diverges, 2 on a usage error
+# or a file jq cannot read or whose shape it cannot use, and (strict seed mode
+# only) 3 when the seed is missing a fleet plugin, so callers can script them.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -133,12 +139,19 @@ EOF
 # marketplace that the fleet list does not carry. A seed false for a plugin
 # outside the fleet list is an opt-out of nothing and is not reported.
 # Entries for other marketplaces are the seed's own business. Always returns
-# 0 (.shellcheckrc's SC2310); divergence signals through DIVERGED.
+# 0 (.shellcheckrc's SC2310); divergence signals through DIVERGED, and the
+# one class a gate acts on — a fleet plugin the seed never names — through
+# SEED_MISSING. That flag is why the message prefix is a variable handed to jq
+# rather than a literal inside the filter: the text a caller would otherwise
+# grep for is defined once, three lines from the only match against it, so
+# rewording it cannot silently turn a gate green.
+SEED_MISSING=0
 compare_seed() {
   local base="$1" seed="$2" label="$3" diverged=0 line
+  local missing_prefix='in fleet list, not in seed: '
 
   local diff
-  diff=$(jq -r --slurpfile b "$base" '
+  diff=$(jq -r --slurpfile b "$base" --arg missing "$missing_prefix" '
     ($b[0].extraKnownMarketplaces // {} | keys) as $mps
     | ($b[0].enabledPlugins // {} | to_entries | map(select(.value == true) | .key)) as $fleet
     | (.claudeSettings.seed.enabledPlugins // {}) as $seed
@@ -147,7 +160,7 @@ compare_seed() {
     | ($scoped | map(.key)) as $seed_keys
     | ($scoped | map(select(.value == true) | .key)) as $seed_enabled
     | ($scoped | map(select(.value == false) | .key)) as $opted_out
-    | (($fleet - $seed_keys) | map("in fleet list, not in seed: " + .))
+    | (($fleet - $seed_keys) | map($missing + .))
       + (($fleet - ($fleet - $opted_out)) | map("in fleet list, seed opts out: " + .))
       + (($seed_enabled - $fleet) | map("in seed, not in fleet list: " + .))
     | .[]' "$seed" 2>/dev/null | tr -d '\r' || true)
@@ -156,6 +169,9 @@ compare_seed() {
     [[ -n "$line" ]] || continue
     printf '%s: %s\n' "$label" "$line"
     diverged=1
+    if [[ "$line" == "$missing_prefix"* ]]; then
+      SEED_MISSING=1
+    fi
   done <<EOF
 $diff
 EOF
@@ -183,6 +199,21 @@ require_parses() {
   }
 }
 
+# require_seed_shape <file> — a file can parse as JSON and still carry no
+# usable plugin list. When claudeSettings.seed.enabledPlugins is absent, or is
+# a scalar, or the root is an array, the comparison either reads the seed as
+# empty (reporting the whole fleet as missing) or dies inside jq, where the
+# filter's `2>/dev/null || true` swallows the error and an empty diff reports
+# "matches the fleet list". Both are wrong about a broken file, so refuse it
+# with the same loud code an unparsable one gets.
+require_seed_shape() {
+  jq -e '.claudeSettings?.seed?.enabledPlugins? // null | type == "object"' \
+    "$1" >/dev/null 2>&1 || {
+    printf 'check-plugin-baseline: %s has no claudeSettings.seed.enabledPlugins object\n' "$1" >&2
+    exit 2
+  }
+}
+
 if [[ "${1:-}" == "--compare-catalog" ]]; then
   [[ $# -eq 4 ]] || {
     echo 'usage: check-plugin-baseline.sh --compare-catalog <catalog.json> <settings.json> <marketplace>' >&2
@@ -194,15 +225,19 @@ if [[ "${1:-}" == "--compare-catalog" ]]; then
   exit "$DIVERGED"
 fi
 
-if [[ "${1:-}" == "--compare-seed" ]]; then
+if [[ "${1:-}" == "--compare-seed" || "${1:-}" == "--compare-seed-strict" ]]; then
   [[ $# -eq 2 || $# -eq 3 ]] || {
-    echo 'usage: check-plugin-baseline.sh --compare-seed <seed.json> [baseline.json]' >&2
+    echo 'usage: check-plugin-baseline.sh --compare-seed[-strict] <seed.json> [baseline.json]' >&2
     exit 2
   }
   seed_base="${3:-$baseline}"
   require_parses "$2" 'seed'
+  require_seed_shape "$2"
   require_parses "$seed_base" 'baseline'
   compare_seed "$seed_base" "$2" "$(basename "$2")"
+  if [[ "$1" == "--compare-seed-strict" && "$SEED_MISSING" -eq 1 ]]; then
+    exit 3
+  fi
   exit "$DIVERGED"
 fi
 

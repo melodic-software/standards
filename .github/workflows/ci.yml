@@ -954,6 +954,82 @@ jobs:
       - name: Validate production manifest
         run: bash distribution/sync-manifest.sh validate
 
+  # Fleet plugin list vs the dotfiles workstation seed. The two lists are
+  # separate on purpose — the fleet list is the cloud install set and
+  # first-party only, the seed is workstation enablement and additionally
+  # carries third-party entries — but a first-party plugin added to the fleet
+  # list and never reaching the seed is drift nobody sees until someone runs
+  # the comparator by hand, which is how four ids went missing.
+  #
+  # A separate job rather than a step in `distribution`, for the reason the
+  # pr-convention-lockstep job records: this reads a consumer repository over
+  # the network, and that non-hermetic dependency must not contaminate the
+  # hermetic component lane.
+  plugin-seed-drift:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # dotfiles is private, so the seed is read through the contents API with
+      # a contents-read token from the standards-sync App — the
+      # pr-convention-lockstep precedent. No new secret: dotfiles is already a
+      # sync target, so it is in that installation, and the token is narrowed
+      # to that one repository. The mint is guarded on the secrets being
+      # present so an absent credential reaches the fetch tokenless and dies
+      # there instead of inside the mint action; the fetch then fails and the
+      # lane goes red. Not a skip either way. Two run kinds see no repository
+      # secrets: fork pull requests, which carry none by design, and
+      # Dependabot pull requests, which resolve the same two names from this
+      # repository's Dependabot secrets. Mirror both there whenever the App
+      # key rotates, or every Dependabot pull request fails this lane too.
+      - name: Mint a contents-read App token for the dotfiles seed
+        id: seed-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          owner: melodic-software
+          repositories: dotfiles
+          permission-contents: read
+      # Only a fleet plugin the seed never names gates, and `-strict` is how
+      # the comparator says so: exit 3. Plain --compare-seed exits 1 on ANY
+      # divergence, and the steady state carries deliberate per-plugin seed
+      # opt-outs plus one seed-only entry, so that code alone would be red on
+      # every run; grepping the report's prose instead would put the go/no-go
+      # on a message the script is free to reword, which is the same silent
+      # green one layer down. Exit 2 — missing jq, unreadable JSON, a seed
+      # with no claudeSettings.seed.enabledPlugins object — still fails the
+      # lane, so a broken comparator or a structurally broken seed cannot read
+      # as "no drift". The report itself streams to the log either way.
+      - name: Compare the fleet plugin list against the dotfiles seed
+        env:
+          GH_TOKEN: ${{ steps.seed-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          seed="$RUNNER_TEMP/dotfiles-claude.json"
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            repos/melodic-software/dotfiles/contents/.chezmoidata/claude.json >"$seed"
+          bash distribution/check-plugin-baseline.sh --compare-seed-strict "$seed" && rc=0 || rc=$?
+          case "$rc" in
+            0 | 1) ;;
+            3)
+              echo '::error::the dotfiles seed is missing a plugin the fleet list enables'
+              exit 1
+              ;;
+            *) exit "$rc" ;;
+          esac
+
   exec-bit:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
@@ -1156,6 +1232,7 @@ jobs:
       - harness
       - cloud-environment
       - distribution
+      - plugin-seed-drift
       - lefthook
       - exec-bit
       - machine-specific-paths
@@ -1224,6 +1301,7 @@ jobs:
             ${{ needs.harness.result }}
             ${{ needs.cloud-environment.result }}
             ${{ needs.distribution.result }}
+            ${{ needs.plugin-seed-drift.result }}
             ${{ needs.lefthook.result }}
             ${{ needs.exec-bit.result }}
             ${{ needs.machine-specific-paths.result }}
