@@ -1377,7 +1377,7 @@ test("omitted local permissions require the precise privileged hosted exception"
   }
 });
 
-test("read-only permissions and the selector's exact observer secret remain locally routable", async () => {
+test("read-only job permissions keep a fleet-literal workload locally routable", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
@@ -2285,7 +2285,7 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
-test("a local-routing grant admits an exactly matching environment job to selector routing", async () => {
+test("a local-routing grant admits an exactly matching environment job to fleet routing", async () => {
   const root = await repository({
     localRoutingGrants: {
       ".github/workflows/deploy.yml#apply": {
@@ -2603,7 +2603,7 @@ test("a local-routing grant never authorizes fixed hosted or structurally exclud
     localRoutingGrants: {
       ".github/workflows/ci.yml#workload": {
         permissions: { contents: "read", issues: "write" },
-        justification: "This intentionally exercises the selector-routed-only scope.",
+        justification: "This intentionally exercises the fleet-routed-only scope.",
       },
     },
     workflows: {
@@ -3371,7 +3371,7 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
-test("the reviewed caller permission waiver applies only to selector-routed calls", async () => {
+test("the reviewed caller permission waiver applies only to fleet-routed calls", async () => {
   const contract = {
     routing: "runner-input",
     runnerInput: "runner",
@@ -3391,7 +3391,7 @@ test("the reviewed caller permission waiver applies only to selector-routed call
       id-token: write
 `;
 
-  const selectorRouted = await repository({
+  const fleetRouted = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
     },
@@ -3408,11 +3408,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
 `,
     },
   });
-  assert.deepEqual(
-    await audit(selectorRouted),
-    [],
-    "selector-routed call must still waive cleanly",
-  );
+  assert.deepEqual(await audit(fleetRouted), [], "fleet-routed call must still waive cleanly");
 
   const fixedHostedNoException = await repository({
     policyOverrides: {
@@ -3928,7 +3924,7 @@ test("a contract naming both caller-permission terms must be satisfiable", async
   );
 });
 
-test("a secret-capable runner-input contract admits a statically read-only selector-routed caller", async () => {
+test("a secret-capable runner-input contract admits a statically read-only fleet-routed caller", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
@@ -4025,7 +4021,7 @@ jobs:
   );
 });
 
-test("a secret-capable contract keeps its privileged hosted boundary off the selector", async () => {
+test("a secret-capable contract keeps its privileged hosted boundary on a fixed hosted caller", async () => {
   const workflows = {
     "sync.yml": `permissions:
   contents: read
@@ -4069,7 +4065,7 @@ jobs:
   );
 });
 
-test("unreviewed reusable workflow cannot forward an approved selector output", async () => {
+test("unreviewed reusable workflow cannot receive the fleet label as its runner input", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
@@ -5134,7 +5130,7 @@ test("Dependabot SHA bump is declined when the previously reviewed basis has a m
 // Regression test for a gap where jobRoutingSurface recorded only the
 // literal declared runs-on expression. A fetched reusable workflow's job can
 // route through needs.<job>.outputs.<name> -- the same needs-output pattern
-// this analyzer already trusts for local selector routing -- so the
+// this analyzer already reads for local job wiring -- so the
 // producing job's output value (here pick's runs-on) can change the actual
 // runner boundary while the consuming job's runs-on expression stays a
 // byte-identical `needs.pick.outputs.runner`. Auto-approval cannot safely
@@ -6033,7 +6029,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   assert.deepEqual(await audit(root), []);
 });
 
-test("repository-local runner-input workflow accepts the governed selector output", async () => {
+test("repository-local runner-input workflow accepts the governed fleet label", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
@@ -6832,7 +6828,7 @@ jobs:
   );
 });
 
-test("selector-routed job container is rejected and requires matching hosted exception", async () => {
+test("a fleet-routed job container is rejected and requires matching hosted exception", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all
@@ -6850,7 +6846,7 @@ jobs:
   );
 });
 
-test("selector-routed services are rejected even with matching hosted exception", async () => {
+test("fleet-routed services are rejected even with matching hosted exception", async () => {
   const root = await repository({
     exceptions: {
       ".github/workflows/ci.yml#test": {
@@ -7207,9 +7203,9 @@ test("anchored uses scalars retain provenance enforcement", async () => {
 
 // ---------------------------------------------------------------------------
 // The `managed-literal` routing target: the governed fleet label written
-// directly, with no selector job in the workflow. Admitted only on a private
-// repository enrolled for local routing; everywhere else the existing routing
-// gate refuses it under its existing rule id.
+// directly, which is the only way a job reaches the managed fleet. Admitted
+// only on a private repository enrolled for local routing; everywhere else the
+// existing routing gate refuses it under its existing rule id.
 // ---------------------------------------------------------------------------
 
 const FLEET_LANE_CONTRACT = {
@@ -7226,7 +7222,7 @@ const FLEET_LANE_CONTRACT = {
   },
 };
 
-test("an enrolled private repository may name the governed fleet label with no selector", async () => {
+test("an enrolled private repository may name the governed fleet label directly", async () => {
   const root = await repository({
     workflows: {
       "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
@@ -7754,7 +7750,7 @@ jobs:
   );
 });
 
-test("a Phase 3.2 ci-status grant applies unchanged when the literal replaces the selector", async () => {
+test("a Phase 3.2 ci-status grant admits the fleet-literal ci-status job unchanged", async () => {
   // The four github-iac/dotfiles/provisioning/medley `ci-status` grants were
   // written before the fleet label replaced the routing expression, and their
   // JSON did not change when it did. The same grant must still admit the
@@ -7788,8 +7784,8 @@ ${jobBody}    runs-on: ${FLEET_LABEL}
 });
 
 // Repository visibility, keyed by sync-manifest target name. `routingEnabled`
-// admits the governed selector only for private self-hosted consumers, and
-// that ban consults neither `exceptions` nor `localRoutingGrants` — so a
+// admits the governed fleet label only for private self-hosted consumers, and
+// that ban consults neither `exceptions` nor `localRoutingGrants`, so a
 // PUBLIC target has no configuration escape.
 //
 // Checked in rather than read from the GitHub API: these tests must run
@@ -7866,7 +7862,7 @@ test("every managed target of a claude lane caller admits that caller", async ()
       if (!(definition.managed ?? []).includes(component)) continue;
       assert.ok(
         !isPublicTarget(target),
-        `${source} is managed for ${target}, which is public — runner-policy rejects a selector-routed caller there`,
+        `${source} is managed for ${target}, which is public, and runner-policy rejects a fleet-routed caller there`,
       );
       const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
       assert.deepEqual(
@@ -7878,11 +7874,11 @@ test("every managed target of a claude lane caller admits that caller", async ()
   }
 });
 
-// A caller reaches the managed fleet either through the governed selector or
-// by naming a managed label directly. Both spellings are private-only, so the
-// public-target assertions below must recognise both; a test keyed to the
-// selector alone would quietly stop asserting anything the moment a caller
-// dropped its selector job.
+// A caller reaches the managed fleet by naming a managed label directly, in
+// `runs-on` or in a reviewed reusable's runner input. That is private-only, so
+// the public-target assertions below match the label itself rather than any
+// one spelling of a caller, which is what keeps them asserting something as
+// caller shapes change.
 const MANAGED_LABEL_REGEXES = BASE_POLICY.managedLabelPatterns.map(
   (pattern) => new RegExp(pattern, "u"),
 );
@@ -8430,9 +8426,9 @@ test("the claude lane caller components all pin one ci-workflows revision", asyn
 // involved). It is managed for public targets and for private targets NOT
 // enrolled for local routing, and one of its managed targets
 // (claude-code-plugins) executes this gate, so the shipped bytes must audit
-// clean under exactly those inventories — and must NOT be admitted to an
+// clean under exactly those inventories, and must NOT be admitted to an
 // enrolled private consumer, which is why those targets take a
-// selector-routed sibling instead (components/managed-files-guard/README.md).
+// fleet-routed sibling instead (components/managed-files-guard/README.md).
 async function managedFilesGuardCaller() {
   const manifest = parse(
     await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
@@ -8461,7 +8457,7 @@ test("the managed-files-guard caller audits clean on every target that manages i
   }
 });
 
-test("the managed-files-guard caller is not admitted to a selector-enrolled private consumer", async () => {
+test("the managed-files-guard caller is not admitted to a routing-enrolled private consumer", async () => {
   const { body, source } = await managedFilesGuardCaller();
   const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
   const findings = await auditRepository({
@@ -8471,6 +8467,6 @@ test("the managed-files-guard caller is not admitted to a selector-enrolled priv
   });
   assert.ok(
     findings.length > 0,
-    `${source} audits clean for an enrolled private consumer; the selector-routed second hop may be unnecessary — revisit the hosted-only exclusion deliberately`,
+    `${source} audits clean for an enrolled private consumer; the fleet-routed second hop may be unnecessary, so revisit the hosted-only exclusion deliberately`,
   );
 });
