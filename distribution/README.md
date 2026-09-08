@@ -273,10 +273,11 @@ must add all of the following in the same integration PR:
 `select-runner` reusable workflow (ci-workflows#569, merged as
 `541ee4e90d12d77a90a3ddd72a3af9bc78634ea7`, released as v0.23.0) and
 standards#556 (merged as `771a796628f325c3c418c7b397d09fb7211e2972`) removed its
-grammar from this component, taking `schemaVersion` from 3 to 4. There is no
-`needs.<selector>.outputs.runner` expression to fall back from and no
-`vars.CI_HOSTED_RUNNER` to read: `selector` appears nowhere in
-`components/runner-policy/runner-policy.test.mjs`. The
+grammar from this component, taking `schemaVersion` from 3 to 4. No consumer
+writes a `needs.<selector>.outputs.runner` fallback expression any more, and
+nothing reads `vars.CI_HOSTED_RUNNER`; that organization variable still exists,
+like the other four the selector consumed, and its removal is covered by the
+same Phase 7 step 5 apply described in the consumer-handoff bullet below. The
 `ci-runner-selection-failed` marker is not a shape a consumer may write either,
 though it survives in `policy.json` and `policy.schema.json` as a
 `failureSentinelMarker` the analyzer validates stays outside every hosted and
@@ -291,9 +292,11 @@ inside an enrolled private repository declares an entry under `exceptions` in
 that repository's `.github/runner-policy.json`, keyed `<workflow path>#<jobId>`
 and carrying a `reason` drawn from `policy.json`'s closed `hostedExceptionReasons`
 set plus a free-text `justification`; `hosted-exception-required` is the finding
-the analyzer raises when that entry is missing, not a key a consumer writes. See
-[the exceptions section](../components/runner-policy/README.md) for the exact
-shape. The decision is recorded in melodic-software/github-iac#466, which adds
+the analyzer raises when that entry is missing, not a key a consumer writes. The
+key carries the literal `.github/workflows/` prefix, as in
+`.github/workflows/ci.yml#windows`, and a wrong `reason` fails with the full
+valid set printed in the analyzer's own error. The decision is recorded in
+melodic-software/github-iac#466, which adds
 `docs/adr/0014-fleet-first-ci-for-private-repositories.md`.
 
 The synchronizer deliberately does not invent those files: workflow shape,
@@ -352,11 +355,14 @@ What stays consumer-owned:
   starter list in a repo-local PR alongside (or before) its caller
   materialization PR.
 - The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
-  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
-  no longer read by anything: the selector that consumed them is deleted
+  runner-policy consumer handoff above. The five selector variables
+  (`CI_RUNNER_POLICY`, `CI_RUNNER_SCOPE`, `CI_HOSTED_RUNNER`,
+  `CI_MANAGED_RUNNER_PREFIX`, `CI_SELF_HOSTED_LABEL`) are no longer read by
+  anything, because the selector that consumed them is deleted
   (ci-workflows#569). The organization variables themselves still exist, and
   their removal from the github-iac Pulumi program is decided pending that
-  repository's Phase 7 step 5 apply.
+  repository's Phase 7 step 5 apply. `CI_RUNNER_OBSERVER_CLIENT_ID` is not one
+  of them; it is the observer key named above and it stays.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and
