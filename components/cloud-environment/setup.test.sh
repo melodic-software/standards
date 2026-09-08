@@ -153,17 +153,32 @@ assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
 
-# The build installs from the fleet list alone. A repo's enabledPlugins block
-# is a deltas overlay applied by the session bootstrap's drift repair, so no
-# call here may install from the checkout's settings file: reintroducing one
-# would make the snapshot repo-specific again and resurrect the block as a
-# whole-set install source.
+# This script installs from the fleet list alone. A repo's enabledPlugins block
+# is a deltas overlay the repo's own bootstrap applies, so no call here may
+# install from the checkout's settings file: reintroducing one would make the
+# snapshot repo-specific again and resurrect the block as a whole-set install
+# source.
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_not_contains 'setup.sh does not install from the checkout settings block' \
   "$(cat "$script")" 'install_plugins_from "$settings"'
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_not_contains 'setup.sh does not resolve the checkout settings block for install' \
   "$(cat "$script")" 'settings="$REPO_ROOT/.claude/settings.json"'
+
+# Ordering contract: the fleet install must precede the repo bootstrap. The
+# repo bootstrap applies the repo's deltas as an overlay on the fleet list and
+# skips entirely when that list is absent, so a bootstrap that runs first bakes
+# no deltas into the snapshot and the repo's own plugins go live only on the
+# next resume.
+# shellcheck disable=SC2016 # the $ is a literal in the grep needle
+fleet_install_ln="$(grep -n -F 'install_plugins_from "$fleet_file" fleet' "$script" | head -n 1 | cut -d: -f1)"
+repo_bootstrap_ln="$(grep -n -F 'bash .claude/cloud-bootstrap.sh' "$script" | head -n 1 | cut -d: -f1)"
+if [[ -n "$fleet_install_ln" && -n "$repo_bootstrap_ln" && "$fleet_install_ln" -lt "$repo_bootstrap_ln" ]]; then
+  pass 'fleet plugin install runs before the repo bootstrap'
+else
+  fail 'fleet plugin install runs before the repo bootstrap' \
+    "fleet install at line '${fleet_install_ln:-none}', repo bootstrap at line '${repo_bootstrap_ln:-none}'"
+fi
 
 # Spawn census for install_plugins_from: two sources must share one
 # marketplace list and one plugin list, the memoization cloud-bootstrap.sh

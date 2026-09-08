@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-07.2'
+SCRIPT_VERSION='2026-09-08.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -316,37 +316,18 @@ for track in "A gh + powershell|$track_a_log" \
   rm -f "$track_file" 2>/dev/null
 done
 
-# Bake the checked-out repo's committed bootstrap (.claude/cloud-bootstrap.sh
-# under the resolved repo root) into the cached snapshot. One name, no
-# fallbacks: every fleet repo commits its generic repository setup —
-# dependencies and plugin installs — there. Running it here is load-bearing
-# for plugins: the session's plugin registry is built at process start and
-# never re-read, so plugin installs must land at cache build, not
-# mid-session.
-if [[ -z "$REPO_ROOT" ]]; then
-  log 'repo bootstrap skipped: repo root unresolved (see WARN above); nothing baked'
-elif [[ -f "$REPO_ROOT/.claude/cloud-bootstrap.sh" ]]; then
-  if (cd "$REPO_ROOT" &&
-    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$REPO_ROOT" \
-      bash .claude/cloud-bootstrap.sh) >>"$LOG" 2>&1; then
-    log 'repo bootstrap .claude/cloud-bootstrap.sh baked'
-  else
-    log 'WARN repo bootstrap .claude/cloud-bootstrap.sh failed (see log)'
-  fi
-else
-  # Unambiguous no-op: the root WAS resolved, the repo just has no bootstrap.
-  # The unresolved-root case logs its own distinct line above.
-  log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
-fi
-
 # Generic plugin install from one settings-shaped file (extraKnownMarketplaces
 # + enabledPlugins): the fleet list at FLEET_PLUGINS_URL, which every snapshot
 # installs whatever repo it was built for. No repo-specific logic — a repo's
-# own enabledPlugins block declares deltas beyond the fleet and the session
-# bootstrap applies them as an overlay, so the snapshot itself stays the same
-# for every repo built against it. This must happen here, at cache build:
+# own enabledPlugins block declares deltas beyond the fleet and the repo
+# bootstrap below applies them as an overlay, so the snapshot itself stays the
+# same for every repo built against it. This must happen here, at cache build:
 # Claude Code reads its plugin registry at process start and never re-reads
 # it, so only snapshot-baked installs are loaded at a session's first turn.
+# It must also happen BEFORE the repo bootstrap: that bootstrap's plugin stage
+# reads this fetched list and skips outright when it is absent, so a bootstrap
+# that ran first would bake none of the repo's deltas and leave them to arrive
+# on a later resume.
 # Github-source marketplaces' install/update semantics already handle
 # versions — no snapshot-refresh logic here (the commit-drift refresh in
 # claude-code-plugins' own hook is specific to its directory-source
@@ -357,11 +338,11 @@ elif ! command -v jq >/dev/null 2>&1; then
   log 'plugins: jq not available; skipping'
 else
   # The fetched copy lands in the snapshot (FLEET_PLUGINS, or its /tmp
-  # fallback with a WARN, mirroring the stamp) so the per-repo bootstrap's
-  # drift repair reads the same list offline. A fetch failure costs this
-  # build's plugin install, never the build: the next rebuild fetches again,
-  # and a session on a snapshot without the list installs nothing rather than
-  # guessing at a set.
+  # fallback with a WARN, mirroring the stamp) so the repo bootstrap below —
+  # and every later drift repair it runs on resume — reads the same list
+  # offline. A fetch failure costs this build's plugin install, never the
+  # build: the next rebuild fetches again, and a session on a snapshot without
+  # the list installs nothing rather than guessing at a set.
   rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
   if curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
     "$FLEET_PLUGINS_URL" -o "$FLEET_PLUGINS_FALLBACK" >>"$LOG" 2>&1 &&
@@ -379,6 +360,32 @@ else
     rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
     log 'WARN plugins (fleet): list fetch failed or empty; no plugins install this build'
   fi
+fi
+
+# Bake the checked-out repo's committed bootstrap (.claude/cloud-bootstrap.sh
+# under the resolved repo root) into the cached snapshot. One name, no
+# fallbacks: every fleet repo commits its generic repository setup —
+# dependencies and plugin installs — there. Running it here is load-bearing
+# for plugins: the session's plugin registry is built at process start and
+# never re-read, so plugin installs must land at cache build, not mid-session.
+# It runs AFTER the fleet install above so its plugin stage finds the fetched
+# fleet list and overlays the repo's own deltas onto it — that is what makes
+# those deltas live at a session's first turn instead of only after the
+# session bootstrap re-runs and the operator resumes.
+if [[ -z "$REPO_ROOT" ]]; then
+  log 'repo bootstrap skipped: repo root unresolved (see WARN above); nothing baked'
+elif [[ -f "$REPO_ROOT/.claude/cloud-bootstrap.sh" ]]; then
+  if (cd "$REPO_ROOT" &&
+    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$REPO_ROOT" \
+      bash .claude/cloud-bootstrap.sh) >>"$LOG" 2>&1; then
+    log 'repo bootstrap .claude/cloud-bootstrap.sh baked'
+  else
+    log 'WARN repo bootstrap .claude/cloud-bootstrap.sh failed (see log)'
+  fi
+else
+  # Unambiguous no-op: the root WAS resolved, the repo just has no bootstrap.
+  # The unresolved-root case logs its own distinct line above.
+  log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
 
 # Temp-file hygiene: without this the fetched installers — and this script
