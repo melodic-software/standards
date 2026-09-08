@@ -276,8 +276,8 @@ standards#556 (merged as `771a796628f325c3c418c7b397d09fb7211e2972`) removed its
 grammar from this component, taking `schemaVersion` from 3 to 4. No consumer
 writes a `needs.<selector>.outputs.runner` fallback expression any more, and
 nothing reads `vars.CI_HOSTED_RUNNER`; that organization variable still exists,
-like the other four the selector consumed, and its removal is covered by the
-same Phase 7 step 5 apply described in the consumer-handoff bullet below. The
+like the others the selector consumed, and its removal is covered by the
+same Phase 7 step 5 apply described in the caller-component bullet below. The
 `ci-runner-selection-failed` marker is not a shape a consumer may write either,
 though it survives in `policy.json` and `policy.schema.json` as a
 `failureSentinelMarker` the analyzer validates stays outside every hosted and
