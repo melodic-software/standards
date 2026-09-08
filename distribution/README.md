@@ -247,41 +247,57 @@ must add all of the following in the same integration PR:
 1. A locally owned `.github/runner-policy.json` with correct visibility,
    enrollment, and exact job exception and local-routing-grant inventory. A
    hosted-only consumer uses `selfHostedCi: false` and `exceptions: {}`;
-   because selector routing is disabled, fixed approved hosted targets need no
-   exception and the analyzer rejects every unconsumed entry as
+   fixed approved hosted targets need no exception and the analyzer rejects
+   every unconsumed entry as
    `exception-inventory-drift` (grants likewise fail as
    `local-routing-grant-drift`).
 2. A CI job that runs
    `npm ci --prefix .github/standards/runner-policy`, then invokes
    `node .github/standards/runner-policy/runner-policy.mjs --root .` with
    `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. A
-   private consumer with `selfHostedCi: true` routes this job through the
-   governed selector with the approved hosted fallback; a hosted-only consumer
-   runs it as a fixed `ubuntu-24.04` hosted job with no exception. The
+   private consumer with `selfHostedCi: true` names the governed fleet label
+   `melodic-ubuntu-24.04-x64` directly, which the analyzer admits under its
+   `managed-literal` routing kind; a hosted-only consumer runs it as a fixed
+   `ubuntu-24.04` hosted job with no exception. The
    analyzer consumes GitHub's default `GITHUB_REPOSITORY` environment variable
    as trusted owner evidence; `.github/runner-policy.json#repositoryOwner` is
    only inventory and a mismatch tripwire.
 3. Workflow routing, exception, and grant inventory that pass the gate at the
-   reviewed selector/reusable-workflow SHA in the distributed `policy.json`.
+   reviewed reusable-workflow SHA in the distributed `policy.json`.
    Do not add a consumer npm Dependabot entry for
    `/.github/standards/runner-policy`: that lockfile is byte-exact
    sync-managed, so a downstream bump is drift the next sync reverts.
    Alerts still report the nested lockfile without a consumer entry.
 
-Selector-dependent direct jobs and ordinary reusable callers use the recovery
-contract: `if: ${{ !cancelled() }}` (safely conjoined with any existing
-predicate) and `${{ needs.<selector>.outputs.runner || 'ubuntu-24.04' }}` as the
-direct `runs-on` value or canonical `with.runner` input. The fallback never
-reads `vars.CI_HOSTED_RUNNER`, because selector failure means that value was not
-validated by the selector.
+**The selector recovery contract is retired.** ci-perf Phase 7 deleted the
+`select-runner` reusable workflow (ci-workflows#569, merged as
+`541ee4e90d12d77a90a3ddd72a3af9bc78634ea7`, released as v0.23.0) and
+standards#556 (merged as `771a796628f325c3c418c7b397d09fb7211e2972`) removed its
+grammar from this component, taking `schemaVersion` from 3 to 4. No consumer
+writes a `needs.<selector>.outputs.runner` fallback expression any more, and
+nothing reads `vars.CI_HOSTED_RUNNER`; that organization variable still exists,
+like the others the selector consumed, and its removal is covered by the
+same Phase 7 step 5 apply described in the caller-component bullet below. The
+`ci-runner-selection-failed` marker is not a shape a consumer may write either,
+though it survives in `policy.json` and `policy.schema.json` as a
+`failureSentinelMarker` the analyzer validates stays outside every hosted and
+managed runner label set; a job naming it as a runner is refused.
 
-A repository-local reusable workflow may instead require its runner input with
-no default. That zero-hosted-fallback form passes the raw selector output only
-behind the exact successful self-hosted-route proof. The reserved
-`ci-runner-selection-failed` marker step is accepted solely for the narrowly
-shaped hosted rejection guard documented by the runner-policy component; it is
-not a general workload runner or fallback. During migration the legacy unroutable
-`runs-on: ci-runner-selection-failed` shape remains accepted.
+A direct job or a reusable caller now names its runner as a literal. A private
+enrolled consumer names `melodic-ubuntu-24.04-x64` as the direct `runs-on` value
+or the canonical `with.runner` input, and the analyzer admits it under the
+`managed-literal` routing kind; a public or hosted-only consumer names an
+approved hosted label such as `ubuntu-24.04`. A job that needs hosted capacity
+inside an enrolled private repository declares an entry under `exceptions` in
+that repository's `.github/runner-policy.json`, keyed `<workflow path>#<jobId>`
+and carrying a `reason` drawn from `policy.json`'s closed `hostedExceptionReasons`
+set plus a free-text `justification`; `hosted-exception-required` is the finding
+the analyzer raises when that entry is missing, not a key a consumer writes. The
+key carries the literal `.github/workflows/` prefix, as in
+`.github/workflows/ci.yml#windows`, and a wrong `reason` fails with the full
+valid set printed in the analyzer's own error. The decision is recorded in
+melodic-software/github-iac#466, which adds
+`docs/adr/0014-fleet-first-ci-for-private-repositories.md`.
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
@@ -338,9 +354,14 @@ What stays consumer-owned:
   The manifest has no seed-once mechanism, so a new adopter commits its
   starter list in a repo-local PR alongside (or before) its caller
   materialization PR.
-- The `CLAUDE_CODE_OAUTH_TOKEN` secret and the optional `CI_RUNNER_*`
-  selector variables and observer key, per the runner-policy consumer
-  handoff above.
+- The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
+  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
+  no longer read by anything, because the selector that consumed them is deleted
+  (ci-workflows#569); they still exist at organization scope, and their removal
+  with their Pulumi declarations is decided pending github-iac's Phase 7 step 5
+  apply. github-iac's `README.md` "Local CI routing governance" owns the exact
+  list and its status. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob but is
+  not one of them; it is the observer key named above and it stays.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and
@@ -348,9 +369,11 @@ no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
 inline. Do not normalize the two.
 
-Both components resolve the runner through the governed `select-runner`
-indirection, and `runner-policy` admits that selector only for a private
-self-hosted consumer. The ban consults neither `exceptions` nor
+Both components name the governed review-tier fleet label
+`melodic-review-ubuntu-24.04-x64` directly (`claude-review.yml` and
+`claude-security-review.yml`), and `runner-policy` admits that literal, like
+every entry in `approvedManagedRunnerLabels`, only for a private self-hosted
+consumer. The ban consults neither `exceptions` nor
 `localRoutingGrants`, so a PUBLIC target has no configuration escape and would
 fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
@@ -361,7 +384,7 @@ differently for each lane:
 - `claude-security-review-caller` is `managed` for private adopters
   (`provisioning` first). The public repos running a security lane today,
   `claude-code-plugins` and `ci-workflows`, remain ineligible for the
-  selector-routed shape.
+  fleet-routed shape.
 
 `melodic-software/claude-code-plugins`, the org's one public caller target and
 the only repo whose ruleset requires `security-review / security-review`, is
@@ -371,10 +394,11 @@ knowingly: that repo stays outside this normalization and re-pins by hand at
 each `ci-workflows` release.
 
 Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
-constraint: a selector-routed caller component may not be `managed` for a
-public target, every caller component must audit clean for a private
-self-hosted consumer, and a selector-routed caller is expected to be rejected
-outright on a public one.
+constraint, now stated over the fleet literal rather than the retired selector:
+"fleet-routed claude lane callers are not managed for a public sync target",
+"claude lane caller components pass runner policy for a private self-hosted
+consumer", and "a fleet-routed claude lane caller is rejected outright on a
+public consumer".
 
 Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
@@ -395,13 +419,13 @@ the second recorded exception to the consumer-owned-caller rule, on the same
 grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
-The caller runs on the approved hosted label directly, with no selector, so
-it is `managed` for the hosted-only-eligible targets (the public targets plus
-`claude-code-proxy`, private but not enrolled for local routing) and
-deliberately NOT for the four selector-enrolled private targets (`dotfiles`,
-`github-iac`, `medley`, `provisioning`), where runner-policy requires a
-selector route for every read-only job; those take a selector-routed sibling
-in a second hop. `ci-workflows` is `locally-owned`: it hosts the action and
+The caller runs on the approved hosted label directly, so it is `managed` for
+the hosted-only-eligible targets (the public targets plus `claude-code-proxy`,
+private but not enrolled for local routing) and deliberately NOT for the four
+fleet-enrolled private targets (`dotfiles`, `github-iac`, `medley`,
+`provisioning`), where runner-policy requires the fleet literal for every
+read-only job; those take a fleet-routed sibling in a second hop.
+`ci-workflows` is `locally-owned`: it hosts the action and
 already runs the guard from its own tree. The check is advisory (not in any
 `ci-status`) during its soak, and the caller passes `standards-ref: main`
 until the soak completes. Rationale, pins, the advance path through the
