@@ -355,14 +355,13 @@ What stays consumer-owned:
   starter list in a repo-local PR alongside (or before) its caller
   materialization PR.
 - The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
-  runner-policy consumer handoff above. The five selector variables
-  (`CI_RUNNER_POLICY`, `CI_RUNNER_SCOPE`, `CI_HOSTED_RUNNER`,
-  `CI_MANAGED_RUNNER_PREFIX`, `CI_SELF_HOSTED_LABEL`) are no longer read by
-  anything, because the selector that consumed them is deleted
-  (ci-workflows#569). The organization variables themselves still exist, and
-  their removal from the github-iac Pulumi program is decided pending that
-  repository's Phase 7 step 5 apply. `CI_RUNNER_OBSERVER_CLIENT_ID` is not one
-  of them; it is the observer key named above and it stays.
+  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
+  no longer read by anything, because the selector that consumed them is deleted
+  (ci-workflows#569); they still exist at organization scope, and their removal
+  with their Pulumi declarations is decided pending github-iac's Phase 7 step 5
+  apply. github-iac's `README.md` "Local CI routing governance" owns the exact
+  list and its status. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob but is
+  not one of them; it is the observer key named above and it stays.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and
