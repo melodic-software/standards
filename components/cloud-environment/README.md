@@ -47,7 +47,8 @@ distrusted root is a distinct `WARN`/notice line, never conflated with
 
 ## Repo bootstrap handoff
 
-After the parallel toolchain tracks finish, the script runs the resolved
+After the parallel toolchain tracks finish and the
+[fleet plugin install](#plugin-install) has run, the script runs the resolved
 checkout's committed `.claude/cloud-bootstrap.sh`, best-effort, with
 `CLAUDE_CODE_REMOTE=true`, `CLAUDE_PROJECT_DIR` set to the checkout root,
 and the checkout root as the working directory.
@@ -58,7 +59,7 @@ its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 
 ## Plugin install
 
-After the repo bootstrap, a generic, data-driven stage installs plugins from
+Before the repo bootstrap, a generic, data-driven stage installs plugins from
 one settings-shaped file: **the fleet list**,
 [`fleet-plugins.json`](fleet-plugins.json) beside this script, the one place
 the organization's cloud plugin set is declared. The script fetches it from
@@ -72,9 +73,15 @@ repo-agnostic.
 A repo's own `.claude/settings.json` carries only the deltas it declares
 beyond the fleet (an extra marketplace, a plugin beyond the fleet, or a
 `false` opt-out, which project scope applies over the user-scope install).
-Those are not installed here: each repo's session bootstrap applies them as
-an overlay on top of this list, from the snapshot copy, at session start (see
-the [cloud-bootstrap component](../cloud-bootstrap/README.md)).
+Those are not installed by this stage: the
+[repo bootstrap](#repo-bootstrap-handoff) that runs next applies them as an
+overlay on top of this list, from the snapshot copy (see the
+[cloud-bootstrap component](../cloud-bootstrap/README.md)). That is why this
+stage runs first — the bootstrap's plugin step skips outright when the fleet
+list is absent, so a bootstrap running before the fetch would bake no deltas
+at all and leave them to arrive only when the session bootstrap re-runs and
+the operator resumes. The same bootstrap still runs at session start, where
+it repairs drift between the snapshot and the repo's current declarations.
 
 `extraKnownMarketplaces` entries are registered (`claude plugin marketplace
 add`, skipping ones already registered) and every `enabledPlugins` entry set
