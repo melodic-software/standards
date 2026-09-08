@@ -1,7 +1,31 @@
 #!/usr/bin/env bash
-# Tests check-plugin-baseline.sh's offline --compare mode: identical settings
-# match, a missing/extra enabledPlugins entry and a diverging marketplace
-# source are each reported, and report lines carry the candidate label.
+# Tests check-plugin-baseline.sh's four offline comparison modes and the exit
+# code each one contracts for. Report lines carry the label of the file being
+# judged in every mode.
+#
+#   --compare <baseline> <candidate>
+#     0 identical settings; 1 a missing/extra enabledPlugins entry, a
+#     candidate-only marketplace or a diverging marketplace source; 2 an
+#     unparsable candidate, which must never read as an empty diff.
+#   --compare-catalog <catalog> <settings> <marketplace>
+#     0 the settings cover the catalog; 1 a catalog plugin the settings never
+#     enable or a declaration the catalog dropped; 2 an unparsable catalog.
+#     Another marketplace's entries are out of scope, and the marketplace name
+#     is stripped as a literal suffix, not a pattern.
+#   --compare-seed <seed> [baseline]
+#     0 the seed carries every fleet entry; 1 a fleet plugin the seed opts out
+#     of or names beyond the fleet list; 2 an unparsable seed, or one whose
+#     shape require_seed_shape rejects — a missing, scalar or non-object
+#     claudeSettings.seed.enabledPlugins, or an array root.
+#   --compare-seed-strict <seed> [baseline]
+#     The same comparison with one class raised: 3 when a fleet plugin is
+#     absent from the seed. Opt-outs and seed-only entries stay 1, a matching
+#     seed stays 0, a broken seed stays 2, and plain --compare-seed keeps
+#     reporting the same gap as 1.
+#
+# Three non-mode checks ride along: the script parses under `bash -n`,
+# --compare batches its structural jq into one pass plus two parse checks, and
+# the fleet list the baseline points at exists and is what the script reads.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
