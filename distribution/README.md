@@ -274,20 +274,27 @@ must add all of the following in the same integration PR:
 `541ee4e90d12d77a90a3ddd72a3af9bc78634ea7`, released as v0.23.0) and
 standards#556 (merged as `771a796628f325c3c418c7b397d09fb7211e2972`) removed its
 grammar from this component, taking `schemaVersion` from 3 to 4. There is no
-`needs.<selector>.outputs.runner` expression to fall back from, no
-`vars.CI_HOSTED_RUNNER`, and no reserved `ci-runner-selection-failed` marker: the
-identifier appears nowhere in `components/runner-policy/runner-policy.mjs`, and
-`selector` appears nowhere in `components/runner-policy/runner-policy.test.mjs`.
+`needs.<selector>.outputs.runner` expression to fall back from and no
+`vars.CI_HOSTED_RUNNER` to read: `selector` appears nowhere in
+`components/runner-policy/runner-policy.test.mjs`. The
+`ci-runner-selection-failed` marker is not a shape a consumer may write either,
+though it survives in `policy.json` and `policy.schema.json` as a
+`failureSentinelMarker` the analyzer validates stays outside every hosted and
+managed runner label set; a job naming it as a runner is refused.
 
 A direct job or a reusable caller now names its runner as a literal. A private
 enrolled consumer names `melodic-ubuntu-24.04-x64` as the direct `runs-on` value
 or the canonical `with.runner` input, and the analyzer admits it under the
 `managed-literal` routing kind; a public or hosted-only consumer names an
 approved hosted label such as `ubuntu-24.04`. A job that needs hosted capacity
-inside an enrolled private repository declares a `hosted-exception-required`
-key with a justification in that repository's `.github/runner-policy.json`,
-which is a reviewed diff rather than a run-time route. See
-melodic-software/github-iac `docs/adr/0014-fleet-first-ci-for-private-repositories.md`.
+inside an enrolled private repository declares an entry under `exceptions` in
+that repository's `.github/runner-policy.json`, keyed `<workflow path>#<jobId>`
+and carrying a `reason` drawn from `policy.json`'s closed `hostedExceptionReasons`
+set plus a free-text `justification`; `hosted-exception-required` is the finding
+the analyzer raises when that entry is missing, not a key a consumer writes. See
+[the exceptions section](../components/runner-policy/README.md) for the exact
+shape. The decision is recorded in melodic-software/github-iac#466, which adds
+`docs/adr/0014-fleet-first-ci-for-private-repositories.md`.
 
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
@@ -346,7 +353,10 @@ What stays consumer-owned:
   materialization PR.
 - The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
   runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
-  retired with the selector; `CI_RUNNER_POLICY` reads nowhere and is deleted.
+  no longer read by anything: the selector that consumed them is deleted
+  (ci-workflows#569). The organization variables themselves still exist, and
+  their removal from the github-iac Pulumi program is decided pending that
+  repository's Phase 7 step 5 apply.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and
@@ -354,9 +364,11 @@ no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
 inline. Do not normalize the two.
 
-Both components name the governed fleet label `melodic-ubuntu-24.04-x64`
-directly, and `runner-policy` admits that literal only for a private
-self-hosted consumer. The ban consults neither `exceptions` nor
+Both components name the governed review-tier fleet label
+`melodic-review-ubuntu-24.04-x64` directly (`claude-review.yml` and
+`claude-security-review.yml`), and `runner-policy` admits that literal, like
+every entry in `approvedManagedRunnerLabels`, only for a private self-hosted
+consumer. The ban consults neither `exceptions` nor
 `localRoutingGrants`, so a PUBLIC target has no configuration escape and would
 fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
@@ -407,7 +419,8 @@ the hosted-only-eligible targets (the public targets plus `claude-code-proxy`,
 private but not enrolled for local routing) and deliberately NOT for the four
 fleet-enrolled private targets (`dotfiles`, `github-iac`, `medley`,
 `provisioning`), where runner-policy requires the fleet literal for every
-read-only job; those take a fleet-routed sibling in a second hop. `ci-workflows` is `locally-owned`: it hosts the action and
+read-only job; those take a fleet-routed sibling in a second hop.
+`ci-workflows` is `locally-owned`: it hosts the action and
 already runs the guard from its own tree. The check is advisory (not in any
 `ci-status`) during its soak, and the caller passes `standards-ref: main`
 until the soak completes. Rationale, pins, the advance path through the
