@@ -218,7 +218,7 @@ assert_not_contains 'a fleet list with no enabledPlugins is not refused' \
 assert_contains 'a fleet list with no enabledPlugins is summarised as a source' \
   "$empty_out" 'fleet list'
 assert_contains 'a repo delta outside the fleet list is installed as an overlay' \
-  "$empty_out" 'repo .claude/settings.json: 1 enabled, 1 newly installed'
+  "$empty_out" 'repo .claude/settings.json: 1 declared, 1 newly installed'
 assert_eq 'the overlay install reaches the plugin CLI' '1' \
   "$(cat "$inv_tmp/counts/plugin-install" 2>/dev/null || echo 0)"
 rm -rf "$inv_tmp"
