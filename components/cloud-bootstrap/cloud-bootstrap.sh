@@ -263,7 +263,7 @@ plugin_have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null
 # says which list each plugin came from.
 install_plugins_from() {
   local file="$1" label="$2" declared wanted
-  local mp_name mp_target id enabled installed
+  local mp_name mp_target id declared_count installed
   [[ -f "$file" ]] || return 0
   declared=$(
     jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
@@ -291,11 +291,11 @@ EOF
       | select(.value == true) | .key' "$file" 2>/dev/null || true
   )
 
-  enabled=0
+  declared_count=0
   installed=0
   while IFS= read -r id; do
     [[ -n "$id" ]] || continue
-    enabled=$((enabled + 1))
+    declared_count=$((declared_count + 1))
     if [[ $'\n'"$plugin_have"$'\n' == *$'\n'"$id"$'\n'* ]]; then continue; fi
     if claude plugin install "$id" --scope user -y >/dev/null 2>&1; then
       installed=$((installed + 1))
@@ -307,7 +307,7 @@ EOF
 $wanted
 EOF
 
-  echo "cloud-bootstrap: $label: $enabled enabled, $installed newly installed" >&2
+  echo "cloud-bootstrap: $label: $declared_count declared, $installed newly installed" >&2
   return 0
 }
 
