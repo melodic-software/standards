@@ -257,4 +257,79 @@ rc=$?
 assert_exit 'malformed seed exits 2' 2 "$rc"
 assert_contains 'malformed seed is named' "$out" 'not valid JSON'
 
+# A seed that parses can still carry no usable plugin list. Reading one as an
+# empty seed reports the whole fleet as missing; a structural jq error inside
+# compare_seed is swallowed and reports a match. Both are wrong about a broken
+# file, so the shape is checked before the comparison and exits 2 like any
+# other unreadable input.
+cat >"$tmp/seed-scalar.json" <<'JSON'
+{ "claudeSettings": { "seed": { "enabledPlugins": "oops" } } }
+JSON
+out="$(bash "$script" --compare-seed "$tmp/seed-scalar.json" "$tmp/baseline.json" 2>&1)"
+rc=$?
+assert_exit 'a seed whose enabledPlugins is a scalar exits 2' 2 "$rc"
+assert_contains 'a scalar enabledPlugins is named' \
+  "$out" 'no claudeSettings.seed.enabledPlugins object'
+assert_not_contains 'a scalar enabledPlugins never reports a match' \
+  "$out" 'matches the fleet list'
+
+cat >"$tmp/seed-no-key.json" <<'JSON'
+{ "claudeSettings": { "seed": {} } }
+JSON
+out="$(bash "$script" --compare-seed "$tmp/seed-no-key.json" "$tmp/baseline.json" 2>&1)"
+rc=$?
+assert_exit 'a seed with no enabledPlugins key exits 2' 2 "$rc"
+
+printf '[]' >"$tmp/seed-array.json"
+out="$(bash "$script" --compare-seed "$tmp/seed-array.json" "$tmp/baseline.json" 2>&1)"
+rc=$?
+assert_exit 'a seed whose root is an array exits 2' 2 "$rc"
+assert_not_contains 'an array root never reports a match' "$out" 'matches the fleet list'
+
+# --- strict seed comparison (--compare-seed-strict) -------------------------
+# The CI gate acts on exactly one divergence class — a fleet plugin the seed
+# never names — and must not decide that by grepping this script's prose. The
+# strict mode raises that class to exit 3; the message below is asserted in
+# the same breath, so rewording it without moving the flag trips here first.
+cat >"$tmp/seed-gap.json" <<'JSON'
+{
+  "claudeSettings": {
+    "seed": {
+      "enabledPlugins": {
+        "alpha@melodic-software": true,
+        "delta@third-party": true
+      }
+    }
+  }
+}
+JSON
+out="$(bash "$script" --compare-seed-strict "$tmp/seed-gap.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'a seed missing a fleet plugin exits 3 under --compare-seed-strict' 3 "$rc"
+assert_contains 'the missing fleet plugin is still reported in the log' \
+  "$out" 'in fleet list, not in seed: beta@melodic-software'
+
+# Existing callers of --compare-seed keep today's semantics: the same gap is
+# ordinary divergence, exit 1.
+out="$(bash "$script" --compare-seed "$tmp/seed-gap.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'the same gap stays exit 1 under plain --compare-seed' 1 "$rc"
+
+# Only that class raises the code: a seed carrying every fleet key but opting
+# out of one still diverges (exit 1), and strict mode must not escalate it,
+# because the real seed's steady state is exactly this shape.
+out="$(bash "$script" --compare-seed-strict "$tmp/seed.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'opt-outs and seed-only entries stay exit 1 under --compare-seed-strict' 1 "$rc"
+assert_contains 'the opt-out is still reported' \
+  "$out" 'in fleet list, seed opts out: beta@melodic-software'
+
+out="$(bash "$script" --compare-seed-strict "$tmp/seed-match.json" "$tmp/baseline.json")"
+rc=$?
+assert_exit 'a matching seed exits 0 under --compare-seed-strict' 0 "$rc"
+
+out="$(bash "$script" --compare-seed-strict "$tmp/seed-scalar.json" "$tmp/baseline.json" 2>&1)"
+rc=$?
+assert_exit 'a structurally broken seed exits 2 under --compare-seed-strict' 2 "$rc"
+
 [[ $FAILED -eq 0 ]] || exit 1

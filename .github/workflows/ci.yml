@@ -1002,12 +1002,16 @@ jobs:
           owner: melodic-software
           repositories: dotfiles
           permission-contents: read
-      # Only `in fleet list, not in seed` gates. The comparator exits 1 on ANY
+      # Only a fleet plugin the seed never names gates, and `-strict` is how
+      # the comparator says so: exit 3. Plain --compare-seed exits 1 on ANY
       # divergence, and the steady state carries deliberate per-plugin seed
-      # opt-outs plus one seed-only entry, so the exit code alone would be red
-      # on every run; the line prefix is the signal, as dotfiles#694 recorded.
-      # Exit 2 — missing jq, unreadable JSON — still fails the lane, so a
-      # broken comparator cannot read as "no drift".
+      # opt-outs plus one seed-only entry, so that code alone would be red on
+      # every run; grepping the report's prose instead would put the go/no-go
+      # on a message the script is free to reword, which is the same silent
+      # green one layer down. Exit 2 — missing jq, unreadable JSON, a seed
+      # with no claudeSettings.seed.enabledPlugins object — still fails the
+      # lane, so a broken comparator or a structurally broken seed cannot read
+      # as "no drift". The report itself streams to the log either way.
       - name: Compare the fleet plugin list against the dotfiles seed
         env:
           GH_TOKEN: ${{ steps.seed-token.outputs.token }}
@@ -1016,13 +1020,15 @@ jobs:
           seed="$RUNNER_TEMP/dotfiles-claude.json"
           gh api -H 'Accept: application/vnd.github.raw+json' \
             repos/melodic-software/dotfiles/contents/.chezmoidata/claude.json >"$seed"
-          out=$(bash distribution/check-plugin-baseline.sh --compare-seed "$seed") && rc=0 || rc=$?
-          printf '%s\n' "$out"
-          [[ "$rc" -le 1 ]] || exit "$rc"
-          if grep -q 'in fleet list, not in seed:' <<<"$out"; then
-            echo '::error::the dotfiles seed is missing a plugin the fleet list enables'
-            exit 1
-          fi
+          bash distribution/check-plugin-baseline.sh --compare-seed-strict "$seed" && rc=0 || rc=$?
+          case "$rc" in
+            0 | 1) ;;
+            3)
+              echo '::error::the dotfiles seed is missing a plugin the fleet list enables'
+              exit 1
+              ;;
+            *) exit "$rc" ;;
+          esac
 
   exec-bit:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
