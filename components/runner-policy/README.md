@@ -727,6 +727,42 @@ routing-relevant field, which cannot be safely diffed for auto-approval", is
 still unanswered, and bumping the sync reusable inside a change whose own merge
 triggers the fan-out would put an untested sync engine on the critical path.
 Both wait for a later decision that answers the `needs` question first.
+Three of the seven are registered a fourth time at the v0.24.0 tag
+`2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3`, the merged main commit the release
+points at: `checks`, `claude-review` and `link-check`. Only three, because this
+registration exists to unblock one consumer repin (dotfiles#674), whose seven
+`uses:` bumps are those three reusables plus the `powershell`, `shellcheck`,
+`pr-contract` and `ci-status` composite actions, and composite actions are not
+SHA-allowlisted. Every entry copies its v0.22.2 terms verbatim and nothing
+widens; the v0.22.2 and older entries stay, and this repository's own callers
+stay at v0.22.2 and converge on their own change. Read at both revisions
+through the contents API and compared with `diff`, `link-check.yml` is
+byte-identical. `checks.yml` differs by a header comment block, a
+`timeout-minutes: 8` key on eight download-bearing steps (ci-workflows#577),
+and one word inside the `timeout-minutes` input's own description prose, where
+`semantic-pr` drops out of the list of per-tool reusables the default is said
+to match. Every input name, type, `required` flag and `default` is unchanged,
+as are workflow and job `permissions`, the empty secret map, and the
+`runs-on: ${{ inputs.runner }}` routing. `claude-review.yml` differs by exactly
+two lines, both `anthropics/claude-code-action` pin bumps from
+`ef8bb1e43bf303cff727a1dd0b8837029fe982a2` (v1.0.215) to
+`d75b94d5ad426cb8546e6628b6f5f19b84e5cce1` (v1.0.216).
+Auto-approval carries none of the three, and each decline reason is recorded
+here rather than worked around. `reusableWorkflowSecuritySurfacesMatch` run
+against the two revisions returns `diffField: inputs` for `checks.yml`, because
+the inputs surface records each description in full and description prose
+moved, and `diffField: credentialReferences` for `claude-review.yml`, because
+that surface records a credential-consuming step's `uses:` line in full and a
+pin bump reads as a diff. It returns `unchanged: true` for `link-check.yml`,
+whose source did not move at all, and the analyzer declines that one anyway for
+the standing reason recorded above: the auto-approval path declines any
+contract naming `allowedCallerPermissions`, which `link-check` does. No
+caller-facing contract moved in any of the three, which is why the entries are
+written by review.
+The `claude-review` entry keeps its `runner`, `pr-number` and `timeout-minutes`
+inputs and the single `CLAUDE_CODE_OAUTH_TOKEN` mapping, and lists neither
+`standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the
+visibility-scoped invariant below holds unchanged.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
