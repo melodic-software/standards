@@ -317,7 +317,9 @@ components:
 # (proof artifact in that plan, 2026-08-17), and the melodic-software/.github
 # canary was observed end-to-end on 2026-08-23 — PR 62 armed on open and
 # self-merged 31 seconds later with all four required contexts green. An
-# absent automerge key is the armed default, and the fleet is armed.
+# absent automerge key is the armed default, and the fleet is armed. The
+# watchdog caller was removed on 2026-09-14 with the other automated
+# issue-opening processes; nothing now reports a stuck sync PR.
 #
 # No per-target opt-out remains as of 2026-09-04. The last three
 # (agent-plugins, cursor-plugins, claude-code-proxy) were disarmed only because

@@ -14,8 +14,7 @@ on:
   workflow_dispatch:
   schedule:
     # Off-minute daily poll, deliberately clear of `sync.yml`'s weekly
-    # `17 6 * * 1` reconciliation and the stuck-automerge watchdog's hourly
-    # `17 * * * *`. GitHub queues every scheduled workflow on the platform
+    # `17 6 * * 1` reconciliation. GitHub queues every scheduled workflow on the platform
     # against one dispatcher, so the top of the hour and each quarter-hour are
     # the most contended and most delayed slots; :41 is neither.
     - cron: "41 14 * * *"
@@ -170,9 +169,7 @@ jobs:
           # leaving `repositories` empty would instead scope it to EVERY
           # repository in the App's installation, so deriving the repository
           # name from the event payload would silently widen the token on any
-          # trigger whose payload omits it. Same shape the sibling
-          # standards-sync-stuck-automerge-alert reusable uses for its own
-          # single-repository token.
+          # trigger whose payload omits it.
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
@@ -202,7 +199,6 @@ jobs:
             components/runner-policy/runner-policy.test.mjs
             .github/workflows/claude-review.yml
             .github/workflows/sync.yml
-            .github/workflows/standards-sync-stuck-automerge-alert.yml
           commit-message: |
             chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
 

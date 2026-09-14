@@ -60,11 +60,6 @@ const REPIN_TARGETS = [
     callerFiles: [".github/workflows/sync.yml"],
     kind: "reusable",
   },
-  {
-    workflowPath: `${UPSTREAM}/.github/workflows/standards-sync-stuck-automerge-alert.yml`,
-    callerFiles: [".github/workflows/standards-sync-stuck-automerge-alert.yml"],
-    kind: "reusable",
-  },
 ];
 
 const PIN_RE = /uses:\s+melodic-software\/ci-workflows\/[^@\s]+@([0-9a-fA-F]{40})/u;

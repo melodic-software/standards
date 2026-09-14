@@ -32,7 +32,6 @@ readonly LANE_DIR='components/claude-lanes'
 readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
   '.github/workflows/sync.yml'
-  '.github/workflows/standards-sync-stuck-automerge-alert.yml'
   'components/managed-files-guard/managed-files-guard.yml'
 )
 

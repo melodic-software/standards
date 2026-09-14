@@ -13,15 +13,13 @@ name: lychee-private-inventory
 # targets stay outside both halves; the script reports them as unverified.
 #
 # The App token is minted metadata-read only, over the installation's whole
-# repository set, and is used for exactly one read. It cannot write anything,
-# which is also why this workflow files a tracking issue in THIS repository
-# through the job's own token rather than opening a fix PR: the sync App
-# deliberately holds no write grant on its source repository.
+# repository set, and is used for exactly one read. It cannot write anything.
+# Drift fails the run; it opens no issue.
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1`, the watchdog's
-    # hourly `17 * * * *`, and claude-lanes-repin's `41 14 * * *`.
+    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1` and
+    # claude-lanes-repin's `41 14 * * *`.
     - cron: "23 15 * * *"
 
 permissions:
@@ -35,7 +33,6 @@ jobs:
   inventory:
     permissions:
       contents: read
-      issues: write
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -43,8 +40,6 @@ jobs:
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
-      ISSUE_MARKER: "<!-- standards:lychee-private-inventory:v1 -->"
-      ISSUE_TITLE: "lychee private-repo inventory disagrees with repository visibility"
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,60 +103,8 @@ jobs:
           fi
           exit 0
 
-      # One rolling tracking issue, keyed by a hidden marker: created on the
-      # first drift, refreshed on every later one, and closed by the first
-      # clean run — so a drift is never a permanently red cron nobody reads
-      # (standards#274), and never a pile of duplicate issues either.
-      - name: File or refresh the drift tracking issue
+      - name: Fail on inventory drift
         if: steps.check.outputs.rc == '1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -euo pipefail
-          body="$RUNNER_TEMP/issue-body.md"
-          {
-            printf '%s\n\n' "$ISSUE_MARKER"
-            cat <<'SUMMARY'
-          ## Summary
-
-          The private-repo exclude inventory in `lychee.toml` disagrees with actual repository visibility. Regenerate it at the source — never in a downstream copy (that is how .github#46 was silently reverted):
-
-          ```sh
-          bash components/lychee/private-repo-inventory.sh generate --write
-          ```
-
-          ## Findings
-
-          ```text
-          SUMMARY
-            cat "$RUNNER_TEMP/check.err"
-            cat <<'FOOTER'
-          ```
-
-          FOOTER
-            printf -- '- Run: %s\n' "$RUN_URL"
-            printf -- '- Updated automatically by the lychee-private-inventory workflow; the first clean run closes this issue.\n'
-          } >"$body"
-          existing="$(gh issue list --state open --search "\"$ISSUE_MARKER\" in:body" --json number --jq '.[0].number // empty')"
-          if [[ -n "$existing" ]]; then
-            gh issue edit "$existing" --body-file "$body"
-            echo "Refreshed tracking issue #$existing"
-          else
-            gh issue create --title "$ISSUE_TITLE" --body-file "$body" --label automated --label link-check
-          fi
-          echo "::error::lychee.toml private-repo inventory drift — see the tracking issue"
+          echo "::error::lychee.toml private-repo inventory drift. Regenerate it at the source, never in a downstream copy: bash components/lychee/private-repo-inventory.sh generate --write"
           exit 1
-
-      - name: Close the drift tracking issue on a clean run
-        if: steps.check.outputs.rc == '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          existing="$(gh issue list --state open --search "\"$ISSUE_MARKER\" in:body" --json number --jq '.[0].number // empty')"
-          if [[ -n "$existing" ]]; then
-            gh issue close "$existing" --comment "The inventory agrees with repository visibility again (run ${RUN_URL})."
-            echo "Closed tracking issue #$existing"
-          fi
