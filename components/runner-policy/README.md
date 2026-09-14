@@ -727,10 +727,13 @@ routing-relevant field, which cannot be safely diffed for auto-approval", is
 still unanswered, and bumping the sync reusable inside a change whose own merge
 triggers the fan-out would put an untested sync engine on the critical path.
 Both wait for a later decision that answers the `needs` question first.
-As of 2026-09-14 this repository no longer calls the
-`standards-sync-stuck-automerge-alert` or `link-check` reusables: both callers
-were deleted under the decision to remove automated issue-opening processes.
-Their contract entries above stay as the record for other consumers.
+Amendment: ci-workflows no longer ships the `link-check`,
+`pulumi-version-drift-check`, `standards-sync-stuck-automerge-alert`,
+`approval-agent`, `claude-assistant`, `claude-e2e-verify` and
+`dependabot-lock-regen` reusables, and no repository calls them. `policy.json`
+carries no contract for any of those paths at any revision; every registration
+for them described in this section, including the hosted-only and
+`runner-input` entries below, is history and no longer in force.
 Three of the seven are registered a fourth time at the v0.24.0 tag
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3`, the merged main commit the release
 points at: `checks`, `claude-review` and `link-check`. Only three, because this
