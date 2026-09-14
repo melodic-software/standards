@@ -77,17 +77,20 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-The admitted pin is `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2). It
-supersedes `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
+The admitted pin is `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0). It
+supersedes `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
+superseded `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
 ci-workflows#530), the commit that closed the guard's fail-open on an
 unreadable diff: before it, an unfetched or bogus ref produced an empty change
 list and the guard passed precisely when it could not see the diff. No release
 carried that commit when this component was admitted (the newest, v0.17.2, is
 2026-08-21), so the comment took the convention's short-SHA fallback form until
-a release contained it. v0.22.2 is a release that contains it, and
-`.github/actions/managed-files-guard/` is untouched between the two revisions
-(verified through the compare API), so the pin now carries the release-tag
-comment form and nothing the guard executes changed.
+a release contained it; v0.22.2 was the first release that did, and the pin has
+carried the release-tag comment form since. Between v0.22.2 and v0.24.0
+`.github/actions/managed-files-guard/action.yml` changed once (verified through
+the compare API): it adds `dependabot[bot]` to the actors the guard skips and
+quotes the existing `melodic-standards-sync[bot]` case pattern. Nothing else the
+guard executes moved.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
