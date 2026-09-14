@@ -88,9 +88,17 @@ carried that commit when this component was admitted (the newest, v0.17.2, is
 a release contained it; v0.22.2 was the first release that did, and the pin has
 carried the release-tag comment form since. Between v0.22.2 and v0.24.0
 `.github/actions/managed-files-guard/action.yml` changed once (verified through
-the compare API): it adds `dependabot[bot]` to the actors the guard skips and
-quotes the existing `melodic-standards-sync[bot]` case pattern. Nothing else the
-guard executes moved.
+the compare API), in ci-workflows `3c23f69e4248700c3636cabd49f1d5c888284444`
+(ci-workflows#568). It adds a `'dependabot[bot]'|dependabot` arm to the actor
+`case`, so both the bracketed login and the bare name now skip the hand-edit
+check; a Dependabot bump that edits a pinned action inside a standards-managed
+file reds the guard without it. It also **quotes** the existing
+`melodic-standards-sync[bot]` pattern, which is a behavior change, not
+cosmetics: unquoted, bash parsed `[bot]` as a glob character class matching a
+single `b`, `o` or `t`, so that arm never matched the bot login at all. It was
+masked by the sibling `standards-sync` label check, which skipped sync-bot PRs
+through the label path; quoting turns a dead arm live. Nothing else the guard
+executes moved.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
