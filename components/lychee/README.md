@@ -24,8 +24,8 @@ went public; the alternations sorted and identical) and in the scheduled
 `lychee-private-inventory` workflow for the direction it cannot (a new private
 sync target missing from the list, read from the standards-sync App
 installation). Private repositories outside the sync roster are the residual
-the check reports as unverified. A new private repository therefore surfaces
-as a tracking issue here within a day; fix it at this source, never in a
+the check reports as unverified. A new private repository therefore fails
+that scheduled workflow within a day; fix it at this source, never in a
 consumer's synced copy, which the next sync overwrites. Public
 siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
 exceptions are scoped to the exact URL, not the host: every other URL on

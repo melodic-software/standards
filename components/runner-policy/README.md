@@ -720,13 +720,17 @@ including its `allowedCallerPermissions` exact match of `contents: read` plus
 Two reusables that a v0.22.2 entry would otherwise be expected to cover are
 deliberately absent: `standards-sync` and `standards-sync-stuck-automerge-alert`.
 Neither has a v0.22.x entry at any revision, and this repository's own callers
-stay at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2). The
+stayed at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2). The
 `repin-policy-lockstep` decline reason for the first of them,
 "`standards-sync.yml` old revision job `sync` references `needs` in a
 routing-relevant field, which cannot be safely diffed for auto-approval", is
 still unanswered, and bumping the sync reusable inside a change whose own merge
 triggers the fan-out would put an untested sync engine on the critical path.
 Both wait for a later decision that answers the `needs` question first.
+As of 2026-09-14 this repository no longer calls the
+`standards-sync-stuck-automerge-alert` or `link-check` reusables: both callers
+were deleted under the decision to remove automated issue-opening processes.
+Their contract entries above stay as the record for other consumers.
 Three of the seven are registered a fourth time at the v0.24.0 tag
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3`, the merged main commit the release
 points at: `checks`, `claude-review` and `link-check`. Only three, because this

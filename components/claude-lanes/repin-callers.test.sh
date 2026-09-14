@@ -387,13 +387,6 @@ jobs:
   sync:
     uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${other_sha} # v0.8.0
 YAML
-cat > "$repo/.github/workflows/standards-sync-stuck-automerge-alert.yml" <<YAML
-name: alert
-on: schedule
-jobs:
-  alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@${other_sha} # v0.8.0
-YAML
 cat > "$repo/.github/workflows/claude-review.yml" <<YAML
 name: local-review
 on: pull_request
@@ -434,18 +427,15 @@ assert_not_contains 'apply: a fallback pin dated before the release is not repor
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml \
   "$repo"/.github/workflows/sync.yml \
-  "$repo"/.github/workflows/standards-sync-stuck-automerge-alert.yml \
   "$repo"/.github/workflows/claude-review.yml \
   "$repo/$guard_caller" | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '8' "$mixed_pins"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
   "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
   "$(cat "$repo/$guard_caller")" '2026-08-01'
 mixed_paths="$(git -C "$repo" diff --name-only | sort | paste -sd, -)"
 assert_contains 'apply: mixed-SHA extras include sync.yml' "$mixed_paths" '.github/workflows/sync.yml'
-assert_contains 'apply: mixed-SHA extras include the alert caller' "$mixed_paths" \
-  '.github/workflows/standards-sync-stuck-automerge-alert.yml'
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
   '.github/workflows/claude-review.yml'
 assert_contains 'apply: mixed-SHA extras include the guard caller component' "$mixed_paths" "$guard_caller"
@@ -463,7 +453,7 @@ export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml; do
   cat > "$repo/.github/workflows/$extra" <<YAML
 name: extra
 on: pull_request
@@ -498,14 +488,14 @@ assert_contains 'apply: the version note names the file left untouched' "$(cat "
   "(${new_sha}): \`${guard_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
+assert_eq 'apply: every other enumerated pin still advances' '6' "$ahead_pins"
 
 # Same-day dates do not prove containment. When compare says the pin is
 # ahead of the release, apply must leave it — this is the Codex P2 on #511.
 repo="$scratch/repo-same-day-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done
@@ -525,7 +515,7 @@ assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard
 repo="$scratch/repo-same-day-behind"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done
@@ -545,7 +535,7 @@ assert_contains 'apply: a same-day contained pin advances to the tag form' \
 repo="$scratch/repo-compare-fail"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml standards-sync-stuck-automerge-alert.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done
@@ -596,13 +586,6 @@ on: pull_request
 jobs:
   review:
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
-YAML
-cat > "$repo/.github/workflows/standards-sync-stuck-automerge-alert.yml" <<YAML
-name: alert
-on: schedule
-jobs:
-  alert:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync-stuck-automerge-alert.yml@${old_sha} # v0.9.1
 YAML
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'partial extras'
