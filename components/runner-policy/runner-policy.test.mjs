@@ -29,11 +29,9 @@ const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
-const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${PRODUCTION_SHA}`;
+const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
-const PULUMI_DRIFT_SHA = "15aefd8799e8a8b5ffdfcc183dcbfcbf58044481";
-const PULUMI_DRIFT_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${PULUMI_DRIFT_SHA}`;
 const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
 const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
 const ALTERNATE_REVIEWED_SHA = "1123456789abcdef0123456789abcdef01234567";
@@ -53,11 +51,6 @@ const SYNC_RUNNER_INPUT_CONTRACT = {
     "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
   },
 };
-// The reviewed ci-workflows floor-conversion merge commit that carries these
-// reusables' runner input; shared by both runner-input contracts.
-const WAVE1_FLOOR_CONVERSION_SHA = "3dfb18452a8c6059a22e62456390d84feb10b42f";
-const LINK_CHECK_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
-const PULUMI_DRIFT_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${WAVE1_FLOOR_CONVERSION_SHA}`;
 // The governed fleet labels: the only routing targets that reach the managed
 // fleet, written literally in `runs-on` (or in a reviewed reusable's runner
 // input). `FLEET_REVIEW_LABEL` is the review tier of the same fleet.
@@ -2936,12 +2929,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
     ].allowedInputs,
     [],
   );
-  assert.deepEqual(contracts[PULUMI_DRIFT_REUSABLE_REFERENCE], {
-    routing: "hosted-only",
-    allowedInputs: [],
-    allowedSecrets: {},
-    fixedRunsOn: ["ubuntu-24.04"],
-  });
   assert.deepEqual(contracts[STANDARDS_SYNC_REUSABLE_REFERENCE], {
     routing: "hosted-only",
     allowedInputs: ["dry-run", "targets"],
@@ -2982,20 +2969,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
       allowedSecrets: {},
     },
   );
-  assert.deepEqual(contracts[LINK_CHECK_RUNNER_INPUT_REFERENCE], {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner", "args"],
-    allowedSecrets: {},
-    allowedCallerPermissions: { contents: "read", issues: "write" },
-  });
-  assert.deepEqual(contracts[PULUMI_DRIFT_RUNNER_INPUT_REFERENCE], {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner"],
-    allowedSecrets: {},
-    allowedCallerPermissions: { contents: "read", issues: "write" },
-  });
   for (const sha of [REPINE_LANE_SHA_V0_14_2, REPINE_LANE_SHA_V0_17_0]) {
     assert.deepEqual(
       contracts[`melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${sha}`],
@@ -3004,18 +2977,6 @@ test("production contracts pin reviewed Windows and selectable Linux workflows",
         runnerInput: "runner",
         allowedInputs: ["runner", "scan-args", "fail-on-vuln", "allow-no-lockfiles"],
         allowedSecrets: {},
-      },
-    );
-    assert.deepEqual(
-      contracts[
-        `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${sha}`
-      ],
-      {
-        routing: "runner-input",
-        runnerInput: "runner",
-        allowedInputs: ["runner"],
-        allowedSecrets: {},
-        allowedCallerPermissions: { contents: "read", issues: "write" },
       },
     );
   }
@@ -5872,72 +5833,6 @@ test("hosted-only reusable contract accepts its exact reviewed secret mapping", 
   assert.deepEqual(await audit(root), []);
 });
 
-test("reviewed Pulumi drift workflow is an exact privileged hosted contract", async () => {
-  const root = await repository({
-    exceptions: {
-      ".github/workflows/ci.yml#drift": {
-        reason: "privileged-control-plane",
-        justification: "The reviewed drift workflow maintains an issue on hosted compute.",
-      },
-    },
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  drift:
-    permissions:
-      contents: read
-      issues: write
-    uses: ${PULUMI_DRIFT_REUSABLE_REFERENCE}
-`,
-    },
-  });
-  await writeFile(
-    path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-  );
-  assert.deepEqual(await audit(root), []);
-});
-
-test("Pulumi drift issues write requires the privileged hosted category", async () => {
-  for (const [exceptions, expectedRule] of [
-    [{}, "hosted-exception-required"],
-    [
-      {
-        ".github/workflows/ci.yml#drift": {
-          reason: "docker-socket",
-          justification: "This intentionally exercises the wrong hosted category.",
-        },
-      },
-      "hosted-exception-category",
-    ],
-  ]) {
-    const root = await repository({
-      exceptions,
-      workflows: {
-        "ci.yml": `permissions: read-all
-jobs:
-  drift:
-    permissions:
-      contents: read
-      issues: write
-    uses: ${PULUMI_DRIFT_REUSABLE_REFERENCE}
-`,
-      },
-    });
-    await writeFile(
-      path.join(root, "runner-policy-policy.json"),
-      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
-    );
-    const findings = await audit(root);
-    assert.equal(findings.length, 1);
-    assert.equal(findings[0].rule, expectedRule);
-    assert.match(
-      findings[0].message,
-      /write GITHUB_TOKEN permissions \(issues\).*privileged-control-plane/,
-    );
-  }
-});
-
 test("production Claude review contract accepts its supported skip-actors input", async () => {
   for (const skipActors of [
     "dependabot[bot],claude[bot],melodic-ai[bot]",
@@ -7968,54 +7863,19 @@ test("both claude lane contracts at the wave tag copy their predecessors forward
   assert.equal(asserted, 2);
 });
 
-// The two reusables the wave-tag convergence stranded. Neither is a claude
-// lane and neither is distributed by this repository, so the first 6b-i pull
-// request did not carry them; the consumers that call them (claude-code-plugins
-// for both, .github and github-iac for link-check) had to hold their old pins
-// because `reusableWorkflowStatus` fails closed on an unreviewed path@SHA and
-// the Dependabot auto-approval path declines any contract naming
-// `allowedCallerPermissions`, which both of these do. The declared surfaces are
+// The reusable the wave-tag convergence stranded. It is not a claude lane and
+// is not distributed by this repository, so the first 6b-i pull request did
+// not carry it; its caller had to hold its old pin because
+// `reusableWorkflowStatus` fails closed on an unreviewed path@SHA and the
+// Dependabot auto-approval path declines any contract naming
+// `allowedCallerPermissions`, which this one does. The declared surface is
 // unchanged at the tag, so equality against the predecessor is the assertion.
-test("link-check and issue-triage-label at the wave tag copy their predecessors forward verbatim", () => {
+test("issue-triage-label at the wave tag copies its predecessor forward verbatim", () => {
   const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const previousByPath = {
-    "link-check": GH_FREE_GATE_SHA,
-    "issue-triage-label": "c5e729c0af0e55ffed4675ec85c1b57356fef79e",
-  };
-  let asserted = 0;
-  for (const [reusable, previousSha] of Object.entries(previousByPath)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${previousSha}`];
-    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
-    assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
-    asserted += 1;
-  }
-  assert.equal(asserted, 2);
-});
-
-test("a governed caller of link-check at the wave tag is admitted", async () => {
-  const reference = `melodic-software/ci-workflows/.github/workflows/link-check.yml@${REPINE_LANE_SHA_V0_22_0}`;
-  const root = await repository({
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
-      },
-    },
-    workflows: {
-      "ci.yml": `permissions: read-all
-jobs:
-  links:
-    permissions:
-      contents: read
-      issues: write
-    uses: ${reference}
-    with:
-      runner: ${FLEET_LABEL}
-      args: --no-progress
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
+  const workflowPath = "melodic-software/ci-workflows/.github/workflows/issue-triage-label.yml";
+  const previous = contracts[`${workflowPath}@c5e729c0af0e55ffed4675ec85c1b57356fef79e`];
+  assert.ok(previous, "expected a predecessor contract for issue-triage-label");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
 });
 
 test("a governed caller of issue-triage-label at the wave tag is admitted", async () => {
@@ -8169,12 +8029,12 @@ ${permissions}
 
 // The ci-workflows v0.22.1 patch tag. Every reusable already reviewed at
 // v0.22.0 is re-registered at it so the wave repositories that pin the patch
-// can call them. Read at both revisions through the contents API: six of the
-// seven are byte-identical, and the seventh, `checks.yml`, differs only by
+// can call them. Read at both revisions through the contents API: all but
+// `checks.yml` are byte-identical, and `checks.yml` differs only by
 // thirteen `uses:` lines re-pinning its own composite steps from v0.20.0 to
 // the v0.22.0 revision. No `on.workflow_call` declaration, workflow
 // `permissions`, job `permissions`, `if` or `runs-on` expression moved on any
-// of the seven, so the caller-facing contract is unchanged and each entry is a
+// of them, so the caller-facing contract is unchanged and each entry is a
 // verbatim copy forward. The composite re-pin is why auto-approval declines
 // (`checks.yml` steps are recorded in full by the surface diff), so the entry
 // is written by review instead.
@@ -8196,11 +8056,6 @@ const WAVE_PATCH_TAG_CALLERS = [
     reusable: "checks",
     job: "checks",
     permissions: ["contents: read", "pull-requests: read"],
-  },
-  {
-    reusable: "link-check",
-    job: "links",
-    permissions: ["contents: read", "issues: write"],
   },
   {
     reusable: "issue-triage-label",
@@ -8233,7 +8088,7 @@ test("every reusable contract at the wave patch tag copies its v0.22.0 entry for
     );
     asserted += 1;
   }
-  assert.equal(asserted, 7);
+  assert.equal(asserted, 6);
 });
 
 test("a governed caller of each reusable at the wave patch tag is admitted", async () => {
@@ -8262,13 +8117,13 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
     assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);
     asserted += 1;
   }
-  assert.equal(asserted, 7);
+  assert.equal(asserted, 6);
 });
 
 // The ci-workflows v0.22.2 patch tag, the revision the whole fleet converges
 // on. `compare/cd2f4e6d...5776760` touches only the `ci-status` composite,
 // `.claude/cloud-bootstrap.sh`, `.github/actionlint.yaml` and ci-workflows'
-// own `ci.yml` and `README.md`, so all seven of the reusables above are
+// own `ci.yml` and `README.md`, so all of the reusables above are
 // byte-identical at the two revisions, `checks.yml` included this time (its
 // thirteen composite steps did not move again). Every entry is a verbatim copy
 // forward of its v0.22.1 entry, and the v0.22.1 and older entries stay as they
@@ -8287,7 +8142,7 @@ test("every reusable contract at the convergence tag copies its v0.22.1 entry fo
     );
     asserted += 1;
   }
-  assert.equal(asserted, 7);
+  assert.equal(asserted, 6);
 });
 
 test("a governed caller of each reusable at the convergence tag is admitted", async () => {
@@ -8316,84 +8171,24 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
     assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);
     asserted += 1;
   }
-  assert.equal(asserted, 7);
+  assert.equal(asserted, 6);
 });
 
-// `pulumi-version-drift-check` is the eighth entry at the convergence tag and
-// the only one with no v0.22.x predecessor to copy: the newest approved
-// revision for that path is the GH_FREE_GATE_SHA one github-iac's caller still
-// pins. It is derived, not copied, and the derivation is that the
-// caller-facing surface did not move between the two revisions:
-// `on.workflow_call.inputs` is `runner` alone, there is no
-// `on.workflow_call.secrets` block, workflow `permissions` is `{}`, the
-// `drift-check` job declares `contents: read` plus `issues: write`, and
-// `runs-on` is `${{ inputs.runner }}` — all identical. The whole diff is one
-// step body porting the drift detection off the `gh` CLI onto
-// `actions/github-script`, plus an `actions/checkout` patch bump, which is
-// also why auto-approval declines: the credential-references surface records a
-// credential-bearing step in full. So the derived terms come out equal to the
-// predecessor's, which this asserts rather than assumes.
-test("the pulumi drift contract at the convergence tag derives to its predecessor's terms", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const workflowPath =
-    "melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml";
-  const previous = contracts[`${workflowPath}@${GH_FREE_GATE_SHA}`];
-  assert.ok(previous, "expected the predecessor pulumi drift contract");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_2}`], {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner"],
-    allowedSecrets: {},
-    allowedCallerPermissions: {
-      contents: "read",
-      issues: "write",
-    },
-  });
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_2}`], previous);
-});
-
-test("a governed pulumi drift caller at the convergence tag is admitted", async () => {
-  const reference = `melodic-software/ci-workflows/.github/workflows/pulumi-version-drift-check.yml@${REPINE_LANE_SHA_V0_22_2}`;
-  const root = await repository({
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
-      },
-    },
-    workflows: {
-      "drift.yml": `permissions: read-all
-jobs:
-  drift:
-    permissions:
-      contents: read
-      issues: write
-    uses: ${reference}
-    with:
-      runner: ${FLEET_LABEL}
-`,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
-});
-
-// The two sync-family reusables are deliberately absent at the convergence
-// tag. `repin-policy-lockstep` declines `standards-sync.yml` because its old
+// The sync reusable is deliberately absent at the convergence tag.
+// `repin-policy-lockstep` declines `standards-sync.yml` because its old
 // revision's `sync` job "references `needs` in a routing-relevant field, which
 // cannot be safely diffed for auto-approval", and that question is unanswered;
 // bumping the sync reusable inside a change whose own merge triggers the
 // fan-out would also put an untested sync engine on the critical path. This
-// asserts the absence so a later change adds them deliberately rather than by
-// a copy-forward sweep.
-test("the sync-family reusables carry no contract at the convergence tag", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  for (const reusable of ["standards-sync", "standards-sync-stuck-automerge-alert"]) {
-    const key = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml@${REPINE_LANE_SHA_V0_22_2}`;
-    assert.equal(
-      contracts[key],
-      undefined,
-      `${reusable} gained a convergence-tag contract without answering the needs question`,
-    );
-  }
+// asserts the absence so a later change adds it deliberately rather than by a
+// copy-forward sweep.
+test("the sync reusable carries no contract at the convergence tag", () => {
+  const key = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${REPINE_LANE_SHA_V0_22_2}`;
+  assert.equal(
+    BASE_POLICY.approvedReusableWorkflowContracts[key],
+    undefined,
+    "standards-sync gained a convergence-tag contract without answering the needs question",
+  );
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily
