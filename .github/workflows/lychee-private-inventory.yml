@@ -87,13 +87,11 @@ jobs:
             args+=(--installation-list "$RUNNER_TEMP/installation.tsv")
           fi
           # The runner's default shell already carries `-e`, which `set -uo`
-          # does not clear, so the exit code is captured in the `if` (where
-          # a non-zero status is not fatal) rather than through `$?` after a
-          # bare call that `-e` would have aborted the step on.
+          # does not clear, so the exit code is captured through `|| rc=$?`
+          # (where a non-zero status is not fatal). Inside `if ! cmd; then`,
+          # `$?` is the negation's status, always 0, which hid every drift.
           rc=0
-          if ! bash components/lychee/private-repo-inventory.sh "${args[@]}" >"$RUNNER_TEMP/check.out" 2>"$RUNNER_TEMP/check.err"; then
-            rc=$?
-          fi
+          bash components/lychee/private-repo-inventory.sh "${args[@]}" >"$RUNNER_TEMP/check.out" 2>"$RUNNER_TEMP/check.err" || rc=$?
           cat "$RUNNER_TEMP/check.out"
           cat "$RUNNER_TEMP/check.err" >&2
           echo "rc=$rc" >>"$GITHUB_OUTPUT"
