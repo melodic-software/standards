@@ -770,6 +770,43 @@ The `claude-review` entry keeps its `runner`, `pr-number` and `timeout-minutes`
 inputs and the single `CLAUDE_CODE_OAUTH_TOKEN` mapping, and lists neither
 `standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the
 visibility-scoped invariant below holds unchanged.
+Three more join them at the same v0.24.0 SHA:
+`claude-security-review`, `osv-scanner` and `zizmor`. They are the reusables
+this repository's OWN callers pin at v0.22.2 —
+`components/claude-lanes/claude-security-review.yml` for the first,
+`.github/workflows/ci.yml` for the other two — and `reusableWorkflowStatus`
+fails closed on an unreviewed `path@SHA`, so those callers cannot move until
+these entries exist. The other nineteen v0.22.2 references in `ci.yml` and the
+one in `components/managed-files-guard/managed-files-guard.yml` are composite
+actions under `.github/actions/`, which are not SHA-allowlisted and need no
+entry. Each of the three copies its v0.22.2 terms verbatim and nothing widens;
+the v0.22.2 and older entries stay.
+Read at both revisions through the contents API and compared with `diff`,
+`zizmor.yml` and `osv-scanner.yml` are byte-identical: ci-workflows#577 bounded
+the download-bearing steps of `checks.yml` alone and left these two untouched.
+`claude-security-review.yml` differs by exactly two lines, the same
+`anthropics/claude-code-action` pin bump from
+`ef8bb1e43bf303cff727a1dd0b8837029fe982a2` (v1.0.215) to
+`d75b94d5ad426cb8546e6628b6f5f19b84e5cce1` (v1.0.216) that `claude-review.yml`
+carries. No `workflow_call` input, secret, `permissions` block or
+`runs-on: ${{ inputs.runner }}` routing moved in any of the three.
+`reusableWorkflowSecuritySurfacesMatch` run against the two revisions returns
+`unchanged: true` for `zizmor.yml` and `osv-scanner.yml`, and
+`diffField: credentialReferences` for `claude-security-review.yml`, because that
+surface records a credential-consuming step's `uses:` line in full and a pin
+bump reads as a diff. Auto-approval declines `zizmor` and
+`claude-security-review` anyway for the standing reason recorded above — the
+path declines any contract naming `allowedCallerPermissions`, which both do, and
+declines `claude-security-review` a second time for forwarding a reviewed secret
+on a caller-chosen runner. `osv-scanner` is the one entry auto-approval could
+have carried: it names `minimumCallerPermissions` only and forwards no secret.
+It is registered by review regardless, because auto-approval is a live fetch at
+audit time that `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL` turns off, and the
+lockstep procedure's reviewed entry is the durable record.
+The `claude-security-review` entry keeps its `runner`, `paths-file` and
+`skip-actors` inputs and the single `CLAUDE_CODE_OAUTH_TOKEN` mapping, and lists
+neither `standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the
+visibility-scoped invariant below holds unchanged for it too.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
