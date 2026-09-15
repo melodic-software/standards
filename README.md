@@ -102,3 +102,21 @@ bash harness/shell/run-tests.sh harness/shell/lib.test.sh
 
 Individual component tests skip cleanly when their external engine is absent;
 CI installs pinned engines and runs the complete suite.
+
+### CI posture
+
+This repository is public, so every `ci.yml` lane runs on GitHub-hosted
+`ubuntu-24.04` under a literal label, with no runner selector. `ci-status` is
+the one required status-check context; the org `ci-gate` ruleset requires
+nothing else, and lanes are added or removed behind it without touching the
+ruleset. Both of those follow from the organization-wide posture, whose
+reasoning and measurements are recorded once in `melodic-software/github-iac`
+at
+[`docs/topics/ci-perf/POSTURE.md`](https://github.com/melodic-software/github-iac/blob/main/docs/topics/ci-perf/POSTURE.md),
+with the decisions in that repository's ADRs 0008 and 0014. Read them there
+rather than a copy here.
+
+Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
+schedule or otherwise; `lychee-private-inventory.yml` fails the run on drift.
+No lane checks external URLs: the blocking `lychee` lane is offline-only, over
+local files and fragments.
