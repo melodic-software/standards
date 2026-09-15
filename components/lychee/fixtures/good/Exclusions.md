@@ -1,7 +1,7 @@
 # URL exclusion boundaries
 
-Private repositories intentionally excluded from the unauthenticated online
-lane:
+Private repositories intentionally excluded from an unauthenticated manual
+online run:
 
 - <https://github.com/melodic-software/claude-code-proxy>
 - <https://github.com/melodic-software/dotfiles>
