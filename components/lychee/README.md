@@ -5,13 +5,13 @@ Local link and Markdown-anchor validation with
 root-canonical [`lychee.toml`](../../lychee.toml).
 
 The blocking `ci-workflows` action runs offline for deterministic local-file and
-fragment checks. An online scheduled workflow may check external URLs
-advisorially because network health is inherently transient.
+fragment checks. External URLs are checked only by a manual online run, because
+network health is inherently transient.
 
 Managed consumers do not edit the config. `fixtures/` and `lychee.test.sh`
 prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 
-The online lane excludes explicitly inventoried private GitHub repository and
+Manual online runs exclude explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes a calling repository's token receive
 a 404. The inventory itself lives in the two `melodic-software/` alternations in
 [`lychee.toml`](../../lychee.toml)'s `exclude` list. Read it there rather than
