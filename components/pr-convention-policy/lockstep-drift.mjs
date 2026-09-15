@@ -488,11 +488,19 @@ export function maskCode(text) {
       }
 
       let rendered = "";
+      // The same line with code-span content blanked rather than removed, so
+      // its offsets still line up with the raw line's.
+      let scan = "";
       let position = 0;
       let inlineTicks = 0;
       while (position < line.length) {
         if (line[position] !== "`") {
-          if (inlineTicks === 0) rendered += line[position];
+          if (inlineTicks === 0) {
+            rendered += line[position];
+            scan += line[position];
+          } else {
+            scan += " ";
+          }
           position += 1;
           continue;
         }
@@ -505,17 +513,18 @@ export function maskCode(text) {
         } else if (inlineTicks === ticks) {
           inlineTicks = 0;
         }
-        if (!wasInline && inlineTicks === 0) rendered += line.slice(position, stop);
+        const literal = !wasInline && inlineTicks === 0;
+        if (literal) rendered += line.slice(position, stop);
+        scan += literal ? line.slice(position, stop) : " ".repeat(ticks);
         position = stop;
       }
 
       // Comment state is tracked only on lines that reach here, because the
       // composite tracks it in the same character loop it never runs on a line
       // inside a code block. It is also asymmetric there, and mirrored as such:
-      // an opener is honoured only outside a code span, so it is read from the
-      // rendered line, while a closer is matched against the raw remainder with
-      // no span awareness at all.
-      const lastOpen = rendered.lastIndexOf("<!--");
+      // an opener is honoured only outside a code span, a closer anywhere. Both
+      // offsets are read in the raw line's coordinate space so they compare.
+      const lastOpen = scan.lastIndexOf("<!--");
       const lastClose = line.lastIndexOf("-->");
       if (lastOpen > lastClose) commentOpen = true;
       else if (lastClose > lastOpen) commentOpen = false;

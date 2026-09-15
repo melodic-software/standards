@@ -329,6 +329,13 @@ test("the masker follows the composite's code-span rules", () => {
     maskCode("<!--\ntext `-->` more\n```\nNo related issue: x\n"),
     /No related issue/,
   );
+  // Both delimiter offsets are read in the raw line's coordinate space, so a
+  // masked span before them cannot make a closer look later than an opener
+  // that follows it. Here the comment stays open and the fence never fires.
+  assert.match(
+    maskCode("<!--\n`example` --> <!--\n```\nNo related issue: x\n"),
+    /No related issue/,
+  );
 });
 
 test("rules file missing a section or keyword is reported", () => {
