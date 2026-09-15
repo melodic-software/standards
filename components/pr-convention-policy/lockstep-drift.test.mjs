@@ -226,6 +226,22 @@ test("template missing a policy heading is reported", () => {
   assert.equal(errors.filter((e) => e.startsWith("org PR template:")).length, 1);
 });
 
+test("a template naming one accepted no-issue marker is not drift; naming none is", () => {
+  const oneMarker = goodTexts();
+  oneMarker.orgTemplate = oneMarker.orgTemplate.replace(" / `No linked issue`", "");
+  assert.deepEqual(checkCopies(POLICY, oneMarker), []);
+
+  const noMarker = goodTexts();
+  noMarker.orgTemplate = noMarker.orgTemplate.replace(
+    "Or `No related issue: <reason>` / `No linked issue`.",
+    "Or say why there is none.",
+  );
+  const errors = checkCopies(POLICY, noMarker).filter((e) =>
+    e.startsWith("org PR template (no-issue markers)"),
+  );
+  assert.equal(errors.length, 1, errors.join("; "));
+});
+
 test("rules file missing a section or keyword is reported", () => {
   const texts = goodTexts();
   texts.rulesFile = texts.rulesFile.replace("## Related", "## See also").replace("Resolves", "");
