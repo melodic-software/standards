@@ -32,7 +32,12 @@ baseline is understood. Promotion is a per-target decision, taken in that
 target's own `ci-status` wiring after its soak is clean; nothing in this
 component promotes. The soak and the promotion decisions are operator-owned
 after the admitting pull request (standards#496); that issue is the record
-until each target's promotion lands.
+until each target's promotion lands. Promotion must also decide whether the
+action's `dependabot[bot]` actor skip stays: under it, a Dependabot pull
+request that edits a managed destination passes the guard rather than reds
+it, and the next sync reverts the edit; the durable fix is the action
+absorbing the consumer
+checkout, which needs a ci-workflows release.
 
 **Hosted-only first hop.** The caller runs on `ubuntu-24.04` directly, naming
 the approved hosted label and nothing else. `runner-policy` admits that shape
@@ -180,9 +185,10 @@ Two properties of that ride are deliberate:
   component follows in the same change. That is the checkout advance path,
   and it is deliberate lockstep, not friction to remove. In a consumer, its
   own Dependabot will propose bumping `actions/checkout` inside the managed
-  file; that pull request is precisely the hand-edit the guard reports, and
-  the next sync reverts it. Expect that finding class during the soak, and
-  classify it as structural rather than as a downstream defect. Before
+  file. From ci-workflows v0.23.0 the action skips the `dependabot[bot]`
+  actor, so that pull request passes the guard rather than reds it, and the
+  next sync reverts the edit; the pin therefore moves only by a hand edit to
+  this standards component, not by a consumer's Dependabot. Before
   promotion, resolve it one of two ways: the action absorbs the consumer
   checkout (so the caller carries no third-party pin at all), or the fleet
   Dependabot posture for managed callers is settled in `github-iac`. Neither
