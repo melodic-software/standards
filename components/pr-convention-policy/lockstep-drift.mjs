@@ -425,6 +425,12 @@ function assertMentions(text, terms, location) {
   }
 }
 
+function assertMentionsAny(text, terms, location) {
+  if (!terms.some((term) => text.includes(term))) {
+    throw new DriftError(`${location}: mentions none of: ${terms.join(", ")}`);
+  }
+}
+
 // One drift verdict per copy; every check runs so a single invocation reports
 // the whole divergence set instead of the first hit.
 export function checkCopies(policy, texts) {
@@ -483,18 +489,17 @@ export function checkCopies(policy, texts) {
   run(() =>
     assertMentions(texts.rulesFile, policy.body.closingKeywords, "rules file (closing keywords)"),
   );
-  // The rules file is guidance, not enforcement: it must steer agents to at
-  // least one accepted opt-out marker, not enumerate every accepted phrasing.
-  run(() => {
-    if (!policy.body.noIssueMarkers.some((marker) => texts.rulesFile.includes(marker))) {
-      throw new DriftError(
-        `rules file (no-issue markers): mentions none of: ${policy.body.noIssueMarkers.join(", ")}`,
-      );
-    }
-  });
+  // The rules file and the org PR template are guidance, not enforcement: each
+  // must steer an author to at least one accepted opt-out marker, not
+  // enumerate every accepted phrasing. Naming more than one gives the author a
+  // choice the gate never asked for, and `policy.json` keeps the full accepted
+  // set for the artifacts that do enforce it.
+  run(() =>
+    assertMentionsAny(texts.rulesFile, policy.body.noIssueMarkers, "rules file (no-issue markers)"),
+  );
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
-    assertMentions(
+    assertMentionsAny(
       texts.orgTemplate,
       policy.body.noIssueMarkers,
       "org PR template (no-issue markers)",
