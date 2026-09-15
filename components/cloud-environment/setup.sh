@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-08.1'
+SCRIPT_VERSION='2026-09-15.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -167,7 +167,7 @@ fi
 # is unresolved). Each repo's cloud-bootstrap still installs its exact pins
 # repo-locally — the env copy is a warm cache, the bootstrap the
 # correctness guarantee.
-DOTNET_FALLBACK_VERSIONS='10.0.302 10.0.400'
+DOTNET_FALLBACK_VERSIONS='10.0.400 10.0.401'
 NODE_FALLBACK_VERSION='24.20.0'
 dotnet_versions="$DOTNET_FALLBACK_VERSIONS"
 if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/global.json" ]]; then
@@ -264,8 +264,8 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
 ) &
 
 # Track B: .NET SDKs — the resolved repo's global.json pin when present,
-# else the fleet fallback list above (rollForward: disable across the fleet,
-# so exact versions matter).
+# else the fleet fallback list above (most fleet pins set rollForward:
+# disable, so exact versions matter).
 (
   LOG="$track_b_log"
   if curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh >>"$LOG" 2>&1; then
