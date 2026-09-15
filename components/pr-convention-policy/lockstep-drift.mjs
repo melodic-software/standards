@@ -431,6 +431,129 @@ function assertMentionsAny(text, terms, location) {
   }
 }
 
+// The `pr-contract` composite masks fenced and indented code blocks and inline
+// code spans before matching a PR body, so an escape an author copies verbatim
+// from a backticked template is invisible to the gate and the PR draws the
+// advisory `needs-issue-linkage` label with no visible cause (.github#135). The
+// composite's masker cannot be shared: it is an awk program embedded in a bash
+// composite in ci-workflows, read here only as fetched text, and it also masks
+// HTML comments — which the org template uses as its guidance surface by
+// design. This mirrors the composite's code-span and code-block rules only,
+// deliberately leaving HTML comments rendered.
+//
+// Inline spans follow the composite's `has_closing_run`: a run of N backticks
+// opens a span only when a run of exactly N appears later on the same line; an
+// unmatched run is literal text. Block detection is suppressed inside an HTML
+// comment, as the composite suppresses it, so a fenced example in the
+// template's guidance comment cannot open a fence that swallows the rest of
+// the file. Inline spans are still masked there, because that is where the
+// backticked escape .github#135 removed was written.
+export function maskCode(text) {
+  let fenceChar = "";
+  let fenceLength = 0;
+  let commentOpen = false;
+  return text
+    .split("\n")
+    .map((raw) => {
+      const line = raw.replace(/\r$/, "");
+      const blocksApply = !commentOpen;
+      // Spaces only, as the composite counts them: a tab-indented line is
+      // indented code to it, never a fence marker.
+      const indent = /^ */.exec(line)[0].length;
+      const rest = line.slice(indent);
+      const markerChar = rest[0];
+      const markerRun = markerChar === "`" || markerChar === "~" ? runLength(rest, markerChar) : 0;
+      const isMarker = indent <= 3 && markerRun >= 3;
+      const info = isMarker ? rest.slice(markerRun) : "";
+
+      if (blocksApply) {
+        if (fenceChar !== "") {
+          if (
+            isMarker &&
+            markerChar === fenceChar &&
+            markerRun >= fenceLength &&
+            /^[ \t]*$/.test(info)
+          ) {
+            fenceChar = "";
+            fenceLength = 0;
+          }
+          return "";
+        }
+        if (isMarker && !(markerChar === "`" && info.includes("`"))) {
+          fenceChar = markerChar;
+          fenceLength = markerRun;
+          return "";
+        }
+        if (line.startsWith("    ") || line.startsWith("\t")) return "";
+      }
+
+      let rendered = "";
+      let position = 0;
+      let inlineTicks = 0;
+      while (position < line.length) {
+        if (line[position] !== "`") {
+          if (inlineTicks === 0) rendered += line[position];
+          position += 1;
+          continue;
+        }
+        let stop = position + 1;
+        while (line[stop] === "`") stop += 1;
+        const ticks = stop - position;
+        const wasInline = inlineTicks !== 0;
+        if (!wasInline && hasClosingRun(line, stop, ticks)) {
+          inlineTicks = ticks;
+        } else if (inlineTicks === ticks) {
+          inlineTicks = 0;
+        }
+        if (!wasInline && inlineTicks === 0) rendered += line.slice(position, stop);
+        position = stop;
+      }
+
+      // Comment state is tracked only on lines that reach here, because the
+      // composite tracks it in the same character loop it never runs on a line
+      // inside a code block. It is also asymmetric there, and mirrored as such:
+      // an opener is honoured only outside a code span, so it is read from the
+      // rendered line, while a closer is matched against the raw remainder with
+      // no span awareness at all.
+      const lastOpen = rendered.lastIndexOf("<!--");
+      const lastClose = line.lastIndexOf("-->");
+      if (lastOpen > lastClose) commentOpen = true;
+      else if (lastClose > lastOpen) commentOpen = false;
+      return rendered;
+    })
+    .join("\n");
+}
+
+function runLength(text, character) {
+  let n = 0;
+  while (text[n] === character) n += 1;
+  return n;
+}
+
+function hasClosingRun(line, start, ticks) {
+  let column = start;
+  while (column < line.length) {
+    if (line[column] !== "`") {
+      column += 1;
+      continue;
+    }
+    let stop = column + 1;
+    while (line[stop] === "`") stop += 1;
+    if (stop - column === ticks) return true;
+    column = stop;
+  }
+  return false;
+}
+
+function assertMentionsAnyRendered(text, terms, location) {
+  const rendered = maskCode(text);
+  if (!terms.some((term) => rendered.includes(term))) {
+    throw new DriftError(
+      `${location}: mentions none of the following outside an inline code span or code block: ${terms.join(", ")}`,
+    );
+  }
+}
+
 // One drift verdict per copy; every check runs so a single invocation reports
 // the whole divergence set instead of the first hit.
 export function checkCopies(policy, texts) {
@@ -493,13 +616,16 @@ export function checkCopies(policy, texts) {
   // must steer an author to at least one accepted opt-out marker, not
   // enumerate every accepted phrasing. Naming more than one gives the author a
   // choice the gate never asked for, and `policy.json` keeps the full accepted
-  // set for the artifacts that do enforce it.
+  // set for the artifacts that do enforce it. The rules file names its marker
+  // as prose markup and is never copied into a PR body, so it is matched as
+  // written; the template is copied verbatim, so its marker is matched after
+  // masking.
   run(() =>
     assertMentionsAny(texts.rulesFile, policy.body.noIssueMarkers, "rules file (no-issue markers)"),
   );
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
-    assertMentionsAny(
+    assertMentionsAnyRendered(
       texts.orgTemplate,
       policy.body.noIssueMarkers,
       "org PR template (no-issue markers)",
