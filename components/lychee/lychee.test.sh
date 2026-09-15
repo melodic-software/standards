@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests the lychee component: the good fixture's local links and anchors resolve
-# on disk, the bad fixture's broken references are flagged, and the online lane's
-# accept list treats a live 429 as a pass while an unaccepted 404 still fails.
+# on disk, the bad fixture's broken references are flagged, and the accept list
+# for a manual online run treats a live 429 as a pass while an unaccepted 404
+# still fails.
 # Skips cleanly when the engine or the fixture server's runtime is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
