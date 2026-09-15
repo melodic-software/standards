@@ -723,10 +723,22 @@ Neither has a v0.22.x entry at any revision, and this repository's own callers
 stayed at `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2). The
 `repin-policy-lockstep` decline reason for the first of them,
 "`standards-sync.yml` old revision job `sync` references `needs` in a
-routing-relevant field, which cannot be safely diffed for auto-approval", is
-still unanswered, and bumping the sync reusable inside a change whose own merge
-triggers the fan-out would put an untested sync engine on the critical path.
-Both wait for a later decision that answers the `needs` question first.
+routing-relevant field, which cannot be safely diffed for auto-approval", was
+unanswered at that registration, and bumping the sync reusable inside a change
+whose own merge triggers the fan-out would put an untested sync engine on the
+critical path.
+Amendment: the `needs` question is answered, and only one of the two paths still
+exists. `standards-sync` carries a hand-reviewed contract at the v0.24.0 tag
+`2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3`, whose review note is recorded below;
+the answer is that the decline is correct and bars automatic copy-forward, not
+the contract, so the entry is written by review rather than derived from a
+surface diff. `standards-sync-stuck-automerge-alert` is no longer shipped at
+all: ci-workflows#585 deleted the reusable after the v0.24.0 tag and #568
+deleted this repository's caller, so it needs no entry and has none at any
+revision. The second reason above still stands on its own and is not what the
+`needs` answer settles: this repository's `.github/workflows/sync.yml` stays
+pinned at `0f8176e87e0be518f382664779655011bf95784a` until a change whose own
+merge does not run the sync engine moves it.
 Amendment: ci-workflows no longer ships the `link-check`,
 `pulumi-version-drift-check`, `standards-sync-stuck-automerge-alert`,
 `approval-agent`, `claude-assistant`, `claude-e2e-verify` and
@@ -807,6 +819,53 @@ The `claude-security-review` entry keeps its `runner`, `paths-file` and
 `skip-actors` inputs and the single `CLAUDE_CODE_OAUTH_TOKEN` mapping, and lists
 neither `standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the
 visibility-scoped invariant below holds unchanged for it too.
+Two more join them at the same v0.24.0 SHA: `issue-triage-label` and
+`standards-sync`. Each is the only entry for its path at this tag, and
+`reusableWorkflowStatus` fails closed on an unreviewed `path@SHA`, so two live
+callers cannot move until these entries exist: claude-code-plugins'
+`.github/workflows/issue-triage-label.yml`, pinned at v0.22.2, and this
+repository's own `.github/workflows/sync.yml`, pinned at v0.17.2. Both pass
+today on their current revisions, and neither pin moves in the registering
+change; the entries make those bumps possible and each repository takes its own.
+Read at both revisions and compared with `git diff`, `issue-triage-label.yml`
+between `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2) and the tag, and
+`standards-sync.yml` between `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2)
+and the tag, both files are byte-identical. Every input name, every `type` and
+`default`, the secret block, the `permissions` blocks and the routing are
+therefore unchanged, and each entry's terms equal its newest predecessor's
+exactly. `issue-triage-label` keeps `runner`, `label` and `label-prefix`, an
+empty secret map, and an `allowedCallerPermissions` exact match of
+`issues: write`, the single grant its one job declares. `standards-sync` keeps
+`runner`, `manifest`, `standards-ref`, `dry-run` and `targets`, and the
+`app-client-id` and `app-private-key` mappings, whose caller expressions
+`${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}` and
+`${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}` were checked against
+`.github/workflows/sync.yml`; it names no `allowedCallerPermissions`, as its
+v0.17.2 predecessor does not. Nothing widens; the older entries stay. The older
+`standards-sync` entries carrying `routing: "hosted-only"` with a `fixedRunsOn`
+of `["ubuntu-latest"]` at `1d3762c2` and `["ubuntu-24.04"]` at `35f2684a` are
+history and are not the shape to copy:
+`runs-on` is `${{ inputs.runner }}` on all three jobs (`plan`, `attest` and
+`sync`) at the tag, so `runner-input` is the correct routing.
+Auto-approval carries neither, and the `standards-sync` decline is the one this
+registration answers. `reusableWorkflowSecuritySurfacesMatch` run against
+`0f8176e8` and the tag throws before comparing any surface:
+`jobs.sync.strategy` is `matrix: ${{ fromJson(needs.plan.outputs.matrix) }}`,
+`strategy` is in `DYNAMIC_ROUTING_FIELDS` and `NEEDS_REFERENCE` is
+`/\bneeds\b/i`, so `assertReusableWorkflowDiffable` raises "old revision job
+`sync` references `needs` in a routing-relevant field, which cannot be safely
+diffed for auto-approval" and `repin-policy-lockstep` reports `lockstep=manual`
+and writes nothing. Only the `strategy` value trips it; the job-level
+`needs: [plan, attest]` key is not a routing field. That decline is correct and
+is not overridden: what it bars is automatic copy-forward of a contract whose
+routing fields a surface diff cannot prove static, which is the reason this
+entry is written by review instead. What the reference actually feeds is the
+per-target sync matrix the `plan` job builds from the manifest, whose keys are
+target coordinates — `repo`, `repo_owner`, `repo_name` and `automerge` —
+consumed by step inputs; no `runs-on` in the workflow reads from the matrix, so
+it does not move the runner boundary. `issue-triage-label` is declined for the
+standing reason recorded above: the path declines any contract naming
+`allowedCallerPermissions`, which it does.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
