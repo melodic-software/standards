@@ -820,12 +820,13 @@ The `claude-security-review` entry keeps its `runner`, `paths-file` and
 neither `standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the
 visibility-scoped invariant below holds unchanged for it too.
 Two more join them at the same v0.24.0 SHA: `issue-triage-label` and
-`standards-sync`. Each is the only entry for its path at this tag, and each
-unblocks a live caller `reusableWorkflowStatus` fails closed on —
-claude-code-plugins' `.github/workflows/issue-triage-label.yml`, pinned at
-v0.22.2, and this repository's own `.github/workflows/sync.yml`, pinned at
-v0.17.2. Neither pin moves in the registering change; the entries make those
-bumps possible and each repository takes its own.
+`standards-sync`. Each is the only entry for its path at this tag, and
+`reusableWorkflowStatus` fails closed on an unreviewed `path@SHA`, so two live
+callers cannot move until these entries exist: claude-code-plugins'
+`.github/workflows/issue-triage-label.yml`, pinned at v0.22.2, and this
+repository's own `.github/workflows/sync.yml`, pinned at v0.17.2. Both pass
+today on their current revisions, and neither pin moves in the registering
+change; the entries make those bumps possible and each repository takes its own.
 Read at both revisions and compared with `git diff`, `issue-triage-label.yml`
 between `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2) and the tag, and
 `standards-sync.yml` between `0f8176e87e0be518f382664779655011bf95784a` (v0.17.2)
@@ -841,8 +842,9 @@ empty secret map, and an `allowedCallerPermissions` exact match of
 `${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}` were checked against
 `.github/workflows/sync.yml`; it names no `allowedCallerPermissions`, as its
 v0.17.2 predecessor does not. Nothing widens; the older entries stay. The older
-`standards-sync` entries carrying `routing: "hosted-only"` and
-`fixedRunsOn: ["ubuntu-latest"]` are history and are not the shape to copy:
+`standards-sync` entries carrying `routing: "hosted-only"` with a `fixedRunsOn`
+of `["ubuntu-latest"]` at `1d3762c2` and `["ubuntu-24.04"]` at `35f2684a` are
+history and are not the shape to copy:
 `runs-on` is `${{ inputs.runner }}` on all three jobs (`plan`, `attest` and
 `sync`) at the tag, so `runner-input` is the correct routing.
 Auto-approval carries neither, and the `standards-sync` decline is the one this
