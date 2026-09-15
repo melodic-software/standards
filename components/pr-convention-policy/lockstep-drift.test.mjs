@@ -12,6 +12,7 @@ import {
   checkPinnedReusable,
   DriftError,
   detectArtifactPin,
+  maskCode,
   parseCallerPin,
   parseCompositeRequireScope,
   parseCompositeSections,
@@ -94,8 +95,37 @@ const GOOD_VALIDATOR = [
   "REQUIRED_SECTIONS=(Summary Fix Verification Related)",
   "",
 ].join("\n");
-const GOOD_TEMPLATE =
-  "Closes #\n\nOr `No related issue: <reason>` / `No linked issue`.\n\n## Summary\n\n## Fix\n\n## Verification\n\n## Related\n";
+// The live org template's shape since .github#135: one escape, plain text, on
+// its own line inside the guidance comment an author reads and deletes. The
+// comment placement is load-bearing — masking it the way the composite masks a
+// PR body would leave the live template with no marker at all.
+const GOOD_TEMPLATE = [
+  "Closes #",
+  "",
+  "<!--",
+  "Complete the `Closes #` line above with the issue number. If this PR closes",
+  "no issue, replace that line with the escape and its reason, as plain text:",
+  "",
+  "No related issue: <reason>",
+  "",
+  "Write it without backticks: the gate masks inline code spans before matching.",
+  "-->",
+  "",
+  "## Summary",
+  "",
+  "## Fix",
+  "",
+  "## Verification",
+  "",
+  "## Related",
+  "",
+].join("\n");
+// The pre-#135 shape: both escapes present, but only ever inside inline code
+// spans, so the composite sees neither.
+const BACKTICKED_TEMPLATE = GOOD_TEMPLATE.replace(
+  "No related issue: <reason>",
+  "Use `No related issue: <reason>` or `No linked issue`.",
+);
 const GOOD_RULES = [
   "# PR body contract",
   "`Closes #<issue>` (`Fixes`/`Resolves`), or `No related issue: <reason>`.",
@@ -226,20 +256,86 @@ test("template missing a policy heading is reported", () => {
   assert.equal(errors.filter((e) => e.startsWith("org PR template:")).length, 1);
 });
 
-test("a template naming one accepted no-issue marker is not drift; naming none is", () => {
-  const oneMarker = goodTexts();
-  oneMarker.orgTemplate = oneMarker.orgTemplate.replace(" / `No linked issue`", "");
-  assert.deepEqual(checkCopies(POLICY, oneMarker), []);
-
-  const noMarker = goodTexts();
-  noMarker.orgTemplate = noMarker.orgTemplate.replace(
-    "Or `No related issue: <reason>` / `No linked issue`.",
-    "Or say why there is none.",
-  );
-  const errors = checkCopies(POLICY, noMarker).filter((e) =>
+function templateMarkerErrors(orgTemplate) {
+  return checkCopies(POLICY, { ...goodTexts(), orgTemplate }).filter((e) =>
     e.startsWith("org PR template (no-issue markers)"),
   );
-  assert.equal(errors.length, 1, errors.join("; "));
+}
+
+test("a template naming one accepted no-issue marker is not drift; naming none is", () => {
+  assert.deepEqual(
+    templateMarkerErrors(GOOD_TEMPLATE.replace("No related issue:", "No linked issue:")),
+    [],
+  );
+  assert.equal(
+    templateMarkerErrors(
+      GOOD_TEMPLATE.replace("No related issue: <reason>", "Say why there is none."),
+    ).length,
+    1,
+  );
+});
+
+// The failure .github#135 removed: a marker present only inside an inline code
+// span is masked away by the gate, so an author who copies it verbatim draws
+// `needs-issue-linkage` with no visible cause. A substring check cannot see it.
+test("a template whose only markers sit in code spans or code blocks is drift", () => {
+  assert.equal(templateMarkerErrors(BACKTICKED_TEMPLATE).length, 1);
+  assert.match(templateMarkerErrors(BACKTICKED_TEMPLATE)[0], /outside an inline code span/);
+
+  // Code blocks only count outside the guidance comment, as they do for the
+  // composite, so these two move the escape out of it.
+  const outside = GOOD_TEMPLATE.replace("No related issue: <reason>", "").replace(
+    "## Summary",
+    "PLACEHOLDER\n\n## Summary",
+  );
+  const fenced = outside.replace("PLACEHOLDER", "```\nNo related issue: <reason>\n```");
+  assert.equal(templateMarkerErrors(fenced).length, 1);
+
+  const indented = outside.replace("PLACEHOLDER", "    No related issue: <reason>");
+  assert.equal(templateMarkerErrors(indented).length, 1);
+
+  // The same escape on a plain line there is not drift, so the two above fail
+  // for the code block and nothing else.
+  assert.deepEqual(templateMarkerErrors(outside.replace("PLACEHOLDER", "No related issue: x")), []);
+});
+
+test("the masker follows the composite's code-span rules", () => {
+  // A run of N backticks opens a span only when a run of exactly N closes it
+  // later on the same line; an unmatched run is literal text.
+  assert.equal(maskCode("a `b` c"), "a  c");
+  assert.equal(maskCode("a ` b c"), "a ` b c");
+  assert.equal(maskCode("a ``b ` c`` d"), "a  d");
+  // Indentation is counted in spaces only, as the composite counts it: a
+  // tab-indented marker run is indented code, not a fence.
+  assert.equal(maskCode("\t```\nkept\n```"), "\nkept\n");
+  // HTML comments are deliberately left rendered: the org template's guidance
+  // lives inside one, and that is where its escape is named.
+  assert.match(maskCode("<!--\nNo related issue: <reason>\n-->"), /No related issue/);
+  // Block detection is suppressed inside a comment, as it is for the composite:
+  // an odd fence line in the guidance must not swallow the rest of the file.
+  assert.match(maskCode("<!--\n```\n-->\nNo related issue: x\n"), /No related issue/);
+  // A backticked escape inside a comment is still masked. That is the .github#135
+  // shape, and the comment is where the old template wrote it.
+  assert.doesNotMatch(maskCode("<!--\n`No related issue: x`\n-->"), /No related issue/);
+  // A `<!--` inside a code span does not open a comment, so it cannot suppress
+  // the block detection that masks the marker below it.
+  assert.doesNotMatch(maskCode("a `<!--` b\n```\nNo related issue: x\n"), /No related issue/);
+  // Nor does one inside a fence: the fence still closes on its own marker, and
+  // the marker after it is ordinary text.
+  assert.match(maskCode("```\n<!--\n```\nNo related issue: x\n"), /No related issue/);
+  // A closer is asymmetric to an opener, as it is for the composite: it counts
+  // even inside a code span, so the fence below it still opens.
+  assert.doesNotMatch(
+    maskCode("<!--\ntext `-->` more\n```\nNo related issue: x\n"),
+    /No related issue/,
+  );
+  // Both delimiter offsets are read in the raw line's coordinate space, so a
+  // masked span before them cannot make a closer look later than an opener
+  // that follows it. Here the comment stays open and the fence never fires.
+  assert.match(
+    maskCode("<!--\n`example` --> <!--\n```\nNo related issue: x\n"),
+    /No related issue/,
+  );
 });
 
 test("rules file missing a section or keyword is reported", () => {
