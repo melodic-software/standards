@@ -34,9 +34,9 @@ component promotes. The soak and the promotion decisions are operator-owned
 after the admitting pull request (standards#496); that issue is the record
 until each target's promotion lands. Promotion must also decide whether the
 action's `dependabot[bot]` actor skip stays: under it, a Dependabot pull
-request that edits a managed destination (in this caller, only the
-`actions/checkout` pin) passes the guard rather than reds it, and the next
-sync reverts the edit; the durable fix is the action absorbing the consumer
+request that edits a managed destination passes the guard rather than reds
+it, and the next sync reverts the edit; the durable fix is the action
+absorbing the consumer
 checkout, which needs a ci-workflows release.
 
 **Hosted-only first hop.** The caller runs on `ubuntu-24.04` directly, naming
