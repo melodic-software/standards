@@ -309,6 +309,23 @@ assert_nonzero 'apply: a partially-rewritten caller set fails' "$rc"
 assert_contains 'apply: the partial rewrite reports the count mismatch' "$out" '::error::'
 assert_not_contains 'apply: the partial rewrite reports no change' "$(cat "$out_file")" 'changed=true'
 
+# The runtime out-of-scope assertion is the second half of the scope fence:
+# the enumerated glob decides what the rewrite READS, and this decides whether
+# the result is trustworthy. Because the glob makes out-of-scope writes
+# impossible, the only way to reach the assertion is a tree that already
+# carries them — so that is what this drives. Refusing is correct: `apply`
+# cannot distinguish "the rewrite did this" from "something else did", and a
+# step that cannot prove its own blast radius must not hand a diff to a
+# privileged pull request.
+repo="$scratch/repo-dirty"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+printf 'unrelated drift\n' >> "$repo/components/pin-comment-convention/fixtures/good/workflow.yml"
+out_file="$scratch/out-apply-dirty"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
+assert_nonzero 'apply: refuses when the tree carries changes outside the lane directory' "$rc"
+assert_contains 'apply: names the out-of-scope path it refused over' "$out" 'fixtures/good/workflow.yml'
+assert_not_contains 'apply: out-of-scope drift reports no change' "$(cat "$out_file")" 'changed=true'
+
 # apply also refuses without a result channel.
 repo="$scratch/repo-nooutput"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
