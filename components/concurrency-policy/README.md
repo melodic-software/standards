@@ -48,7 +48,7 @@ concurrency:
 
 `github.workflow` keys the group per workflow. `github.event.pull_request.number`
 supersedes an in-flight run of the same pull request, so a force-push or a rapid
-second push cancels the prior run instead of queueing a second one. That number
+second push cancels the prior run instead of queuing a second one. That number
 is empty on `push` and `schedule` events, so those runs fall back to the unique
 `github.run_id` and are never cancelled: a default-branch or scheduled run is
 never superseded by another.

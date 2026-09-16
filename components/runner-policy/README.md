@@ -124,7 +124,7 @@ The literal is admitted only where routing is enabled, that is a repository
 whose inventory says `visibility: private` and `selfHostedCi: true`. On a
 public repository it reports `public-self-hosted-routing`, and on a private
 repository with `selfHostedCi: false` it reports `self-hosted-routing-disabled`.
-A repository cannot enrol itself by misdeclaring its own visibility:
+A repository cannot enroll itself by misdeclaring its own visibility:
 `CI_REPOSITORY_VISIBILITY` from the event is compared against the checked-in
 value and a disagreement is a configuration error, not a finding.
 
@@ -1090,7 +1090,7 @@ A production fleet relabel is the same class of event plus its own sites:
 every `runs-on:` and reviewed `runner` input naming the old label, and each
 host's scale-set labels in `provisioning`. Live-state drift between those
 layers is not detected by any repository check and shows up as an admitted job
-queueing against a label no host answers to.
+queuing against a label no host answers to.
 
 The analyzer also reports `pin-provenance-drift`: when the trailing comment on
 a 40-character `uses:` pin contains a token that reads as a short commit SHA

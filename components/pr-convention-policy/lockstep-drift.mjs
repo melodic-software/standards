@@ -153,7 +153,7 @@ export function parseCompositePatterns(runShText, location) {
   // `tolower(body)` in the anchor above for the marker). The probes below
   // lowercase to mirror that. If the lowercasing ever went away the extracted
   // pattern would become case-sensitive against raw text and reject the
-  // documented capitalised forms, so its presence is asserted rather than
+  // documented capitalized forms, so its presence is asserted rather than
   // assumed — the composite's equivalent of the reusable's `i` flag.
   if (!/lower = tolower\(line\)/.test(runShText)) {
     throw new DriftError(
@@ -243,7 +243,7 @@ export function parseGatePatterns(workflowText, location) {
   // "declarations not found" — a parse failure wearing a drift error's clothes.
   //
   // Flags are CAPTURED, not discarded, because they are behavior. Both bodies are
-  // lowercase and depend on `i` to accept the documented capitalised keyword forms;
+  // lowercase and depend on `i` to accept the documented capitalized keyword forms;
   // rebuilding the probe with a hardcoded `i` would silently pass a gate that had
   // dropped it and become case-sensitive, which is exactly the enforcement drift this check
   // exists to catch. `g` and `y` are the one exception, stripped below.
@@ -522,7 +522,7 @@ export function maskCode(text) {
       // Comment state is tracked only on lines that reach here, because the
       // composite tracks it in the same character loop it never runs on a line
       // inside a code block. It is also asymmetric there, and mirrored as such:
-      // an opener is honoured only outside a code span, a closer anywhere. Both
+      // an opener is honored only outside a code span, a closer anywhere. Both
       // offsets are read in the raw line's coordinate space so they compare.
       const lastOpen = scan.lastIndexOf("<!--");
       const lastClose = line.lastIndexOf("-->");

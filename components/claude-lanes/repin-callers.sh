@@ -74,7 +74,7 @@ require_output_file() {
 # SINGLE SOURCE OF TRUTH: the highest-SemVer PUBLISHED RELEASE.
 #
 # Upstream's own `release.yml` computes the next version by the same rule, so
-# the two halves of the release -> re-pin chain read one artefact under one
+# the two halves of the release -> re-pin chain read one artifact under one
 # ordering. They did not always: `release.yml` once computed from the newest
 # TAG while this resolver read a Release, so a tag published without a Release
 # advanced the version counter while staying invisible here — the fleet

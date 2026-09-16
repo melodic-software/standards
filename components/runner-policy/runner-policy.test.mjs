@@ -7237,7 +7237,7 @@ test("a fleet literal cannot be reached by a config that claims private under pu
     },
   });
   // ConfigurationError, which the CLI reports as exit 2 rather than as a
-  // finding: a repository cannot enrol itself for local routing by lying about
+  // finding: a repository cannot enroll itself for local routing by lying about
   // its own visibility in a checked-in file.
   await assert.rejects(
     () => audit(root, { repositoryVisibility: "public" }),
