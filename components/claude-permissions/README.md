@@ -100,8 +100,8 @@ the primary consumer merges the file into a shared template-data namespace) carr
   load-bearing. The documented list is explicitly non-exhaustive ("These include…"), so
   **membership must be tested, never inferred from a command being read-only in spirit.**
 
-  **Scope limit: these grants are deterministic only outside auto mode.** Every allow
-  entry on this floor is a shell rule (`Bash()` / `PowerShell()`), and a consumer setting
+  **Scope limit: the shell grants are deterministic only outside auto mode.** Most allow
+  entries on this floor are shell rules (`Bash()` / `PowerShell()`), and a consumer setting
   `autoMode.classifyAllShell: true` suspends *all* shell allow rules
   (<https://code.claude.com/docs/en/auto-mode-config>). In such a session the classifier
   adjudicates each of these actions on its merits and the built-in "External System Writes"
@@ -109,6 +109,10 @@ the primary consumer merges the file into a shared template-data namespace) carr
   prose `autoMode.allow` entry in user or managed settings, which this component does not
   carry. Consumers that route all shell through the classifier must treat this floor as the
   non-auto fallback posture and provide lane grants in prose.
+
+  The `allow` list also carries non-shell tool rules: the `WebFetch(domain:…)` grants for
+  the documentation hosts agent sessions read from. `classifyAllShell` is a shell setting,
+  so it does not suspend them; they hold in auto mode as written.
 
   `deny` is unaffected: `classifyAllShell` suspends allow rules only, so every deny entry
   stays pre-classifier and non-overridable in every mode.
