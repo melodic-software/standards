@@ -82,7 +82,10 @@
       "PowerShell(git worktree list *)",
       "PowerShell(git worktree prune *)",
       "PowerShell(git worktree prune)",
-      "PowerShell(git worktree remove *)"
+      "PowerShell(git worktree remove *)",
+      "WebFetch(domain:cli.github.com)",
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:learn.microsoft.com)"
     ],
     "deny": [
       "Bash(LEFTHOOK*=0 *)",
@@ -115,8 +118,10 @@
       "Bash(gh api * DELETE *user/gpg_keys/*)",
       "Bash(gh api * DELETE *user/keys/*)",
       "Bash(gh api * DELETE *user/ssh_signing_keys/*)",
+      "Bash(gh gpg-key delete*)",
       "Bash(gh pr merge --auto *)",
       "Bash(gh pr merge --auto)",
+      "Bash(gh ssh-key delete*)",
       "Bash(git add * --force *)",
       "Bash(git add * --force)",
       "Bash(git add * -f *)",
@@ -223,6 +228,8 @@
       "Bash(ruff check --fix-only*)",
       "PowerShell(*:lefthook*)",
       "PowerShell(*LEFTHOOK*)",
+      "PowerShell(gh gpg-key delete*)",
+      "PowerShell(gh ssh-key delete*)",
       "PowerShell(git * clean --force)",
       "PowerShell(git * clean -df)",
       "PowerShell(git * clean -dfx)",
