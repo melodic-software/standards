@@ -101,7 +101,7 @@ assert_not_contains 'bootstrap does not read the world-writable fleet list fallb
 assert_contains 'bootstrap keeps the repo enabledPlugins block as the deltas overlay' \
   "$(cat "$script")" 'install_plugins_from "$settings"'
 
-# Runtime behaviour of the catalog inventory with the repo settings file
+# Runtime behavior of the catalog inventory with the repo settings file
 # absent: the fleet list alone must still name the catalog gap. Driven with a
 # stub `claude` on PATH, a fleet list handed to the script through its
 # CLOUD_BOOTSTRAP_FLEET_LIST seam (so no case ever reads, or needs to write,
@@ -141,7 +141,7 @@ chmod +x "$inv_tmp/bin/claude"
 inv_out="$(cd "$inv_tmp/repo" && git init -q . && PATH="$inv_tmp/bin:$PATH" \
   CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/repo" \
   CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/fleet.json" bash "$script" 2>&1 >/dev/null)"
-assert_contains 'fleet list installs are summarised when the repo settings file is absent' \
+assert_contains 'fleet list installs are summarized when the repo settings file is absent' \
   "$inv_out" 'fleet list'
 assert_contains 'catalog gap is still named from the fleet list alone' \
   "$inv_out" 'stub-market carries plugins this repo does not declare: newcomer'
@@ -186,7 +186,7 @@ degrade_case() {
     "$out" 'repo .claude/settings.json'
   assert_eq "$label installs nothing" '0' \
     "$(cat "$inv_tmp/counts/plugin-install" 2>/dev/null || echo 0)"
-  assert_not_contains "$label does not summarise a fleet list source" \
+  assert_not_contains "$label does not summarize a fleet list source" \
     "$out" 'fleet list'
 }
 degrade_case 'an absent fleet list' "$inv_tmp/no-such-fleet.json" \
@@ -215,7 +215,7 @@ empty_out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
   CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/no-enabled.json" bash "$script" 2>&1 >/dev/null)"
 assert_not_contains 'a fleet list with no enabledPlugins is not refused' \
   "$empty_out" 'is not a settings-shaped object'
-assert_contains 'a fleet list with no enabledPlugins is summarised as a source' \
+assert_contains 'a fleet list with no enabledPlugins is summarized as a source' \
   "$empty_out" 'fleet list'
 assert_contains 'a repo delta outside the fleet list is installed as an overlay' \
   "$empty_out" 'repo .claude/settings.json: 1 declared, 1 newly installed'

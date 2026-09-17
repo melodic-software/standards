@@ -46,7 +46,7 @@ baseline="$root/components/cloud-environment/fleet-plugins.json"
 # missing (in baseline, not candidate), extra (in candidate, not baseline),
 # and marketplace declarations whose name or source differ. Always returns 0
 # (so callers under set -e need no condition context — .shellcheckrc's SC2310);
-# divergence is signalled through the DIVERGED global instead.
+# divergence is signaled through the DIVERGED global instead.
 DIVERGED=0
 compare_settings() {
   local base="$1" cand="$2" label="$3" diverged=0 line

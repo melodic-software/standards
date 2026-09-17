@@ -367,7 +367,7 @@ test("composite keyword/marker regressions are caught functionally, not by menti
 // The composite's awk patterns are lowercase and match text the analyzer has
 // already lowercased. Probing them with lowercased input is only correct while
 // that lowercasing is there; a composite that dropped it would become
-// case-sensitive against raw text and reject the capitalised keyword forms the
+// case-sensitive against raw text and reject the capitalized keyword forms the
 // contract documents. The extractor must
 // refuse to certify it rather than probe a pattern the gate no longer applies.
 test("a composite that stops lowercasing the line is drift, not a pass", () => {
@@ -637,14 +637,14 @@ test("a global declaration parses and still probes", () => {
 });
 
 // Tolerating flags must not blind the check to losing one. Both declared bodies
-// are lowercase and rely on `i` to accept the documented capitalised keyword
+// are lowercase and rely on `i` to accept the documented capitalized keyword
 // forms, so a gate that dropped `i` would silently become case-sensitive.
 // Probing with a hardcoded `i` would pass it; the DECLARED flags catch it.
 test("a reusable that drops the i flag is enforcement drift, not a pass", () => {
   const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
   const patterns = parseGatePatterns(caseSensitiveGate, "gate");
   assert.equal(patterns.keyword.ignoreCase, false, "declared flags are preserved");
-  assert.equal(patterns.keyword.test("Closes #12"), false, "capitalised form now rejected");
+  assert.equal(patterns.keyword.test("Closes #12"), false, "capitalized form now rejected");
   const errors = checkPinnedReusable(POLICY, "dotfiles", "9".repeat(40), caseSensitiveGate);
   assert.equal(errors.length, 1, "drift is reported");
   assert.match(errors[0], /closing keyword "Closes"/);

@@ -37,7 +37,7 @@ On organization repositories the type axis is **native GitHub Issue Types**, not
 
 **Issue creation always sets the type.** CLI and agent-driven issue creation passes `--type` with one of the org's enabled native types, for example `gh issue create --type Task` (or `Bug`/`Feature`, whichever applies). The web UI's issue form surfaces the same Types field at creation time, but GitHub does not force it to be filled in there either; setting it is this policy's requirement, not something the platform enforces on either path. A scheduled sweep is the backstop for whatever still slips through: see `github-iac`'s untyped-issue sweep.
 
-Personal accounts have no native Issue Types, so their repositories retain a labelled type axis under the same naming grammar. This is a deliberate per-account divergence, not drift; each account's own infrastructure-as-code program is the record of which mechanism its repositories use (see "Definitions live in infrastructure-as-code" above).
+Personal accounts have no native Issue Types, so their repositories retain a labeled type axis under the same naming grammar. This is a deliberate per-account divergence, not drift; each account's own infrastructure-as-code program is the record of which mechanism its repositories use (see "Definitions live in infrastructure-as-code" above).
 
 ## The status axis
 

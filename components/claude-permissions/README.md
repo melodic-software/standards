@@ -143,7 +143,7 @@ the non-auto posture, not a classifier bypass.
 composition that carries this floor into a consumer's live settings **unions** it, so
 locally-accumulated rules survive, and a union cannot subtract. A row that has ever reached a
 machine's live allow list therefore stays granted by every later apply, however long ago this file
-dropped it. Measured, not theorised: the auto-mode re-derivation above retired 18 rows and all 18
+dropped it. Measured, not theorized: the auto-mode re-derivation above retired 18 rows and all 18
 remained live on the operator's machine (melodic-software/dotfiles#337). Those 18 seed the array.
 
 Entries are exact strings, never globs: a tombstone that quietly matched more than it names would

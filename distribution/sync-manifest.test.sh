@@ -906,7 +906,7 @@ assert_not_contains 'absent locally-owned is never reported as an empty sequence
 # Empty-string paths. These frame the structural pass rather than the validator:
 # `@tsv` renders an empty string as a genuinely empty column, and tab is an IFS
 # *whitespace* character, so reading a row with `IFS=$'\t' read` would merge the
-# empty column into its neighbour and reconstruct a path pair that the manifest
+# empty column into its neighbor and reconstruct a path pair that the manifest
 # never declared — turning a rejection into a silent acceptance that `apply`
 # would then materialize.
 bad="${manifest/policy.txt: .policy/policy.txt: \"\"}"
