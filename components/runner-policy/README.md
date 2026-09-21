@@ -866,6 +866,47 @@ consumed by step inputs; no `runs-on` in the workflow reads from the matrix, so
 it does not move the runner boundary. `issue-triage-label` is declined for the
 standing reason recorded above: the path declines any contract naming
 `allowedCallerPermissions`, which it does.
+Three paths are registered again at the v0.25.0 tag
+`91d06c94d733e5daa507e0afaa06a140bb46d337`, the merged main commit that release
+points at: `claude-review`, `claude-security-review` and `standards-sync`. Those
+are the three reusables the claude-lanes repin moves. Its fourth moved reference,
+`.github/actions/managed-files-guard`, is a composite action and is not
+SHA-allowlisted, so it needs no entry. Each of the three copies its v0.24.0
+terms verbatim and nothing widens; the v0.24.0 and older entries stay, because
+an older approved revision is what keeps an unconverged consumer passing.
+Read from the ci-workflows clone at both revisions and compared with
+`git diff`, `claude-review.yml` differs by three lines: two
+`anthropics/claude-code-action` pin bumps from
+`d75b94d5ad426cb8546e6628b6f5f19b84e5cce1` (v1.0.216) to
+`cfc3eb22bfed5c26ef66e3223c982af27e4524de` (v1.0.231), and one
+`.github/actions/claude-lane-outcome` pin bump from
+`a570a4214d6d2aeb4591eb8fee82c1d8ea143a2e` to
+`35b267e65ff71004c697cbc0022d4d6dd56ec580`.
+`claude-security-review.yml` carries the same three pin moves plus two comment
+blocks, which record that the incident aggregator no longer reads lane
+annotations regardless of check conclusion, so the security lane's documented
+alarm chain for a classified external failure is now the outcome composite's
+`class=<token>` annotation and the failure marker comment alone.
+`standards-sync.yml` is comment-only: three lines of header prose that referred
+to the deleted `standards-sync-stuck-automerge-alert.yml`.
+No `workflow_call` input, secret, workflow or job `permissions`, `runs-on`
+routing, or job `needs` key moved in any of the three, checked by deep equality
+on exactly those surfaces parsed at both revisions.
+Auto-approval carries none of the three. `reusableWorkflowSecuritySurfacesMatch`
+run against the two revisions returns `diffField: credentialReferences` for both
+lanes, because that surface records a credential-consuming step's `uses:` line
+in full and a pin bump reads as a diff, and throws for `standards-sync` before
+comparing any surface, with the same `sync`-job `needs`-in-a-routing-relevant-field
+decline recorded above. Each decline is correct and none is overridden, which is
+why these entries are written by review.
+The `claude-review` entry keeps its `runner`, `pr-number` and `timeout-minutes`
+inputs, `claude-security-review` keeps `runner`, `paths-file` and `skip-actors`,
+both keep the single `CLAUDE_CODE_OAUTH_TOKEN` mapping, and neither lists
+`standards-ref` nor any `STANDARDS_REVIEW_APP_*` secret, so the visibility-scoped
+invariant below holds unchanged. `standards-sync` keeps `runner`, `manifest`,
+`standards-ref`, `dry-run` and `targets` with the `app-client-id` and
+`app-private-key` mappings, and names no `allowedCallerPermissions`, as its
+v0.24.0 predecessor does not.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
