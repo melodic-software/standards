@@ -26,6 +26,8 @@ const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
 const REPINE_LANE_SHA_V0_22_0 = "906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 const REPINE_LANE_SHA_V0_22_1 = "cd2f4e6d500e7923c0db521b4d10034d36331ed3";
 const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
+const REPINE_LANE_SHA_V0_24_0 = "2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3";
+const REPINE_LANE_SHA_V0_25_0 = "91d06c94d733e5daa507e0afaa06a140bb46d337";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8189,6 +8191,31 @@ test("the sync reusable carries no contract at the convergence tag", () => {
     undefined,
     "standards-sync gained a convergence-tag contract without answering the needs question",
   );
+});
+
+// The v0.25.0 tag. Auto-approval declines all three: both lanes report
+// `diffField: credentialReferences`, because that surface records a
+// credential-consuming step's `uses:` line in full and the revision bumps
+// `anthropics/claude-code-action` inside one, and `standards-sync` throws the
+// same `needs`-in-a-routing-relevant-field decline it has always thrown. Each
+// entry is therefore written by review, and equality against its v0.24.0
+// predecessor is the assertion, so an input, secret, or caller permission
+// widened in the new key fails here rather than shipping.
+test("every reusable contract at the v0.25.0 tag copies its v0.24.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  let asserted = 0;
+  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_24_0}`];
+    assert.ok(previous, `expected a v0.24.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_25_0}`],
+      previous,
+      `${reusable} at the v0.25.0 tag is not a verbatim copy of its v0.24.0 entry`,
+    );
+    asserted += 1;
+  }
+  assert.equal(asserted, 3);
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily
