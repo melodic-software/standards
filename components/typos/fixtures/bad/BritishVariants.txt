@@ -1,0 +1,6 @@
+Pins that the proper-noun allowlist did not disable the en-us locale itself:
+these British variants must still be corrections.
+
+armour
+behaviour
+labelled

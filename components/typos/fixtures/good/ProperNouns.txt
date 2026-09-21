@@ -1,0 +1,13 @@
+Proper nouns and product names the en-us locale would otherwise "correct" into
+a different word. Each appears here in the form the consuming repo actually
+writes it, including the compound identifiers typos splits into words.
+
+Asus.ArmouryCrate is the winget package id for ASUS Armoury Crate.
+The armoury entry is a package id, not British prose for an arsenal.
+
+calibre.calibre is the winget package id for the Calibre ebook manager.
+Its CLI binaries are calibre and calibredb, and CALIBRE_CONFIG_DIRECTORY
+points at its profile. A step id reads calibreInstall.
+
+Reaching for the full axe is the American spelling; en-us prefers the ax
+variant and would rewrite it.
