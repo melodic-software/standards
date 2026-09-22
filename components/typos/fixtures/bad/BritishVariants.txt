@@ -1,6 +1,7 @@
-Pins that the proper-noun allowlist did not disable the en-us locale itself:
-these British variants must still be corrections.
-
+# Pins that the proper-noun allowlist did not disable the en-us locale itself.
+# One token per line, no comment: typos.test.sh derives the list from this file
+# and asserts EACH is still corrected, so a dictionary or config change that
+# accepts any one of them fails the suite rather than hiding behind the others.
 armour
 behaviour
 labelled
