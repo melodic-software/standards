@@ -132,7 +132,8 @@ function withheldSurfacesClause(unchangedPaths) {
   if (unchangedPaths.length === 0) return "";
   return (
     " These surfaces were unchanged and were not copy-forwarded, because any decline suppresses every write: " +
-    `${unchangedPaths.join(", ")}.`
+    `${unchangedPaths.join(", ")}. ` +
+    "Register one `approvedReusableWorkflowContracts` entry for each of those withheld paths too."
   );
 }
 

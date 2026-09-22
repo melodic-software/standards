@@ -141,7 +141,7 @@ test("manual and applied notes name the schema-4 registration and omit the selec
   assert.ok(!declined.includes("were not copy-forwarded"));
   assert.match(
     withheld,
-    / These surfaces were unchanged and were not copy-forwarded, because any decline suppresses every write: melodic-software\/ci-workflows\/\.github\/workflows\/claude-security-review\.yml, melodic-software\/ci-workflows\/\.github\/workflows\/standards-sync\.yml\. This pull request is never auto-merged\.$/u,
+    / These surfaces were unchanged and were not copy-forwarded, because any decline suppresses every write: melodic-software\/ci-workflows\/\.github\/workflows\/claude-security-review\.yml, melodic-software\/ci-workflows\/\.github\/workflows\/standards-sync\.yml\. Register one `approvedReusableWorkflowContracts` entry for each of those withheld paths too\. This pull request is never auto-merged\.$/u,
   );
 });
 
