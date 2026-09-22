@@ -418,12 +418,7 @@ targets:
   # `claude-security-review-caller` note above); hosted lane callers arrive
   # by repo-local PR, the claude-code-plugins route. Plus the hosted-only
   # `managed-files-guard-caller`, which every public target carries.
-  # `automerge: false` because the repository sits outside the org ci-gate
-  # ruleset until github-iac flips its requires-ci, so an armed sync PR would
-  # merge ungated; removal trigger: that flip, in the change that lands the
-  # ci.yml that emits ci-status.
   melodic-software/claude-code-account-rotation:
-    automerge: false
     managed:
       - cloud-bootstrap
       - dotnet-analysis
@@ -440,6 +435,10 @@ targets:
       - review-instructions
       - shellcheck
       - typos
+    # Armed as of 2026-09-22: claude-code-account-rotation#95 landed the ci.yml
+    # whose ci-status job aggregates every lane and carries the pull-request
+    # contract as steps of that one check, and github-iac#528 extends the org
+    # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
