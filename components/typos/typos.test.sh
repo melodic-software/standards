@@ -52,4 +52,18 @@ typos --isolated --config "$parent_config" components/typos/fixtures/good/Scansi
 rc=$?
 assert_exit 'parent config rejects uppercase DUM' 2 "$rc"
 
+# British-variant regression: the proper-noun allowlist must not have switched
+# the en-us locale off. Asserted PER TOKEN, derived from the fixture rather than
+# restated here: the bad-directory sweep above only proves that SOME correction
+# was reported, so it would still pass if a later dictionary or config change
+# started accepting one of these.
+british_fixture='components/typos/fixtures/bad/BritishVariants.txt'
+british_out="$(typos --config "$config" "$british_fixture" 2>&1)"
+rc=$?
+assert_exit 'british variants fixture exits 2' 2 "$rc"
+for british_token in $(grep -v '^#' "$british_fixture" | tr -d '\r'); do
+  assert_contains "british variant $british_token still corrected" \
+    "$british_out" "\`$british_token\` should be"
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
