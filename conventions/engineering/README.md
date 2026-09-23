@@ -8,6 +8,7 @@ Agent-agnostic engineering standards that no linter can decide for you: the auth
 | [architecture-and-design.md](architecture-and-design.md) | dependency direction, vertical slices, composition, result-modeling, consistency boundaries, extension points, no-outage operational change |
 | [domain-driven-design.md](domain-driven-design.md) | tactical patterns (entities, value objects, aggregates, repositories) and ubiquitous language |
 | [naming.md](naming.md) | verbose behavior-naming, name-by-responsibility, disambiguating overloaded terms |
+| [azure-naming.md](azure-naming.md) | Azure resource names and tags: token values, per-type patterns, the consumer-split, nonsecret-placement and fleet rules |
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |
 | [concise-prose.md](concise-prose.md) | removing prose overhead without losing meaning, force, or clarity |
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
