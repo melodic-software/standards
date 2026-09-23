@@ -17,7 +17,7 @@ identify what can go wrong, map concrete responses, and validate the result.
   capacity.
 - Whether a push to the default branch or a scheduled run can be superseded is
   the group's fallback term, a per-repository decision restricted to two values:
-  `github.run_id`, under which such a run is never cancelled, and `github.ref`,
+  `github.run_id`, under which such a run is never canceled, and `github.ref`,
   under which a burst of pushes to one ref collapses to the newest. Any other
   term is a finding.
 - A contract-only run, which records no lane verdict of its own and carries a
@@ -111,7 +111,7 @@ these model-level risks.
 Re-run this threat model when the analyzer accepts a new concurrency expression
 form, a new exception reason, or a new trigger classification; when GitHub
 changes concurrency, `github` context, or reusable-workflow semantics; when the
-schema version changes; or after an incident where a superseded or cancelled run
+schema version changes; or after an incident where a superseded or canceled run
 crossed the pull-request/default-branch boundary.
 
 Each review confirms the data flow, adds a negative test for every new failure

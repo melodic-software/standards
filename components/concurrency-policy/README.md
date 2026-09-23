@@ -50,7 +50,7 @@ concurrency:
 supersedes an in-flight run of the same pull request, so a force-push or a rapid
 second push cancels the prior run instead of queuing a second one. That number
 is empty on `push` and `schedule` events, so those runs fall back to the unique
-`github.run_id` and are never cancelled: a default-branch or scheduled run is
+`github.run_id` and are never canceled: a default-branch or scheduled run is
 never superseded by another.
 
 The pull-request number, not `github.head_ref`, is deliberate. Both satisfy the
@@ -136,7 +136,7 @@ A workflow whose required check carries the pull-request contract also runs on
 `edited`, `labeled` and `unlabeled` — events that change the contract answer
 without a new commit. Those runs gate every lane off and carry the recorded lane
 verdict forward instead of re-running the lanes, so such a run must never cancel
-the full run it reads that verdict from: cancelling it means the verdict is
+the full run it reads that verdict from: canceling it means the verdict is
 never recorded and the carry-forward can only fail. Expressed as
 `!(<contract-only predicate>)`, cancellation stays on for every full-run event —
 including `synchronize`, which still cancels everything on the superseded SHA —

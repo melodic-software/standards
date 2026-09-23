@@ -38,7 +38,7 @@ cleanup() {
   rm -rf "$path_fixture_root" "$http_fixture_root"
 }
 trap cleanup EXIT
-# A cancelled CI job signals rather than exits, and bash does not run an EXIT
+# A canceled CI job signals rather than exits, and bash does not run an EXIT
 # trap for a signal it has no handler for; converting each to an exit keeps
 # cleanup on one path instead of duplicating it per signal.
 trap 'exit 130' INT

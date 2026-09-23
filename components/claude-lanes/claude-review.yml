@@ -63,7 +63,7 @@ permissions:
 # event can cancel an in-flight review through this group; that is accepted
 # as bounded: with no `synchronize` trigger, same-PR events are rare and
 # human-driven. This value is per-LANE and deliberate: the security caller
-# must NOT copy it (cancelling a REQUIRED check is not a skip and does not
+# must NOT copy it (canceling a REQUIRED check is not a skip and does not
 # read success).
 #
 # The group is the `${{ github.workflow }}`-prefixed canonical form the

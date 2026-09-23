@@ -55,9 +55,9 @@ permissions:
 
 # No top-level concurrency block: the standards `concurrency-policy` component
 # requires a `${{ github.workflow }}`-prefixed group and literal
-# `cancel-in-progress: true`, which this lane cannot ship. A cancelled run of
+# `cancel-in-progress: true`, which this lane cannot ship. A canceled run of
 # a check a ruleset might later read is not a skip and does not read success,
-# so cancelling an in-flight review can wedge the merge behind a void check.
+# so canceling an in-flight review can wedge the merge behind a void check.
 # Concurrency lives on the `security-review` job below
 # (`cancel-in-progress: false`, no queue), which is the shape a
 # `delegated-job-level` concurrency-policy exception waives. And NO job-level

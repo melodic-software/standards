@@ -24,7 +24,7 @@ permissions:
 
 # A queued run must never race the branch push of the run ahead of it. A re-pin
 # already in flight is worth finishing rather than superseding, so the second
-# run waits instead of cancelling the first.
+# run waits instead of canceling the first.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
