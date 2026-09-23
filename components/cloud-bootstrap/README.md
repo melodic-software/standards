@@ -31,6 +31,12 @@ pinned versions:
   repo-local, each skipped when the manifest is absent or already satisfied;
 - repairs the shallow single-branch cloud clone (unshallow + make
   `origin/main` resolve) so base-ref diffs work;
+- sets the global git `author.name`/`author.email` from the GitHub account
+  the session is connected to (`gh api user`; the email is the account's
+  `<id>+<login>@users.noreply.github.com` noreply address), because cloud
+  sessions do not author commits as that account. Author only: the committer
+  stays the session's identity so its SSH signature keeps verifying. A failed
+  lookup sets nothing and logs one warning;
 - runs the repo's committed `.claude/cloud-bootstrap.local.sh` when present
   (the enrich seam, below);
 - installs plugins from two settings-shaped sources, fleet list first: the

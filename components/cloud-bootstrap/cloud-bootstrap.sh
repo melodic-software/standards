@@ -158,6 +158,23 @@ fi
   git fetch --quiet origin "+main:refs/remotes/origin/main" 2>/dev/null ||
     toolchain_warn 'could not fetch origin/main'
 
+  # Git author: cloud sessions don't author commits as the connected GitHub
+  # account (undocumented). This derives the author from the account the
+  # session is connected to, so each person is attributed to themselves.
+  # Author-only so the committer's SSH signature keeps verifying. Remove once
+  # upstream fixes it.
+  # The select drops a response missing login or id, so an empty field can
+  # never shift the tab-split fields below.
+  gh_user="$(gh api user --jq 'select((.login // "") != "" and (.id // "" | tostring) != "")
+    | [.login, (.id | tostring), (.name // "")] | @tsv' 2>/dev/null)" || gh_user=''
+  IFS=$'\t' read -r gh_login gh_id gh_name <<<"$gh_user"
+  if [[ -z "$gh_login" || -z "$gh_id" ]]; then
+    toolchain_warn 'could not read the connected GitHub account; git author left unset'
+  elif ! git config --global author.name "${gh_name:-$gh_login}" ||
+    ! git config --global author.email "$gh_id+$gh_login@users.noreply.github.com"; then
+    toolchain_warn 'could not set the git author'
+  fi
+
   # --- Repo extension (enrich seam) -----------------------------------------
   # A repo appends its own setup — extra lockfiles, pinned hygiene binaries,
   # symlinks — in this committed, never-synced sibling. Same contract as this
