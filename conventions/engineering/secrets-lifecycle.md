@@ -25,10 +25,12 @@ between them. Vendor-specific procedures belong in the consuming repository, not
 
 - **Set the expiry at the issuer when the issuer supports one.** An expiry the vendor enforces
   turns a forgotten key off by itself; a date recorded only in a secret store may not.
-- **Know which store fields enforce anything.** Azure Key Vault is the example: its `exp` attribute
-  is informational, and a `get` still returns an expired secret. Setting `enabled` to `false` is
-  what blocks retrieval. Record the expiry in the store anyway, with tags for owner and
-  rotation-due, so a listing shows what is due; Microsoft recommends tags for that metadata.
+- **Know which store fields enforce anything.** A store's expiry date can be informational only,
+  with a separate control (disabling or deleting the secret) being what blocks retrieval. Read the
+  store's live documentation before relying on its expiry; for Azure Key Vault that is
+  [About Azure Key Vault secrets](https://learn.microsoft.com/en-us/azure/key-vault/secrets/about-secrets#secret-attributes).
+  Record the expiry in the store anyway, with owner and rotation-due metadata, so a listing shows
+  what is due.
 - **Never rely on one renewal reminder.** An enforced expiry turns a missed renewal into an outage,
   so every expiring secret needs at least two independent renewal triggers, for example a calendar
   entry plus a store-side expiry or tag that surfaces in a routine listing. The
@@ -37,10 +39,12 @@ between them. Vendor-specific procedures belong in the consuming repository, not
 
 ## Rotate first, then purge stale copies
 
-Create the new secret, deploy it, verify one consumer works, then revoke the old one. Revocation
-makes every stale copy inert, so purging copies from app settings, config files, and caches comes
-after it: at that point the purge removes dead configuration rather than closing exposure, and any
-consumer that still reads a stale copy fails loudly, which finds the copies that were missed.
+On a scheduled rotation, create the new secret, deploy it to every known consumer, verify each
+one, then revoke the old value; where the issuer supports two live credentials or a grace period,
+use it so no consumer goes down during the switch. On exposure, revoke first and accept the
+outage. Revocation makes every stale copy inert, so purging copies from app settings, config
+files, and caches comes after it: at that point the purge removes dead configuration rather than
+closing exposure, and a stale copy nobody knew about fails loudly instead of lingering.
 
 ## Choose the store by the key's owner
 
@@ -59,8 +63,8 @@ resolves secrets from a vault at launch instead of persisting them.
 
 ## Sources
 
-Checked 2026-09. Recheck when a cited page changes the example interval or the Key Vault attribute
-semantics.
+Checked 2026-09-23. Recheck the cited pages by 2027-03-23, and before changing the default
+cadence.
 
 - OWASP: [Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html),
   sections 2.7.2 Rotation, 2.7.3 Revocation, and 2.7.4 Expiration
