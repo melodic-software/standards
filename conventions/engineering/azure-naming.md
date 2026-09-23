@@ -15,30 +15,29 @@ How Melodic Software names and tags Azure resources. Every rule below either cit
 
 ## Patterns by resource type
 
-| Resource type | Pattern | Example | Uniqueness | Length | Character set |
-|---|---|---|---|---|---|
-| Subscription display name | `Melodic Software` | | Tenant, by convention | Not published | Not published |
-| Resource group | `rg-<workload>-<env>` | `rg-billing-prod` | Subscription | 1-90 | Letters, digits, underscore, hyphen, period, parentheses; cannot end with a period |
-| Key vault | `kv-melo-<consumer>-<env>` | `kv-melo-billing-prod` | Global | 3-24 | Alphanumerics and hyphens; starts with a letter; ends with a letter or digit; no consecutive hyphens |
-| Log Analytics workspace | `log-<workload>-<env>` | `log-billing-prod` | Resource group | 4-63 | Alphanumerics and hyphens; starts and ends with an alphanumeric |
-| Storage account | `stmelo<workload>` or `stmelo<workload><nnn>` | `stmeloreports001` | Global | 3-24 | Lowercase letters and digits only |
-| Blob container | `<workload>` or `<workload>-<nnn>` | `invoices` | Storage account | 3-63 | Lowercase letters, digits, hyphens; starts with a lowercase letter or digit; no consecutive hyphens |
+| Resource type | Pattern | Example |
+|---|---|---|
+| Subscription display name | `Melodic Software` | |
+| Resource group | `rg-<workload>-<env>` | `rg-billing-prod` |
+| Key vault | `kv-melo-<consumer>-<env>` | `kv-melo-billing-prod` |
+| Log Analytics workspace | `log-<workload>-<env>` | `log-billing-prod` |
+| Storage account | `stmelo<workload>` or `stmelo<workload><nnn>` | `stmeloreports001` |
+| Blob container | `<workload>` or `<workload>-<nnn>` | `invoices` |
 
 The example workloads are illustrative, not resources that exist.
 
-Sources for that table:
+Before creating a resource, check the name against the type's current uniqueness scope, length and
+character set in Microsoft's
+[naming rules and restrictions](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules).
+Those limits are Azure's to change, so this file does not copy them. Length and character limits
+for a subscription display name are not published on any Microsoft page located, so treat a plain
+ASCII phrase as the safe shape (judgment).
 
-- Abbreviations `rg`, `kv`, `log`, `st`:
-  <https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations>.
-  The abbreviations are bare tokens; the hyphen comes from the delimiter rule below, not from the
-  abbreviation. That page carries no subscription row and no blob-container row, so those two
-  patterns are judgment.
-- Per-type length, character set and uniqueness scope:
-  <https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules>,
-  verified 2026-09-23; recheck before creating a resource of a type in this table, since Azure
-  enforces the current limits at creation. Length and character limits for a subscription display
-  name are not published on any Microsoft page located, so treat a plain ASCII phrase as the safe
-  shape (judgment).
+The abbreviations `rg`, `kv`, `log`, `st` come from
+<https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations>.
+They are bare tokens; the hyphen comes from the delimiter rule below, not from the abbreviation.
+That page carries no subscription row and no blob-container row, so those two patterns are
+judgment.
 
 ### The hyphen rule
 
@@ -52,8 +51,8 @@ separate naming components. However, not every resource in Azure allows you to u
 
 `melo` appears only inside names that must be globally unique, which for these types means key
 vaults and storage accounts. Names scoped to the subscription or to a parent resource already have
-uniqueness and the token only spends characters. Both globally unique types cap at 24 characters
-with incompatible character sets, so the token budget is tightest exactly where it is needed
+uniqueness and the token only spends characters. The globally unique types also carry the
+tightest length limits among these types, so the token budget is tightest exactly where it is needed
 (<https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules>).
 That the token buys nothing on a subscription-scoped name is judgment.
 
@@ -125,8 +124,9 @@ tells a reader nothing, while the consumer is the boundary Microsoft states:
 
 <https://learn.microsoft.com/en-us/azure/key-vault/general/secure-key-vault>
 
-Extra vaults carry no standing charge (same source), so the split costs configuration effort
-rather than money.
+Extra vaults carry no standing charge (same source, verified 2026-09-23; recheck against
+<https://azure.microsoft.com/en-us/pricing/details/key-vault/> before splitting a vault), so the
+split costs configuration effort rather than money.
 
 The one documented exception is a resource group whose job is lifecycle co-location of several
 vaults. A resource group groups by shared lifecycle, not by classification, so such a group names
