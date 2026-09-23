@@ -29,6 +29,7 @@ const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
 const REPINE_LANE_SHA_V0_24_0 = "2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3";
 const REPINE_LANE_SHA_V0_25_0 = "91d06c94d733e5daa507e0afaa06a140bb46d337";
 const REPINE_LANE_SHA_V0_26_0 = "de644a0a80d78096a9f6074710f913eed13c9a91";
+const REPINE_LANE_SHA_V0_27_0 = "ac062650c46005edb4787aff378347746bf63804";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8242,6 +8243,33 @@ test("every reusable contract at the v0.26.0 tag copies its v0.25.0 entry forwar
     asserted += 1;
   }
   assert.equal(asserted, 3);
+});
+
+// v0.27.0 registers the three lane/sync reusables the repin lane moves plus
+// the four reusables consumers repin by hand. None widens: checks gains a
+// markdown-extra-globs input that stays out of allowedInputs because no
+// caller passes it, and issue-triage-label only changes its label default.
+test("every reusable contract at the v0.27.0 tag copies its predecessor forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const predecessors = {
+    "claude-review": REPINE_LANE_SHA_V0_26_0,
+    "claude-security-review": REPINE_LANE_SHA_V0_26_0,
+    "standards-sync": REPINE_LANE_SHA_V0_26_0,
+    checks: REPINE_LANE_SHA_V0_24_0,
+    zizmor: REPINE_LANE_SHA_V0_24_0,
+    "osv-scanner": REPINE_LANE_SHA_V0_24_0,
+    "issue-triage-label": REPINE_LANE_SHA_V0_24_0,
+  };
+  for (const [reusable, sha] of Object.entries(predecessors)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${sha}`];
+    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_27_0}`],
+      previous,
+      `${reusable} at the v0.27.0 tag is not a verbatim copy of its predecessor`,
+    );
+  }
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily

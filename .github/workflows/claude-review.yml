@@ -63,7 +63,7 @@ jobs:
     concurrency:
       group: claude-review-${{ github.repository }}
       queue: max
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@de644a0a80d78096a9f6074710f913eed13c9a91 # v0.26.0
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@ac062650c46005edb4787aff378347746bf63804 # v0.27.0
     with:
       # DEVIATION from the component, which resolves the runner through the
       # governed selector: this repository is PUBLIC, and runner-policy admits
