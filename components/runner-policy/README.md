@@ -927,6 +927,30 @@ action and is not SHA-allowlisted. Auto-approval still writes nothing: the
 `standards-sync` `needs` decline recorded above is unchanged because the file
 is unchanged, and that one decline suppresses the lane copy-forwards. These
 entries are written by review for that reason.
+Seven paths are registered at the v0.27.0 tag
+`ac062650c46005edb4787aff378347746bf63804`: the three the repin lane moves,
+`claude-review`, `claude-security-review` and `standards-sync`, copied from
+their v0.26.0 entries, and the four consumers repin by hand, `checks`,
+`zizmor`, `osv-scanner` and `issue-triage-label`, copied from their v0.24.0
+entries. Zizmor copies the `2c1de45a` lineage because `de50a08b` is not an
+ancestor of the tag. Each copy is verbatim and nothing widens; the older
+entries stay. `standards-sync.yml` is byte-identical to v0.26.0.
+`claude-security-review.yml` changes spelling in comments, quotes the
+`--allowedTools` grant, and re-pins `claude-lane-outcome`. `claude-review.yml` gains two
+dispatch-delivery evidence steps, re-pins `claude-lane-outcome`, and quotes the
+`--allowedTools` grant; no `workflow_call` input, secret, permission or
+`runs-on` routing moved. `checks.yml` adds a `markdown-extra-globs` input
+forwarded to the markdown composite and re-pins its composites from v0.22.0 to
+v0.24.0. That input stays out of `allowedInputs` because no caller passes it.
+`issue-triage-label.yml` changes the `label` default from
+`priority: needs-triage` to `needs-triage`, and `zizmor.yml` and
+`osv-scanner.yml` change only a `codeql-action` pin and generated-block
+comments. `reusableWorkflowSecuritySurfacesMatch` returns `unchanged: true` for
+`claude-security-review`, `zizmor` and `osv-scanner`, `diffField: inputs` for
+`checks` and `issue-triage-label` (description prose and the default),
+`diffField: credentialReferences` for `claude-review`, and throws the standing
+`needs` decline for `standards-sync`. These entries are therefore written by
+review.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
