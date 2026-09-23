@@ -168,11 +168,14 @@ fi
   gh_user="$(gh api user --jq 'select((.login // "") != "" and (.id // "" | tostring) != "")
     | [.login, (.id | tostring), (.name // "")] | @tsv' 2>/dev/null)" || gh_user=''
   IFS=$'\t' read -r gh_login gh_id gh_name <<<"$gh_user"
-  if [[ -z "$gh_login" || -z "$gh_id" ]]; then
-    toolchain_warn 'could not read the connected GitHub account; git author left unset'
-  elif ! git config --global author.name "${gh_name:-$gh_login}" ||
+  # On any failure both keys are cleared, so neither a stale author from an
+  # earlier run nor a half-written pair survives.
+  if [[ -z "$gh_login" || -z "$gh_id" ]] ||
+    ! git config --global author.name "${gh_name:-$gh_login}" ||
     ! git config --global author.email "$gh_id+$gh_login@users.noreply.github.com"; then
-    toolchain_warn 'could not set the git author'
+    git config --global --unset author.name 2>/dev/null || true
+    git config --global --unset author.email 2>/dev/null || true
+    toolchain_warn 'could not derive the git author from the connected GitHub account; author.* cleared'
   fi
 
   # --- Repo extension (enrich seam) -----------------------------------------

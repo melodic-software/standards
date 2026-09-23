@@ -247,8 +247,13 @@ STUB
 chmod +x "$author_tmp/bin/gh"
 (cd "$author_tmp/repo" && git init -q .)
 author_case() {
-  # author_case <label> <remote> <gh user json, empty = gh fails>
+  # author_case <label> <remote> <gh user json, empty = gh fails> [stale]
+  # A fourth argument seeds a stale author from an earlier run first.
   local cfg="$author_tmp/$1.gitconfig"
+  if [[ -n "${4:-}" ]]; then
+    GIT_CONFIG_GLOBAL="$cfg" git config --global author.name 'Stale Author'
+    GIT_CONFIG_GLOBAL="$cfg" git config --global author.email 'stale@example.test'
+  fi
   (cd "$author_tmp/repo" && PATH="$author_tmp/bin:$PATH" GIT_CONFIG_GLOBAL="$cfg" \
     GIT_CONFIG_NOSYSTEM=1 CLAUDE_CODE_REMOTE="$2" CLAUDE_PROJECT_DIR="$author_tmp/repo" \
     CLOUD_BOOTSTRAP_FLEET_LIST="$author_tmp/no-such-fleet.json" GH_STUB_USER="$3" \
@@ -262,6 +267,7 @@ assert_eq 'an account with no display name falls back to the login' \
   "$(printf '%s\n' 'author.email=42+octo@users.noreply.github.com' 'author.name=octo')" \
   "$(author_case no-name true '{"login":"octo","id":42,"name":null}')"
 assert_eq 'a failed gh call sets nothing' '' "$(author_case failure true '')"
+assert_eq 'a failed gh call clears a stale author' '' "$(author_case stale true '' stale)"
 assert_eq 'an empty login sets nothing' '' \
   "$(author_case no-login true '{"login":null,"id":42,"name":"Octo Cat"}')"
 assert_eq 'an empty id sets nothing' '' \

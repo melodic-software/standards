@@ -36,7 +36,7 @@ pinned versions:
   `<id>+<login>@users.noreply.github.com` noreply address), because cloud
   sessions do not author commits as that account. Author only: the committer
   stays the session's identity so its SSH signature keeps verifying. A failed
-  lookup sets nothing and logs one warning;
+  lookup clears `author.*`, so no stale author survives, and logs one warning;
 - runs the repo's committed `.claude/cloud-bootstrap.local.sh` when present
   (the enrich seam, below);
 - installs plugins from two settings-shaped sources, fleet list first: the
