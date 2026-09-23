@@ -50,16 +50,6 @@ else
   echo "cloud-bootstrap: no env setup stamp (unmanaged environment or interrupted cache build)" >&2
 fi
 
-# Placeholder: Claude Code on the web does not author commits as the connected
-# GitHub account (undocumented, no setting). Author-only on purpose: the committer
-# stays the session's identity so its SSH commit signature still verifies.
-# Hardcodes one person; revisit if anyone else runs cloud sessions on these repos,
-# and remove once upstream attributes commits to the GitHub account.
-if ! { git config --global author.name "Kyle Sexton" &&
-  git config --global author.email "153232337+kyle-sexton@users.noreply.github.com"; }; then
-  echo "cloud-bootstrap: could not set the git author identity; commits keep the session's author" >&2
-fi
-
 # --- Repo toolchain ---------------------------------------------------------
 # Ahead of the plugin-CLI guards below on purpose: those `command -v` checks
 # exit 0 when `claude` or `jq` is missing, and the toolchain must not be

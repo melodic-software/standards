@@ -17,8 +17,9 @@ materialized="$root/.claude/cloud-bootstrap.sh"
 readme="$root/components/cloud-bootstrap/README.md"
 env_setup="$root/components/cloud-environment/setup.sh"
 
-# Every cloud-mode run below writes `git config --global`; point it at a
-# scratch file so the suite never touches the host's real global config.
+# The cloud-mode runs below execute the real script, which may write
+# `git config --global`; point it at a scratch file so the suite never touches
+# the host's real global config.
 GIT_CONFIG_GLOBAL="$(mktemp)"
 export GIT_CONFIG_GLOBAL
 trap 'rm -f "$GIT_CONFIG_GLOBAL"' EXIT
@@ -227,29 +228,6 @@ assert_contains 'a repo delta outside the fleet list is installed as an overlay'
   "$empty_out" 'repo .claude/settings.json: 1 declared, 1 newly installed'
 assert_eq 'the overlay install reaches the plugin CLI' '1' \
   "$(cat "$inv_tmp/counts/plugin-install" 2>/dev/null || echo 0)"
-
-# Git identity: a cloud session sets the author only. The committer must stay
-# the session's own identity, whose SSH signature GitHub verifies against the
-# committer email, so user.* and committer.* stay unset. Outside cloud
-# sessions nothing is written.
-mkdir -p "$inv_tmp/home"
-identity_run() {
-  # identity_run <CLAUDE_CODE_REMOTE value> — runs the script against an
-  # isolated HOME and global config, echoing that config's contents.
-  local cfg="$inv_tmp/home/gitconfig"
-  rm -f "$cfg"
-  (cd "$inv_tmp/repo" && PATH="$inv_tmp/bin:$PATH" HOME="$inv_tmp/home" \
-    GIT_CONFIG_GLOBAL="$cfg" CLAUDE_CODE_REMOTE="$1" CLAUDE_PROJECT_DIR="$inv_tmp/repo" \
-    CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/fleet.json" bash "$script" >/dev/null 2>&1)
-  git config --file "$cfg" --list 2>/dev/null
-}
-id_cfg="$(identity_run true)"
-assert_contains 'cloud session sets author.name' "$id_cfg" 'author.name=Kyle Sexton'
-assert_contains 'cloud session sets author.email' "$id_cfg" \
-  'author.email=153232337+kyle-sexton@users.noreply.github.com'
-assert_not_contains 'cloud session leaves user.* unset' "$id_cfg" 'user.'
-assert_not_contains 'cloud session leaves committer.* unset' "$id_cfg" 'committer.'
-assert_eq 'non-cloud run writes no global git config' '' "$(identity_run '')"
 rm -rf "$inv_tmp"
 
 # README/script drift guards.

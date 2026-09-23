@@ -32,4 +32,15 @@ for component_lock in components/*/package-lock.json distribution/package-lock.j
   fi
 done
 
+# Placeholder: Claude Code on the web does not author commits as the connected
+# GitHub account (undocumented, no setting). Author-only on purpose: the committer
+# stays the session's identity so its SSH commit signature still verifies.
+# Scoped to this repository only. Roll out per repo through its own
+# cloud-bootstrap.local.sh, or replace with an account-derived identity once a
+# cloud session validates that approach.
+git config --global author.name "Kyle Sexton" ||
+  warn 'could not set git author.name'
+git config --global author.email "153232337+kyle-sexton@users.noreply.github.com" ||
+  warn 'could not set git author.email'
+
 exit 0

@@ -26,9 +26,6 @@ pinned versions:
 - logs the environment snapshot stamp (`/opt/melodic-env-setup.done`, or its
   `/tmp/melodic-env-setup.done` fallback when `/opt` was unwritable at cache
   build) so every session reports which environment build it booted from;
-- sets the global git author identity (`author.name`/`author.email`) only,
-  never `user.*` or `committer.*`, so the committer stays the session's
-  identity and its SSH commit signature still verifies;
 - Node from `.node-version` (via the VM's nvm), `npm ci` from the root
   `package-lock.json`, and the .NET SDK exactly as `global.json` pins,
   repo-local, each skipped when the manifest is absent or already satisfied;
