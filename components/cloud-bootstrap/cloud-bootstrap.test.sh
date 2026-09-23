@@ -230,6 +230,52 @@ assert_eq 'the overlay install reaches the plugin CLI' '1' \
   "$(cat "$inv_tmp/counts/plugin-install" 2>/dev/null || echo 0)"
 rm -rf "$inv_tmp"
 
+# Git author from the connected GitHub account. A stub `gh` on PATH answers
+# `gh api user` through the script's own --jq filter, and each case writes to
+# an isolated global git config, so the host's identity is never read or
+# touched. Only author.* may be set: committer.* and user.* stay unset so the
+# committer's SSH signature keeps verifying. The fleet list points at a
+# missing file so the plugin stage ends before any `claude` call.
+author_tmp="$(mktemp -d)"
+mkdir -p "$author_tmp/bin" "$author_tmp/repo"
+cat >"$author_tmp/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+[[ -n "${GH_STUB_USER:-}" ]] || exit 1
+[[ "$1 $2 $3" == 'api user --jq' ]] || exit 1
+printf '%s' "$GH_STUB_USER" | jq -r "$4"
+STUB
+chmod +x "$author_tmp/bin/gh"
+(cd "$author_tmp/repo" && git init -q .)
+author_case() {
+  # author_case <label> <remote> <gh user json, empty = gh fails> [stale]
+  # A fourth argument seeds a stale author from an earlier run first.
+  local cfg="$author_tmp/$1.gitconfig"
+  if [[ -n "${4:-}" ]]; then
+    GIT_CONFIG_GLOBAL="$cfg" git config --global author.name 'Stale Author'
+    GIT_CONFIG_GLOBAL="$cfg" git config --global author.email 'stale@example.test'
+  fi
+  (cd "$author_tmp/repo" && PATH="$author_tmp/bin:$PATH" GIT_CONFIG_GLOBAL="$cfg" \
+    GIT_CONFIG_NOSYSTEM=1 CLAUDE_CODE_REMOTE="$2" CLAUDE_PROJECT_DIR="$author_tmp/repo" \
+    CLOUD_BOOTSTRAP_FLEET_LIST="$author_tmp/no-such-fleet.json" GH_STUB_USER="$3" \
+    bash "$script" >/dev/null 2>&1)
+  GIT_CONFIG_GLOBAL="$cfg" git config --global --list 2>/dev/null | sort
+}
+assert_eq 'the connected account sets author.* only' \
+  "$(printf '%s\n' 'author.email=42+octo@users.noreply.github.com' 'author.name=Octo Cat')" \
+  "$(author_case success true '{"login":"octo","id":42,"name":"Octo Cat"}')"
+assert_eq 'an account with no display name falls back to the login' \
+  "$(printf '%s\n' 'author.email=42+octo@users.noreply.github.com' 'author.name=octo')" \
+  "$(author_case no-name true '{"login":"octo","id":42,"name":null}')"
+assert_eq 'a failed gh call sets nothing' '' "$(author_case failure true '')"
+assert_eq 'a failed gh call clears a stale author' '' "$(author_case stale true '' stale)"
+assert_eq 'an empty login sets nothing' '' \
+  "$(author_case no-login true '{"login":null,"id":42,"name":"Octo Cat"}')"
+assert_eq 'an empty id sets nothing' '' \
+  "$(author_case no-id true '{"login":"octo","id":null,"name":"Octo Cat"}')"
+assert_eq 'a non-remote session sets nothing' '' \
+  "$(author_case local false '{"login":"octo","id":42,"name":"Octo Cat"}')"
+rm -rf "$author_tmp"
+
 # README/script drift guards.
 assert_contains 'README documents the materialized path' \
   "$(cat "$readme")" '.claude/cloud-bootstrap.sh'
