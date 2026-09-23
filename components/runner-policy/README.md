@@ -907,6 +907,23 @@ invariant below holds unchanged. `standards-sync` keeps `runner`, `manifest`,
 `standards-ref`, `dry-run` and `targets` with the `app-client-id` and
 `app-private-key` mappings, and names no `allowedCallerPermissions`, as its
 v0.24.0 predecessor does not.
+Three paths are registered again at the v0.26.0 tag
+`de644a0a80d78096a9f6074710f913eed13c9a91`: `claude-review`,
+`claude-security-review` and `standards-sync`. The compare against the v0.25.0
+tag is two commits, `chore: sync standards components` (`983bd79253`) and
+`feat(actions): add check-jsonschema default-filetype and typos hidden inputs`
+(`de644a0a80`), and the only files that move are
+`.github/actions/check-jsonschema/action.yml`, `.github/actions/typos/action.yml`,
+and `_typos.toml`. The three workflow blobs are identical at both revisions
+(`claude-review.yml` `ced17901ee977de27739e67f34daf5dd9563feba`,
+`claude-security-review.yml` `4db26ce62a3631f263cf4cce82883ed83932fddc`,
+`standards-sync.yml` `900d64101256158276785d03b84965f9840bfdab`), so each
+contract copies its v0.25.0 terms verbatim and nothing widens. The fourth moved
+caller reference, `.github/actions/managed-files-guard`, is still a composite
+action and is not SHA-allowlisted. Auto-approval still writes nothing: the
+`standards-sync` `needs` decline recorded above is unchanged because the file
+is unchanged, and that one decline suppresses the lane copy-forwards. These
+entries are written by review for that reason.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
