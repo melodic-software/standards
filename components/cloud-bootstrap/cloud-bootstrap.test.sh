@@ -17,6 +17,13 @@ materialized="$root/.claude/cloud-bootstrap.sh"
 readme="$root/components/cloud-bootstrap/README.md"
 env_setup="$root/components/cloud-environment/setup.sh"
 
+# The cloud-mode runs below execute the real script, which may write
+# `git config --global`; point it at a scratch file so the suite never touches
+# the host's real global config.
+GIT_CONFIG_GLOBAL="$(mktemp)"
+export GIT_CONFIG_GLOBAL
+trap 'rm -f "$GIT_CONFIG_GLOBAL"' EXIT
+
 bash -n "$script" 2>/dev/null
 rc=$?
 assert_exit 'cloud-bootstrap.sh parses (bash -n)' 0 "$rc"
