@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Runner-policy lockstep for claude-lanes re-pins. When the upstream selector
- * and lane reusable contracts are unchanged between the old and new ci-workflows
- * SHAs, copy-forward the approved allowlist entries and refresh the repo-local
- * caller pin. Otherwise report that a human must complete the policy half.
+ * Runner-policy lockstep for claude-lanes re-pins. When every pinned
+ * reusable workflow's security surface is unchanged between the old and new
+ * ci-workflows SHAs, copy-forward its approvedReusableWorkflowContracts
+ * entry and refresh the repo-local caller pin. Otherwise write nothing and
+ * emit the human checklist. schemaVersion 4 has no selector key; this
+ * script does not read or write one.
  *
  * Invoked from .github/workflows/claude-lanes-repin.yml after repin-callers.sh
  * apply. Reports through GITHUB_OUTPUT (lockstep, policy-note).
  */
-import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,24 +25,15 @@ import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const UPSTREAM = "melodic-software/ci-workflows";
-const SELECTOR_PATH = `${UPSTREAM}/.github/workflows/select-runner.yml`;
 const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
-const TEST_PATH = path.join(ROOT, "components/runner-policy/runner-policy.test.mjs");
 
 /**
  * Each entry is one upstream reusable plus the caller files that pin it.
  * Old SHAs are read per caller file — do not assume a single-SHA world.
- * `kind` selects which policy.json map receives a copy-forward.
+ * `kind` is lane or reusable. Both copy forward approvedReusableWorkflowContracts.
+ * Any other kind throws and does not add a property.
  */
 const REPIN_TARGETS = [
-  {
-    workflowPath: `${UPSTREAM}/.github/workflows/select-runner.yml`,
-    callerFiles: [
-      "components/claude-lanes/claude-review.yml",
-      "components/claude-lanes/claude-security-review.yml",
-    ],
-    kind: "selector",
-  },
   {
     workflowPath: `${UPSTREAM}/.github/workflows/claude-review.yml`,
     callerFiles: [
@@ -131,9 +123,43 @@ function laneSecuritySurfacesMatch(oldSource, newSource, lanePath, policy) {
   }
 }
 
-function constantNameForTag(tag) {
+export function constantNameForTag(tag) {
   const body = tag.replace(/^v/u, "").replaceAll(".", "_").toUpperCase();
   return `REPINE_LANE_SHA_V${body}`;
+}
+
+function withheldSurfacesClause(unchangedPaths) {
+  if (unchangedPaths.length === 0) return "";
+  return (
+    " These surfaces were unchanged and were not copy-forwarded, because any decline suppresses every write: " +
+    `${unchangedPaths.join(", ")}. ` +
+    "Register one `approvedReusableWorkflowContracts` entry for each of those withheld paths too."
+  );
+}
+
+export function manualPolicyNote(reasons, tag, unchangedPaths = []) {
+  const withheld = withheldSurfacesClause(unchangedPaths);
+  return (
+    "> [!WARNING]\n" +
+    `> **Runner-policy lockstep requires a human.** ${reasons}. ` +
+    "Before merging, register one `approvedReusableWorkflowContracts` entry for each declined workflow named above, " +
+    "add the rollout record in `components/runner-policy/README.md`, and add " +
+    `\`${constantNameForTag(tag)}\` plus a verbatim copy-forward assertion in ` +
+    "`components/runner-policy/runner-policy.test.mjs` " +
+    `(same shape as the v0.25.0 registration, PR #589).${withheld} ` +
+    "This pull request is never auto-merged."
+  );
+}
+
+export function appliedPolicyNote(tag) {
+  return (
+    "Runner-policy lockstep applied automatically: every pinned reusable workflow's security surface is unchanged, " +
+    "so each matching `approvedReusableWorkflowContracts` entry in `components/runner-policy/policy.json` was copy-forwarded and the repo-local caller pins were rewritten. " +
+    "**Operator:** before merging, add the rollout record in `components/runner-policy/README.md` and " +
+    `\`${constantNameForTag(tag)}\` plus a verbatim copy-forward assertion in ` +
+    "`components/runner-policy/runner-policy.test.mjs` " +
+    "(same shape as the v0.25.0 registration, PR #589). This script writes neither of those two files."
+  );
 }
 
 function rewritePinLine(line, newSha, tag) {
@@ -209,27 +235,6 @@ export async function rewriteCallerFiles(newSha, tag, root = ROOT) {
   return anyChanged;
 }
 
-function copySelectorContract(policy, oldSha, newSha) {
-  const ownerList = policy.approvedSelectorReferencesByRepositoryOwner?.["melodic-software"];
-  assert.ok(Array.isArray(ownerList), "melodic-software selector allowlist is missing");
-  const selectorRef = `${SELECTOR_PATH}@${newSha}`;
-  let changed = false;
-  if (!ownerList.includes(selectorRef)) {
-    ownerList.push(selectorRef);
-    changed = true;
-  }
-  const oldSelectorKey = `${SELECTOR_PATH}@${oldSha}`;
-  const contract = policy.approvedSelectorInputContracts?.[oldSelectorKey];
-  if (!contract) {
-    throw new Error(`policy.json has no selector input contract for ${oldSelectorKey}`);
-  }
-  if (!policy.approvedSelectorInputContracts[selectorRef]) {
-    policy.approvedSelectorInputContracts[selectorRef] = structuredClone(contract);
-    changed = true;
-  }
-  return changed;
-}
-
 function copyReusableContract(policy, workflowPath, oldSha, newSha) {
   const oldKey = `${workflowPath}@${oldSha}`;
   const newKey = `${workflowPath}@${newSha}`;
@@ -242,15 +247,10 @@ function copyReusableContract(policy, workflowPath, oldSha, newSha) {
   return true;
 }
 
-async function updatePolicyJson(copyForwards) {
-  const policy = JSON.parse(await readFile(POLICY_PATH, "utf8"));
+export function copyForwardContracts(policy, copyForwards) {
   let changed = false;
-
   for (const item of copyForwards) {
     switch (item.kind) {
-      case "selector":
-        if (copySelectorContract(policy, item.oldSha, item.newSha)) changed = true;
-        break;
       case "lane":
       case "reusable":
         if (copyReusableContract(policy, item.workflowPath, item.oldSha, item.newSha)) {
@@ -263,48 +263,16 @@ async function updatePolicyJson(copyForwards) {
       }
     }
   }
+  return changed;
+}
 
+async function updatePolicyJson(copyForwards) {
+  const policy = JSON.parse(await readFile(POLICY_PATH, "utf8"));
+  const changed = copyForwardContracts(policy, copyForwards);
   if (changed) {
     await writeFile(POLICY_PATH, `${JSON.stringify(policy, null, 2)}\n`);
   }
   return changed;
-}
-
-// `selectorCopiedForward` is false both when the selector source changed and
-// when no caller pins the selector at all. The callers stopped pinning it in
-// ci-perf Phase 3b, and without this distinction the next tag would insert a
-// selector SHA constant into the test's production allowlist mirror that
-// `policy.json` never gained, because `copySelectorContract` never ran.
-async function updateTestMjs(newSha, tag, selectorCopiedForward) {
-  if (!selectorCopiedForward) return false;
-  let text = await readFile(TEST_PATH, "utf8");
-  if (text.includes(`@${newSha}`)) return false;
-
-  const constantName = constantNameForTag(tag);
-  if (text.includes(`const ${constantName} = "${newSha}"`)) return false;
-
-  const constLine = `const ${constantName} = "${newSha}";\n`;
-  const anchor = "const AVAILABILITY_RULING_LANE_SHA = ";
-  const anchorIndex = text.indexOf(anchor);
-  if (anchorIndex === -1) {
-    throw new Error("could not locate selector SHA constants in runner-policy.test.mjs");
-  }
-  const lineEnd = text.indexOf("\n", anchorIndex);
-  text = `${text.slice(0, lineEnd + 1)}${constLine}${text.slice(lineEnd + 1)}`;
-
-  const arrayNeedle = "$" + "{SELECTOR_PATH}@" + "${AVAILABILITY_RULING_LANE_SHA}`,";
-  const arrayIndex = text.indexOf(arrayNeedle);
-  if (arrayIndex === -1) {
-    throw new Error(
-      "could not locate production selector allowlist array in runner-policy.test.mjs",
-    );
-  }
-  const insertAt = arrayIndex + arrayNeedle.length;
-  const insertion = `\n      \`\${SELECTOR_PATH}@\${${constantName}}\`,`;
-  text = `${text.slice(0, insertAt)}${insertion}${text.slice(insertAt)}`;
-
-  await writeFile(TEST_PATH, text);
-  return true;
 }
 
 async function main() {
@@ -332,7 +300,6 @@ async function main() {
   const newSourceByRepoPath = new Map();
   const reasons = [];
   const copyForwards = [];
-  let selectorCopiedForward = false;
 
   for (const target of REPIN_TARGETS) {
     const pins = readCallerPins(target.workflowPath, target.callerFiles);
@@ -349,22 +316,6 @@ async function main() {
     }
 
     for (const fromSha of pinnedOldShas) {
-      if (target.kind === "selector") {
-        const oldSource = fetchUpstreamFile(repoPath, fromSha);
-        if (oldSource !== newSource) {
-          reasons.push(`\`${repoPath}\` changed between ${fromSha.slice(0, 7)} and the new SHA`);
-          continue;
-        }
-        selectorCopiedForward = true;
-        copyForwards.push({
-          kind: "selector",
-          workflowPath: target.workflowPath,
-          oldSha: fromSha,
-          newSha,
-        });
-        continue;
-      }
-
       const oldSource = fetchUpstreamFile(repoPath, fromSha);
       const surface = laneSecuritySurfacesMatch(oldSource, newSource, target.workflowPath, policy);
       if (!surface.unchanged) {
@@ -381,12 +332,8 @@ async function main() {
   }
 
   if (reasons.length > 0) {
-    const note =
-      `> [!WARNING]\n` +
-      `> **Runner-policy lockstep requires a human.** ${reasons.join("; ")}. ` +
-      "Before merging, add the selector allowlist entry, both lane contract entries, " +
-      "the README rollout record, and the test constants — see PR #345 for precedent. " +
-      "This pull request is never auto-merged.";
+    const unchangedPaths = [...new Set(copyForwards.map((item) => item.workflowPath))];
+    const note = manualPolicyNote(reasons.join("; "), tag, unchangedPaths);
     emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
     await appendOutput(outputFile, [
       ["lockstep", "manual"],
@@ -396,21 +343,10 @@ async function main() {
   }
 
   const policyChanged = await updatePolicyJson(copyForwards);
-  // A changed selector source already returned above through `reasons`, so a
-  // copy-forward having happened is the whole condition here.
-  const testChanged = await updateTestMjs(newSha, tag, selectorCopiedForward);
   const callerChanged = await rewriteCallerFiles(newSha, tag);
+  const note = appliedPolicyNote(tag);
 
-  const note =
-    "Runner-policy lockstep applied automatically: selector is byte-identical and both lane " +
-    "reusable-workflow security surfaces are unchanged between revisions, so `policy.json`, " +
-    "`runner-policy.test.mjs`, and the repo-local caller pin were copy-forwarded. " +
-    "**Operator:** add the README rollout record describing what this revision carries " +
-    "before merging (see `components/runner-policy/README.md` precedent).";
-
-  emitNotice(
-    `Policy lockstep applied (policy=${policyChanged}, test=${testChanged}, caller=${callerChanged}).`,
-  );
+  emitNotice(`Policy lockstep applied (policy=${policyChanged}, caller=${callerChanged}).`);
   await appendOutput(outputFile, [
     ["lockstep", "applied"],
     ["policy-note", note],

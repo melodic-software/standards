@@ -441,9 +441,12 @@ caller permission, or routing surface. Its payload is the security lane's two-ti
 availability ruling (ci-workflows#397, docs in #398): the required check stays
 red only for the caller-drift validation skip, the shape the PR itself
 clears, while every classified external failure (auth, billing, rate-limit,
-server, `other`) concludes green with a warning annotation, the failure marker
-comment, and the incident aggregator's conclusion-independent escalation as
-the compensating alarm chain. Check conclusions change; permissions do not.
+server, `other`) concludes green with a warning annotation and the failure marker
+comment. At v0.12.0 the workflow comment also named the incident aggregator's
+conclusion-independent escalation. ci-workflows#585
+(`7af4ab86add2cd0d1581e20ce2d7a48824387872`, contained in tag v0.25.0) deleted
+`.github/workflows/claude-lane-incident-aggregator.yml`; that aggregator is not
+part of the alarm chain after v0.25.0. Check conclusions change; permissions do not.
 The revision at `62bef7bab01e8532fedfa739879034a210e9e67d` (v0.14.0) is
 approved on a narrow reading: the lanes gain only additive optional inputs,
 `plugins`,
