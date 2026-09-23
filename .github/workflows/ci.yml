@@ -32,8 +32,8 @@ permissions:
 # workflow and cannot branch.
 #
 # Contract-only branch: `ci-contract-<pr>-<run_id>`, unique per run. No
-# contract-only run can be cancelled, evict anything, or be evicted. That is
-# deliberate. Eviction of a *pending* run is unconditional in GitHub's queueing
+# contract-only run can be canceled, evict anything, or be evicted. That is
+# deliberate. Eviction of a *pending* run is unconditional in GitHub's queuing
 # ("any existing pending job or workflow in the same concurrency group will be
 # canceled") and is NOT governed by `cancel-in-progress`, so the old shared
 # group let one contract-only event evict another and leave a check suite on the
@@ -44,10 +44,10 @@ permissions:
 #
 # Full branch: `<workflow>-<pr number || run_id>` with cancel-in-progress true,
 # so a `synchronize` still cancels the run it supersedes. Keying PRs on the
-# number (not head_ref) keeps fork PRs that share a branch name from cancelling
+# number (not head_ref) keeps fork PRs that share a branch name from canceling
 # each other's required runs. The fallback term stays `github.run_id`, which
 # this repository has always used: every push gets its own group and no push run
-# is ever cancelled.
+# is ever canceled.
 #
 # The cost of the branch: a contract-only run no longer queues behind the full
 # run whose `ci-lanes` status it carries forward, so the two race. The

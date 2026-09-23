@@ -55,7 +55,7 @@ const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 // workflow. github.workflow keys the run per workflow; github.event.pull_request.number
 // supersedes an in-flight run of the same pull request; and because that number
 // is empty on push and schedule events, those runs fall back to the unique
-// github.run_id and are never cancelled. The pull-request number (not
+// github.run_id and are never canceled. The pull-request number (not
 // github.head_ref) is used deliberately: head_ref is a fork-controllable branch
 // name that collides across same-named branches from different head repositories
 // on pull_request_target, whereas the number is unique and trusted. Internal
@@ -88,7 +88,7 @@ const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(${CONTRACT_ONLY_PREDICATE_TEXT}) }}`;
 // evicts a pending run unconditionally, so `cancel-in-progress: false` does not
 // protect the contract-only run that queues behind the full run it reads. The
 // branched group puts contract-only runs in their own per-run group keyed on
-// github.run_id: no contract-only run can be cancelled, evicted, or evict
+// github.run_id: no contract-only run can be canceled, evicted, or evict
 // anything, and the composite's bounded carry-forward wait replaces the queue.
 // The full branch keeps the canonical shape, and its fallback term is the
 // per-repository push decision: `github.ref` keeps push-side burst collapse,
