@@ -69,6 +69,8 @@ assert_eq 'concurrency block carries exactly the two canonical keys' 'cancel-in-
 
 assert_eq 'exactly one job' '1' "$(q '.jobs | length')"
 assert_eq 'the job is named managed-files-guard' 'managed-files-guard' "$(q '.jobs | keys | .[0]')"
+assert_eq 'the job display name equals its id (check context stays managed-files-guard)' \
+  'managed-files-guard' "$(q '.jobs["managed-files-guard"].name')"
 assert_eq 'the job runs on the approved hosted label directly' 'ubuntu-24.04' \
   "$(q '.jobs["managed-files-guard"]["runs-on"]')"
 assert_eq 'the job has a 10-minute timeout' '10' "$(q '.jobs["managed-files-guard"]["timeout-minutes"]')"
