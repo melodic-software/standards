@@ -28,6 +28,7 @@ const REPINE_LANE_SHA_V0_22_1 = "cd2f4e6d500e7923c0db521b4d10034d36331ed3";
 const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
 const REPINE_LANE_SHA_V0_24_0 = "2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3";
 const REPINE_LANE_SHA_V0_25_0 = "91d06c94d733e5daa507e0afaa06a140bb46d337";
+const REPINE_LANE_SHA_V0_26_0 = "de644a0a80d78096a9f6074710f913eed13c9a91";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8218,14 +8219,39 @@ test("every reusable contract at the v0.25.0 tag copies its v0.24.0 entry forwar
   assert.equal(asserted, 3);
 });
 
+// The v0.26.0 tag moves no lane or sync workflow bytes. The compare
+// 91d06c94...de644a0a is two commits, and neither touches
+// claude-review.yml, claude-security-review.yml, or standards-sync.yml;
+// those three blobs are identical at both revisions. Auto-approval still
+// declines the set, because standards-sync throws the standing
+// needs-in-a-routing-relevant-field error and that decline suppresses every
+// write. Each entry is therefore written by review, as a verbatim copy of
+// its v0.25.0 predecessor.
+test("every reusable contract at the v0.26.0 tag copies its v0.25.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  let asserted = 0;
+  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_25_0}`];
+    assert.ok(previous, `expected a v0.25.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_26_0}`],
+      previous,
+      `${reusable} at the v0.26.0 tag is not a verbatim copy of its v0.25.0 entry`,
+    );
+    asserted += 1;
+  }
+  assert.equal(asserted, 3);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
 // each of its pull requests while nothing was actually wrong. Assert instead
 // that the lane callers agree with each other on one revision, which is what
 // convergence means; whether that revision has a reviewed contract is already
-// proved by the three tests above that audit these same bytes against the
-// real policy.json.
+// proved by the registration tests above that audit these same bytes against
+// the real policy.json.
 test("the claude lane caller components all pin one ci-workflows revision", async () => {
   const pins = new Set();
   for (const { source, body } of await claudeLaneCallerComponents()) {
