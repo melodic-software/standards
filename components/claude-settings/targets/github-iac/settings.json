@@ -1,19 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "enabledPlugins": {
-    "biome-format@melodic-software": false,
-    "dometrain@melodic-software": false,
-    "education@melodic-software": false,
     "evals@melodic-software": false,
-    "event-storming@melodic-software": false,
-    "go-format@melodic-software": false,
     "kindle-dedrm@melodic-software": false,
-    "knowledge@melodic-software": false,
-    "miro@melodic-software": false,
-    "powershell-format@melodic-software": false,
-    "ruff-format@melodic-software": false,
-    "skill-quality@melodic-software": false,
-    "songwriting@melodic-software": false
+    "miro@melodic-software": false
   },
   "extraKnownMarketplaces": {
     "melodic-software": {
