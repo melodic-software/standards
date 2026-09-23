@@ -21,6 +21,7 @@ Agent-agnostic engineering standards that no linter can decide for you: the auth
 | [deterministic-work-execution.md](deterministic-work-execution.md) | session-time tool execution for deterministic sub-work; judgment remains human- or agent-owned |
 | [session-time-agent-output-trust.md](session-time-agent-output-trust.md) | what an undiffed mid-session agent claim owes its reader, and what the reader owes before acting |
 | [progressive-disclosure.md](progressive-disclosure.md) | layering information so a reader pays only for the depth they reach |
+| [secrets-lifecycle.md](secrets-lifecycle.md) | rotation cadence, issuer-enforced expiry, rotate-then-purge, revocation on exposure, store choice by key owner |
 | [container-supply-chain.md](container-supply-chain.md) | Dockerfile, build-context, image-scanning, artifact-identity, and runtime assurance boundaries |
 | [legacy-and-migration-debt.md](legacy-and-migration-debt.md) | describing the current form; the exposure classifier for old paths |
 | [enforceability-tiers.md](enforceability-tiers.md) | deterministic vs detect-then-judge vs reasoning-only; why this directory exists |

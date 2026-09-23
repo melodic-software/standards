@@ -4,7 +4,7 @@ Diff-time checks for the security concerns automated tooling cannot fully catch:
 
 ## Secrets and credentials
 
-- **No secrets in source**: tokens, keys, and connection strings live in environment variables or a secret store, never in code or tracked config. Watch for local-only config content leaking into a tracked file. (The Gitleaks component backstops this mechanically.)
+- **No secrets in source**: tokens, keys, and connection strings live in environment variables or a secret store, never in code or tracked config. Watch for local-only config content leaking into a tracked file. (The Gitleaks component backstops this mechanically.) Rotation, expiry, revocation, and store placement follow [secrets-lifecycle.md](../engineering/secrets-lifecycle.md).
 - **Credential-bearing inputs via environment only**: a tool that consumes credentials, cookie files, or session state reads their location from the environment or detects them at runtime; it never embeds login state in a tracked file.
 - **No personal data in logs**: personally identifiable information logged without a data-classification control is a finding; flag it for redaction.
 
