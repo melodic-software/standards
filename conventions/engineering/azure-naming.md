@@ -20,7 +20,7 @@ How Melodic Software names and tags Azure resources. Every rule below either cit
 | Subscription display name | `Melodic Software` | | Tenant, by convention | Not published | Not published |
 | Resource group | `rg-<workload>-<env>` | `rg-billing-prod` | Subscription | 1-90 | Letters, digits, underscore, hyphen, period, parentheses; cannot end with a period |
 | Key vault | `kv-melo-<consumer>-<env>` | `kv-melo-billing-prod` | Global | 3-24 | Alphanumerics and hyphens; starts with a letter; ends with a letter or digit; no consecutive hyphens |
-| Log Analytics workspace | `log-<workload>-<env>` | `log-billing-prod` | Resource group | Not carried here | Not carried here |
+| Log Analytics workspace | `log-<workload>-<env>` | `log-billing-prod` | Resource group | 4-63 | Alphanumerics and hyphens; starts and ends with an alphanumeric |
 | Storage account | `stmelo<workload>` or `stmelo<workload><nnn>` | `stmeloreports001` | Global | 3-24 | Lowercase letters and digits only |
 | Blob container | `<workload>` or `<workload>-<nnn>` | `invoices` | Storage account | 3-63 | Lowercase letters, digits, hyphens; starts with a lowercase letter or digit; no consecutive hyphens |
 
@@ -34,12 +34,11 @@ Sources for that table:
   abbreviation. That page carries no subscription row and no blob-container row, so those two
   patterns are judgment.
 - Per-type length, character set and uniqueness scope:
-  <https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules>.
-  Length and character limits for a subscription display name are not published on any Microsoft
-  page located, so treat a plain ASCII phrase as the safe shape (judgment).
-- Log Analytics workspace length and character set were not established against a primary source;
-  the pattern follows the delimiter and abbreviation rules and the limits are left unstated rather
-  than guessed (judgment).
+  <https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules>,
+  verified 2026-09-23; recheck before creating a resource of a type in this table, since Azure
+  enforces the current limits at creation. Length and character limits for a subscription display
+  name are not published on any Microsoft page located, so treat a plain ASCII phrase as the safe
+  shape (judgment).
 
 ### The hyphen rule
 
