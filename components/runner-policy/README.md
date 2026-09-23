@@ -951,6 +951,15 @@ comments. `reusableWorkflowSecuritySurfacesMatch` returns `unchanged: true` for
 `diffField: credentialReferences` for `claude-review`, and throws the standing
 `needs` decline for `standards-sync`. These entries are therefore written by
 review.
+The same seven paths are registered at the v0.27.1 tag
+`4610c31e92eb1c4b24981e2f200ac87bdb2a1753`, each a verbatim copy of its v0.27.0
+entry. The only change between the tags is ci-workflows' internal self-pins:
+`checks.yml` moves its thirteen composite pins from v0.24.0 to v0.27.0, and
+`claude-review.yml` and `claude-security-review.yml` move their
+`claude-lane-freshness`, `claude-lane-outcome` and `claude-lane-marker-comment`
+pins to v0.27.0. No `workflow_call` input, secret, permission, `runs-on` or
+`needs` field moved. `standards-sync`, `zizmor`, `osv-scanner` and
+`issue-triage-label` are byte-identical to v0.27.0. Nothing widens.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
