@@ -39,7 +39,7 @@ Diff-time checks for latent failure modes: changes that pass review and testing 
 - **vs `messaging.md`**: broker delivery semantics, dead-lettering, and poison-message disposition live there; this file owns growth-boundedness of any queue.
 - **vs `multi-tenancy.md`**: multi-tenancy owns per-tenant fairness controls (rate limits, quotas, concurrency caps) that stop one tenant exhausting a shared resource, and the completeness of a tenant's deletion and retention path across stores. This file owns system-wide growth, quota, and retention hazards that are not tenant-attributable.
 - **vs `performance.md`**: performance owns the cost of the hot path at today's volume; this file owns what degrades only with growth, age, or lifecycle events.
-- **vs `security.md`**: cryptographic strength, secret storage, and trust boundaries live there; this file owns the expiry-and-rotation timing of credentials as a lifecycle hazard.
+- **vs `security.md`**: cryptographic strength, secret storage, and trust boundaries live there; this file owns the expiry-and-rotation timing of credentials as a diff-time lifecycle hazard. Operational rotation cadence, revocation, and store placement are owned by [`../engineering/secrets-lifecycle.md`](../engineering/secrets-lifecycle.md).
 - **vs `observability.md`**: alert and telemetry design lives there; this file flags only the diff-shaped absence of a validity or completion signal where a bar above requires one.
 
 ## Sources
