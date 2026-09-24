@@ -107,8 +107,8 @@ components:
   # component sourced from `components/claude-lanes/`, selector-using or not,
   # so a hosted-only component in that directory still fails the build.
   #
-  # The security lane has no path gating from ci-workflows v0.29.0: every
-  # non-draft PR is reviewed, and a target's `.github/claude-security-paths`
+  # The security lane has no path gating from ci-workflows v0.29.0: it reviews
+  # every non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths`
   # file is no longer read. The manifest never synced that file, so a target
   # removes its copy in a repo-local PR if it wants to.
   #

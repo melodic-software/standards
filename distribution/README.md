@@ -364,8 +364,8 @@ What stays consumer-owned:
   list and its status. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob but is
   not one of them; it is the observer key named above and it stays.
 
-The security lane has no path gating from ci-workflows v0.29.0: every
-non-draft PR is reviewed and a target's `.github/claude-security-paths` file is
+The security lane has no path gating from ci-workflows v0.29.0: it reviews every
+non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths` file is
 no longer read. The manifest never managed that file.
 
 The two callers deliberately carry different concurrency values (per-PR
