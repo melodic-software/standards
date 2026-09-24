@@ -114,7 +114,9 @@ jobs:
       timeout-minutes: 15
       # Zero disables the reusable's per-PR review cap (default 5), which
       # otherwise stops reviewing a PR silently after its fifth reviewed push.
-      # The per-PR cancel group above bounds the spend instead.
+      # The review count per PR is now unbounded: the per-PR cancel group
+      # above only retires a superseded in-flight run, and `timeout-minutes`
+      # is the only per-run cost limit.
       max-reviews-per-pr: 0
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
