@@ -960,6 +960,18 @@ entry. The only change between the tags is ci-workflows' internal self-pins:
 pins to v0.27.0. No `workflow_call` input, secret, permission, `runs-on` or
 `needs` field moved. `standards-sync`, `zizmor`, `osv-scanner` and
 `issue-triage-label` are byte-identical to v0.27.0. Nothing widens.
+`claude-review` and `claude-security-review` are registered at the v0.28.0 tag
+`39390344a0fef0671d3e5a7546dd03af7a36b8f5`, copied from their v0.27.1 entries
+with `allowedInputs` widened; the other five paths stay on v0.27.1. The only
+change between the tags in either file is ci-workflows#620: a boolean
+`status-check` input (default false) that adds one job needing the review job,
+running on the caller's `runner` with `permissions: {}`, no secret, and the
+review's declared outputs passed through `env:`; plus comment and canonical
+caller prose. No secret, caller permission or `runs-on` routing moved. Both
+contracts admit `status-check`. The review contract also admits
+`max-reviews-per-pr`, a spend cap present since earlier releases that
+claude-code-plugins sets to 0 so every push is reviewed. These entries are
+written by review because the input set changed.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
