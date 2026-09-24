@@ -31,6 +31,8 @@ const REPINE_LANE_SHA_V0_25_0 = "91d06c94d733e5daa507e0afaa06a140bb46d337";
 const REPINE_LANE_SHA_V0_26_0 = "de644a0a80d78096a9f6074710f913eed13c9a91";
 const REPINE_LANE_SHA_V0_27_0 = "ac062650c46005edb4787aff378347746bf63804";
 const REPINE_LANE_SHA_V0_27_1 = "4610c31e92eb1c4b24981e2f200ac87bdb2a1753";
+const REPINE_LANE_SHA_V0_28_0 = "39390344a0fef0671d3e5a7546dd03af7a36b8f5";
+const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8294,6 +8296,22 @@ test("every reusable contract at the v0.27.1 tag copies its v0.27.0 entry forwar
       contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_27_1}`],
       previous,
       `${reusable} at the v0.27.1 tag is not a verbatim copy of its v0.27.0 entry`,
+    );
+  }
+});
+
+// v0.28.1 changes only claude-review's behavior under a disabled review cap;
+// both lane contracts copy v0.28.0 forward.
+test("both claude lane contracts at the v0.28.1 tag copy their v0.28.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  for (const reusable of ["claude-review", "claude-security-review"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_0}`];
+    assert.ok(previous, `expected a v0.28.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`],
+      previous,
+      `${reusable} at the v0.28.1 tag is not a verbatim copy of its v0.28.0 entry`,
     );
   }
 });
