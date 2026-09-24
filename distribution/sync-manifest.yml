@@ -107,11 +107,10 @@ components:
   # component sourced from `components/claude-lanes/`, selector-using or not,
   # so a hosted-only component in that directory still fails the build.
   #
-  # The security caller reads the repo-owned `.github/claude-security-paths`
-  # pattern file (absent = fail-open: every PR reviewed). That file is
-  # deliberately NOT sync-managed, and the manifest has no seed-once
-  # mechanism, so a new adopter commits its starter list via a repo-local PR
-  # at adoption time.
+  # The security lane has no path gating from ci-workflows v0.29.0: every
+  # non-draft PR is reviewed, and a target's `.github/claude-security-paths`
+  # file is no longer read. The manifest never synced that file, so a target
+  # removes its copy in a repo-local PR if it wants to.
   #
   # `claude-security-review-caller` is managed for private adopters (see
   # `provisioning` below). Public/shared-shape unpark is still blocked: a

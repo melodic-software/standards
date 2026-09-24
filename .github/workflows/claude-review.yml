@@ -3,7 +3,7 @@ name: claude-review
 # Automated PR code review via the ci-workflows reusable workflow. The caller
 # owns the triggers + GITHUB_TOKEN permission grant (a called workflow can only
 # downgrade them, never elevate); the reusable workflow owns the action pin, the
-# model, the cadence guards, the kill-switches, and the secret-handling model.
+# model, and the secret-handling model.
 #
 # Repo-local rather than the sync-managed `claude-review-caller` component
 # (melodic-software/standards, components/claude-lanes/claude-review.yml): this
@@ -11,29 +11,25 @@ name: claude-review
 # except where a documented constraint forces a deviation — see the trigger,
 # concurrency, and runner notes below.
 #
-# Fork PRs receive no secrets and a read-only token, so they are simply not
-# reviewed by design (no token-exfiltration surface).
+# The reusable skips drafts, fork PRs (they receive no secrets and a read-only
+# token) and every `[bot]` actor, so none of them is reviewed by design.
 
 on:
   pull_request:
     # `synchronize` reviews every push, including the push that resolves a
     # merge conflict, matching components/claude-lanes/claude-review.yml:
     # GitHub runs no pull_request workflow while a PR conflicts with its base.
-    # The reusable's `max-reviews-per-pr` (default 5) caps reviewed pushes.
     #
     # Re-running the job does NOT review a newer head: a re-run replays the
-    # ORIGINAL event payload, so the reusable's freshness guard retires it as
-    # superseded. Push, reopen, or mark the PR draft and ready again.
+    # ORIGINAL event payload. Push, reopen, or mark the PR draft and ready
+    # again.
     types: [opened, synchronize, ready_for_review, reopened]
 
 permissions:
   contents: read
 
 # Per-PR supersede group: a newer event for the same PR cancels the older run,
-# so a rapid open→ready→reopen burst spends one review, not several. Distinct
-# by construction from the reusable's inner job-level group, which appends the
-# head SHA (`claude-review-<PR>-<headSHA>`), so no caller/inner same-name
-# deadlock is possible.
+# so a rapid open→ready→reopen burst spends one review, not several.
 #
 # The `${{ github.workflow }}`-prefixed canonical group is what this
 # repository's own `concurrency-policy` component requires
@@ -60,7 +56,7 @@ jobs:
     concurrency:
       group: claude-review-${{ github.repository }}
       queue: max
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@6567856ef6070a4a1c9c2691f610278a7f2de153 # v0.29.0
     with:
       # DEVIATION from the component, which resolves the runner through the
       # governed selector: this repository is PUBLIC, and runner-policy admits
@@ -69,10 +65,6 @@ jobs:
       # repositories not enrolled for local CI cannot call the selector"), so
       # this caller pins the approved hosted label directly.
       runner: ubuntu-24.04
-      # No `skip-actors`: the reusable's default carries the self-trigger ban
-      # (Claude and the org's automation bots must never trigger their own
-      # lanes). Passing the input would override that default and freeze this
-      # lane's ban list at whatever was current when it was written.
     # Pass only the one named secret (least privilege) rather than `secrets:
     # inherit`, which would forward every parent secret to the called workflow.
     secrets:

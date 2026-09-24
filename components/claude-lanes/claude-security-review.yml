@@ -10,27 +10,19 @@ name: claude-security-review
 #
 # Thin caller for the org's reusable security-review lane (advisory verdict,
 # fail-closed execution check). The reusable workflow owns the action pin,
-# model, relevance gate, retry, kill-switches, and the secret-handling model;
-# per its CONSUMER CONTRACT header, this caller owns the triggers and the
-# GITHUB_TOKEN permission grant.
+# model, and the secret-handling model; per its header, this caller owns the
+# triggers, concurrency, and the GITHUB_TOKEN permission grant.
 #
-# PATHS-FILE CONVENTION: the consuming repo owns `.github/claude-security-paths`
-# — root-anchored gitignore patterns, one per line, matched via `git
-# check-ignore` (`#` comments and blank lines ignored). Hard-errors on `!`,
-# `?`, or `+`. Names that repo's security-sensitive surfaces. The
-# reusable reads it from the PR's BASE branch, never the head. An ABSENT file
-# FAILS OPEN: every PR is security-reviewed until the repo commits one. The
-# file is repo-owned tuning and is deliberately NOT sync-managed.
+# There is no path gating: every non-draft same-repository PR is
+# security-reviewed. A `.github/claude-security-paths` file is no longer read.
 #
 # NEVER add workflow-level `paths:`/`paths-ignore:` to this caller: a
 # required check whose workflow never triggers stays Pending forever and
-# wedges every out-of-scope PR. The reusable's `changes` job owns relevance
-# and reports a name-stable SKIPPED check instead, which a ruleset reads as
-# success.
+# wedges every out-of-scope PR.
 #
-# Fork PRs receive no secrets and a read-only token, so they are simply not
-# reviewed by design; a required check does NOT prove a fork PR was reviewed
-# (see the reusable's header).
+# The reusable skips fork PRs (they receive no secrets and a read-only token)
+# and every `[bot]` actor; a required check does NOT prove a fork PR was
+# reviewed (see the reusable's header).
 #
 # RUNNER PLACEMENT: this component names the governed managed fleet review
 # label directly, for the same reason and under the same inventory constraint
@@ -40,9 +32,7 @@ on:
   pull_request:
     # `synchronize`, matching the code-review lane: every push is reviewed,
     # including the push that resolves a merge conflict (GitHub runs no
-    # pull_request workflow while a PR conflicts with its base). After a
-    # successful review the reusable skips later pushes whose incremental
-    # delta touches no security-relevant path (ci-workflows#259). The check
+    # pull_request workflow while a PR conflicts with its base). The check
     # stays advisory: github-iac ADR 0011 forbids any organization ruleset
     # from making an agentic review a merge or deployment prerequisite. With
     # the per-PR group below not cancelling, pushes during a review queue at
@@ -72,11 +62,6 @@ jobs:
   security-review:
     # A draft is work in progress and does not spend a review; the
     # ready_for_review trigger above is what delivers one when it is ready.
-    # No event guard, unlike the code-review caller: this lane has no
-    # workflow_dispatch trigger, so `pull_request` is the only event that can
-    # start it and `github.event.pull_request` is always present. Adding a
-    # dispatch trigger here would mean adding the guard with it, because a
-    # dispatched run has no pull-request payload to read a draft flag from.
     if: github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
@@ -87,15 +72,9 @@ jobs:
     concurrency:
       group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@cc0462990687534e9597de9e00ab89d3dcca61d2 # v0.28.1
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@6567856ef6070a4a1c9c2691f610278a7f2de153 # v0.29.0
     with:
       runner: melodic-review-ubuntu-24.04-x64
-      paths-file: .github/claude-security-paths
-    # No `timeout-minutes`: the reusable exposes no such input at this pin or
-    # at `main`, so the lane keeps the reusable's own job budget. No
-    # `pr-number` either: it is not in this contract's reviewed input list.
-    # Both are ci-workflows work items, not caller edits.
-    #
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
     # called workflow.
