@@ -8,13 +8,13 @@ name: claude-review
 # component to `locally-owned` in the manifest to customize.
 #
 # Thin caller for the org's reusable code-review lane. The reusable workflow
-# owns the action pin, model, cadence guards, retry, kill-switches, and the
-# secret-handling model; per its CONSUMER CONTRACT header, this caller owns
-# the triggers and the GITHUB_TOKEN permission grant (a called workflow can
-# only downgrade the caller's grant, never elevate it).
+# owns the action pin, model, and the secret-handling model; per its header,
+# this caller owns the triggers, concurrency, and the GITHUB_TOKEN permission
+# grant (a called workflow can only downgrade the caller's grant, never
+# elevate it).
 #
-# Fork PRs receive no secrets and a read-only token, so they are simply not
-# reviewed by design (no token-exfiltration surface).
+# The reusable skips fork PRs (they receive no secrets and a read-only token)
+# and every `[bot]` actor, so neither is reviewed by design.
 #
 # RUNNER PLACEMENT: this component names the governed managed fleet review
 # label directly. Every target that manages it is a private repository
@@ -36,42 +36,27 @@ on:
     # `synchronize` reviews every push, including the push that resolves a
     # merge conflict: GitHub runs no pull_request workflow while a PR
     # conflicts with its base, so a once-per-PR trigger set silently skipped
-    # any PR that conflicted when it opened. The job below sets
-    # `max-reviews-per-pr: 0` so no push goes unreviewed past a cap.
+    # any PR that conflicted when it opened.
     #
     # Re-running the job does NOT review a newer head: a re-run replays the
-    # ORIGINAL event payload, so the reusable's freshness guard retires it as
-    # superseded. Push, or dispatch this workflow with the PR number.
+    # ORIGINAL event payload. Push to review the current head.
     types: [opened, synchronize, ready_for_review, reopened]
-  workflow_dispatch:
-    inputs:
-      pr-number:
-        description: Pull request number to re-review
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 # Per-PR supersede group: a newer event for the same PR, a push included,
-# cancels the older run, so per-push reviews do not stack. Distinct
-# by construction from the reusable's inner job-level group (which appends the
-# head SHA: claude-review-<PR>-<headSHA>), so a caller/inner same-name
-# concurrency deadlock, real under a pre-v0.9.0 reusable whose inner group
-# was claude-review-<PR> exactly, cannot recur. A skipped actor's same-PR
-# event can cancel an in-flight review through this group; that is accepted:
-# with `synchronize`, the cancelled review was of a head the new event has
-# already superseded. This value is per-LANE and deliberate: the security
-# caller does not copy it (see its own concurrency note).
+# cancels the older run, so per-push reviews do not stack. A skipped actor's
+# same-PR event can cancel an in-flight review through this group; that is
+# accepted: with `synchronize`, the cancelled review was of a head the new
+# event has already superseded. This value is per-LANE and deliberate: the
+# security caller does not copy it (see its own concurrency note).
 #
 # The group is the `${{ github.workflow }}`-prefixed canonical form the
 # standards `concurrency-policy` component requires, so a target enforcing
-# that policy passes without an exemption. Because this workflow is named
-# `claude-review`, the prefixed form and a literal `claude-review-${{ … }}`
-# resolve to the identical runtime group, so distinctness from the
-# reusable's inner per-(PR,head) group is preserved either way. A file whose
-# header says downstream edits are overwritten cannot ask its consumers to
-# normalize it themselves.
+# that policy passes without an exemption. A file whose header says
+# downstream edits are overwritten cannot ask its consumers to normalize it
+# themselves.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -79,14 +64,11 @@ concurrency:
 jobs:
   review:
     # A draft is work in progress and does not spend a review; the
-    # ready_for_review trigger above is what delivers one when it is ready. The
-    # event_name clause is load-bearing: a dispatched run has no
-    # `github.event.pull_request` at all, so a bare draft comparison would
-    # never run the review the operator asked for.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # ready_for_review trigger above is what delivers one when it is ready.
+    if: github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
-      pull-requests: write   # post review + track_progress tracking comment
+      pull-requests: write   # post review + tracking comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
     # Repo-wide review queue: a SEPARATE block from the workflow-level
@@ -99,25 +81,9 @@ jobs:
     concurrency:
       group: claude-review-${{ github.repository }}
       queue: max
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@cc0462990687534e9597de9e00ab89d3dcca61d2 # v0.28.1
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@6567856ef6070a4a1c9c2691f610278a7f2de153 # v0.29.0
     with:
       runner: melodic-review-ubuntu-24.04-x64
-      # Empty on a pull_request event, where the payload supplies the number
-      # and head SHA; on a dispatch it is the number the operator typed, and
-      # the reusable resolves the live head from the API.
-      pr-number: ${{ inputs.pr-number }}
-      # Below the reusable's own 30-minute default, which is sized for two
-      # 11-minute attempts plus backoff. This lane is advisory and its runs are
-      # among the largest single lines in a consumer's Actions bill, so it is
-      # capped: a review that has not landed in fifteen minutes is retired
-      # rather than paid for.
-      timeout-minutes: 15
-      # Zero disables the reusable's per-PR review cap (default 5), which
-      # otherwise stops reviewing a PR silently after its fifth reviewed push.
-      # The review count per PR is now unbounded: the per-PR cancel group
-      # above only retires a superseded in-flight run, and `timeout-minutes`
-      # is the only per-run cost limit.
-      max-reviews-per-pr: 0
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
     # called workflow.

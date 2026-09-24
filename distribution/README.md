@@ -355,13 +355,6 @@ in `ci-workflows`; only the caller files are managed bytes.
 
 What stays consumer-owned:
 
-- `.github/claude-security-paths`: the security lane's pattern file naming
-  the repo's security-sensitive surfaces, read by the reusable from the PR's
-  base branch. It is repo-specific tuning, so it is deliberately not a
-  managed file; an absent file fails open (every PR is security-reviewed).
-  The manifest has no seed-once mechanism, so a new adopter commits its
-  starter list in a repo-local PR alongside (or before) its caller
-  materialization PR.
 - The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
   runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
   no longer read by anything, because the selector that consumed them is deleted
@@ -370,6 +363,10 @@ What stays consumer-owned:
   apply. github-iac's `README.md` "Local CI routing governance" owns the exact
   list and its status. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob but is
   not one of them; it is the observer key named above and it stays.
+
+The security lane has no path gating from ci-workflows v0.29.0: it reviews every
+non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths` file is
+no longer read. The manifest never managed that file.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel plus a repo-wide queue on the code-review caller; cancel disabled and

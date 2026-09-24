@@ -33,6 +33,7 @@ const REPINE_LANE_SHA_V0_27_0 = "ac062650c46005edb4787aff378347746bf63804";
 const REPINE_LANE_SHA_V0_27_1 = "4610c31e92eb1c4b24981e2f200ac87bdb2a1753";
 const REPINE_LANE_SHA_V0_28_0 = "39390344a0fef0671d3e5a7546dd03af7a36b8f5";
 const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
+const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8312,6 +8313,21 @@ test("both claude lane contracts at the v0.28.1 tag copy their v0.28.0 entry for
       contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`],
       previous,
       `${reusable} at the v0.28.1 tag is not a verbatim copy of its v0.28.0 entry`,
+    );
+  }
+});
+
+// v0.29.0 slims both lanes to one caller-passed input; only allowedInputs narrows.
+test("both claude lane contracts at the v0.29.0 tag narrow their v0.28.1 entry to the runner input", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  for (const reusable of ["claude-review", "claude-security-review"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`];
+    assert.ok(previous, `expected a v0.28.1 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_0}`],
+      { ...previous, allowedInputs: ["runner"] },
+      `${reusable} at the v0.29.0 tag must equal its v0.28.1 entry except allowedInputs ["runner"]`,
     );
   }
 });

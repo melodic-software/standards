@@ -981,6 +981,15 @@ review-count comment. The input set is unchanged; only the
 `max-reviews-per-pr` description moved, which is why the repin lane declined
 to copy the entries forward. No secret, caller permission or `runs-on` routing
 moved. `claude-security-review` is byte-identical to v0.28.0.
+Both lanes are also registered at the v0.29.0 tag
+`6567856ef6070a4a1c9c2691f610278a7f2de153`, copied from their v0.28.1
+entries with `allowedInputs` narrowed to `runner`. ci-workflows#622 slimmed
+both reusables to the inputs `runner`, `plugins`, `plugin-marketplaces`,
+`plugin-command`, `claude-args` and `exclude-comments-by-actor`, removing
+`pr-number`, `timeout-minutes`, `max-reviews-per-pr`, `status-check`,
+`skip-actors`, `paths-file` and the other cadence, retry and dispatch inputs;
+`runner` is the only input any lane caller passes now, so it is the only one
+admitted. No secret, caller permission or `runs-on` routing moved.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
