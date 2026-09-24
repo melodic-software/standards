@@ -973,6 +973,14 @@ contracts admit `status-check`. The review contract also admits
 claude-code-plugins and the `claude-lanes` caller component set to 0 so every
 push is reviewed. These entries are
 written by review because the input set changed.
+Both lanes are also registered at the v0.28.1 tag
+`cc0462990687534e9597de9e00ab89d3dcca61d2`, verbatim copies of their v0.28.0
+entries. The only change between the tags is ci-workflows#621: with
+`max-reviews-per-pr` at 0 or less, the review lane no longer reads or posts its
+review-count comment. The input set is unchanged; only the
+`max-reviews-per-pr` description moved, which is why the repin lane declined
+to copy the entries forward. No secret, caller permission or `runs-on` routing
+moved. `claude-security-review` is byte-identical to v0.28.0.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
