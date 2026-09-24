@@ -16,18 +16,15 @@ name: claude-review
 
 on:
   pull_request:
-    # No `synchronize`: this lane reviews on open/ready/reopen only, which
-    # cuts per-PR spend on active branches. The security lane, whose check
-    # certifies execution against the head, keeps `synchronize`.
+    # `synchronize` reviews every push, including the push that resolves a
+    # merge conflict, matching components/claude-lanes/claude-review.yml:
+    # GitHub runs no pull_request workflow while a PR conflicts with its base.
+    # The reusable's `max-reviews-per-pr` (default 5) caps reviewed pushes.
     #
-    # Re-running the job does NOT get a fresh review after a push: a re-run
-    # replays the ORIGINAL event payload, so the reusable's freshness guard —
-    # it compares the payload's `pull_request.head.sha` against the live
-    # head — retires the run as superseded and every review step skips.
-    # Re-running only helps when the head has not moved. To review a newer
-    # head, reopen the PR, or mark it draft and ready again: either emits a
-    # fresh event at the current head.
-    types: [opened, ready_for_review, reopened]
+    # Re-running the job does NOT review a newer head: a re-run replays the
+    # ORIGINAL event payload, so the reusable's freshness guard retires it as
+    # superseded. Push, reopen, or mark the PR draft and ready again.
+    types: [opened, synchronize, ready_for_review, reopened]
 
 permissions:
   contents: read
