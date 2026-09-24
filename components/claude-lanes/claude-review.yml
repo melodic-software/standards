@@ -33,17 +33,16 @@ name: claude-review
 
 on:
   pull_request:
-    # No `synchronize`: this lane reviews on open/ready/reopen only, which
-    # cuts per-PR spend on active branches.
+    # `synchronize` reviews every push, including the push that resolves a
+    # merge conflict: GitHub runs no pull_request workflow while a PR
+    # conflicts with its base, so a once-per-PR trigger set silently skipped
+    # any PR that conflicted when it opened. The reusable's
+    # `max-reviews-per-pr` (default 5) still caps reviewed pushes per PR.
     #
-    # Re-running the job does NOT get a fresh review after a push: a re-run
-    # replays the ORIGINAL event payload, so the reusable's freshness guard
-    # (it compares the payload's `pull_request.head.sha` against the live
-    # head) retires the run as superseded and every review step skips.
-    # Re-running only helps when the head has not moved. To review a newer
-    # head: reopen the PR, mark it draft and ready again, or dispatch this
-    # workflow with the PR number.
-    types: [opened, ready_for_review, reopened]
+    # Re-running the job does NOT review a newer head: a re-run replays the
+    # ORIGINAL event payload, so the reusable's freshness guard retires it as
+    # superseded. Push, or dispatch this workflow with the PR number.
+    types: [opened, synchronize, ready_for_review, reopened]
   workflow_dispatch:
     inputs:
       pr-number:
@@ -54,17 +53,16 @@ on:
 permissions:
   contents: read
 
-# Per-PR supersede group: a newer event for the same PR cancels the older run,
-# so a rapid open, ready, reopen burst spends one review, not several. Distinct
+# Per-PR supersede group: a newer event for the same PR, a push included,
+# cancels the older run, so per-push reviews do not stack. Distinct
 # by construction from the reusable's inner job-level group (which appends the
 # head SHA: claude-review-<PR>-<headSHA>), so a caller/inner same-name
 # concurrency deadlock, real under a pre-v0.9.0 reusable whose inner group
 # was claude-review-<PR> exactly, cannot recur. A skipped actor's same-PR
-# event can cancel an in-flight review through this group; that is accepted
-# as bounded: with no `synchronize` trigger, same-PR events are rare and
-# human-driven. This value is per-LANE and deliberate: the security caller
-# must NOT copy it (canceling a REQUIRED check is not a skip and does not
-# read success).
+# event can cancel an in-flight review through this group; that is accepted:
+# with `synchronize`, the cancelled review was of a head the new event has
+# already superseded. This value is per-LANE and deliberate: the security
+# caller does not copy it (see its own concurrency note).
 #
 # The group is the `${{ github.workflow }}`-prefixed canonical form the
 # standards `concurrency-policy` component requires, so a target enforcing
