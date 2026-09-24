@@ -970,7 +970,8 @@ review's declared outputs passed through `env:`; plus comment and canonical
 caller prose. No secret, caller permission or `runs-on` routing moved. Both
 contracts admit `status-check`. The review contract also admits
 `max-reviews-per-pr`, a spend cap present since earlier releases that
-claude-code-plugins sets to 0 so every push is reviewed. These entries are
+claude-code-plugins and the `claude-lanes` caller component set to 0 so every
+push is reviewed. These entries are
 written by review because the input set changed.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so

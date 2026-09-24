@@ -36,8 +36,8 @@ on:
     # `synchronize` reviews every push, including the push that resolves a
     # merge conflict: GitHub runs no pull_request workflow while a PR
     # conflicts with its base, so a once-per-PR trigger set silently skipped
-    # any PR that conflicted when it opened. The reusable's
-    # `max-reviews-per-pr` (default 5) still caps reviewed pushes per PR.
+    # any PR that conflicted when it opened. The job below sets
+    # `max-reviews-per-pr: 0` so no push goes unreviewed past a cap.
     #
     # Re-running the job does NOT review a newer head: a re-run replays the
     # ORIGINAL event payload, so the reusable's freshness guard retires it as
@@ -99,7 +99,7 @@ jobs:
     concurrency:
       group: claude-review-${{ github.repository }}
       queue: max
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@39390344a0fef0671d3e5a7546dd03af7a36b8f5 # v0.28.0
     with:
       runner: melodic-review-ubuntu-24.04-x64
       # Empty on a pull_request event, where the payload supplies the number
@@ -112,6 +112,12 @@ jobs:
       # capped: a review that has not landed in fifteen minutes is retired
       # rather than paid for.
       timeout-minutes: 15
+      # Zero disables the reusable's per-PR review cap (default 5), which
+      # otherwise stops reviewing a PR silently after its fifth reviewed push.
+      # The review count per PR is now unbounded: the per-PR cancel group
+      # above only retires a superseded in-flight run, and `timeout-minutes`
+      # is the only per-run cost limit.
+      max-reviews-per-pr: 0
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
     # called workflow.
