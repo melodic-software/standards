@@ -27,6 +27,7 @@
     "test:dependabot-policy": "node --test components/dependabot-policy/dependabot-policy.test.mjs",
     "test:pr-convention-lockstep": "node --test components/pr-convention-policy/lockstep-drift.test.mjs",
     "test:pr-convention-policy": "node --test components/pr-convention-policy/pr-convention-policy.test.mjs",
+    "test:mcp-launcher": "node --test components/mcp-launcher/launcher.test.mjs",
     "test:lefthook-dotnet": "node --test components/lefthook-dotnet/dotnet-format-staged.test.mjs",
     "test:packages": "node --test harness/packages/package-lifecycle.test.mjs",
     "test:runner-policy": "node --test components/runner-policy/runner-policy.test.mjs"
