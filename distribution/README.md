@@ -406,7 +406,7 @@ public consumer".
 Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
 component across both visibilities (#377). That path also needs a cross-repo
-reusable routing kind in runner-policy, a deliberate narrowing of the blanket
+reusable routing kind in runner-policy and a deliberate narrowing of the blanket
 public-target test for `components/claude-lanes/`. claude-code-plugins'
 callers no longer carry a repo-owned evidence guard or `skip-actors` (removed
 with ci-workflows v0.29.0), so nothing else of theirs blocks the move.
