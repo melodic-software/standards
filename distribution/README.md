@@ -384,9 +384,9 @@ fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
 differently for each lane:
 
-- Both components are `managed` for every private target (claude-code-proxy,
-  dotfiles, github-iac, medley, provisioning), so every PR there gets both
-  advisory lanes. The public repos running a security lane today,
+- Both components are `managed` for the private targets dotfiles, github-iac,
+  medley and provisioning, and `locally-owned` for claude-code-proxy (see its
+  manifest note), so every PR there gets both advisory lanes. The public repos running a security lane today,
   `claude-code-plugins` and `ci-workflows`, remain ineligible for the
   fleet-routed shape.
 

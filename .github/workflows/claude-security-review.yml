@@ -7,7 +7,7 @@ name: claude-security-review
 # Repo-local rather than the sync-managed `claude-security-review-caller`
 # component (components/claude-lanes/claude-security-review.yml): this
 # repository is the manifest SOURCE, not a sync target. It tracks that
-# component except for the concurrency and runner notes below.
+# component except for the runner note below.
 #
 # Every non-draft same-repository PR is reviewed; the reusable skips fork PRs
 # (they receive no secrets and a read-only token) and every `[bot]` actor.
@@ -24,13 +24,9 @@ on:
 permissions:
   contents: read
 
-# DEVIATION from the component, which keeps a no-cancel job-level group in
-# case a ruleset ever reads its check: this repository's `concurrency-policy`
-# lane requires the canonical top-level block, and the check here is advisory,
-# so a newer push superseding an in-flight review voids nothing required.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+# No top-level concurrency block, as in the component: a security review is
+# never cancelled. The `delegated-job-level` exception in
+# .github/concurrency-policy.json waives the canonical block.
 
 jobs:
   security-review:
@@ -41,6 +37,10 @@ jobs:
       pull-requests: write   # post the security review + tracking comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
+    # Per-PR serialization without cancellation.
+    concurrency:
+      group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: false
     uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@6567856ef6070a4a1c9c2691f610278a7f2de153 # v0.29.0
     with:
       # DEVIATION from the component, which names the managed fleet label:
