@@ -114,8 +114,9 @@ components:
   # file is no longer read. The manifest never synced that file, so a target
   # removes its copy in a repo-local PR if it wants to.
   #
-  # `claude-security-review-caller` is managed for private adopters (see
-  # `provisioning` below). Public/shared-shape unpark is still blocked: a
+  # `claude-security-review-caller` is managed for the private adopters
+  # dotfiles, github-iac, medley and provisioning (their target blocks
+  # below). Public/shared-shape unpark is still blocked: a
   # caller that resolves its runner through the governed selector is rejected
   # outright on a public repository — runner-policy admits the selector only
   # for a private self-hosted consumer, consulting neither `exceptions` nor
