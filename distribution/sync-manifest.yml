@@ -261,6 +261,14 @@ components:
   markdownlint-home:
     files:
       components/markdownlint/home/.markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
+  # Project MCP stdio entry with --vault key resolution
+  # (components/mcp-launcher/README.md). The tests and stubs stay upstream.
+  mcp-launcher:
+    requires:
+      - node-runtime
+    files:
+      components/mcp-launcher/dispatch.js: tools/mcp-launcher/dispatch.js
+      components/mcp-launcher/launcher.js: tools/mcp-launcher/launcher.js
   node-runtime:
     files:
       .node-version: .node-version
@@ -637,6 +645,10 @@ targets:
       # wrapper.
       - comment-hygiene-tools
       - lychee
+      # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
+      # --vault the behavior is unchanged, and medley's *-dispatch.test.sh
+      # suites pass against these files.
+      - mcp-launcher
       - node-runtime
       - path-detection-tools
       - pr-body-contract-rule

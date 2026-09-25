@@ -548,7 +548,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/biome@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
         with:
           config: components/biome/biome.json
-          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/runner-policy distribution harness/packages
+          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/mcp-launcher components/runner-policy distribution harness/packages
 
   tsc:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -913,6 +913,24 @@ jobs:
           components/cloud-bootstrap/cloud-bootstrap.test.sh
           .cursor/install.test.sh
 
+  mcp-launcher:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - name: Launcher --vault tests
+        run: node --test components/mcp-launcher/launcher.test.mjs
+
   distribution:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
@@ -1231,6 +1249,7 @@ jobs:
       - dotnet-fixtures
       - harness
       - cloud-environment
+      - mcp-launcher
       - distribution
       - plugin-seed-drift
       - lefthook

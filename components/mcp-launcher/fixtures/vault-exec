@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+// Test double for ~/.local/bin/vault-exec: same argv contract, no vault.
+// Appends its argv to $STUB_VAULT_LOG, sets each NAME to `stub-<secret>`
+// (or leaves it unset when STUB_VAULT_MODE=empty, like an --optional miss),
+// then runs the command with stdio inherited and exits with its code.
+// A nested call exits 99 at once, so a broken loop guard fails fast
+// instead of recursing.
+const fs = require("node:fs");
+const { spawnSync } = require("node:child_process");
+
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.STUB_VAULT_LOG, `${args.join(" ")}\n`);
+if (process.env.STUB_VAULT_DEPTH) process.exit(99);
+const split = args.indexOf("--");
+const env = { ...process.env, STUB_VAULT_DEPTH: "1" };
+args.slice(0, split).forEach((arg, i, head) => {
+  if (arg !== "--env") return;
+  const [name, secret] = head[i + 1].split("=");
+  if (process.env.STUB_VAULT_MODE === "empty") {
+    delete env[name];
+    process.stderr.write(`vault-exec: ${name} not set: stub; starting without it\n`);
+  } else {
+    env[name] = `stub-${secret}`;
+  }
+});
+const [command, ...rest] = args.slice(split + 1);
+process.exit(spawnSync(command, rest, { stdio: "inherit", env }).status ?? 1);
