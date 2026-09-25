@@ -990,6 +990,15 @@ both reusables to the inputs `runner`, `plugins`, `plugin-marketplaces`,
 `skip-actors`, `paths-file` and the other cadence, retry and dispatch inputs;
 `runner` is the only input any lane caller passes now, so it is the only one
 admitted. No secret, caller permission or `runs-on` routing moved.
+Both lanes and `standards-sync` are also registered at the v0.29.1 tag
+`0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9`, verbatim copies of their v0.29.0
+(lanes) and v0.27.1 (`standards-sync`) entries. ci-workflows#625 appends a
+`Skill(<plugin-command>)` grant to the lanes' composed CLI arguments and makes
+each lane's status job go red when no review happened, and rewords the
+`claude-args` description; ci-workflows#624 only rewrites comments. The input
+set is unchanged; the repin lane declined because that description moved and
+`standards-sync` throws the standing `needs` decline. No secret, caller
+permission or `runs-on` routing moved.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
