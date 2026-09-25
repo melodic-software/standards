@@ -30,7 +30,7 @@ jobs:
   sync:
     # Real runs attest App access for the complete unfiltered manifest before
     # mutation; `targets` limits reconciliation only, never attestation.
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9 # v0.29.1
     with:
       runner: ubuntu-24.04
       # Schedule and push run for real (inputs is empty on those events, so

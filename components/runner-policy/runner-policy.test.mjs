@@ -34,6 +34,7 @@ const REPINE_LANE_SHA_V0_27_1 = "4610c31e92eb1c4b24981e2f200ac87bdb2a1753";
 const REPINE_LANE_SHA_V0_28_0 = "39390344a0fef0671d3e5a7546dd03af7a36b8f5";
 const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
 const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
+const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8328,6 +8329,27 @@ test("both claude lane contracts at the v0.29.0 tag narrow their v0.28.1 entry t
       contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_0}`],
       { ...previous, allowedInputs: ["runner"] },
       `${reusable} at the v0.29.0 tag must equal its v0.28.1 entry except allowedInputs ["runner"]`,
+    );
+  }
+});
+
+// v0.29.1 moves no input, secret, permission or routing field: the lanes gain
+// a Skill grant and a stricter status job, standards-sync only comments.
+test("every reusable contract at the v0.29.1 tag copies its predecessor forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const predecessors = {
+    "claude-review": REPINE_LANE_SHA_V0_29_0,
+    "claude-security-review": REPINE_LANE_SHA_V0_29_0,
+    "standards-sync": REPINE_LANE_SHA_V0_27_1,
+  };
+  for (const [reusable, sha] of Object.entries(predecessors)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${sha}`];
+    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_1}`],
+      previous,
+      `${reusable} at the v0.29.1 tag is not a verbatim copy of its predecessor`,
     );
   }
 });
