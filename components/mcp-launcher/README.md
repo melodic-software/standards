@@ -53,9 +53,10 @@ environment-variable name) exits 2.
 ## Adopting it
 
 Select `mcp-launcher` for the repository in
-[`distribution/sync-manifest.yml`](../../distribution/sync-manifest.yml). The
-entries below assume the synced path `tools/mcp-launcher/launcher.js`, `fnm`
-on the PATH, and a `.node-version` or `.nvmrc` in the repository. `fnm exec`
+[`distribution/sync-manifest.yml`](../../distribution/sync-manifest.yml). It
+requires `node-runtime`, whose `.node-version` is the version `fnm exec`
+reads. The entries below assume the synced path
+`tools/mcp-launcher/launcher.js` and `fnm` on the PATH. `fnm exec`
 gives GUI hosts the repository's Node without a shell profile, and
 `MCP_LAUNCHER_FNM_ACTIVE=1` tells the launcher not to wrap itself in `fnm`
 again.

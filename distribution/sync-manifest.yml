@@ -264,6 +264,8 @@ components:
   # Project MCP stdio entry with --vault key resolution
   # (components/mcp-launcher/README.md). The tests and stubs stay upstream.
   mcp-launcher:
+    requires:
+      - node-runtime
     files:
       components/mcp-launcher/dispatch.js: tools/mcp-launcher/dispatch.js
       components/mcp-launcher/launcher.js: tools/mcp-launcher/launcher.js
