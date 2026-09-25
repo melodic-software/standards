@@ -18,6 +18,8 @@ const { spawn, spawnSync } = require("node:child_process");
 const { attachLifecycle, dispatch } = require("./dispatch.js");
 
 const TRIED = "MCP_LAUNCHER_VAULT_TRIED";
+const VAULT_SPEC_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*=.+$/;
+const UNEXPANDED_PLACEHOLDER_PATTERN = /^\$\{.*\}$/;
 
 function warn(message) {
   process.stderr.write(`mcp-launcher: ${message}\n`);
@@ -29,7 +31,7 @@ function parseVault(args) {
   let rest = args;
   while (rest[0] === "--vault") {
     const spec = rest[1] ?? "";
-    if (!/^[A-Za-z_][A-Za-z0-9_]*=.+$/.test(spec)) {
+    if (!VAULT_SPEC_PATTERN.test(spec)) {
       warn(`--vault requires NAME=vault-secret-name, got: ${spec}`);
       process.exit(2);
     }
@@ -43,7 +45,7 @@ function parseVault(args) {
 // Empty, or a placeholder the host passed through unexpanded (`${NAME}`, `${env:NAME}`).
 function isSet(name) {
   const value = process.env[name];
-  return Boolean(value) && !/^\$\{.*\}$/.test(value);
+  return Boolean(value) && !UNEXPANDED_PLACEHOLDER_PATTERN.test(value);
 }
 
 function findVaultExec() {
