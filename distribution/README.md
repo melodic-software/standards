@@ -384,15 +384,13 @@ fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
 differently for each lane:
 
-- `claude-review-caller` is `managed` for the four private targets that run
-  the code-review lane (dotfiles, github-iac, medley, provisioning).
-- `claude-security-review-caller` is `managed` for private adopters
-  (`provisioning` first). The public repos running a security lane today,
+- Both components are `managed` for every private target (claude-code-proxy,
+  dotfiles, github-iac, medley, provisioning), so every PR there gets both
+  advisory lanes. The public repos running a security lane today,
   `claude-code-plugins` and `ci-workflows`, remain ineligible for the
   fleet-routed shape.
 
-`melodic-software/claude-code-plugins`, the org's one public caller target and
-the only repo whose ruleset requires `security-review / security-review`, is
+`melodic-software/claude-code-plugins`, the org's one public caller target, is
 `locally-owned` for both components and keeps its hand-written hosted-only
 callers that pass `runner: ubuntu-24.04` directly. Consequence to accept
 knowingly: that repo stays outside this normalization and re-pins by hand at
@@ -409,9 +407,9 @@ Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
 component across both visibilities (#377). That path also needs a cross-repo
 reusable routing kind in runner-policy, a deliberate narrowing of the blanket
-public-target test for `components/claude-lanes/`, and either absorbing
-claude-code-plugins' repo-owned `security-review-evidence` guard into the
-reusable or accepting that caller stays `locally-owned`.
+public-target test for `components/claude-lanes/`. claude-code-plugins'
+callers no longer carry a repo-owned evidence guard or `skip-actors` (removed
+with ci-workflows v0.29.0), so nothing else of theirs blocks the move.
 
 ## managed-files-guard caller component
 

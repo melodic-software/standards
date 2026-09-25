@@ -76,9 +76,9 @@ components:
   # - claude-code-proxy: adopted by the same retarget and now a sync TARGET
   #   (same Phase 4 expansion — target block, App grant, and
   #   `TARGET_VISIBILITY` entry shipped), admissible on visibility (private),
-  #   but not yet a review-lane adopter: it runs no claude lane today, so
-  #   adding it to this component's `managed:` lists waits on deliberate lane
-  #   adoption, not on any grant.
+  #   and fleet-enrolled in github-iac (its ci.yml already runs on the fleet
+  #   label). It manages both lane callers: every PR gets both advisory
+  #   Claude lanes.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
   #   the same retarget. Neither ever held a target block, so nothing left
   #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
@@ -128,11 +128,13 @@ components:
   # "every managed target of a claude lane caller admits that caller" rule,
   # which rejects EVERY `components/claude-lanes/` public managed target
   # whether or not the caller references select-runner;
-  # (3) claude-code-plugins' repo-owned `security-review-evidence` job and
-  # ADR-required local `skip-actors` cannot be sync-managed as written —
-  # absorb the evidence guard into the reusable, or keep that one caller
-  # `locally-owned`. The claude-code-plugins `locally-owned` note below
-  # records this same three-part trigger.
+  # claude-code-plugins' callers no longer block a managed sync on their own
+  # content: its PR 4465 and ci-workflows v0.29.0 removed its evidence job,
+  # local `skip-actors`, and all lane bookkeeping. They differ from these
+  # components only in the hosted runner (blockers 1 and 2) and in the
+  # security caller's workflow-level cancel-in-progress concurrency, which a
+  # managed sync would replace with the component's no-cancel job group. The
+  # claude-code-plugins `locally-owned` note below records the same trigger.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
@@ -463,12 +465,11 @@ targets:
     # pass `runner: ubuntu-24.04` directly. Removal trigger (necessary but not
     # sufficient — see the `claude-security-review-caller` public/shared-shape
     # blockers above / #377): (1) runner indirection moves inside the
-    # ci-workflows reusable, (2) runner-policy gains a cross-repo routing kind
-    # and the blanket public-target claude-lanes test is narrowed, and
-    # (3) this repo's `security-review-evidence` job plus ADR-required local
-    # `skip-actors` are absorbed into the reusable (or this caller stays
-    # `locally-owned`). Only then does one managed component serve both
-    # visibilities without deleting the evidence guard.
+    # ci-workflows reusable, and (2) runner-policy gains a cross-repo routing
+    # kind and the blanket public-target claude-lanes test is narrowed. This
+    # repo's callers carry no evidence job or local `skip-actors` since its
+    # PR 4465 and ci-workflows v0.29.0, so after (1) and (2) a managed sync
+    # would change only the security caller's cancel-in-progress concurrency.
     #
     # `ruff`: the canonical policy reports 385 findings against that tree
     # against 166 under upstream's bare defaults, so adoption is a migration
@@ -512,6 +513,8 @@ targets:
   # satisfies lefthook-python's requirement as a repo-owned implementation.
   melodic-software/claude-code-proxy:
     managed:
+      - claude-review-caller
+      - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -568,6 +571,7 @@ targets:
       - actionlint
       - claude-permissions
       - claude-review-caller
+      - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -620,6 +624,7 @@ targets:
       # no workflow-level path filtering), so medley's review volume rises
       # slightly.
       - claude-review-caller
+      - claude-security-review-caller
       # The destination file is byte-canonical since medley's wrapper refactor
       # (medley ADR-0023, the ADR-0019 "share bodies, NOT wrapping" shape):
       # medley policy lives in a repo-owned comment-hygiene-local.sh that

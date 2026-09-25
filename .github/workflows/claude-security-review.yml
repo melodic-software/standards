@@ -1,0 +1,54 @@
+name: claude-security-review
+
+# Automated PR security review via the ci-workflows reusable workflow, the
+# security sibling of claude-review.yml. Advisory: never add any check in this
+# file to required status checks (github-iac ADR 0011).
+#
+# Repo-local rather than the sync-managed `claude-security-review-caller`
+# component (components/claude-lanes/claude-security-review.yml): this
+# repository is the manifest SOURCE, not a sync target. It tracks that
+# component except for the concurrency and runner notes below.
+#
+# Every non-draft same-repository PR is reviewed; the reusable skips fork PRs
+# (they receive no secrets and a read-only token) and every `[bot]` actor.
+#
+# NEVER add workflow-level `paths:`/`paths-ignore:`: a check whose workflow
+# never triggers stays Pending forever.
+
+on:
+  pull_request:
+    # NO `merge_group:`: the pinned action cannot serve that event; see
+    # melodic-software/ci-workflows#272 before enabling a merge queue.
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+
+# DEVIATION from the component, which keeps a no-cancel job-level group in
+# case a ruleset ever reads its check: this repository's `concurrency-policy`
+# lane requires the canonical top-level block, and the check here is advisory,
+# so a newer push superseding an in-flight review voids nothing required.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  security-review:
+    # A draft does not spend a review; ready_for_review delivers one.
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read         # checkout + read the diff
+      pull-requests: write   # post the security review + tracking comment
+      id-token: write        # OIDC, mints the Claude GitHub App token (required
+                             # even with an OAuth/API-key credential)
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@6567856ef6070a4a1c9c2691f610278a7f2de153 # v0.29.0
+    with:
+      # DEVIATION from the component, which names the managed fleet label:
+      # this repository is PUBLIC, and runner-policy admits a managed label
+      # only for an enrolled private consumer (`components/runner-policy/README.md`),
+      # so this caller pins the approved hosted label directly.
+      runner: ubuntu-24.04
+    # Pass only the one named secret (least privilege) rather than `secrets:
+    # inherit`, which would forward every parent secret to the called workflow.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
