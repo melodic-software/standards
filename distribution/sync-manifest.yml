@@ -77,8 +77,10 @@ components:
   #   (same Phase 4 expansion — target block, App grant, and
   #   `TARGET_VISIBILITY` entry shipped), admissible on visibility (private),
   #   and fleet-enrolled in github-iac (its ci.yml already runs on the fleet
-  #   label). It manages both lane callers: every PR gets both advisory
-  #   Claude lanes.
+  #   label). It holds both lane callers `locally-owned`: managing them would
+  #   mark it selector-routed, which excludes the hosted managed-files-guard
+  #   caller it manages today, and no fleet-routed guard sibling exists yet.
+  #   Removal trigger: that sibling shipping.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
   #   the same retarget. Neither ever held a target block, so nothing left
   #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
@@ -513,8 +515,6 @@ targets:
   # satisfies lefthook-python's requirement as a repo-owned implementation.
   melodic-software/claude-code-proxy:
     managed:
-      - claude-review-caller
-      - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -532,6 +532,8 @@ targets:
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
+      - claude-review-caller
+      - claude-security-review-caller
       - ruff
     # Armed as of 2026-09-04: main CI has been green since 2026-09-03,
     # claude-code-proxy#214 landed the three metadata callers beside the
