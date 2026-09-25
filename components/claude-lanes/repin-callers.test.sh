@@ -394,6 +394,13 @@ jobs:
   review:
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
 YAML
+cat > "$repo/.github/workflows/claude-security-review.yml" <<YAML
+name: local-security-review
+on: pull_request
+jobs:
+  security-review:
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${old_sha} # v0.9.1
+YAML
 # The guard caller pins a composite ACTION at a step, in the convention's
 # fallback comment form, dated before the release under test — so this
 # release may advance it, and the rewrite must land the tag form.
@@ -428,8 +435,9 @@ mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml \
   "$repo"/.github/workflows/sync.yml \
   "$repo"/.github/workflows/claude-review.yml \
+  "$repo"/.github/workflows/claude-security-review.yml \
   "$repo/$guard_caller" | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '8' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
   "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
@@ -453,7 +461,7 @@ export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml claude-security-review.yml; do
   cat > "$repo/.github/workflows/$extra" <<YAML
 name: extra
 on: pull_request
@@ -488,14 +496,14 @@ assert_contains 'apply: the version note names the file left untouched' "$(cat "
   "(${new_sha}): \`${guard_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every other enumerated pin still advances' '6' "$ahead_pins"
+assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 
 # Same-day dates do not prove containment. When compare says the pin is
 # ahead of the release, apply must leave it — this is the Codex P2 on #511.
 repo="$scratch/repo-same-day-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done
@@ -515,7 +523,7 @@ assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard
 repo="$scratch/repo-same-day-behind"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done
@@ -535,7 +543,7 @@ assert_contains 'apply: a same-day contained pin advances to the tag form' \
 repo="$scratch/repo-compare-fail"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml; do
+for extra in sync.yml claude-review.yml claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
     "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
 done

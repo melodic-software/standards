@@ -31,6 +31,7 @@ readonly LANE_DIR='components/claude-lanes'
 # copy forward (components/managed-files-guard/README.md).
 readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
+  '.github/workflows/claude-security-review.yml'
   '.github/workflows/sync.yml'
   'components/managed-files-guard/managed-files-guard.yml'
 )
