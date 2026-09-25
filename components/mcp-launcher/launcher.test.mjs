@@ -143,6 +143,12 @@ test("no vault-exec warns once and starts keyless, dropping a literal placeholde
   ]);
 });
 
+test("a -- after the --vault pairs is dropped", () => {
+  const r = run(sandbox(), ["--vault", "KEY_A=secret-a", "--"], { KEY_A: "from-env" });
+  assertPassthrough(r);
+  assert.match(r.stderr, /stub-server: KEY_A=from-env/);
+});
+
 test("without --vault the launcher dispatches unchanged", () => {
   const r = run(sandbox(), []);
   assertPassthrough(r);

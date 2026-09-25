@@ -13,7 +13,7 @@ without it.
 
 ## What it does
 
-`node launcher.js [--vault NAME=vault-secret-name ...] <server>`, where
+`node launcher.js [--vault NAME=vault-secret-name ...] [--] <server>`, where
 `<server>` is either:
 
 - npx arguments (`-y @scope/package@pin …`). On Windows `npx.cmd` runs through
@@ -88,7 +88,9 @@ interpolation syntax for the key:
 ```
 
 Codex, `.codex/config.toml`. Codex filters a stdio server's environment to
-its allowlist, so the key is passed through by name with `env_vars`:
+its allowlist, so the key is passed through by name with `env_vars`. A
+`vault-exec` round adds a Key Vault read to the npx cold start, so give the
+server a startup timeout well above Codex's default:
 
 ```toml
 [mcp_servers.perplexity]
@@ -96,6 +98,7 @@ command = "fnm"
 args = ["exec", "--version-file-strategy=recursive", "--", "node", "tools/mcp-launcher/launcher.js",
         "--vault", "PERPLEXITY_API_KEY=perplexity-api-key", "-y", "@perplexity-ai/mcp-server@0.9.0"]
 env_vars = ["PERPLEXITY_API_KEY"]
+startup_timeout_sec = 60
 
 [mcp_servers.perplexity.env]
 MCP_LAUNCHER_FNM_ACTIVE = "1"

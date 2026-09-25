@@ -23,7 +23,7 @@ function warn(message) {
   process.stderr.write(`mcp-launcher: ${message}\n`);
 }
 
-// Leading `--vault NAME=secret` pairs, and the args after them.
+// Leading `--vault NAME=secret` pairs, and the args after them (an optional `--` ends the pairs).
 function parseVault(args) {
   const specs = [];
   let rest = args;
@@ -36,6 +36,7 @@ function parseVault(args) {
     specs.push(spec);
     rest = rest.slice(2);
   }
+  if (specs.length > 0 && rest[0] === "--") rest = rest.slice(1);
   return { specs, rest };
 }
 
