@@ -93,8 +93,13 @@ const GOOD_VALIDATOR = [
   "CLOSING_ERE='(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:blank:]]*:?[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
   "NON_CLOSING_ERE='^ {0,3}(refs|relates[[:blank:]]+to):[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[[:blank:]]*$'",
   "NO_ISSUE_ERE='[^a-z0-9_]no (linked|related) issue[^a-z0-9_]'",
+  // The live `scan_linkage` operand lines, verbatim.
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
   '    lower="${line,,}"',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '    while chunk="${lower:off}" && [[ "$chunk" =~ $CLOSING_ERE ]]; do',
+  `  lower=$'\\n'"\${1,,}"$'\\n'`,
+  '  [[ "$lower" =~ $NO_ISSUE_ERE ]]',
   "REQUIRED_SECTIONS=(Summary Fix Verification Related)",
   "",
 ].join("\n");
@@ -438,13 +443,27 @@ test("validator keyword/marker regressions are caught functionally", () => {
   assert.match(errors[0], /"No related issue"/);
 });
 
-test("validator that stops lowercasing before scan_linkage is drift", () => {
+test("validator that matches its EREs against un-lowercased text is drift", () => {
+  const mutations = [
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ['lower="${line,,}"', 'lower="$line"', "CLOSING_ERE"],
+    ['"$chunk" =~ $CLOSING_ERE', '"$line" =~ $CLOSING_ERE', "CLOSING_ERE"],
+    ['"$lower" =~ $NO_ISSUE_ERE', '"$1" =~ $NO_ISSUE_ERE', "NO_ISSUE_ERE"],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ["${1,,}", "$1", "NO_ISSUE_ERE"],
+  ];
+  for (const [from, to, name] of mutations) {
+    const texts = goodTexts();
+    texts.hookValidator = texts.hookValidator.replace(from, to);
+    assert.notEqual(texts.hookValidator, GOOD_VALIDATOR, from);
+    const errors = checkCopies(POLICY, texts);
+    assert.equal(errors.length, 1, from);
+    assert.match(errors[0], new RegExp(`^hook validator: .*no longer matches ${name}`), from);
+  }
+  // An extra raw-line match alongside the lowercased one is drift too.
   const texts = goodTexts();
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-  texts.hookValidator = texts.hookValidator.replace('lower="${line,,}"', 'lower="$line"');
-  const errors = checkCopies(POLICY, texts);
-  assert.equal(errors.length, 1);
-  assert.match(errors[0], /^hook validator: .*no longer lowercases/);
+  texts.hookValidator += '[[ "$line" =~ $CLOSING_ERE ]]\n';
+  assert.equal(checkCopies(POLICY, texts).length, 1);
 });
 
 test("stale reusable pin with current sections but stale keyword enforcement is drift", () => {

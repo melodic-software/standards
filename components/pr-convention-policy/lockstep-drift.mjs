@@ -290,18 +290,33 @@ export function parseMarkdownHeadings(markdownText) {
 // `scan_linkage` transcription of the composite's `scan_line`; translate the
 // POSIX classes they use and probe them the same way. The probes pad with
 // spaces because NO_ISSUE_ERE guards with [^a-z0-9_] boundary classes. Both
-// EREs are lowercase and `scan_linkage` lowercases the line before matching,
-// so that lowercasing is asserted, as it is for the composite.
+// EREs are lowercase, so every `=~` against them must read a lowercased
+// operand, as the composite's `tolower` is asserted: CLOSING_ERE only on
+// `$chunk` (a slice of `lower="${line,,}"`), NO_ISSUE_ERE only on `$lower`
+// (`${1,,}` wrapped in newlines). A match on the raw line is drift.
+const VALIDATOR_OPERANDS = {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
+  CLOSING_ERE: { operand: "chunk", sources: ['lower="${line,,}"', 'chunk="${lower:off}"'] },
+  NO_ISSUE_ERE: { operand: "lower", sources: [`lower=$'\\n'"\${1,,}"$'\\n'`] },
+};
+
 export function parseValidatorPatterns(shellText, location) {
   const keyword = shellText.match(/CLOSING_ERE='([^']+)'/);
   const marker = shellText.match(/NO_ISSUE_ERE='([^']+)'/);
   if (!keyword || !marker) {
     throw new DriftError(`${location}: CLOSING_ERE / NO_ISSUE_ERE declarations not found`);
   }
-  if (!/lower="\$\{line,,\}"/.test(shellText)) {
-    throw new DriftError(
-      `${location}: scan_linkage no longer lowercases the line (\`lower="\${line,,}"\`), so the extracted pattern is not the one the hook applies`,
-    );
+  for (const [name, { operand, sources }] of Object.entries(VALIDATOR_OPERANDS)) {
+    const uses = [...shellText.matchAll(new RegExp(`"\\$(\\w+)" =~ \\$${name}\\b`, "g"))];
+    const lowercased =
+      uses.length > 0 &&
+      uses.every((use) => use[1] === operand) &&
+      sources.every((source) => shellText.includes(source));
+    if (!lowercased) {
+      throw new DriftError(
+        `${location}: scan_linkage no longer matches ${name} only against the lowercased \`$${operand}\` (${sources.join(", ")}), so the extracted pattern is not the one the hook applies`,
+      );
+    }
   }
   const toJs = (ere) =>
     new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
