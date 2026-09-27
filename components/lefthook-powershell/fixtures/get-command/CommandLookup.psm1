@@ -13,5 +13,3 @@ function Get-ExternalToolPath {
     }
     return $null
 }
-
-Export-ModuleMember -Function Get-ExternalToolPath

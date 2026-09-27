@@ -22,8 +22,10 @@ cache, so a single file in a fresh process can intermittently throw a
 The per-target worker keeps one failure from masking other targets; it does
 not prevent the race. Until the upstream fix ([#2206][5]) ships in a release,
 remove the triggers: keep `PSUseCorrectCasing` disabled, and drop
-`Export-ModuleMember` from a `.psm1` that exports every function it defines
-(without the call, a script module exports all its functions and aliases).
+`Export-ModuleMember` from a `.psm1` that exports every function and alias it
+defines (without the call, a script module exports all its functions and
+aliases). A module that hides private members keeps the call, or moves its
+export list into a module manifest.
 
 The focused `psscriptanalyzer-staged.test.ps1` regression supplies a fake
 analyzer module to prove deterministic one-target/one-process isolation, then
