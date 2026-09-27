@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -162,5 +163,27 @@ for (const spec of ["KEY_A", "KEY_A=", "1KEY=secret", "BAD-NAME=secret"]) {
     assert.equal(r.status, 2);
     assert.equal(r.stdout, "");
     assert.deepEqual(r.calls, []);
+  });
+}
+
+// cmd strips one ^ layer per parse; after both, what remains is the C runtime form.
+const { escapeCmdShimArg } = createRequire(import.meta.url)("./dispatch.js");
+const uncaret = (s) => s.replace(/\^(.)/g, "$1");
+
+for (const [arg, crt] of [
+  ["-y", '"-y"'],
+  ["@scope/pkg@1.2.3", '"@scope/pkg@1.2.3"'],
+  ['{"a":1}', '"{\\"a\\":1}"'],
+  ['a\\"b', '"a\\\\\\"b"'],
+  ["C:\\dir\\", '"C:\\dir\\\\"'],
+  ["C:\\a\\b", '"C:\\a\\b"'],
+  ["100%PATH%", '"100%PATH%"'],
+  ["a^b&c|d", '"a^b&c|d"'],
+  ["two words (x) <y> !z!", '"two words (x) <y> !z!"'],
+]) {
+  test(`escapeCmdShimArg ${arg}`, () => {
+    const escaped = escapeCmdShimArg(arg);
+    assert.equal(uncaret(uncaret(escaped)), crt);
+    assert.doesNotMatch(escaped.replace(/\^\^\^./g, ""), /[\s"%&|<>()^!]/);
   });
 }
