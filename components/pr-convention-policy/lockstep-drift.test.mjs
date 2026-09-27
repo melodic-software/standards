@@ -90,8 +90,11 @@ const GOOD_GATE = `
             const NO_ISSUE_MARKER = /\\bno (?:linked|related) issue\\b/i;
 `;
 const GOOD_VALIDATOR = [
-  "KEYWORD_ERE='[^a-z0-9_](close[sd]?|fix(es|ed)?|resolve[sd]?)[[:space:]]*:?[[:space:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[^a-z0-9_]'",
+  "CLOSING_ERE='(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:blank:]]*:?[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
+  "NON_CLOSING_ERE='^ {0,3}(refs|relates[[:blank:]]+to):[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[[:blank:]]*$'",
   "NO_ISSUE_ERE='[^a-z0-9_]no (linked|related) issue[^a-z0-9_]'",
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '    lower="${line,,}"',
   "REQUIRED_SECTIONS=(Summary Fix Verification Related)",
   "",
 ].join("\n");
@@ -433,6 +436,15 @@ test("validator keyword/marker regressions are caught functionally", () => {
   assert.equal(errors.length, 1);
   assert.match(errors[0], /"Resolves"/);
   assert.match(errors[0], /"No related issue"/);
+});
+
+test("validator that stops lowercasing before scan_linkage is drift", () => {
+  const texts = goodTexts();
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  texts.hookValidator = texts.hookValidator.replace('lower="${line,,}"', 'lower="$line"');
+  const errors = checkCopies(POLICY, texts);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^hook validator: .*no longer lowercases/);
 });
 
 test("stale reusable pin with current sections but stale keyword enforcement is drift", () => {

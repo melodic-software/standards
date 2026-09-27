@@ -286,16 +286,25 @@ export function parseMarkdownHeadings(markdownText) {
   return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
 }
 
-// The hook validator's enforcement is a pair of POSIX ERE strings; translate
-// the one POSIX class they use and probe them the same way. The probes pad
-// with spaces because both EREs guard with [^a-z0-9_] boundary classes.
+// The hook validator's enforcement is a pair of POSIX ERE strings, its
+// `scan_linkage` transcription of the composite's `scan_line`; translate the
+// POSIX classes they use and probe them the same way. The probes pad with
+// spaces because NO_ISSUE_ERE guards with [^a-z0-9_] boundary classes. Both
+// EREs are lowercase and `scan_linkage` lowercases the line before matching,
+// so that lowercasing is asserted, as it is for the composite.
 export function parseValidatorPatterns(shellText, location) {
-  const keyword = shellText.match(/KEYWORD_ERE='([^']+)'/);
+  const keyword = shellText.match(/CLOSING_ERE='([^']+)'/);
   const marker = shellText.match(/NO_ISSUE_ERE='([^']+)'/);
   if (!keyword || !marker) {
-    throw new DriftError(`${location}: KEYWORD_ERE / NO_ISSUE_ERE declarations not found`);
+    throw new DriftError(`${location}: CLOSING_ERE / NO_ISSUE_ERE declarations not found`);
   }
-  const toJs = (ere) => new RegExp(ere.replaceAll("[[:space:]]", "\\s"), "i");
+  if (!/lower="\$\{line,,\}"/.test(shellText)) {
+    throw new DriftError(
+      `${location}: scan_linkage no longer lowercases the line (\`lower="\${line,,}"\`), so the extracted pattern is not the one the hook applies`,
+    );
+  }
+  const toJs = (ere) =>
+    new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
   return { keyword: toJs(keyword[1]), marker: toJs(marker[1]) };
 }
 
@@ -645,6 +654,7 @@ export function checkCopies(policy, texts) {
       parseValidatorPatterns(texts.hookValidator, "hook validator"),
       policy,
       "hook validator (enforcement patterns)",
+      { lowercaseProbe: true },
     ),
   );
   return errors;
