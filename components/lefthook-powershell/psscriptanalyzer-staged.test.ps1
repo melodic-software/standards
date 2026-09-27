@@ -141,9 +141,9 @@ Export-ModuleMember -Function Invoke-ScriptAnalyzer
         )
         Assert-Condition ($historicalHookFiles.Count -eq 6) 'The historical commit-hook regression must use six files.'
 
-        # The PSScriptAnalyzer 1.25.0 cross-target state failure is intermittent. Repeating the exact
-        # six-file hook shape made the old shared-process adapter fail reliably, while the fake-module
-        # assertion above deterministically proves each target now receives an isolated worker.
+        # The PSScriptAnalyzer 1.25.0 CommandInfo race is intermittent. Repeating the exact six-file hook
+        # shape made the old shared-process adapter fail reliably, while the fake-module assertion above
+        # deterministically proves each target now receives its own worker.
         foreach ($iteration in 1..8) {
             $real = Invoke-AdapterProcess -Files $historicalHookFiles
             $realSucceeded = $real.ExitCode -eq 0
