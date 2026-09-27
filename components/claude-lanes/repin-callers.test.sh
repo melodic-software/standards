@@ -304,19 +304,19 @@ lane_repo() {
 name: claude-review
 on: pull_request
 jobs:
-  select-runner:
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@${pin_sha} # ${pin_tag}
   review:
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${pin_sha} # ${pin_tag}
+    with:
+      runner: melodic-review-ubuntu-24.04-x64
 YAML
   cat > "$dir/components/claude-lanes/claude-security-review.yml" <<YAML
 name: claude-security-review
 on: pull_request
 jobs:
-  select-runner:
-    uses: melodic-software/ci-workflows/.github/workflows/select-runner.yml@${pin_sha} # ${pin_tag}
   security:
     uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${pin_sha} # ${pin_tag}
+    with:
+      runner: melodic-review-ubuntu-24.04-x64
 YAML
   git -C "$dir" add -A
   git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'lane callers'
@@ -350,7 +350,7 @@ assert_contains 'apply: major-version bump names both versions' "$(cat "$out_fil
 
 # Both callers carry the new pin, and the comment carries the new tag.
 lane_pins="$(grep -hoE "$new_sha # v1.4.0" "$repo"/components/claude-lanes/*.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every lane pin is rewritten' '4' "$lane_pins"
+assert_eq 'apply: every lane pin is rewritten' '2' "$lane_pins"
 assert_not_contains 'apply: no stale pin survives' \
   "$(cat "$repo"/components/claude-lanes/*.yml)" "$old_sha"
 
@@ -437,7 +437,7 @@ mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/.github/workflows/claude-review.yml \
   "$repo"/.github/workflows/claude-security-review.yml \
   "$repo/$guard_caller" | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '8' "$mixed_pins"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '6' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
   "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
@@ -496,7 +496,7 @@ assert_contains 'apply: the version note names the file left untouched' "$(cat "
   "(${new_sha}): \`${guard_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
+assert_eq 'apply: every other enumerated pin still advances' '5' "$ahead_pins"
 
 # Same-day dates do not prove containment. When compare says the pin is
 # ahead of the release, apply must leave it — this is the Codex P2 on #511.

@@ -6,12 +6,12 @@
 # Three layers, in order:
 #   1. Shape — the parsed YAML carries exactly the locked design: pull_request
 #      trigger, read-only token, the canonical concurrency block, one hosted
-#      job with no selector, a full-history checkout, and the composite action
+#      job on the approved hosted label, a full-history checkout, and the composite action
 #      pinned by full SHA under the pin-comment convention with
 #      `standards-ref: main` for the soak.
 #   2. Manifest wiring — the component maps to the locked destination, is
 #      managed only for hosted-only-eligible targets (never alongside a
-#      selector-routed lane caller), is `locally-owned` by ci-workflows, and
+#      fleet-routed lane caller), is `locally-owned` by ci-workflows, and
 #      accounts for every target one way or another.
 #   3. Materialization — the engine writes the bytes where the manifest says,
 #      byte-identical, and (when actionlint is present) they lint clean there.
@@ -75,10 +75,6 @@ assert_eq 'the job runs on the approved hosted label directly' 'ubuntu-24.04' \
   "$(q '.jobs["managed-files-guard"]["runs-on"]')"
 assert_eq 'the job has a 10-minute timeout' '10' "$(q '.jobs["managed-files-guard"]["timeout-minutes"]')"
 assert_eq 'no job calls a reusable workflow' '0' "$(q '[.jobs[] | select(has("uses"))] | length')"
-# Tree positions only: the header prose legitimately NAMES the selector while
-# explaining why the file does not use it.
-assert_eq 'no uses: anywhere references select-runner' '0' \
-  "$(q '[.jobs[] | .uses, .steps[].uses] | map(select(. != null and test("select-runner"))) | length')"
 assert_eq 'runs-on is a literal, not an expression' '0' \
   "$(q '[.jobs[]["runs-on"] | select(test("\\$\\{\\{"))] | length')"
 assert_eq 'no job-level permissions block (the workflow grant is the whole grant)' '0' \
@@ -132,16 +128,16 @@ assert_eq 'manifest maps the component source to the locked destination' "$desti
 assert_eq 'the component ships exactly one file' '1' \
   "$(yq -r ".components.\"$component\".files | length" "$manifest")"
 
-# component<TAB>source for every claude-lanes-sourced (selector-routed) caller.
+# component<TAB>source for every claude-lanes-sourced (fleet-routed) caller.
 # shellcheck disable=SC2016  # yq expression; $c is a yq variable, not shell
-mapfile -t selector_components < <(
+mapfile -t fleet_components < <(
   yq -r '.components | to_entries[] | .key as $c | .value.files | keys[] | $c + "\t" + .' "$manifest" |
     grep -F $'\tcomponents/claude-lanes/' | cut -f1 | sort -u
 )
-assert_nonzero 'manifest carries at least one selector-routed lane caller to exclude against' \
-  "${#selector_components[@]}"
-declare -A is_selector_component=()
-for c in "${selector_components[@]}"; do is_selector_component["$c"]=1; done
+assert_nonzero 'manifest carries at least one fleet-routed lane caller to exclude against' \
+  "${#fleet_components[@]}"
+declare -A is_fleet_component=()
+for c in "${fleet_components[@]}"; do is_fleet_component["$c"]=1; done
 
 mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
 managed_targets=()
@@ -152,24 +148,24 @@ for target in "${all_targets[@]}"; do
   mapfile -t owned < <(yq -r ".targets.\"$target\".\"locally-owned\" // [] | .[]" "$manifest")
   has_guard=0
   owns_guard=0
-  routes_selector=0
+  routes_fleet=0
   for c in "${managed[@]}"; do
     [[ "$c" == "$component" ]] && has_guard=1
-    [[ -n "${is_selector_component[$c]-}" ]] && routes_selector=1
+    [[ -n "${is_fleet_component[$c]-}" ]] && routes_fleet=1
   done
   for c in "${owned[@]}"; do
     [[ "$c" == "$component" ]] && owns_guard=1
   done
   if [[ "$has_guard" -eq 1 ]]; then
     managed_targets+=("$target")
-    # A target that manages a selector-routed lane caller is a private repo
+    # A target that manages a fleet-routed lane caller is a private repo
     # enrolled for local routing, where a fixed hosted job fails
     # runner-policy — the second hop's sibling serves it, not this file.
-    assert_eq "$target manages the hosted-only caller and no selector-routed lane caller" '0' "$routes_selector"
+    assert_eq "$target manages the hosted-only caller and no fleet-routed lane caller" '0' "$routes_fleet"
   elif [[ "$owns_guard" -eq 1 ]]; then
     locally_owned_targets+=("$target")
-  elif [[ "$routes_selector" -eq 1 ]]; then
-    : # deferred to the selector-routed sibling; accounted for
+  elif [[ "$routes_fleet" -eq 1 ]]; then
+    : # deferred to the fleet-routed sibling; accounted for
   else
     unaccounted+=("$target")
   fi
@@ -178,7 +174,7 @@ done
 assert_nonzero 'at least one target manages the caller' "${#managed_targets[@]}"
 assert_eq 'ci-workflows owns the guard locally (it runs the action from its own tree)' \
   'melodic-software/ci-workflows' "$(printf '%s\n' "${locally_owned_targets[@]}" | paste -sd, -)"
-assert_eq 'every sync target is covered: managed, locally-owned, or deferred to the selector-routed hop' \
+assert_eq 'every sync target is covered: managed, locally-owned, or deferred to the fleet-routed hop' \
   '' "$(printf '%s\n' "${unaccounted[@]-}" | paste -sd, -)"
 
 # ------------------------------------------------------ 3. materialization

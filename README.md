@@ -62,7 +62,7 @@ without a live consumer remains a consumer-local experiment rather than an
 orphan catalog component.
 
 `components/runner-policy/` owns the YAML-aware GitHub Actions routing contract:
-public work remains hosted, enrolled private jobs use only an approved selector,
+public work remains hosted, enrolled private jobs name only an approved fleet label,
 and every hosted exception and privileged local-routing grant is explicit
 machine-readable inventory.
 

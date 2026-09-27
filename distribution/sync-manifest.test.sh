@@ -633,7 +633,7 @@ assert_eq 'lefthook-dotnet production CLI source is executable in the Git index'
 # Exercise every production target that carries either CLI, not only the
 # generic executable fixture. Each CLI's assertions run only where the target
 # manages that component: a public .NET target carries lefthook-dotnet without
-# runner-policy (runner-policy is a private selector-routed consumer's file).
+# runner-policy (runner-policy is a private fleet-routed consumer's file).
 # Linux is the deployment environment that records worktree modes in
 # materialization PR indexes; source-index assertions remain
 # platform-independent and fail before apply if either production mode regresses.
