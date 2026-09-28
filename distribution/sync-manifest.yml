@@ -50,7 +50,8 @@ components:
   # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
   # - Public targets: agent-plugins, ci-runner, claude-code-account-rotation,
-  #   codex-plugins and cursor-plugins take the HOSTED lane callers below,
+  #   claude-code-plugins, codex-plugins and cursor-plugins take the HOSTED
+  #   lane callers below,
   #   never these fleet-label ones (see the public-shape note below).
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
