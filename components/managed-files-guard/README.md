@@ -94,7 +94,7 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-Both files pin `0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9` (v0.29.1) today,
+Both files pin `35880dcbb2f174aac90159e276dc7eddf1bc20b9` (v0.30.1) today,
 and the pin moves with each ci-workflows release through the cascade below.
 The earlier pins are recorded because of what they fixed:
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
@@ -118,7 +118,10 @@ cosmetics: unquoted, bash parsed `[bot]` as a glob character class matching a
 single `b`, `o` or `t`, so that arm never matched the bot login at all. It was
 masked by the sibling `standards-sync` label check, which skipped sync-bot PRs
 through the label path; quoting turns a dead arm live. Nothing else the guard
-executes moved.
+executes moved. v0.30.1 (ci-workflows#634) installs the standards tree's
+`.node-version` with SHA-pinned `actions/setup-node` before `npm ci`: the fleet
+caller's self-hosted runners ship no Node, so the guard failed there with
+`npm: command not found`.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
