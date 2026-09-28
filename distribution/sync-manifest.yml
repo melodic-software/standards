@@ -487,8 +487,9 @@ targets:
     # nor `localRoutingGrants`). It owns hosted-only callers that pass
     # `runner: ubuntu-24.04` directly, at the fleet callers' destinations.
     # The synced hosted pair (`claude-review-hosted-caller`) sits at other
-    # destinations, so managing it here would double-review; this target
-    # stays repo-local rather than delete its callers by hand. Removal trigger: the `claude-security-review-caller`
+    # destinations, so managing it here while its own callers remain would
+    # double-review. Adopting the pair means a repo-local PR deleting those
+    # callers first; that is a separate maintainer decision. Removal trigger: the `claude-security-review-caller`
     # public/shared-shape blockers above (#377) clearing, that is (1) the
     # runner choice moves inside the ci-workflows reusable and runner-policy
     # gains a cross-repo routing kind, and (2) the blanket public-target
