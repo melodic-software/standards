@@ -58,10 +58,10 @@ components:
   #   block below, so adding this component to its existing `managed:` list
   #   adds no repository to the installation's attested set and needs no App
   #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
-  #   ci-runner is PUBLIC, and a selector-routed caller is rejected outright
-  #   on a public repository (see the security-caller public/shared-shape
-  #   blockers below). Removal trigger: the runner indirection moving inside
-  #   the ci-workflows reusable, plus those remaining blockers. STILL LIVE
+  #   ci-runner is PUBLIC, and a caller naming the fleet label is rejected
+  #   outright on a public repository (see the security-caller
+  #   public/shared-shape blockers below). Removal trigger: those blockers
+  #   clearing. STILL LIVE
   #   when that fires, and not rebutted
   #   by the reversal: the original exemption reason, that ci-runner is runner
   #   infrastructure where a wedged lane job could block its own substrate.
@@ -70,7 +70,7 @@ components:
   # - cursor-plugins: adopted by the same retarget and now a sync TARGET
   #   (Phase 4 fleet expansion, PR 428 — target block, App grant, and
   #   `TARGET_VISIBILITY` entry all shipped), but NOT yet a review-lane
-  #   adopter: it is PUBLIC, and a selector-routed caller is rejected
+  #   adopter: it is PUBLIC, and a caller naming the fleet label is rejected
   #   outright on a public repository, so the removal trigger above still
   #   gates adding it to this component's `managed:` lists.
   # - claude-code-proxy: adopted by the same retarget and now a sync TARGET
@@ -78,7 +78,7 @@ components:
   #   `TARGET_VISIBILITY` entry shipped), admissible on visibility (private),
   #   and fleet-enrolled in github-iac (its ci.yml already runs on the fleet
   #   label). It holds both lane callers `locally-owned`: managing them would
-  #   mark it selector-routed, which excludes the hosted managed-files-guard
+  #   mark it fleet-routed, which excludes the hosted managed-files-guard
   #   caller it manages today, and no fleet-routed guard sibling exists yet.
   #   Removal trigger: that sibling shipping.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
@@ -97,17 +97,17 @@ components:
   #   or content-scanning lane, not for claude-review as written.
   #
   # PUBLIC-SAFE SHAPE, CONSIDERED AND REJECTED for the two public adoptions:
-  # a hand-written hosted-only caller passing `runner: ubuntu-24.04` directly,
-  # with no caller-side selector — the shape claude-code-plugins already owns
+  # a hand-written hosted-only caller passing `runner: ubuntu-24.04` directly
+  # instead of the fleet label, the shape claude-code-plugins already owns
   # `locally-owned`. runner-policy admits it on a public repository, so the
-  # bar is a property of the SELECTOR-ROUTED shape, not of public visibility
+  # bar is a property of the FLEET-LABEL shape, not of public visibility
   # as such. Rejected because it forks the reviewed caller into a second
   # per-visibility variant, which this repository deliberately declined
   # pending the reusable-side indirection. It would also require revisiting
   # `runner-policy.test.mjs`: its "every managed target of a claude lane
   # caller admits that caller" test rejects a public managed target for EVERY
-  # component sourced from `components/claude-lanes/`, selector-using or not,
-  # so a hosted-only component in that directory still fails the build.
+  # component sourced from `components/claude-lanes/`, whatever label it
+  # names, so a hosted-only component in that directory still fails the build.
   #
   # The security lane has no path gating from ci-workflows v0.29.0: it reviews
   # every non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths`
@@ -116,22 +116,24 @@ components:
   #
   # `claude-security-review-caller` is managed for the private adopters
   # dotfiles, github-iac, medley and provisioning (their target blocks
-  # below). Public/shared-shape unpark is still blocked: a
-  # caller that resolves its runner through the governed selector is rejected
-  # outright on a public repository — runner-policy admits the selector only
-  # for a private self-hosted consumer, consulting neither `exceptions` nor
-  # `localRoutingGrants`. Moving the runner indirection inside the
-  # ci-workflows reusable is necessary but NOT sufficient for one caller
-  # shape across both visibilities (#377). Remaining blockers:
-  # (1) a new cross-repo reusable routing kind in runner-policy (schema,
-  # analyzer, tests, schemaVersion, contract entries, fleet re-pin) —
-  # `internal-routing` today is repository-local only; the caller must still
-  # pass `secrets: observer-private-key`;
+  # below). Public/shared-shape unpark is still blocked: both callers pass
+  # the fleet label `melodic-review-ubuntu-24.04-x64` as a literal
+  # `with.runner`, and runner-policy admits a fleet label only for an enrolled
+  # private consumer (`public-self-hosted-routing` otherwise), consulting
+  # neither `exceptions` nor `localRoutingGrants`. A synced caller is the same
+  # bytes on every target, so it cannot name the fleet label for private
+  # targets and a hosted label for public ones. One caller shape across both
+  # visibilities (#377) therefore needs:
+  # (1) the runner choice to move inside the ci-workflows reusable, so the
+  # caller names no label, AND a new cross-repo reusable routing kind in
+  # runner-policy to admit that call (schema, analyzer, tests, schemaVersion,
+  # contract entries, fleet re-pin); `internal-routing` today is
+  # repository-local only;
   # (2) narrow `runner-policy.test.mjs`'s blanket
   # "every managed target of a claude lane caller admits that caller" rule,
   # which rejects EVERY `components/claude-lanes/` public managed target
-  # whether or not the caller references select-runner;
-  # claude-code-plugins' callers no longer block a managed sync on their own
+  # whatever label the caller names.
+  # The claude-code-plugins callers no longer block a managed sync on their own
   # content: its PR 4465 and ci-workflows v0.29.0 removed its evidence job,
   # local `skip-actors`, and all lane bookkeeping. They differ from these
   # components only in the hosted runner (blockers 1 and 2) and in the
@@ -242,9 +244,9 @@ components:
   # public repository and on a private one not enrolled for local routing.
   # Deliberate exclusions this hop, with their removal trigger:
   # - dotfiles, github-iac, medley, provisioning: private targets enrolled
-  #   for selector routing (each manages `runner-policy` with a
-  #   selector-routed lane caller), where a fixed hosted read-only job fails
-  #   the runner-policy gate. They take a selector-routed sibling component
+  #   for local routing (each manages `runner-policy` with a
+  #   fleet-routed lane caller), where a fixed hosted read-only job fails
+  #   the runner-policy gate. They take a fleet-label sibling component
   #   in the second hop; trigger: that sibling landing.
   # - ci-workflows: `locally-owned` — it hosts the action and already runs
   #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
@@ -468,16 +470,16 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-    # The lane callers resolve the runner through the governed select-runner
-    # indirection, which runner-policy forbids a PUBLIC repository from
-    # referencing at all (`routingEnabled` is private-and-self-hosted only, and
-    # the ban consults neither `exceptions` nor `localRoutingGrants`). This is
-    # the org's one public caller target, so it owns hosted-only callers that
-    # pass `runner: ubuntu-24.04` directly. Removal trigger (necessary but not
-    # sufficient — see the `claude-security-review-caller` public/shared-shape
-    # blockers above / #377): (1) runner indirection moves inside the
-    # ci-workflows reusable, and (2) runner-policy gains a cross-repo routing
-    # kind and the blanket public-target claude-lanes test is narrowed. This
+    # The lane callers name the managed fleet label, which runner-policy
+    # forbids a PUBLIC repository from routing to at all (`routingEnabled` is
+    # private-and-self-hosted only, and the ban consults neither `exceptions`
+    # nor `localRoutingGrants`). This is the org's one public caller target,
+    # so it owns hosted-only callers that pass `runner: ubuntu-24.04`
+    # directly. Removal trigger: the `claude-security-review-caller`
+    # public/shared-shape blockers above (#377) clearing, that is (1) the
+    # runner choice moves inside the ci-workflows reusable and runner-policy
+    # gains a cross-repo routing kind, and (2) the blanket public-target
+    # claude-lanes test is narrowed. This
     # repo's callers carry no evidence job or local `skip-actors` since its
     # PR 4465 and ci-workflows v0.29.0, so after (1) and (2) a managed sync
     # would change only the security caller's cancel-in-progress concurrency.

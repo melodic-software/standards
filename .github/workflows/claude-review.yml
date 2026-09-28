@@ -58,12 +58,10 @@ jobs:
       queue: max
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9 # v0.29.1
     with:
-      # DEVIATION from the component, which resolves the runner through the
-      # governed selector: this repository is PUBLIC, and runner-policy admits
-      # the selector only for an enrolled private consumer
-      # (`components/runner-policy/README.md`, "Public repositories and
-      # repositories not enrolled for local CI cannot call the selector"), so
-      # this caller pins the approved hosted label directly.
+      # DEVIATION from the component, which names the managed fleet label:
+      # this repository is PUBLIC, and runner-policy admits a fleet label only
+      # for an enrolled private consumer (`public-self-hosted-routing`
+      # otherwise), so this caller pins the approved hosted label directly.
       runner: ubuntu-24.04
     # Pass only the one named secret (least privilege) rather than `secrets:
     # inherit`, which would forward every parent secret to the called workflow.
