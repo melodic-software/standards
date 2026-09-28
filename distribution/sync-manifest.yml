@@ -385,11 +385,6 @@ targets:
       - repository-text
       - shellcheck
       - typos
-    # The hosted review caller carries a job-level `concurrency.queue`, which
-    # the pinned actionlint rejects. ci-runner owns its actionlint config, so
-    # its `.github/actionlint.yaml` must extend the `queue` ignore to
-    # `.github/workflows/claude-review-hosted.yml` before the sync pull
-    # request that adds the caller can pass its own actionlint lane.
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
