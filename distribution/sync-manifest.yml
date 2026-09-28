@@ -50,7 +50,8 @@ components:
   # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
   # - Public targets: agent-plugins, ci-runner, claude-code-account-rotation,
-  #   codex-plugins and cursor-plugins take the HOSTED lane callers below,
+  #   claude-code-plugins, codex-plugins and cursor-plugins take the HOSTED
+  #   lane callers below,
   #   never these fleet-label ones (see the public-shape note below).
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
@@ -120,13 +121,6 @@ components:
   # "every managed target of a claude lane caller admits that caller" rule,
   # which rejects EVERY `components/claude-lanes/` public managed target
   # whatever label the caller names.
-  # The claude-code-plugins callers no longer block a managed sync on their own
-  # content: its PR 4465 and ci-workflows v0.29.0 removed its evidence job,
-  # local `skip-actors`, and all lane bookkeeping. They differ from these
-  # components only in the hosted runner (blockers 1 and 2) and in the
-  # security caller's workflow-level cancel-in-progress concurrency, which a
-  # managed sync would replace with the component's no-cancel job group. The
-  # claude-code-plugins `locally-owned` note below records the same trigger.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
@@ -467,6 +461,8 @@ targets:
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -481,22 +477,10 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-    # The lane callers name the managed fleet label, which runner-policy
-    # forbids a PUBLIC repository from routing to at all (`routingEnabled` is
-    # private-and-self-hosted only, and the ban consults neither `exceptions`
-    # nor `localRoutingGrants`). It owns hosted-only callers that pass
-    # `runner: ubuntu-24.04` directly, at the fleet callers' destinations.
-    # The synced hosted pair (`claude-review-hosted-caller`) sits at other
-    # destinations, so managing it here while its own callers remain would
-    # double-review. Adopting the pair means a repo-local PR deleting those
-    # callers first; that is a separate maintainer decision. Removal trigger: the `claude-security-review-caller`
-    # public/shared-shape blockers above (#377) clearing, that is (1) the
-    # runner choice moves inside the ci-workflows reusable and runner-policy
-    # gains a cross-repo routing kind, and (2) the blanket public-target
-    # claude-lanes test is narrowed. This
-    # repo's callers carry no evidence job or local `skip-actors` since its
-    # PR 4465 and ci-workflows v0.29.0, so after (1) and (2) a managed sync
-    # would change only the security caller's cancel-in-progress concurrency.
+    # Takes the hosted lane pair like the other public targets. Its former
+    # hand-written callers sat at the fleet destinations with the same
+    # workflow names and concurrency groups, and the sync never deletes a
+    # file, so a repo-local claude-code-plugins pull request deletes them.
     #
     # `ruff`: the canonical policy reports 385 findings against that tree
     # against 166 under upstream's bare defaults, so adoption is a migration
@@ -510,8 +494,6 @@ targets:
     # implicit policy nobody chose. Removal trigger: that migration being
     # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
-      - claude-review-caller
-      - claude-security-review-caller
       # Directory-source dogfooding: this repo's bootstrap carries same-version
       # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
