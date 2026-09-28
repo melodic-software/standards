@@ -385,9 +385,8 @@ differently for each lane:
 
 - Both components are `managed` for the private targets claude-code-proxy,
   dotfiles, github-iac, medley and provisioning, so every PR there gets both
-  advisory lanes. The public repos running a security lane today,
-  `claude-code-plugins` and `ci-workflows`, remain ineligible for the
-  fleet-routed shape.
+  advisory lanes. Public repos, `claude-code-plugins` and `ci-workflows`
+  among them, remain ineligible for the fleet-routed shape.
 
 Public targets take a hosted pair instead, as an interim (#622):
 `claude-review-hosted-caller` and `claude-security-review-hosted-caller`,
@@ -397,7 +396,8 @@ sourced from `components/claude-lanes-hosted/` and materialized at
 fleet sibling except for comments and `runner: ubuntu-24.04`; the workflow and
 job names match, so the check contexts do too. The destinations differ because
 a destination has one owning component. They are `managed` for agent-plugins,
-ci-runner, claude-code-account-rotation, codex-plugins and cursor-plugins.
+ci-runner, claude-code-account-rotation, claude-code-plugins, codex-plugins
+and cursor-plugins.
 `.github` stays exempt (near-zero PR traffic).
 
 - On a public repository the lanes review only pull requests from
@@ -412,12 +412,6 @@ ci-runner, claude-code-account-rotation, codex-plugins and cursor-plugins.
 - Removal trigger: the one-shape work below landing, after which the hosted
   pair retires.
 
-`melodic-software/claude-code-plugins` is `locally-owned` for the fleet
-components and keeps its hand-written hosted-only callers that pass
-`runner: ubuntu-24.04` directly, at the fleet destinations. Consequence to
-accept knowingly: that repo stays outside this normalization and re-pins by
-hand at each `ci-workflows` release.
-
 Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
 constraint, now stated over the fleet literal rather than the retired selector:
 "fleet-routed claude lane callers are not managed for a public sync target",
@@ -431,9 +425,7 @@ Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
 component across both visibilities (#377). That path also needs a cross-repo
 reusable routing kind in runner-policy and a deliberate narrowing of the blanket
-public-target test for `components/claude-lanes/`. claude-code-plugins'
-callers no longer carry a repo-owned evidence guard or `skip-actors` (removed
-with ci-workflows v0.29.0), so nothing else of theirs blocks the move.
+public-target test for `components/claude-lanes/`.
 
 ## managed-files-guard caller component
 
