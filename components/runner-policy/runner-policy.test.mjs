@@ -7725,14 +7725,14 @@ function isPublicTarget(target) {
   return visibility === "public";
 }
 
-async function claudeLaneCallerComponents() {
+async function claudeLaneCallerComponents(directory = "components/claude-lanes/") {
   const manifest = parse(
     await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
   );
   const components = [];
   for (const [component, definition] of Object.entries(manifest.components)) {
     for (const source of Object.keys(definition.files ?? {})) {
-      if (!source.startsWith("components/claude-lanes/")) continue;
+      if (!source.startsWith(directory)) continue;
       const body = await readFile(new URL(`../../${source}`, import.meta.url), "utf8");
       components.push({ component, source, body, manifest });
     }
@@ -8351,6 +8351,74 @@ test("every reusable contract at the v0.29.1 tag copies its predecessor forward 
   }
 });
 
+// The hosted lane callers (components/claude-lanes-hosted/) are the public
+// shape of the fleet callers: same bytes except comments and a hosted
+// `runner`, managed only for public targets, and never beside the fleet
+// variant of the same lane (distribution/sync-manifest.yml, the public-shape
+// note).
+const HOSTED_LANE_DIR = "components/claude-lanes-hosted/";
+
+function withoutComments(body) {
+  return body
+    .split("\n")
+    .filter((line) => !/^\s*#/u.test(line))
+    .map((line) => line.replace(/\s+#.*$/u, ""))
+    .join("\n");
+}
+
+test("each hosted claude lane caller equals its fleet sibling except for comments and runner", async () => {
+  const hosted = await claudeLaneCallerComponents(HOSTED_LANE_DIR);
+  assert.equal(hosted.length, 2, "expected a hosted code-review and security-review caller");
+  for (const { source, body } of hosted) {
+    const fleetSource = source.replace(HOSTED_LANE_DIR, "components/claude-lanes/");
+    const fleet = await readFile(new URL(`../../${fleetSource}`, import.meta.url), "utf8");
+    assert.match(body, /^ {6}runner: ubuntu-24\.04$/mu, `${source} must run on ubuntu-24.04`);
+    assert.equal(
+      withoutComments(body).replace(/^( {6}runner:) \S+$/mu, "$1"),
+      withoutComments(fleet).replace(/^( {6}runner:) \S+$/mu, "$1"),
+      `${source} drifted from ${fleetSource} beyond comments and runner`,
+    );
+  }
+});
+
+test("every managed target of a hosted claude lane caller is public and audits clean", async () => {
+  let asserted = 0;
+  for (const { component, source, body, manifest } of await claudeLaneCallerComponents(
+    HOSTED_LANE_DIR,
+  )) {
+    for (const [target, definition] of Object.entries(manifest.targets)) {
+      if (!(definition.managed ?? []).includes(component)) continue;
+      asserted += 1;
+      assert.ok(isPublicTarget(target), `${source} is managed for ${target}, which is private`);
+      const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
+      assert.deepEqual(
+        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        [],
+        `${source} is managed for ${target} (public, hosted-only) but does not audit clean there`,
+      );
+    }
+  }
+  assert.ok(asserted > 0, "expected at least one public target to manage a hosted lane caller");
+});
+
+test("no target manages both the fleet and the hosted caller of one lane", async () => {
+  const fleet = await claudeLaneCallerComponents();
+  const hosted = await claudeLaneCallerComponents(HOSTED_LANE_DIR);
+  const { manifest } = hosted[0];
+  for (const { component: hostedComponent, source } of hosted) {
+    const fleetSource = source.replace(HOSTED_LANE_DIR, "components/claude-lanes/");
+    const sibling = fleet.find((entry) => entry.source === fleetSource);
+    assert.ok(sibling, `${source} has no fleet sibling at ${fleetSource}`);
+    for (const [target, definition] of Object.entries(manifest.targets)) {
+      const managed = definition.managed ?? [];
+      assert.ok(
+        !(managed.includes(hostedComponent) && managed.includes(sibling.component)),
+        `${target} manages both ${sibling.component} and ${hostedComponent}; each lane would run twice`,
+      );
+    }
+  }
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
@@ -8361,7 +8429,10 @@ test("every reusable contract at the v0.29.1 tag copies its predecessor forward 
 // the real policy.json.
 test("the claude lane caller components all pin one ci-workflows revision", async () => {
   const pins = new Set();
-  for (const { source, body } of await claudeLaneCallerComponents()) {
+  for (const { source, body } of [
+    ...(await claudeLaneCallerComponents()),
+    ...(await claudeLaneCallerComponents(HOSTED_LANE_DIR)),
+  ]) {
     const found = [
       ...body.matchAll(/melodic-software\/ci-workflows\/[^@\s]+@([0-9a-f]{40})/gu),
     ].map(([, sha]) => sha);

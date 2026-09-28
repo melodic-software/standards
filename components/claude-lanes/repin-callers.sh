@@ -22,8 +22,9 @@ set -euo pipefail
 # asserts against them.
 readonly LANE_DIR='components/claude-lanes'
 
-# Sync-family and repo-local callers, plus the two managed-files-guard caller
-# components (hosted and fleet-routed), live outside LANE_DIR. They may
+# Sync-family and repo-local callers, the hosted lane caller components, and
+# the two managed-files-guard caller components (hosted and fleet-routed),
+# live outside LANE_DIR. They may
 # already pin a different SHA than the lane components; apply reads each
 # file's own pin rather than assuming one fleet-wide old SHA. The
 # managed-files-guard callers pin a composite ACTION rather than a reusable
@@ -34,6 +35,8 @@ readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
   '.github/workflows/claude-security-review.yml'
   '.github/workflows/sync.yml'
+  'components/claude-lanes-hosted/claude-review.yml'
+  'components/claude-lanes-hosted/claude-security-review.yml'
   'components/managed-files-guard/managed-files-guard.yml'
   'components/managed-files-guard/managed-files-guard-fleet.yml'
 )

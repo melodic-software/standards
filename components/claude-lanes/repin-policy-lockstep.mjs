@@ -38,13 +38,17 @@ const REPIN_TARGETS = [
     workflowPath: `${UPSTREAM}/.github/workflows/claude-review.yml`,
     callerFiles: [
       "components/claude-lanes/claude-review.yml",
+      "components/claude-lanes-hosted/claude-review.yml",
       ".github/workflows/claude-review.yml",
     ],
     kind: "lane",
   },
   {
     workflowPath: `${UPSTREAM}/.github/workflows/claude-security-review.yml`,
-    callerFiles: ["components/claude-lanes/claude-security-review.yml"],
+    callerFiles: [
+      "components/claude-lanes/claude-security-review.yml",
+      "components/claude-lanes-hosted/claude-security-review.yml",
+    ],
     kind: "lane",
   },
   {

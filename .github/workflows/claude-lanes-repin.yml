@@ -194,6 +194,7 @@ jobs:
           base: ${{ steps.default-branch.outputs.name }}
           add-paths: |
             components/claude-lanes
+            components/claude-lanes-hosted
             components/managed-files-guard
             components/runner-policy/policy.json
             components/runner-policy/runner-policy.test.mjs
@@ -209,8 +210,8 @@ jobs:
             ## Summary
 
             Re-pins every `melodic-software/ci-workflows` reference under
-            `components/claude-lanes/`, the `managed-files-guard` caller
-            component, and this repository's own sync-family callers from
+            `components/claude-lanes/` and `components/claude-lanes-hosted/`,
+            the `managed-files-guard` caller components, and this repository's own sync-family callers from
             `${{ steps.repin.outputs.old-tags }}`
             to `${{ steps.release.outputs.tag }}`
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
@@ -223,9 +224,9 @@ jobs:
             ${{ steps.policy-lockstep.outputs.policy-note }}
 
             Merging this cascades: `sync.yml` re-materializes the callers
-            into every target `distribution/sync-manifest.yml` marks
-            `claude-review-caller` / `claude-security-review-caller` /
-            `managed-files-guard-caller` managed for, as a reviewed pull
+            into every target `distribution/sync-manifest.yml` marks a lane
+            caller (fleet or hosted) or a `managed-files-guard` caller
+            managed for, as a reviewed pull
             request per target. This pull request is never auto-merged.
 
             ## Test plan

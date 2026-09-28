@@ -389,18 +389,43 @@ differently for each lane:
   `claude-code-plugins` and `ci-workflows`, remain ineligible for the
   fleet-routed shape.
 
-`melodic-software/claude-code-plugins`, the org's one public caller target, is
-`locally-owned` for both components and keeps its hand-written hosted-only
-callers that pass `runner: ubuntu-24.04` directly. Consequence to accept
-knowingly: that repo stays outside this normalization and re-pins by hand at
-each `ci-workflows` release.
+Public targets take a hosted pair instead, as an interim (#622):
+`claude-review-hosted-caller` and `claude-security-review-hosted-caller`,
+sourced from `components/claude-lanes-hosted/` and materialized at
+`.github/workflows/claude-review-hosted.yml` and
+`.github/workflows/claude-security-review-hosted.yml`. Each file equals its
+fleet sibling except for comments and `runner: ubuntu-24.04`; the workflow and
+job names match, so the check contexts do too. The destinations differ because
+a destination has one owning component. They are `managed` for agent-plugins,
+ci-runner, claude-code-account-rotation, codex-plugins and cursor-plugins.
+`.github` stays exempt (near-zero PR traffic).
+
+- On a public repository the lanes review only pull requests from
+  same-repository branches. Fork and Dependabot pull requests get no secrets,
+  so they get no review.
+- The sync never deletes a file. A target that moves between the hosted and
+  fleet variants must delete the old caller in a repo-local pull request, or
+  both run.
+- ci-runner owns its actionlint config, which must extend its `queue` ignore to
+  `.github/workflows/claude-review-hosted.yml` before its sync pull request can
+  pass.
+- Removal trigger: the one-shape work below landing, after which the hosted
+  pair retires.
+
+`melodic-software/claude-code-plugins` is `locally-owned` for the fleet
+components and keeps its hand-written hosted-only callers that pass
+`runner: ubuntu-24.04` directly, at the fleet destinations. Consequence to
+accept knowingly: that repo stays outside this normalization and re-pins by
+hand at each `ci-workflows` release.
 
 Three tests in `components/runner-policy/runner-policy.test.mjs` hold the
 constraint, now stated over the fleet literal rather than the retired selector:
 "fleet-routed claude lane callers are not managed for a public sync target",
 "claude lane caller components pass runner policy for a private self-hosted
 consumer", and "a fleet-routed claude lane caller is rejected outright on a
-public consumer".
+public consumer". Three more hold the hosted pair: it equals its fleet sibling
+except for comments and `runner`, every target managing it is public and
+audits clean, and no target manages both variants of one lane.
 
 Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed
