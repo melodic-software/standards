@@ -20,7 +20,7 @@
   // it makes no claim about which markdownlint-cli2 version a consumer runs.
   // markdownlint-schema-pin.test.sh fails the standards build if this drifts
   // from that package.json or from the root config.
-  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.23.2/schema/markdownlint-cli2-config-schema.json",
+  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.23.3/schema/markdownlint-cli2-config-schema.json",
   "ignores": [
     // Dependency and virtualenv trees — vendored, never authored, at any depth.
     "**/node_modules/**",
