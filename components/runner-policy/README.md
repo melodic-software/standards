@@ -999,6 +999,13 @@ each lane's status job go red when no review happened, and rewords the
 set is unchanged; the repin lane declined because that description moved and
 `standards-sync` throws the standing `needs` decline. No secret, caller
 permission or `runs-on` routing moved.
+Both lanes and `standards-sync` are also registered at the v0.30.1 tag
+`35880dcbb2f174aac90159e276dc7eddf1bc20b9`, verbatim copies of their v0.29.1
+entries. The lanes only bump their pinned `anthropics/claude-code-action` from
+v1.0.231 to v1.0.235, and `standards-sync` is byte-identical. The repin lane
+declined the lanes because the step carrying their credential references
+changed its `uses`, and `standards-sync` on the standing `needs` decline. No
+input, secret, caller permission or `runs-on` routing moved.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

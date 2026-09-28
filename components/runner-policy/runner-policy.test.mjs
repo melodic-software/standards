@@ -35,6 +35,7 @@ const REPINE_LANE_SHA_V0_28_0 = "39390344a0fef0671d3e5a7546dd03af7a36b8f5";
 const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
 const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
 const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
+const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8416,6 +8417,22 @@ test("no target manages both the fleet and the hosted caller of one lane", async
         `${target} manages both ${sibling.component} and ${hostedComponent}; each lane would run twice`,
       );
     }
+  }
+});
+
+// v0.30.1 moves no input, secret, permission or routing field: the lanes only
+// bump claude-code-action, standards-sync is byte-identical.
+test("every reusable contract at the v0.30.1 tag copies its v0.29.1 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_1}`];
+    assert.ok(previous, `expected a v0.29.1 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_30_1}`],
+      previous,
+      `${reusable} at the v0.30.1 tag is not a verbatim copy of its v0.29.1 entry`,
+    );
   }
 });
 
