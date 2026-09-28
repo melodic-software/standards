@@ -844,6 +844,7 @@ function verifyTargetIdentity(targetRoot, expected) {
   }
   const url = urls[0];
   const match =
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: false positive, RegExp.exec can return null (biomejs/biome#11963)
     /^https:\/\/github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)\/?$/.exec(url) ??
     /^git@github\.com:([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/.exec(url) ??
     /^ssh:\/\/git@github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/.exec(url);
