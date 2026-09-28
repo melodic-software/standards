@@ -20,6 +20,7 @@ import {
   parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
+  parseValidatorPatterns,
   parseValidatorSections,
 } from "./lockstep-drift.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
@@ -441,6 +442,13 @@ test("validator keyword/marker regressions are caught functionally", () => {
   assert.equal(errors.length, 1);
   assert.match(errors[0], /"Resolves"/);
   assert.match(errors[0], /"No related issue"/);
+});
+
+test("validator CLOSING_ERE is read from its own declaration, not NON_CLOSING_ERE", () => {
+  const [closing, nonClosing, ...rest] = GOOD_VALIDATOR.split("\n");
+  const swapped = [nonClosing, closing, ...rest].join("\n");
+  assert.match(parseValidatorPatterns(swapped, "validator").keyword.source, /^\(close/);
+  assert.throws(() => parseValidatorPatterns([nonClosing, ...rest].join("\n"), "v"), DriftError);
 });
 
 test("validator that matches its EREs against un-lowercased text is drift", () => {

@@ -301,8 +301,9 @@ const VALIDATOR_OPERANDS = {
 };
 
 export function parseValidatorPatterns(shellText, location) {
-  const keyword = shellText.match(/CLOSING_ERE='([^']+)'/);
-  const marker = shellText.match(/NO_ISSUE_ERE='([^']+)'/);
+  // Line-anchored, so the sibling NON_CLOSING_ERE declaration never matches.
+  const keyword = shellText.match(/^CLOSING_ERE='([^']+)'/m);
+  const marker = shellText.match(/^NO_ISSUE_ERE='([^']+)'/m);
   if (!keyword || !marker) {
     throw new DriftError(`${location}: CLOSING_ERE / NO_ISSUE_ERE declarations not found`);
   }
