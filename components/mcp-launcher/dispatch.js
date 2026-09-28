@@ -2,6 +2,10 @@ const { execSync, spawn } = require("node:child_process");
 const os = require("node:os");
 const path = require("node:path");
 
+const QUOTE_RE = /(\\*)"/g;
+const TRAILING_BACKSLASHES_RE = /(\\+)$/;
+const CMD_META_RE = /([()[\]%!^"`<>&|;, *?])/g;
+
 function attachLifecycle(child, label) {
   for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => child.kill(sig));
@@ -18,23 +22,32 @@ function attachLifecycle(child, label) {
   });
 }
 
+// Quote one argument for npx.cmd. First the C runtime rules node.exe parses
+// argv with: backslashes before a quote or the closing quote are doubled and
+// each quote becomes \". Then every cmd metacharacter, the quotes included, is
+// escaped twice with ^: once for `cmd /c`, once for the shim's `%*` line.
+function escapeCmdShimArg(arg) {
+  const quoted = `"${arg.replace(QUOTE_RE, '$1$1\\"').replace(TRAILING_BACKSLASHES_RE, "$1$1")}"`;
+  return quoted.replace(CMD_META_RE, "^^^$1");
+}
+
 function runNpx(npxArgs) {
   const isWindows = process.platform === "win32";
   const nodeDir = path.dirname(process.execPath);
   const npxBinary = isWindows ? path.join(nodeDir, "npx.cmd") : path.join(nodeDir, "npx");
   if (isWindows) {
     // On Windows, spawn `cmd /d /s /c` with the entire command line pre-quoted:
-    //   cmd /d /s /c ""C:\Program Files\nodejs\npx.cmd" "arg1" "arg2""
+    //   cmd /d /s /c ""C:\Program Files\nodejs\npx.cmd" ^^^"arg1^^^" ..."
     // cmd's /s flag with /c strips one outer quote pair, then parses the
-    // remaining tokens. Each arg is independently double-quoted so paths
-    // with spaces survive cmd tokenization (e.g., default Node install
-    // under `C:\Program Files\nodejs\`).
+    // remaining tokens. The binary is quoted so a path with spaces survives
+    // (default install under `C:\Program Files\nodejs\`); each arg goes
+    // through escapeCmdShimArg.
     //
     // windowsVerbatimArguments: true prevents Node from re-escaping the
     // already-quoted args. Avoids the DEP0190 deprecation from
     // `{ shell: true }` + args array (Node ≥22 warns; CVE-2024-27980 fix
     // path).
-    const inner = `"${npxBinary}" ${npxArgs.map((a) => `"${a}"`).join(" ")}`;
+    const inner = `"${npxBinary}" ${npxArgs.map(escapeCmdShimArg).join(" ")}`;
     attachLifecycle(
       spawn("cmd.exe", ["/d", "/s", "/c", `"${inner}"`], {
         stdio: "inherit",
@@ -133,4 +146,11 @@ function dispatch(forwardArgs) {
   runNpx(forwardArgs);
 }
 
-module.exports = { attachLifecycle, dispatch, resolveWorktreeRoot, runNpx, runRepo };
+module.exports = {
+  attachLifecycle,
+  dispatch,
+  escapeCmdShimArg,
+  resolveWorktreeRoot,
+  runNpx,
+  runRepo,
+};
