@@ -27,8 +27,9 @@ readonly LANE_DIR='components/claude-lanes'
 # already pin a different SHA than the lane components; apply reads each
 # file's own pin rather than assuming one fleet-wide old SHA. The
 # managed-files-guard callers pin a composite ACTION rather than a reusable
-# workflow: they ride this cascade for the pin rewrite alone and has no runner-policy contract for the lockstep half to
-# copy forward (components/managed-files-guard/README.md).
+# workflow: they ride this cascade for the pin rewrite alone and have no
+# runner-policy contract for the lockstep half to copy forward
+# (components/managed-files-guard/README.md).
 readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
   '.github/workflows/claude-security-review.yml'
