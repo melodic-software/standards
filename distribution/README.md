@@ -237,6 +237,7 @@ The `runner-policy` component materializes one atomic runtime at
 adoption list rather than a visibility class; note `claude-code-plugins` is
 public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 
+- `melodic-software/claude-code-account-rotation`
 - `melodic-software/claude-code-plugins`
 - `melodic-software/dotfiles`
 - `melodic-software/github-iac`
@@ -283,9 +284,9 @@ must add all of the following in the same integration PR:
 standards#556 (merged as `771a796628f325c3c418c7b397d09fb7211e2972`) removed its
 grammar from this component, taking `schemaVersion` from 3 to 4. No consumer
 writes a `needs.<selector>.outputs.runner` fallback expression any more, and
-nothing reads `vars.CI_HOSTED_RUNNER`; that organization variable still exists,
-like the others the selector consumed, and its removal is covered by the
-same Phase 7 step 5 apply described in the caller-component bullet below. The
+nothing reads `vars.CI_HOSTED_RUNNER`. github-iac's Phase 7 step 5 apply
+(2026-09-08) deleted that organization variable and every other variable the
+selector consumed. The
 `ci-runner-selection-failed` marker is not a shape a consumer may write either,
 though it survives in `policy.json` and `policy.schema.json` as a
 `failureSentinelMarker` the analyzer validates stays outside every hosted and
@@ -356,13 +357,11 @@ in `ci-workflows`; only the caller files are managed bytes.
 What stays consumer-owned:
 
 - The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
-  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables are
-  no longer read by anything, because the selector that consumed them is deleted
-  (ci-workflows#569); they still exist at organization scope, and their removal
-  with their Pulumi declarations is decided pending github-iac's Phase 7 step 5
-  apply. github-iac's `README.md` "Local CI routing governance" owns the exact
-  list and its status. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob but is
-  not one of them; it is the observer key named above and it stays.
+  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables
+  are gone: the selector that read them was deleted (ci-workflows#569), and
+  github-iac's Phase 7 step 5 apply (2026-09-08) deleted the variables and
+  their Pulumi declarations. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob
+  but was never one of them; it is the observer key named above and it stays.
 
 The security lane has no path gating from ci-workflows v0.29.0: it reviews every
 non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths` file is

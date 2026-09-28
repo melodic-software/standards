@@ -12,8 +12,10 @@
     Lefthook runs) and passes it explicitly: Invoke-ScriptAnalyzer does not reliably auto-discover
     a root settings file when the analyzed path is in a subdirectory, so without this the consumer's
     ruleset would be silently ignored. Each target runs exactly once in its own fresh no-profile pwsh
-    worker. PSScriptAnalyzer 1.25.0 can leak engine state between sequential targets in one process and
-    intermittently throw a NullReferenceException even though every target passes in isolation.
+    worker. PSScriptAnalyzer 1.25.0 runs rules in parallel against a shared cached CommandInfo, which
+    intermittently throws a NullReferenceException on files that call Export-ModuleMember or when
+    PSUseCorrectCasing is enabled (PowerShell/PSScriptAnalyzer#1867, #1708; fixed upstream in #2206).
+    A fresh worker per target keeps one failure from masking other targets; it does not prevent the race.
 
     The PSScriptAnalyzer component owns the rules; this adapter only orchestrates isolated invocations.
     CI remains the authoritative gate and this lane is fast staged-file feedback.

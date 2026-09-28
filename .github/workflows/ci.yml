@@ -70,7 +70,7 @@ concurrency:
   cancel-in-progress: true
 
 # Public repository: every lane runs on GitHub-hosted ubuntu-24.04 (free for
-# public repositories); the local-runner selector is not permitted here. The
+# public repositories); a managed fleet label is not permitted here. The
 # ci-status gateway aggregates the same lane IDs, so required check names do
 # not change. Workload steps are route-independent: pinned setup/composite
 # actions install every tool, and setup-action caches are GitHub-managed.

@@ -633,7 +633,7 @@ assert_eq 'lefthook-dotnet production CLI source is executable in the Git index'
 # Exercise every production target that carries either CLI, not only the
 # generic executable fixture. Each CLI's assertions run only where the target
 # manages that component: a public .NET target carries lefthook-dotnet without
-# runner-policy (runner-policy is a private selector-routed consumer's file).
+# runner-policy (runner-policy is a private fleet-routed consumer's file).
 # Linux is the deployment environment that records worktree modes in
 # materialization PR indexes; source-index assertions remain
 # platform-independent and fail before apply if either production mode regresses.
@@ -690,13 +690,13 @@ done < <(
     "$actual_manifest"
 )
 
-expected_runner_policy_targets='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
+expected_runner_policy_targets='["melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
 actual_runner_policy_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'runner-policy covers exactly the five enrolled consumers' \
+assert_eq 'runner-policy covers exactly the six enrolled consumers' \
   "$expected_runner_policy_targets" "$actual_runner_policy_targets"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(

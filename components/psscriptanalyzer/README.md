@@ -25,5 +25,5 @@ Lefthook adapter invokes every staged target exactly once in a distinct process,
 continues after an engine error, and fails the overall hook. It then repeatedly
 starts the exact historical six-file no-profile hook contract, followed by the
 current staged set, against pinned PSScriptAnalyzer 1.25.0. This covers both the
-`PSUseCorrectCasing` exclusion for issue #1708 and the separate intermittent
-cross-target engine-state failure that requires process isolation.
+`PSUseCorrectCasing` exclusion for issue #1708 and the intermittent CommandInfo
+race (issue #1867), which a per-target worker contains but does not prevent.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Canonical repo cloud bootstrap (SSOT). Materialized to each fleet repo's
 # .claude/cloud-bootstrap.sh by distribution/sync-manifest.yml, so edits land
-# here by pull request and fan out as reviewed sync PRs — never by patching a
+# here by pull request and fan out as reviewed sync PRs; never by patching a
 # repo's materialized copy. Repo-specific work does not belong here: a repo
 # enriches through its own .claude/cloud-bootstrap.local.sh (run below,
 # never synced), or takes the component locally-owned in the manifest to
@@ -12,7 +12,7 @@
 #      session process launches. Claude Code builds its plugin/command/skill
 #      registry at process start and never re-reads it, so this pre-launch
 #      call is the only path that gets plugins loaded at turn one.
-#   2. The SessionStart hook (startup|resume), as drift repair — the
+#   2. The SessionStart hook (startup|resume), as drift repair: the
 #      environment cache can be ~7 days stale. Plugins it installs go live
 #      at the next resume, not in the session that ran the hook.
 # Outside cloud sessions this exits immediately: declaring a marketplace is
@@ -22,8 +22,8 @@
 # Idempotent and best effort: a failed step costs a tool or a plugin, never
 # the session.
 #
-# Everything below is data-driven from the repo's own manifests — .node-version,
-# package-lock.json, global.json, .claude/settings.json — so this file carries
+# Everything below is data-driven from the repo's own manifests (.node-version,
+# package-lock.json, global.json, .claude/settings.json), so this file carries
 # no repo names, no pinned versions, and no marketplace identifiers.
 #
 # Both callers run `bash <this script>`, so the interpreter is whatever `bash`
@@ -55,7 +55,7 @@ fi
 # exit 0 when `claude` or `jq` is missing, and the toolchain must not be
 # collateral damage of an unrelated CLI being absent. The cloud VM is a fresh
 # Ubuntu image shipping Node 20/21/22 and no .NET, so without this a session
-# builds and lints on the wrong toolchain — the failure a live cloud
+# builds and lints on the wrong toolchain: the failure a live cloud
 # verification run confirmed across the fleet. The shared environment's setup
 # script pre-installs a warm cache of common pins; this stage is the
 # correctness guarantee and must not assume the cache installed anything.
@@ -63,14 +63,14 @@ fi
 # Subshell with its own errexit posture: this file runs under `set -e`, and a
 # failed optional install must cost a toolchain, never the session. The
 # subshell ends in an explicit `exit 0` rather than being wrapped in
-# `|| true` — wrapping would put every call inside it in an `||` context,
+# `|| true`: wrapping would put every call inside it in an `||` context,
 # which is what .shellcheckrc's check-set-e-suppressed (SC2310) exists to flag.
 (
   set +e
 
   toolchain_warn() { printf 'cloud-bootstrap: %s\n' "$*" >&2; }
 
-  # env_line <export-line> — append to the session env file once. Dedup-guarded
+  # env_line <export-line>: append to the session env file once. Dedup-guarded
   # because SessionStart fires again on resume.
   env_line() {
     [[ -n "${CLAUDE_ENV_FILE:-}" ]] || return 0
@@ -133,7 +133,7 @@ fi
           bash "$installer" --version "$sdk" --install-dir .dotnet >/dev/null 2>&1; then
           :
         else
-          toolchain_warn "dotnet $sdk install failed — check the environment's network allowlist (dot.net, aka.ms, builds.dotnet.microsoft.com, download.visualstudio.microsoft.com)"
+          toolchain_warn "dotnet $sdk install failed: check the environment's network allowlist (dot.net, aka.ms, builds.dotnet.microsoft.com, download.visualstudio.microsoft.com)"
         fi
         rm -f "$installer"
       fi
@@ -146,7 +146,7 @@ fi
   fi
 
   # Git history: base-ref diffs (several plugin suites use origin/main) break
-  # on the shallow single-branch cloud clone — deepen it and make origin/main
+  # on the shallow single-branch cloud clone; deepen it and make origin/main
   # resolve. The explicit destination refspec matters: in a single-branch
   # clone a bare `fetch origin main` only writes FETCH_HEAD and never creates
   # refs/remotes/origin/main. `main` is the fleet's default branch.
@@ -179,8 +179,8 @@ fi
   fi
 
   # --- Repo extension (enrich seam) -----------------------------------------
-  # A repo appends its own setup — extra lockfiles, pinned hygiene binaries,
-  # symlinks — in this committed, never-synced sibling. Same contract as this
+  # A repo appends its own setup (extra lockfiles, pinned hygiene binaries,
+  # symlinks) in this committed, never-synced sibling. Same contract as this
   # file: idempotent, best effort, bash-3.2-safe. Deliberately inside this
   # subshell so it inherits the nvm-selected Node on PATH and the
   # warn-never-fatal posture, plus this script's environment
@@ -199,16 +199,16 @@ fi
 )
 
 # --- Session-start hook output ----------------------------------------------
-# When the SessionStart hook is the caller, stdout is parsed as hook output —
-# that is why every summary in this script goes to stderr — and this line asks
+# When the SessionStart hook is the caller, stdout is parsed as hook output
+# (that is why every summary in this script goes to stderr), and this line asks
 # for a skills re-scan for whatever the harness can pick up mid-session (the
 # plugin registry itself is only rebuilt at the next process start). From the
 # pre-launch caller it lands harmlessly in the setup log.
 #
 # Emitted here, before the plugin stage, because the toolchain subshell and
 # the repo's own cloud-bootstrap.local.sh above may already have materialized
-# skills worth rescanning, and every way the plugin stage can end early — no
-# `claude`, no `jq`, no fleet list, or an unexpected failure under `set -e` —
+# skills worth rescanning, and every way the plugin stage can end early (no
+# `claude`, no `jq`, no fleet list, or an unexpected failure under `set -e`)
 # would otherwise swallow the request along with the installs. Nothing below
 # writes to stdout, so this stays the only line the harness parses.
 printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'
@@ -243,7 +243,7 @@ fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
 # JSON of the wrong shape (a bare array, enabledPlugins as an array) ends the
 # plugin stage: every read below is a jq expression that expects the settings
 # shape, and an existence check alone lets a wrong-shaped file through to fail
-# there. Skipping is the whole answer — drift repair has no set to repair
+# there. Skipping is the whole answer: drift repair has no set to repair
 # against without the list, and the repo file declares deltas, not a set. The
 # gate is a shape test, not a content test: an object carrying no
 # enabledPlugins at all is a valid empty source and passes. Exiting here
@@ -336,7 +336,7 @@ install_plugins_from "$settings" "repo $settings"
 
 # Catalog inventory line. Everything above installs strictly what the fleet
 # list and the repo declare, so a plugin added to a marketplace after both
-# were written is not installed and nothing says so — the gap surfaces only
+# were written is not installed and nothing says so: the gap surfaces only
 # when someone types a slash command that does not resolve, which is exactly
 # how it has surfaced. Each registered marketplace is already cloned to disk
 # by the `marketplace add` above, so naming the difference costs one jq pass

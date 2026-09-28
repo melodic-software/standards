@@ -7788,10 +7788,7 @@ const MANAGED_LABEL_REGEXES = BASE_POLICY.managedLabelPatterns.map(
 );
 
 function routesToTheManagedFleet(body) {
-  return (
-    body.includes("/select-runner.yml@") ||
-    MANAGED_LABEL_REGEXES.some((pattern) => pattern.test(body))
-  );
+  return MANAGED_LABEL_REGEXES.some((pattern) => pattern.test(body));
 }
 
 test("fleet-routed claude lane callers are not managed for a public sync target", async () => {

@@ -3,9 +3,8 @@
 .SYNOPSIS
     Analyzes one PowerShell target in an isolated process for the staged-file adapter.
 .DESCRIPTION
-    This internal worker is launched once per target by psscriptanalyzer-staged.ps1. Process
-    isolation prevents PSScriptAnalyzer engine state from leaking between targets while preserving
-    fail-closed behavior: analyzer errors and findings both return nonzero, and no target is retried.
+    This internal worker is launched once per target by psscriptanalyzer-staged.ps1. It is
+    fail-closed: analyzer errors and findings both return nonzero, and no target is retried.
 .PARAMETER Target
     The one PowerShell file to analyze.
 .PARAMETER Settings
