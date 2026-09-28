@@ -11,16 +11,24 @@ ADR-0007 assigned to a downstream hand-edit of a managed file
 binary, the fix path is always a standards change, and the guard is what
 makes a hand-edit visible before the next sync silently reverts it.
 
-`managed-files-guard.yml` is the component's one file. The
-`managed-files-guard-caller` manifest component materializes it at
-`.github/workflows/managed-files-guard.yml` in every target that manages it.
-It is the second recorded exception to the rule that workflow callers stay
+Two files, one per `runner-policy` inventory, identical except for `runs-on`
+and their headers:
+
+| Manifest component | Source | Destination | `runs-on` |
+| --- | --- | --- | --- |
+| `managed-files-guard-caller` | `managed-files-guard.yml` | `.github/workflows/managed-files-guard.yml` | `ubuntu-24.04` |
+| `managed-files-guard-fleet-caller` | `managed-files-guard-fleet.yml` | `.github/workflows/managed-files-guard-fleet.yml` | `melodic-ubuntu-24.04-x64` |
+
+Both carry the same action pin and the same job name, so the check context is
+`managed-files-guard` on every target. The destinations differ because the
+manifest requires each destination to have one owning component.
+The guard caller is the second recorded exception to the rule that workflow callers stay
 consumer-owned (`distribution/README.md`), for the same reason as the Claude
 review-lane callers: a fleet-wide guard is only a signal if every target runs
 the same caller at the same pin, and the sync is the one mechanism that holds
 that.
 
-## Rollout: advisory first, hosted-only first
+## Rollout: advisory first, one caller per runner inventory
 
 **Advisory soak.** The check is not aggregated into any target's `ci-status`
 and is not a required context anywhere. It runs on every pull request,
@@ -39,35 +47,39 @@ it, and the next sync reverts the edit; the durable fix is the action
 absorbing the consumer
 checkout, which needs a ci-workflows release.
 
-**Hosted-only first hop.** The caller runs on `ubuntu-24.04` directly, naming
-the approved hosted label and nothing else. `runner-policy` admits that shape
-on a public repository and on a private repository not enrolled for local CI
-routing, so one file serves both without a per-visibility variant. This hop is
-therefore managed for exactly the hosted-only-eligible targets:
+**Hosted caller.** `managed-files-guard.yml` runs on `ubuntu-24.04`
+directly. `runner-policy` admits that shape on a public repository and on a
+private repository not enrolled for local CI routing. It is managed for
+`melodic-software/.github`, `agent-plugins`, `ci-runner`,
+`claude-code-account-rotation`, `claude-code-plugins`, `codex-plugins`, and
+`cursor-plugins`, all public. `claude-code-plugins` is the one consumer here
+that also executes the `runner-policy` gate;
+`components/runner-policy/runner-policy.test.mjs` asserts this caller audits
+clean under a public hosted-only inventory so the sync cannot red that
+target's `ci-status`.
 
-- `melodic-software/.github`, `agent-plugins`, `ci-runner`,
-  `claude-code-account-rotation`, `claude-code-plugins`, `codex-plugins`,
-  `cursor-plugins` (public), and `claude-code-proxy` (private, not enrolled for
-  local CI routing).
-
-`claude-code-plugins` is the one consumer here that also executes the
-`runner-policy` gate; `components/runner-policy/runner-policy.test.mjs`
-asserts this caller audits clean under a public hosted-only inventory so
-the sync cannot red that target's `ci-status`.
-
-**Excluded this hop: the fleet-routed targets.** `dotfiles`,
-`github-iac`, `medley`, and `provisioning` are private targets enrolled for
-local CI routing (each manages `runner-policy` and a
-`components/claude-lanes/`-sourced Claude lane caller). There,
+**Fleet-routed caller.** `managed-files-guard-fleet.yml` runs on the managed
+fleet label `melodic-ubuntu-24.04-x64`. It is managed for the private targets
+enrolled for local CI routing: `claude-code-proxy`, `dotfiles`, `github-iac`,
+`medley`, and `provisioning`. On a routing-enrolled repository,
 `runner-policy` requires every eligible read-only job either to name the
-managed fleet label or to carry a reviewed hosted exception, and a fixed
-`runs-on: ubuntu-24.04` job with neither fails the gate. A public-safe hosted
-caller cannot name the fleet label without becoming a different file, so those
-four take a **fleet-label sibling component** in a second hop. Removal
-trigger: that sibling landing; this component's target list does not grow to
-include them. The contract test holds the boundary mechanically: no target
-may manage this caller and a `components/claude-lanes/`-sourced caller at
-once.
+managed fleet label or to carry a reviewed hosted exception, so a fixed
+`runs-on: ubuntu-24.04` job fails the gate there, and the fleet label is
+refused on a public repository. `runner-policy.test.mjs` asserts the sibling
+audits clean on each managing target and is refused on a public consumer.
+`claude-code-proxy` runs no `runner-policy` gate today, but it is
+fleet-enrolled in github-iac and its CI already runs on the fleet label.
+
+The contract test holds the boundary mechanically: a target that manages a
+`components/claude-lanes/`-sourced caller must manage the fleet-routed guard
+and not the hosted one, and no target manages both.
+
+The sync never deletes a file. `claude-code-proxy` managed the hosted caller
+before the fleet-routed one existed, so its old
+`.github/workflows/managed-files-guard.yml` stays until a one-time
+claude-code-proxy pull request deletes it. Until then both workflows there
+share the name `managed-files-guard` and so one concurrency group, and each
+pull request event cancels one of the two runs.
 
 **Locally owned by `ci-workflows`.** ci-workflows hosts the action and
 already runs the guard as a job of its own `ci.yml`, through a `./` action
@@ -82,8 +94,11 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-The admitted pin is `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0). It
-supersedes `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
+Both files pin `0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9` (v0.29.1) today,
+and the pin moves with each ci-workflows release through the cascade below.
+The earlier pins are recorded because of what they fixed:
+`2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
+`5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
 superseded `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
 ci-workflows#530), the commit that closed the guard's fail-open on an
 unreadable diff: before it, an unfetched or bogus ref produced an empty change
@@ -121,9 +136,10 @@ the guard executes); do not pin it in this hop.
 The action pin rides the existing `claude-lanes-repin` cascade
 (`.github/workflows/claude-lanes-repin.yml`, daily), which resolves the
 newest full-SemVer ci-workflows release and rewrites every enumerated caller
-to its SHA with a `# vX.Y.Z` comment. This file is enumerated in
-`components/claude-lanes/repin-callers.sh`'s `EXTRA_CALLER_FILES` and in the
-workflow's `add-paths`, so the same reviewed pull request that re-pins the
+to its SHA with a `# vX.Y.Z` comment. Both files are enumerated in
+`components/claude-lanes/repin-callers.sh`'s `EXTRA_CALLER_FILES`, and the
+workflow's `add-paths` covers the whole `components/managed-files-guard`
+directory, so the same reviewed pull request that re-pins the
 lane callers re-pins the guard and the sync fans it out.
 
 Two properties of that ride are deliberate:
@@ -162,7 +178,7 @@ Two properties of that ride are deliberate:
 - **Owner:** the standards repository maintainers (the manifest and the
   Claude lane callers share the same owner); the ci-workflows maintainers own
   the action itself.
-- **Acceptance during soak:** across the seven live consumers, every finding
+- **Acceptance during soak:** across the live consumers, every finding
   is either a real downstream hand-edit of a managed destination (the check
   is doing its job) or a classified defect in the action or manifest; the
   `standards-sync` label / `melodic-standards-sync[bot]` actor exemption
@@ -196,16 +212,17 @@ Two properties of that ride are deliberate:
 
 ## Verification
 
-`managed-files-guard.test.sh` asserts, against the parsed YAML: the
-`pull_request` trigger; `contents: read` as the whole grant; the canonical
-`concurrency-policy` block and nothing else in it; one job on the literal
-approved hosted label with a 10-minute timeout, calling no reusable
-workflow; a full-history, credential-free checkout pinned like the sibling
-workflows; the action pinned by full SHA with a comment the
-`pin-comment-convention` library accepts; and `standards-ref: main`. It then
-checks the manifest wiring (destination path, hosted-only targets only,
-ci-workflows `locally-owned`, every target accounted for) and materializes
-each managing target through the real engine, asserting byte-identity at the
+`managed-files-guard.test.sh` asserts, against the parsed YAML of each file:
+the `pull_request` trigger; `contents: read` as the whole grant; the
+canonical `concurrency-policy` block and nothing else in it; one job on its
+literal label with a 10-minute timeout, calling no reusable workflow; a
+full-history, credential-free checkout pinned like the sibling workflows; the
+action pinned by full SHA with a comment the `pin-comment-convention` library
+accepts; and `standards-ref: main`. It asserts the two files carry the same
+action pin and differ only in comments and `runs-on`. It then checks the
+manifest wiring (destination paths, fleet-routed targets on the fleet-routed
+caller only, no target on both, ci-workflows `locally-owned`, every target
+accounted for) and materializes each managing target through the real engine, asserting byte-identity at the
 destination and, when `actionlint` is on PATH, a clean lint there.
 `components/claude-lanes/repin-callers.test.sh` covers the cascade half,
 including the ahead-of-release fence.

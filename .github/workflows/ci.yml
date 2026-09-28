@@ -712,7 +712,7 @@ jobs:
     uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
     with:
       runner: ubuntu-24.04
-      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml
+      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml components/managed-files-guard/managed-files-guard-fleet.yml
       fail-on-severity: high
 
   osv-scanner:

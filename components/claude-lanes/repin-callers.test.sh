@@ -406,6 +406,7 @@ YAML
 # release may advance it, and the rewrite must land the tag form.
 guard_sha='c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6'
 guard_caller='components/managed-files-guard/managed-files-guard.yml'
+guard_fleet_caller='components/managed-files-guard/managed-files-guard-fleet.yml'
 mkdir -p "$repo/components/managed-files-guard"
 cat > "$repo/$guard_caller" <<YAML
 name: managed-files-guard
@@ -415,6 +416,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-01
 YAML
+cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
 # Fallback pin is contained by the release (compare `behind`); date is
@@ -436,8 +438,8 @@ mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/.github/workflows/sync.yml \
   "$repo"/.github/workflows/claude-review.yml \
   "$repo"/.github/workflows/claude-security-review.yml \
-  "$repo/$guard_caller" | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '6' "$mixed_pins"
+  "$repo/$guard_caller" "$repo/$guard_fleet_caller" | wc -l | tr -d ' ')"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
   "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
@@ -447,6 +449,8 @@ assert_contains 'apply: mixed-SHA extras include sync.yml' "$mixed_paths" '.gith
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
   '.github/workflows/claude-review.yml'
 assert_contains 'apply: mixed-SHA extras include the guard caller component' "$mixed_paths" "$guard_caller"
+assert_contains 'apply: mixed-SHA extras include the fleet guard caller component' "$mixed_paths" \
+  "$guard_fleet_caller"
 unset STUB_COMPARE_STATUS
 
 # ------------------------------------------ apply: a pin ahead of the release
@@ -478,6 +482,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-30
 YAML
+cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned ahead of the release'
 out_file="$scratch/out-apply-ahead"
@@ -493,7 +498,7 @@ assert_eq 'apply: the ahead file stays byte-identical' \
 assert_not_contains 'apply: the ahead SHA is not handed to lockstep as an old SHA' \
   "$(grep '^old-sha=' "$out_file")" "$guard_sha"
 assert_contains 'apply: the version note names the file left untouched' "$(cat "$out_file")" \
-  "(${new_sha}): \`${guard_caller}\`. Those pins advance"
+  "(${new_sha}): \`${guard_caller}\`, \`${guard_fleet_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
 assert_eq 'apply: every other enumerated pin still advances' '5' "$ahead_pins"
@@ -509,6 +514,7 @@ for extra in sync.yml claude-review.yml claude-security-review.yml; do
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
+cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
 export STUB_COMPARE_STATUS=ahead
@@ -529,6 +535,7 @@ for extra in sync.yml claude-review.yml claude-security-review.yml; do
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
+cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, contained'
 export STUB_COMPARE_STATUS=behind
@@ -549,6 +556,7 @@ for extra in sync.yml claude-review.yml claude-security-review.yml; do
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
+cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'compare lookup fails'
 export STUB_COMPARE_STATUS=fail
