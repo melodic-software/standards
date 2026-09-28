@@ -690,13 +690,13 @@ done < <(
     "$actual_manifest"
 )
 
-expected_runner_policy_targets='["melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
+expected_runner_policy_targets='["melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
 actual_runner_policy_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'runner-policy covers exactly the five enrolled consumers' \
+assert_eq 'runner-policy covers exactly the six enrolled consumers' \
   "$expected_runner_policy_targets" "$actual_runner_policy_targets"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(

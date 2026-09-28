@@ -419,14 +419,13 @@ targets:
   # Renamed from account-rotation on 2026-09-07 (github-iac aliases the old name).
   # Adopted 2026-09-05 at repository creation (github-iac governs it; the
   # Pulumi entry and this target land in the same window). A public .NET tool
-  # repo, so the set is github-iac's minus three things.
+  # repo, so the set is github-iac's minus two things.
   # `claude-settings-github-iac` is that target's own settings file.
   # `runner-policy` is an adoption list, not a visibility class (README
   # "Runner-policy consumer handoff"; claude-code-plugins is public and
-  # enrolled), and claude-code-account-rotation is not enrolled yet: enrollment is a
-  # separate consumer change (a repo-local `.github/runner-policy.json` with
-  # `selfHostedCi: false` plus the CI job) to take up with the requires-ci
-  # flip, at which point the component joins this list. Both
+  # enrolled). claude-code-account-rotation enrolled with
+  # claude-code-account-rotation#98: a repo-local `.github/runner-policy.json`
+  # with `selfHostedCi: false` and the gate steps in its CI. Both
   # `components/claude-lanes/` callers name the private fleet's runner label
   # and are refused on a public repository (see the
   # `claude-security-review-caller` note above); hosted lane callers arrive
@@ -447,6 +446,7 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - review-instructions
+      - runner-policy
       - shellcheck
       - typos
     # Armed as of 2026-09-22: claude-code-account-rotation#95 landed the ci.yml
