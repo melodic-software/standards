@@ -237,6 +237,7 @@ The `runner-policy` component materializes one atomic runtime at
 adoption list rather than a visibility class; note `claude-code-plugins` is
 public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 
+- `melodic-software/claude-code-account-rotation`
 - `melodic-software/claude-code-plugins`
 - `melodic-software/dotfiles`
 - `melodic-software/github-iac`
