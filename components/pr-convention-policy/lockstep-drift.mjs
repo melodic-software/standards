@@ -286,16 +286,41 @@ export function parseMarkdownHeadings(markdownText) {
   return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
 }
 
-// The hook validator's enforcement is a pair of POSIX ERE strings; translate
-// the one POSIX class they use and probe them the same way. The probes pad
-// with spaces because both EREs guard with [^a-z0-9_] boundary classes.
+// The hook validator's enforcement is a pair of POSIX ERE strings, its
+// `scan_linkage` transcription of the composite's `scan_line`; translate the
+// POSIX classes they use and probe them the same way. The probes pad with
+// spaces because NO_ISSUE_ERE guards with [^a-z0-9_] boundary classes. Both
+// EREs are lowercase, so every `=~` against them must read a lowercased
+// operand, as the composite's `tolower` is asserted: CLOSING_ERE only on
+// `$chunk` (a slice of `lower="${line,,}"`), NO_ISSUE_ERE only on `$lower`
+// (`${1,,}` wrapped in newlines). A match on the raw line is drift.
+const VALIDATOR_OPERANDS = {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
+  CLOSING_ERE: { operand: "chunk", sources: ['lower="${line,,}"', 'chunk="${lower:off}"'] },
+  NO_ISSUE_ERE: { operand: "lower", sources: [`lower=$'\\n'"\${1,,}"$'\\n'`] },
+};
+
 export function parseValidatorPatterns(shellText, location) {
-  const keyword = shellText.match(/KEYWORD_ERE='([^']+)'/);
-  const marker = shellText.match(/NO_ISSUE_ERE='([^']+)'/);
+  // Line-anchored, so the sibling NON_CLOSING_ERE declaration never matches.
+  const keyword = shellText.match(/^CLOSING_ERE='([^']+)'/m);
+  const marker = shellText.match(/^NO_ISSUE_ERE='([^']+)'/m);
   if (!keyword || !marker) {
-    throw new DriftError(`${location}: KEYWORD_ERE / NO_ISSUE_ERE declarations not found`);
+    throw new DriftError(`${location}: CLOSING_ERE / NO_ISSUE_ERE declarations not found`);
   }
-  const toJs = (ere) => new RegExp(ere.replaceAll("[[:space:]]", "\\s"), "i");
+  for (const [name, { operand, sources }] of Object.entries(VALIDATOR_OPERANDS)) {
+    const uses = [...shellText.matchAll(new RegExp(`"\\$(\\w+)" =~ \\$${name}\\b`, "g"))];
+    const lowercased =
+      uses.length > 0 &&
+      uses.every((use) => use[1] === operand) &&
+      sources.every((source) => shellText.includes(source));
+    if (!lowercased) {
+      throw new DriftError(
+        `${location}: scan_linkage no longer matches ${name} only against the lowercased \`$${operand}\` (${sources.join(", ")}), so the extracted pattern is not the one the hook applies`,
+      );
+    }
+  }
+  const toJs = (ere) =>
+    new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
   return { keyword: toJs(keyword[1]), marker: toJs(marker[1]) };
 }
 
@@ -645,6 +670,7 @@ export function checkCopies(policy, texts) {
       parseValidatorPatterns(texts.hookValidator, "hook validator"),
       policy,
       "hook validator (enforcement patterns)",
+      { lowercaseProbe: true },
     ),
   );
   return errors;
