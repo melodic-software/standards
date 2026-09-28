@@ -38,7 +38,7 @@ extend-ignore-re = [
 # repos that need it; keep every entry annotated.
 [default.extend-words]
 # ASUS Armoury Crate, and the `Asus.ArmouryCrate` winget package id it is
-# installed by: provisioning. typos splits the compound, so the word entry is
+# installed by. Used in provisioning. typos splits the compound, so the word entry is
 # what spares the id; rewriting it to "Armory" would break the install.
 armoury = "armoury"
 # Reaching for "the full axe": claude-code-plugins docs-hygiene. The en-us
