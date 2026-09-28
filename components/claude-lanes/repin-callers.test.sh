@@ -322,6 +322,13 @@ YAML
   git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'lane callers'
 }
 
+# seed_hosted_lanes <dir>: the hosted lane callers are enumerated extras, so a
+# production-shaped repository carries them beside the fleet callers.
+seed_hosted_lanes() {
+  mkdir -p "$1/components/claude-lanes-hosted"
+  cp "$1"/components/claude-lanes/*.yml "$1/components/claude-lanes-hosted/"
+}
+
 # run_apply <dir> <outfile> <tag> <sha> [release-date]
 #
 # The release date only matters to fallback-form pins; the tag-form fixtures
@@ -417,6 +424,7 @@ jobs:
       - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-01
 YAML
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
+seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
 # Fallback pin is contained by the release (compare `behind`); date is
@@ -434,12 +442,12 @@ assert_contains 'apply: mixed-SHA old-sha is a comma-separated unique set' "$mix
 assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' "$out" 'outside'
 assert_not_contains 'apply: a fallback pin dated before the release is not reported as ahead' "$out" 'left as is'
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
-  "$repo"/components/claude-lanes/*.yml \
+  "$repo"/components/claude-lanes/*.yml "$repo"/components/claude-lanes-hosted/*.yml \
   "$repo"/.github/workflows/sync.yml \
   "$repo"/.github/workflows/claude-review.yml \
   "$repo"/.github/workflows/claude-security-review.yml \
   "$repo/$guard_caller" "$repo/$guard_fleet_caller" | wc -l | tr -d ' ')"
-assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '7' "$mixed_pins"
+assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '9' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
   "$(cat "$repo/$guard_caller")" "managed-files-guard@${new_sha} # v0.9.2"
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
@@ -483,6 +491,7 @@ jobs:
       - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-30
 YAML
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
+seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned ahead of the release'
 out_file="$scratch/out-apply-ahead"
@@ -500,8 +509,8 @@ assert_not_contains 'apply: the ahead SHA is not handed to lockstep as an old SH
 assert_contains 'apply: the version note names the file left untouched' "$(cat "$out_file")" \
   "(${new_sha}): \`${guard_caller}\`, \`${guard_fleet_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
-  "$repo"/components/claude-lanes/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
-assert_eq 'apply: every other enumerated pin still advances' '5' "$ahead_pins"
+  "$repo"/components/claude-lanes/*.yml "$repo"/components/claude-lanes-hosted/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
+assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 
 # Same-day dates do not prove containment. When compare says the pin is
 # ahead of the release, apply must leave it — this is the Codex P2 on #511.
@@ -515,6 +524,7 @@ done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
+seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
 export STUB_COMPARE_STATUS=ahead
@@ -536,6 +546,7 @@ done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
+seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, contained'
 export STUB_COMPARE_STATUS=behind
@@ -557,6 +568,7 @@ done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
+seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'compare lookup fails'
 export STUB_COMPARE_STATUS=fail

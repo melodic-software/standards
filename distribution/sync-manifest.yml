@@ -49,27 +49,12 @@ components:
   # exclusions:
   # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
-  # - ci-runner: adopted as a review-lane target by the wave retarget
-  #   (ci-workflows claude-review-lanes plan, ratified 2026-08-01), which
-  #   reverses its earlier runner-infra exemption. It is ALREADY a target
-  #   block below, so adding this component to its existing `managed:` list
-  #   adds no repository to the installation's attested set and needs no App
-  #   grant. Blocked on visibility as the nearer gate, NOT on the App grant:
-  #   ci-runner is PUBLIC, and a caller naming the fleet label is rejected
-  #   outright on a public repository (see the security-caller
-  #   public/shared-shape blockers below). Removal trigger: those blockers
-  #   clearing. STILL LIVE
-  #   when that fires, and not rebutted
-  #   by the reversal: the original exemption reason, that ci-runner is runner
-  #   infrastructure where a wedged lane job could block its own substrate.
-  #   Visibility became the nearer blocker; it did not answer that concern, so
-  #   adoption must clear it on the merits rather than inherit a pass.
-  # - cursor-plugins: adopted by the same retarget and now a sync TARGET
-  #   (Phase 4 fleet expansion, PR 428 — target block, App grant, and
-  #   `TARGET_VISIBILITY` entry all shipped), but NOT yet a review-lane
-  #   adopter: it is PUBLIC, and a caller naming the fleet label is rejected
-  #   outright on a public repository, so the removal trigger above still
-  #   gates adding it to this component's `managed:` lists.
+  # - Public targets: agent-plugins, ci-runner, claude-code-account-rotation,
+  #   codex-plugins and cursor-plugins take the HOSTED lane callers below,
+  #   never these fleet-label ones (see the public-shape note below).
+  #   ci-runner's earlier runner-infra exemption (a stuck lane job could
+  #   block its own runners) does not apply to the hosted shape: those jobs
+  #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
   #   the same retarget. Neither ever held a target block, so nothing left
   #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
@@ -85,18 +70,31 @@ components:
   #   review lane over untrusted third-party content — and then for a security
   #   or content-scanning lane, not for claude-review as written.
   #
-  # PUBLIC-SAFE SHAPE, CONSIDERED AND REJECTED for the two public adoptions:
-  # a hand-written hosted-only caller passing `runner: ubuntu-24.04` directly
-  # instead of the fleet label, the shape claude-code-plugins already owns
-  # `locally-owned`. runner-policy admits it on a public repository, so the
-  # bar is a property of the FLEET-LABEL shape, not of public visibility
-  # as such. Rejected because it forks the reviewed caller into a second
-  # per-visibility variant, which this repository deliberately declined
-  # pending the reusable-side indirection. It would also require revisiting
-  # `runner-policy.test.mjs`: its "every managed target of a claude lane
-  # caller admits that caller" test rejects a public managed target for EVERY
-  # component sourced from `components/claude-lanes/`, whatever label it
-  # names, so a hosted-only component in that directory still fails the build.
+  # PUBLIC SHAPE, ACCEPTED AS AN INTERIM (#622): `claude-review-hosted-caller`
+  # and `claude-security-review-hosted-caller`, sourced from
+  # `components/claude-lanes-hosted/`. Each file equals its fleet sibling
+  # except for comments and `runner: ubuntu-24.04`, which runner-policy admits
+  # on a public repository and GitHub recommends there (self-hosted runners
+  # "should almost never be used for public repositories",
+  # docs.github.com/en/actions/reference/security/secure-use). Same workflow
+  # and job names, so the check contexts match the fleet callers. The
+  # destinations differ (`.github/workflows/claude-review-hosted.yml`,
+  # `.github/workflows/claude-security-review-hosted.yml`) because a
+  # destination has exactly one owning component. The files live outside
+  # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on
+  # that directory stay as strict as they are; runner-policy.test.mjs holds
+  # the hosted pair to its own rules and forbids a target managing both
+  # variants of a lane.
+  # Known limit: on a public repository the lanes review only pull requests
+  # from same-repository branches. Fork and Dependabot pull requests get no
+  # secrets (code.claude.com/docs/en/github-actions), so they get no review.
+  # The sync never deletes a file: a target that moves between the hosted and
+  # fleet variants keeps the old caller, and double-reviews, until a one-time
+  # repo-local pull request deletes it by hand, as claude-code-proxy#269
+  # tracks for the managed-files-guard pair.
+  # Removal trigger: option A of #622 landing, that is blockers (1) and (2)
+  # below, so one caller serves both visibilities. Then the hosted pair and
+  # its destinations retire.
   #
   # The security lane has no path gating from ci-workflows v0.29.0: it reviews
   # every non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths`
@@ -105,7 +103,7 @@ components:
   #
   # `claude-security-review-caller` is managed for the private adopters
   # dotfiles, github-iac, medley and provisioning (their target blocks
-  # below). Public/shared-shape unpark is still blocked: both callers pass
+  # below). One shared shape for both visibilities is still blocked: both callers pass
   # the fleet label `melodic-review-ubuntu-24.04-x64` as a literal
   # `with.runner`, and runner-policy admits a fleet label only for an enrolled
   # private consumer (`public-self-hosted-routing` otherwise), consulting
@@ -132,9 +130,15 @@ components:
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
+  claude-review-hosted-caller:
+    files:
+      components/claude-lanes-hosted/claude-review.yml: .github/workflows/claude-review-hosted.yml
   claude-security-review-caller:
     files:
       components/claude-lanes/claude-security-review.yml: .github/workflows/claude-security-review.yml
+  claude-security-review-hosted-caller:
+    files:
+      components/claude-lanes-hosted/claude-security-review.yml: .github/workflows/claude-security-review-hosted.yml
   # Per-target exact settings.json (issue 404). Not a transform: each
   # consumer has its own source file. Shared marketplace + bootstrap hook
   # are asserted against components/claude-settings/base/settings.json.
@@ -358,6 +362,8 @@ targets:
   # and syncs incrementally like any other target.
   melodic-software/agent-plugins:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -372,6 +378,8 @@ targets:
     # github-iac#367 extended the org ci-gate ruleset to this repository.
   melodic-software/ci-runner:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -383,6 +391,11 @@ targets:
       - repository-text
       - shellcheck
       - typos
+    # The hosted review caller carries a job-level `concurrency.queue`, which
+    # the pinned actionlint rejects. ci-runner owns its actionlint config, so
+    # its `.github/actionlint.yaml` must extend the `queue` ignore to
+    # `.github/workflows/claude-review-hosted.yml` before the sync pull
+    # request that adds the caller can pass its own actionlint lane.
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
@@ -423,12 +436,14 @@ targets:
   # claude-code-account-rotation#98: a repo-local `.github/runner-policy.json`
   # with `selfHostedCi: false` and the gate steps in its CI. Both
   # `components/claude-lanes/` callers name the private fleet's runner label
-  # and are refused on a public repository (see the
-  # `claude-security-review-caller` note above); hosted lane callers arrive
-  # by repo-local PR, the claude-code-plugins route. Plus the hosted-only
-  # `managed-files-guard-caller`, which every public target carries.
+  # and are refused on a public repository, so it takes the hosted lane
+  # callers (see the public-shape note above), which audit clean under its
+  # gate. Plus the hosted-only `managed-files-guard-caller`, which every
+  # public target carries.
   melodic-software/claude-code-account-rotation:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
@@ -469,9 +484,12 @@ targets:
     # The lane callers name the managed fleet label, which runner-policy
     # forbids a PUBLIC repository from routing to at all (`routingEnabled` is
     # private-and-self-hosted only, and the ban consults neither `exceptions`
-    # nor `localRoutingGrants`). This is the org's one public caller target,
-    # so it owns hosted-only callers that pass `runner: ubuntu-24.04`
-    # directly. Removal trigger: the `claude-security-review-caller`
+    # nor `localRoutingGrants`). It owns hosted-only callers that pass
+    # `runner: ubuntu-24.04` directly, at the fleet callers' destinations.
+    # The synced hosted pair (`claude-review-hosted-caller`) sits at other
+    # destinations, so managing it here while its own callers remain would
+    # double-review. Adopting the pair means a repo-local PR deleting those
+    # callers first; that is a separate maintainer decision. Removal trigger: the `claude-security-review-caller`
     # public/shared-shape blockers above (#377) clearing, that is (1) the
     # runner choice moves inside the ci-workflows reusable and runner-policy
     # gains a cross-repo routing kind, and (2) the blanket public-target
@@ -560,6 +578,8 @@ targets:
   # SUCCESS). Its two siblings joined it on 2026-09-04 via github-iac#367.
   melodic-software/codex-plugins:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -571,6 +591,8 @@ targets:
       - typos
   melodic-software/cursor-plugins:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks

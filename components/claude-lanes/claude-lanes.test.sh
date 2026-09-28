@@ -14,7 +14,8 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 manifest='distribution/sync-manifest.yml'
 config='.github/actionlint.yaml'
-source_prefix='components/claude-lanes/'
+# The fleet callers and their hosted siblings (components/claude-lanes-hosted/).
+source_prefix_re='components/claude-lanes(-hosted)?/'
 queue_message='unexpected key "queue" for "concurrency" section'
 
 if ! command -v actionlint >/dev/null 2>&1; then
@@ -44,7 +45,7 @@ consumer_checkout() {
 # shellcheck disable=SC2016  # yq expressions; $c/$t are yq variables, not shell
 mapfile -t lane_files < <(
   yq -r '.components | to_entries[] | .key as $c | .value.files | to_entries[]
-    | $c + "\t" + .key + "\t" + .value' "$manifest" | grep -F "	$source_prefix"
+    | $c + "\t" + .key + "\t" + .value' "$manifest" | grep -E "	$source_prefix_re"
 )
 assert_nonzero 'manifest carries at least one claude lane caller component' "${#lane_files[@]}"
 mapfile -t lane_components < <(printf '%s\n' "${lane_files[@]}" | cut -f1 | sort -u)
