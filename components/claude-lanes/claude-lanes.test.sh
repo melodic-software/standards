@@ -16,7 +16,6 @@ manifest='distribution/sync-manifest.yml'
 config='.github/actionlint.yaml'
 # The fleet callers and their hosted siblings (components/claude-lanes-hosted/).
 source_prefix_re='components/claude-lanes(-hosted)?/'
-queue_message='unexpected key "queue" for "concurrency" section'
 
 if ! command -v actionlint >/dev/null 2>&1; then
   skip_suite 'actionlint not installed'
@@ -125,19 +124,5 @@ for target in "${lane_targets[@]}"; do
   assert_exit "$target lints clean after sync" 0 "$rc"
   assert_silent "$target sync emits no findings" "$out"
 done
-
-# Control: the suppression is load-bearing for every one of those targets, not
-# a nicety. A target that owns actionlint locally must carry its own
-# equivalent or its first sync PR fails its own lane. When this case stops
-# failing, the upstream fix shipped — fire the removal trigger recorded in the
-# canonical config instead of patching this test.
-control="$scratch/no-config"
-consumer_checkout "${lane_targets[0]}" "$control"
-bash distribution/sync-manifest.sh apply --target "${lane_targets[0]}" --target-root "$control" >/dev/null
-rm -f "$control/$config"
-out="$(cd "$control" && actionlint -no-color 2>&1)"
-rc=$?
-assert_nonzero 'a synced lane caller fails actionlint without the suppression' "$rc"
-assert_contains 'control run reports the suppressed message' "$out" "$queue_message"
 
 [[ $FAILED -eq 0 ]] || exit 1

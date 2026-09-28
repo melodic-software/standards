@@ -368,7 +368,7 @@ non-draft same-repository PR whose actor is not a bot, and a target's `.github/c
 no longer read. The manifest never managed that file.
 
 The two callers deliberately carry different concurrency values (per-PR
-cancel plus a repo-wide queue on the code-review caller; cancel disabled and
+cancel on the code-review caller; cancel disabled and
 no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
 inline. Do not normalize the two.
