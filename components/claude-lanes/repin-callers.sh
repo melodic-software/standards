@@ -22,18 +22,19 @@ set -euo pipefail
 # asserts against them.
 readonly LANE_DIR='components/claude-lanes'
 
-# Sync-family and repo-local callers, plus the one other sync-managed caller
-# component, live outside LANE_DIR. They may already pin a different SHA than
-# the lane components; apply reads each file's own pin rather than assuming
-# one fleet-wide old SHA. The managed-files-guard caller pins a composite
-# ACTION rather than a reusable workflow: it rides this cascade for the pin
-# rewrite alone and has no runner-policy contract for the lockstep half to
+# Sync-family and repo-local callers, plus the two managed-files-guard caller
+# components (hosted and fleet-routed), live outside LANE_DIR. They may
+# already pin a different SHA than the lane components; apply reads each
+# file's own pin rather than assuming one fleet-wide old SHA. The
+# managed-files-guard callers pin a composite ACTION rather than a reusable
+# workflow: they ride this cascade for the pin rewrite alone and has no runner-policy contract for the lockstep half to
 # copy forward (components/managed-files-guard/README.md).
 readonly -a EXTRA_CALLER_FILES=(
   '.github/workflows/claude-review.yml'
   '.github/workflows/claude-security-review.yml'
   '.github/workflows/sync.yml'
   'components/managed-files-guard/managed-files-guard.yml'
+  'components/managed-files-guard/managed-files-guard-fleet.yml'
 )
 
 # Any `uses:` reference to a ci-workflows reusable workflow or composite action

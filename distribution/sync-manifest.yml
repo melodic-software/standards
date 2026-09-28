@@ -40,13 +40,10 @@ components:
   # callers empirically drifted: medley's missing `reopened` trigger,
   # divergent skip-actors lists, and pin skew across targets.
   #
-  # ACCEPTED LOSS, all targets: the code-review caller drops `synchronize`,
-  # which every target's hand-written caller carries today. That is the plan's
-  # deliberate cadence cut (review on open/ready/reopen) — not drift — and it
-  # is the single largest behavior change this component makes. Reviewing a
-  # newer head takes a fresh event, not a re-run; the component file states
-  # why. The security lane KEEPS `synchronize`: its check certifies execution
-  # against the latest head.
+  # Both callers trigger on `synchronize`, so every push to a non-draft PR is
+  # reviewed.
+  # A re-run replays the original event rather than reviewing a newer head;
+  # the component files state why.
   #
   # Each component targets the repos that run that lane TODAY. Deliberate
   # exclusions:
@@ -73,14 +70,6 @@ components:
   #   adopter: it is PUBLIC, and a caller naming the fleet label is rejected
   #   outright on a public repository, so the removal trigger above still
   #   gates adding it to this component's `managed:` lists.
-  # - claude-code-proxy: adopted by the same retarget and now a sync TARGET
-  #   (same Phase 4 expansion — target block, App grant, and
-  #   `TARGET_VISIBILITY` entry shipped), admissible on visibility (private),
-  #   and fleet-enrolled in github-iac (its ci.yml already runs on the fleet
-  #   label). It holds both lane callers `locally-owned`: managing them would
-  #   mark it fleet-routed, which excludes the hosted managed-files-guard
-  #   caller it manages today, and no fleet-routed guard sibling exists yet.
-  #   Removal trigger: that sibling shipping.
   # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
   #   the same retarget. Neither ever held a target block, so nothing left
   #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
@@ -232,22 +221,26 @@ components:
     files:
       lychee.toml: lychee.toml
   # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
-  # hosted-only workflow calling the ci-workflows `managed-files-guard`
-  # composite action, which fails a consumer PR that hand-edits one of that
-  # repository's managed destinations. The second recorded exception to the
+  # workflow calling the ci-workflows `managed-files-guard` composite action,
+  # which fails a consumer PR that hand-edits one of that repository's
+  # managed destinations. The second recorded exception to the
   # workflow-caller exclusion in README.md, for the same reason as the first:
   # the guard is only a fleet signal if every target carries the same caller
   # at the same pin, and the sync is the one mechanism that holds that.
   #
-  # FIRST HOP — hosted-only-eligible targets only. The caller's `runs-on` is
-  # the approved hosted label directly, which runner-policy admits on a
-  # public repository and on a private one not enrolled for local routing.
-  # Deliberate exclusions this hop, with their removal trigger:
-  # - dotfiles, github-iac, medley, provisioning: private targets enrolled
-  #   for local routing (each manages `runner-policy` with a
-  #   fleet-routed lane caller), where a fixed hosted read-only job fails
-  #   the runner-policy gate. They take a fleet-label sibling component
-  #   in the second hop; trigger: that sibling landing.
+  # Two components, one per runner-policy inventory. The files are identical
+  # except for `runs-on` and their headers: same action pin, same job name, so
+  # the check context is `managed-files-guard` on every target. Destinations
+  # must be unique across components, so each has its own path. A target
+  # takes one or the other, never both.
+  # - managed-files-guard-caller: the approved hosted label, which
+  #   runner-policy admits on a public repository and on a private one not
+  #   enrolled for local routing.
+  # - managed-files-guard-fleet-caller: the managed fleet label, for the
+  #   private targets enrolled for local routing (claude-code-proxy,
+  #   dotfiles, github-iac, medley, provisioning), where a fixed hosted
+  #   read-only job fails the runner-policy gate.
+  # Deliberate exclusions:
   # - ci-workflows: `locally-owned` — it hosts the action and already runs
   #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
   #   pinned to its own commit), so a second caller would double the check.
@@ -257,6 +250,9 @@ components:
   managed-files-guard-caller:
     files:
       components/managed-files-guard/managed-files-guard.yml: .github/workflows/managed-files-guard.yml
+  managed-files-guard-fleet-caller:
+    files:
+      components/managed-files-guard/managed-files-guard-fleet.yml: .github/workflows/managed-files-guard-fleet.yml
   markdownlint:
     files:
       .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
@@ -524,8 +520,18 @@ targets:
   # lefthook-base + lefthook-powershell + lefthook-python with their closure
   # (node-runtime, psscriptanalyzer). ruff stays locally-owned (below) and
   # satisfies lefthook-python's requirement as a repo-owned implementation.
+  # claude-code-proxy is private and fleet-enrolled in github-iac (its ci.yml
+  # runs on the fleet label), so it takes the fleet-routed guard and both
+  # lane callers. The sync overwrites its former repo-local lane copies at
+  # the same paths. The sync never deletes, so its old hosted
+  # `.github/workflows/managed-files-guard.yml` stays until a one-time
+  # claude-code-proxy PR deletes it (claude-code-proxy#269). Until then
+  # both workflows share the name `managed-files-guard` and so one
+  # concurrency group, and each PR event cancels one of the two runs.
   melodic-software/claude-code-proxy:
     managed:
+      - claude-review-caller
+      - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
       - gitleaks
@@ -533,7 +539,7 @@ targets:
       - lefthook-powershell
       - lefthook-python
       - lychee
-      - managed-files-guard-caller
+      - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
       - psscriptanalyzer
@@ -543,8 +549,6 @@ targets:
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
-      - claude-review-caller
-      - claude-security-review-caller
       - ruff
     # Armed as of 2026-09-04: main CI has been green since 2026-09-03,
     # claude-code-proxy#214 landed the three metadata callers beside the
@@ -593,6 +597,7 @@ targets:
       - lefthook-python
       - lefthook-shellcheck
       - lychee
+      - managed-files-guard-fleet-caller
       - markdownlint
       - markdownlint-home
       - node-runtime
@@ -618,6 +623,7 @@ targets:
       - lefthook-base
       - lefthook-dotnet
       - lychee
+      - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
       - pr-body-contract-rule
@@ -647,6 +653,7 @@ targets:
       # wrapper.
       - comment-hygiene-tools
       - lychee
+      - managed-files-guard-fleet-caller
       # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
       # --vault the behavior is unchanged, and medley's *-dispatch.test.sh
       # suites pass against these files.
@@ -715,6 +722,7 @@ targets:
       - lefthook-powershell
       - lefthook-shellcheck
       - lychee
+      - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
       - pr-body-contract-rule

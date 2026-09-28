@@ -8382,13 +8382,12 @@ test("the claude lane caller components all pin one ci-workflows revision", asyn
 // enrolled for local routing, and one of its managed targets
 // (claude-code-plugins) executes this gate, so the shipped bytes must audit
 // clean under exactly those inventories, and must NOT be admitted to an
-// enrolled private consumer, which is why those targets take a
+// enrolled private consumer, which is why those targets take the
 // fleet-routed sibling instead (components/managed-files-guard/README.md).
-async function managedFilesGuardCaller() {
+async function managedFilesGuardCaller(component = "managed-files-guard-caller") {
   const manifest = parse(
     await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
   );
-  const component = "managed-files-guard-caller";
   const sources = Object.keys(manifest.components[component]?.files ?? {});
   assert.equal(sources.length, 1, `expected ${component} to ship exactly one file`);
   const body = await readFile(new URL(`../../${sources[0]}`, import.meta.url), "utf8");
@@ -8422,6 +8421,43 @@ test("the managed-files-guard caller is not admitted to a routing-enrolled priva
   });
   assert.ok(
     findings.length > 0,
-    `${source} audits clean for an enrolled private consumer; the fleet-routed second hop may be unnecessary, so revisit the hosted-only exclusion deliberately`,
+    `${source} audits clean for an enrolled private consumer; the fleet-routed sibling may be unnecessary, so revisit the hosted-only exclusion deliberately`,
   );
+});
+
+// The fleet-routed sibling names the managed fleet label, so every target that
+// manages it must be a private repository enrolled for local routing, and it
+// must audit clean there. On a public consumer it is refused outright.
+test("the fleet-routed managed-files-guard caller audits clean on every target that manages it", async () => {
+  const { component, source, body, manifest } = await managedFilesGuardCaller(
+    "managed-files-guard-fleet-caller",
+  );
+  const managedTargets = Object.entries(manifest.targets)
+    .filter(([, definition]) => (definition.managed ?? []).includes(component))
+    .map(([target]) => target);
+  assert.ok(managedTargets.length > 0, `expected at least one target to manage ${component}`);
+  for (const target of managedTargets) {
+    assert.ok(!isPublicTarget(target), `${source} is managed for ${target}, which is public`);
+    const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+    assert.deepEqual(
+      await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+      [],
+      `${source} is managed for ${target} (private, enrolled) but does not audit clean there`,
+    );
+  }
+});
+
+test("the fleet-routed managed-files-guard caller is rejected outright on a public consumer", async () => {
+  const { body, source } = await managedFilesGuardCaller("managed-files-guard-fleet-caller");
+  const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
+  const rules = new Set(
+    (
+      await auditRepository({
+        root,
+        githubRepository: "melodic-software/claude-code-plugins",
+        fetchImpl: HERMETIC_FETCH_STUB,
+      })
+    ).map(({ rule }) => rule),
+  );
+  assert.ok(rules.has("public-self-hosted-routing"), `${source} is expected to be private-only`);
 });

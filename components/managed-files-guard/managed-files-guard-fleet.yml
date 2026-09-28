@@ -2,8 +2,9 @@ name: managed-files-guard
 
 # SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
 # Source of truth: melodic-software/standards,
-# components/managed-files-guard/managed-files-guard.yml (the
-# `managed-files-guard-caller` component in distribution/sync-manifest.yml).
+# components/managed-files-guard/managed-files-guard-fleet.yml (the
+# `managed-files-guard-fleet-caller` component in
+# distribution/sync-manifest.yml).
 # Downstream edits are overwritten by the next sync PR; change the component
 # upstream, or move the component to `locally-owned` in the manifest to
 # customize.
@@ -21,10 +22,13 @@ name: managed-files-guard
 # `ci-status` and is not a required context. Promotion is a per-target
 # decision taken after a clean soak, recorded in the component README.
 #
-# Hosted-only shape: `runs-on` names the approved hosted label directly, so the
-# same bytes serve public and un-enrolled private targets. A private target
-# enrolled for local CI routing takes the fleet-routed sibling,
-# components/managed-files-guard/managed-files-guard-fleet.yml, instead.
+# Fleet-routed shape: `runs-on` names the governed managed fleet label
+# directly, which runner-policy admits only on a private repository enrolled
+# for local CI routing. Public and un-enrolled private targets take the
+# hosted sibling, components/managed-files-guard/managed-files-guard.yml.
+# The two files differ only in this paragraph, the source lines above, and
+# `runs-on`; the job name is the same, so the check context is
+# `managed-files-guard` on every target.
 
 on:
   pull_request:
@@ -44,7 +48,7 @@ jobs:
     # Equal to the job id so the check context stays `managed-files-guard`;
     # zizmor's pedantic `anonymous-definition` audit flags an unnamed job.
     name: managed-files-guard
-    runs-on: ubuntu-24.04
+    runs-on: melodic-ubuntu-24.04-x64
     timeout-minutes: 10
     steps:
       - name: Check out

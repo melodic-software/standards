@@ -383,9 +383,9 @@ fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
 differently for each lane:
 
-- Both components are `managed` for the private targets dotfiles, github-iac,
-  medley and provisioning, and `locally-owned` for claude-code-proxy (see its
-  manifest note), so every PR there gets both advisory lanes. The public repos running a security lane today,
+- Both components are `managed` for the private targets claude-code-proxy,
+  dotfiles, github-iac, medley and provisioning, so every PR there gets both
+  advisory lanes. The public repos running a security lane today,
   `claude-code-plugins` and `ci-workflows`, remain ineligible for the
   fleet-routed shape.
 
@@ -412,21 +412,27 @@ with ci-workflows v0.29.0), so nothing else of theirs blocks the move.
 
 ## managed-files-guard caller component
 
-`managed-files-guard-caller` materializes the thin hosted-only caller for the
-`ci-workflows` `managed-files-guard` composite action at
-`.github/workflows/managed-files-guard.yml`. The action fails a consumer pull
+Two components materialize a thin caller for the `ci-workflows`
+`managed-files-guard` composite action: `managed-files-guard-caller` at
+`.github/workflows/managed-files-guard.yml` (hosted) and
+`managed-files-guard-fleet-caller` at
+`.github/workflows/managed-files-guard-fleet.yml` (fleet-routed). The action
+fails a consumer pull
 request that hand-edits one of that repository's managed destinations, which
 is the signal ADR-0007 assigned to a downstream edit of a managed file. It is
 the second recorded exception to the consumer-owned-caller rule, on the same
 grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
-The caller runs on the approved hosted label directly, so it is `managed` for
-the hosted-only-eligible targets (the public targets plus `claude-code-proxy`,
-private but not enrolled for local routing) and deliberately NOT for the four
-fleet-enrolled private targets (`dotfiles`, `github-iac`, `medley`,
-`provisioning`), where runner-policy requires the fleet literal for every
-read-only job; those take a fleet-routed sibling in a second hop.
+The two files differ only in `runs-on` and comments, and share the job name,
+so the check context is `managed-files-guard` everywhere. The hosted caller
+runs on `ubuntu-24.04` and is `managed` for the public targets. The
+fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
+the fleet-enrolled private targets (`claude-code-proxy`, `dotfiles`,
+`github-iac`, `medley`, `provisioning`), where runner-policy requires the
+fleet literal for every read-only job. claude-code-proxy is fleet-enrolled in
+github-iac and its `ci.yml` runs on the fleet label, though it has no
+`.github/runner-policy.json`. No target manages both.
 `ci-workflows` is `locally-owned`: it hosts the action and
 already runs the guard from its own tree. The check is advisory (not in any
 `ci-status`) during its soak, and the caller passes `standards-ref: main`
