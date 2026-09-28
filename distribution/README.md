@@ -368,7 +368,7 @@ non-draft same-repository PR whose actor is not a bot, and a target's `.github/c
 no longer read. The manifest never managed that file.
 
 The two callers deliberately carry different concurrency values (per-PR
-cancel plus a repo-wide queue on the code-review caller; cancel disabled and
+cancel on the code-review caller; cancel disabled and
 no queue on the security caller, whose check may be a required
 execution-evidence context). The component sources record the rationale
 inline. Do not normalize the two.
@@ -406,9 +406,6 @@ and cursor-plugins.
 - The sync never deletes a file. A target that moves between the hosted and
   fleet variants must delete the old caller in a repo-local pull request, or
   both run.
-- ci-runner owns its actionlint config, which must extend its `queue` ignore to
-  `.github/workflows/claude-review-hosted.yml` before its sync pull request can
-  pass.
 - Removal trigger: the one-shape work below landing, after which the hosted
   pair retires.
 
