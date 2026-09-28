@@ -61,7 +61,8 @@ assert_contains 'failure surfaces a ShellCheck code' "$out" 'SC1046'
 
 # Case 3: a consumer disables the lane from its own root config (skip: true merges
 # onto the inherited lane) — the bad file no longer blocks. Proves the open/closed
-# opt-out without editing the base fragment.
+# opt-out without editing the base fragment. Asserted on output, not exit code:
+# lefthook 2.1.13+ exits non-zero when --command matches only skipped jobs.
 cat >lefthook.yml <<'YAML'
 extends:
   - .lefthook/base.yml
@@ -71,7 +72,8 @@ pre-commit:
     shellcheck:
       skip: true
 YAML
-lefthook run pre-commit --command shellcheck >/dev/null 2>&1
-assert_exit 'consumer skip:true opts the lane out' 0 "$?"
+out="$(lefthook run pre-commit --command shellcheck 2>&1)"
+assert_contains 'consumer skip:true opts the lane out' "$out" 'shellcheck (skip)'
+assert_not_contains 'skipped lane does not run ShellCheck' "$out" 'SC1046'
 
 [[ $FAILED -eq 0 ]] || exit 1
