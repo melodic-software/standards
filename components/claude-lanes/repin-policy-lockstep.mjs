@@ -32,23 +32,24 @@ const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
  * Old SHAs are read per caller file — do not assume a single-SHA world.
  * `kind` is lane or reusable. Both copy forward approvedReusableWorkflowContracts.
  * Any other kind throws and does not add a property.
+ *
+ * The hosted lane callers (components/claude-lanes-hosted/) are deliberately
+ * absent: runner-policy.test.mjs holds them to the fleet callers' pin, so the
+ * fleet entries already supply their old SHA, and leaving them out keeps
+ * repin-callers.sh, with its ahead-of-release fence, their only rewriter.
  */
 const REPIN_TARGETS = [
   {
     workflowPath: `${UPSTREAM}/.github/workflows/claude-review.yml`,
     callerFiles: [
       "components/claude-lanes/claude-review.yml",
-      "components/claude-lanes-hosted/claude-review.yml",
       ".github/workflows/claude-review.yml",
     ],
     kind: "lane",
   },
   {
     workflowPath: `${UPSTREAM}/.github/workflows/claude-security-review.yml`,
-    callerFiles: [
-      "components/claude-lanes/claude-security-review.yml",
-      "components/claude-lanes-hosted/claude-security-review.yml",
-    ],
+    callerFiles: ["components/claude-lanes/claude-security-review.yml"],
     kind: "lane",
   },
   {
