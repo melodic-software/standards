@@ -110,11 +110,8 @@ This repository is public, so every `ci.yml` lane runs on GitHub-hosted
 the one required status-check context; the org `ci-gate` ruleset requires
 nothing else, and lanes are added or removed behind it without touching the
 ruleset. Both of those follow from the organization-wide posture, whose
-reasoning and measurements are recorded once in `melodic-software/github-iac`
-at
-[`docs/topics/ci-perf/POSTURE.md`](https://github.com/melodic-software/github-iac/blob/main/docs/topics/ci-perf/POSTURE.md),
-with the decisions in that repository's ADRs 0008 and 0014. Read them there
-rather than a copy here.
+reasoning and measurements are recorded once in the `melodic-software/github-iac`
+ADRs 0008 and 0014. Read them there rather than a copy here.
 
 Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
 schedule or otherwise; `lychee-private-inventory.yml` fails the run on drift.

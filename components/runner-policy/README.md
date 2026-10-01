@@ -469,8 +469,7 @@ declares at `62bef7bab01e8532fedfa739879034a210e9e67d` (`pr-number` is one of th
 above; `timeout-minutes` bounds the review job's wall time), and the
 consumer is claude-code-plugins' locally-owned once-per-PR caller, which
 passes `timeout-minutes: 15` on every event and `pr-number` only on
-`workflow_dispatch`, where no pull-request context exists (github-iac
-`docs/topics/ci-perf/PLAN.md`, Phase 2.4). Neither input touches a secret,
+`workflow_dispatch`, where no pull-request context exists). Neither input touches a secret,
 a caller permission, or the routing surface. The copy-forward statements
 below predate this amendment: v0.14.2 and every later review-lane contract
 keep `allowedInputs: ["runner"]` until a repin review re-approves the two
