@@ -141,11 +141,20 @@ compose_permissions_floor() {
   else
     src=/dev/null
   fi
-  if jq -n --slurpfile f "$floor" '[inputs] as $docs
+  # The merge validates the floor again in the parse it merges from. The check
+  # above reports on the last document of a multi-document file, so only this
+  # one guarantees the document checked is the document merged.
+  if jq -n --slurpfile f "$floor" '($f | if length == 1 then .[0].claudePermissions
+        else error("floor is not a single JSON document") end) as $p
+      | if ($p | type) == "object" and $p.schemaVersion == 1
+          and ($p.allow | type) == "array" and ($p.deny | type) == "array"
+          and ($p.deny | length) > 0 and (($p.withdraw // []) | type) == "array"
+          and ([$p.allow[], $p.deny[]] | all(type == "string" and length > 0))
+        then . else error("floor is not schemaVersion 1 with string rows and a non-empty deny") end
+      | [inputs] as $docs
       | if ($docs | length) == 0 then {}
         elif ($docs | length) == 1 and ($docs[0] | type) == "object" then $docs[0]
         else error("settings file is not a single JSON object") end
-      | $f[0].claudePermissions as $p
       | .permissions.allow = ((((.permissions.allow // []) + $p.allow) | unique) - ($p.withdraw // []))
       | .permissions.deny = (((.permissions.deny // []) + $p.deny) | unique)' \
     "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then

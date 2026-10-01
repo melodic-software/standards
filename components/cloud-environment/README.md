@@ -232,7 +232,8 @@ the snapshot.
 - Rollback: environments keep booting from their cached snapshot until
   rebuilt, so reverting the commit and forcing a rebuild restores the prior
   state; in an emergency the bootstrap can pin a commit SHA in the raw URL
-  instead of `main`.
+  instead of `main`. The pin covers this script only: the fleet list and the
+  permission floor are still fetched from `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
 the shared environment baseline, which includes the fleet plugin list and the

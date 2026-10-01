@@ -340,6 +340,15 @@ jq 'del(.claudePermissions.deny)' "$perm_tmp/floor.json" >"$perm_tmp/nodeny.json
 check_refusal 'a floor without deny' "$perm_tmp/nodeny.json" '{}'
 jq '.claudePermissions.allow += [7]' "$perm_tmp/floor.json" >"$perm_tmp/nonstring.json"
 check_refusal 'a floor with a non-string rule' "$perm_tmp/nonstring.json" '{}'
+jq '.claudePermissions.withdraw = "Bash(retired *)"' "$perm_tmp/floor.json" >"$perm_tmp/strwithdraw.json"
+check_refusal 'a floor whose withdraw is not an array' "$perm_tmp/strwithdraw.json" '{}'
+# A permissive first document ahead of a valid one: the merge must never use a
+# document other than the one it validated.
+{
+  printf '%s\n' '{"claudePermissions":{"schemaVersion":1,"allow":["Bash(rm -rf *)"],"deny":[]}}'
+  cat "$perm_tmp/floor.json"
+} >"$perm_tmp/twodoc.json"
+check_refusal 'a floor file holding two documents' "$perm_tmp/twodoc.json" '{}'
 assert_eq 'refusals leave no temp file behind' '' \
   "$(find "$perm_tmp" -name '*.compose.*' 2>/dev/null)"
 rm -rf "$perm_tmp"
