@@ -248,4 +248,100 @@ assert_contains 'repo pass installs gamma without a second plugin list' \
   "$(cat "$LOG")" 'plugins (repo): installed gamma@stub-market'
 rm -rf "$plug_tmp"
 
+# Permission floor (standards#653): setup.sh fetches the claude-permissions
+# floor this repository publishes and unions it into the user settings file.
+# The union must reproduce the source exactly, keep everything already in the
+# file, and leave the file byte-identical whenever it refuses.
+floor_rel='components/claude-permissions/claude-permissions.json'
+floor_src="$root/$floor_rel"
+assert_file_exists 'the claude-permissions floor exists in this repository' "$floor_src"
+assert_eq 'setup.sh fetches the permission floor from its published path' \
+  "https://raw.githubusercontent.com/melodic-software/standards/main/$floor_rel" \
+  "$(sed -n "s/^CLAUDE_PERMISSIONS_URL='\(.*\)'\$/\1/p" "$script")"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh composes the fetched floor into the user settings file' \
+  "$(cat "$script")" 'compose_permissions_floor "$floor_file" "$user_settings"'
+
+perm_tmp="$(mktemp -d)"
+fresh="$perm_tmp/fresh/.claude/settings.json"
+compose_permissions_floor "$floor_src" "$fresh"
+rc=$?
+assert_exit 'composer creates a missing settings file from the real floor' 0 "$rc"
+assert_eq 'composed allow is exactly the source allow minus withdraw' \
+  "$(jq -c '.claudePermissions | (.allow | unique) - (.withdraw // [])' "$floor_src")" \
+  "$(jq -c '.permissions.allow' "$fresh")"
+assert_eq 'composed deny is exactly the source deny' \
+  "$(jq -c '.claudePermissions.deny | unique' "$floor_src")" \
+  "$(jq -c '.permissions.deny' "$fresh")"
+
+cat >"$perm_tmp/floor.json" <<'JSON'
+{ "claudePermissions": { "schemaVersion": 1,
+  "allow": ["Bash(git add *)", "Bash(gh pr create *)"],
+  "deny": ["Bash(git push --force *)", "Read(**/.env)"],
+  "withdraw": ["Bash(retired *)"] } }
+JSON
+existing="$perm_tmp/existing.json"
+cat >"$existing" <<'JSON'
+{ "enabledPlugins": { "alpha@stub-market": true },
+  "permissions": { "allow": ["Bash(local *)", "Bash(retired *)", "Bash(git add *)"],
+    "ask": ["Bash(ask *)"], "deny": ["Bash(local-deny *)"], "defaultMode": "auto" },
+  "env": { "KEEP": "1" } }
+JSON
+chmod 0640 "$existing"
+mode_settable="$(find "$existing" -perm 0640 2>/dev/null)"
+compose_permissions_floor "$perm_tmp/floor.json" "$existing"
+rc=$?
+assert_exit 'composer merges into an existing settings file' 0 "$rc"
+assert_eq 'composer keeps every non-permission key' \
+  '{"enabledPlugins":{"alpha@stub-market":true},"env":{"KEEP":"1"}}' \
+  "$(jq -c 'del(.permissions)' "$existing")"
+assert_eq 'composer keeps ask and defaultMode untouched' \
+  '{"ask":["Bash(ask *)"],"defaultMode":"auto"}' \
+  "$(jq -c '.permissions | del(.allow, .deny)' "$existing")"
+assert_eq 'composed allow is the union minus the withdraw tombstones' \
+  '["Bash(gh pr create *)","Bash(git add *)","Bash(local *)"]' \
+  "$(jq -c '.permissions.allow' "$existing")"
+assert_eq 'composed deny keeps local rows and adds the floor' \
+  '["Bash(git push --force *)","Bash(local-deny *)","Read(**/.env)"]' \
+  "$(jq -c '.permissions.deny' "$existing")"
+if [[ -z "$mode_settable" ]]; then
+  skip_case 'composer keeps the file mode (chmod has no effect on this filesystem)'
+elif [[ -n "$(find "$existing" -perm 0640 2>/dev/null)" ]]; then
+  pass 'composer keeps the file mode'
+else
+  fail 'composer keeps the file mode' "mode changed from 0640: $(ls -l "$existing")"
+fi
+cp "$existing" "$perm_tmp/first.json"
+compose_permissions_floor "$perm_tmp/floor.json" "$existing"
+cmp -s "$existing" "$perm_tmp/first.json"
+rc=$?
+assert_exit 'composing twice is byte-identical (idempotent)' 0 "$rc"
+
+# Refusals: each must return non-zero and leave the settings file as it was.
+refused="$perm_tmp/refused.json"
+check_refusal() {
+  local label="$1" floor="$2" content="$3" rc
+  printf '%s' "$content" >"$refused"
+  cp "$refused" "$perm_tmp/before.json"
+  compose_permissions_floor "$floor" "$refused" 2>/dev/null
+  rc=$?
+  assert_nonzero "composer refuses $label" "$rc"
+  cmp -s "$refused" "$perm_tmp/before.json"
+  rc=$?
+  assert_exit "composer leaves the file byte-identical when it refuses $label" 0 "$rc"
+}
+check_refusal 'a settings file that is not valid JSON' "$perm_tmp/floor.json" '{"permissions": '
+check_refusal 'a settings file that is not an object' "$perm_tmp/floor.json" '["x"]'
+check_refusal 'a settings file holding two documents' "$perm_tmp/floor.json" '{} {}'
+check_refusal 'a non-array permissions.allow' "$perm_tmp/floor.json" '{"permissions":{"allow":"x"}}'
+jq '.claudePermissions.schemaVersion = 2' "$perm_tmp/floor.json" >"$perm_tmp/v2.json"
+check_refusal 'a floor with an unknown schemaVersion' "$perm_tmp/v2.json" '{}'
+jq 'del(.claudePermissions.deny)' "$perm_tmp/floor.json" >"$perm_tmp/nodeny.json"
+check_refusal 'a floor without deny' "$perm_tmp/nodeny.json" '{}'
+jq '.claudePermissions.allow += [7]' "$perm_tmp/floor.json" >"$perm_tmp/nonstring.json"
+check_refusal 'a floor with a non-string rule' "$perm_tmp/nonstring.json" '{}'
+assert_eq 'refusals leave no temp file behind' '' \
+  "$(find "$perm_tmp" -name '*.compose.*' 2>/dev/null)"
+rm -rf "$perm_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1

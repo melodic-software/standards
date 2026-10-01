@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-09-28.1'
+SCRIPT_VERSION='2026-10-01.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: the one standards-hosted, settings-shaped file every
@@ -50,6 +50,10 @@ STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 FLEET_PLUGINS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json'
 FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
 FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
+# Fleet permission floor: the reviewed allow/deny set of the
+# claude-permissions component, fetched from the same host and unioned into
+# the user settings file sessions boot with (see compose_permissions_floor).
+CLAUDE_PERMISSIONS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/claude-permissions/claude-permissions.json'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
@@ -112,7 +116,46 @@ install_plugins_from() {
     | select(.value == true) | .key' "$file" 2>/dev/null)
 }
 
-# Sourced by setup.test.sh for the plugin-list helpers only.
+# compose_permissions_floor <floor json> <settings json>: union the floor's
+# claudePermissions.allow and .deny into a Claude Code settings file, then drop
+# the floor's withdraw tombstones from allow, the same shape the dotfiles
+# chezmoi modify-template applies. Every other key and every rule already in
+# the file survive, and deny rows are only ever added. A missing file starts
+# from {}. The call returns non-zero and leaves the file untouched when the
+# floor is not schemaVersion 1 with string rows and a non-empty deny, when the
+# file is not a single JSON object, or when any write fails. The new content
+# is written to a copy carrying the original's mode and owner, then renamed
+# over it.
+compose_permissions_floor() {
+  local floor="$1" settings="$2" src="$2" tmp="$2.compose.$$"
+  jq -e '.claudePermissions | .schemaVersion == 1
+    and (.allow | type == "array") and (.deny | type == "array" and length > 0)
+    and ([.allow[], .deny[]] | all(type == "string" and length > 0))' \
+    "$floor" >/dev/null || return 1
+  mkdir -p "${settings%/*}" || return 1
+  if [[ -e "$settings" ]]; then
+    cp -p "$settings" "$tmp" || {
+      rm -f "$tmp"
+      return 1
+    }
+  else
+    src=/dev/null
+  fi
+  if jq -n --slurpfile f "$floor" '[inputs] as $docs
+      | if ($docs | length) == 0 then {}
+        elif ($docs | length) == 1 and ($docs[0] | type) == "object" then $docs[0]
+        else error("settings file is not a single JSON object") end
+      | $f[0].claudePermissions as $p
+      | .permissions.allow = ((((.permissions.allow // []) + $p.allow) | unique) - ($p.withdraw // []))
+      | .permissions.deny = (((.permissions.deny // []) + $p.deny) | unique)' \
+    "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# Sourced by setup.test.sh for the plugin-list and permission-floor helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -387,6 +430,34 @@ else
   # The unresolved-root case logs its own distinct line above.
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
+
+# Permission floor (standards#653): union the fleet's reviewed
+# claude-permissions allow/deny floor into the user settings file the plugin
+# install above wrote at user scope, so a session booted from this snapshot
+# has the deny floor and the unattended-loop grants at its first turn. The
+# dotfiles chezmoi template does the same for local machines, but chezmoi
+# never runs here. This runs after the repo bootstrap so no later build step
+# replaces the file. A fetch failure or a refused compose is a WARN, and the
+# settings file stays as it was.
+floor_file='/tmp/melodic-claude-permissions.json'
+if ! command -v jq >/dev/null 2>&1; then
+  log 'WARN permissions floor: jq not available; no floor composed'
+elif [[ -z "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]]; then
+  log 'WARN permissions floor: neither CLAUDE_CONFIG_DIR nor HOME is set; no floor composed'
+else
+  user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
+    "$CLAUDE_PERMISSIONS_URL" -o "$floor_file" >>"$LOG" 2>&1; then
+    log 'WARN permissions floor: fetch failed; no floor composed this build'
+  elif compose_permissions_floor "$floor_file" "$user_settings" >>"$LOG" 2>&1; then
+    log "permissions floor composed into $user_settings ($(jq -r \
+      '"allow=\(.permissions.allow | length) deny=\(.permissions.deny | length)"' \
+      "$user_settings" 2>/dev/null))"
+  else
+    log "WARN permissions floor: compose refused (invalid floor or settings, or a failed write); $user_settings unchanged"
+  fi
+fi
+rm -f "$floor_file" 2>/dev/null
 
 # Temp-file hygiene: without this the fetched installers — and this script
 # itself, which the environment bootstrap curls to /tmp — persist into the

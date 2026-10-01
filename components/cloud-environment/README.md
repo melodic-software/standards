@@ -108,6 +108,34 @@ semantics already handle versions. The commit-drift refresh logic in
 claude-code-plugins' own hook is deliberately not replicated here; it is
 specific to that repo's directory-source dogfooding.
 
+## Permission floor
+
+After the repo bootstrap, the script composes the fleet's reviewed permission
+floor, [`claude-permissions.json`](../claude-permissions/claude-permissions.json),
+into the user settings file sessions boot with:
+`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`, the same user scope the
+[plugin install](#plugin-install) writes. Locally, the dotfiles chezmoi
+template composes this floor, but chezmoi never runs in a cloud session, so
+without this step cloud sessions had no `deny` floor and none of the
+unattended-loop `allow` grants
+([claude-code-plugins#3172](https://github.com/melodic-software/claude-code-plugins/issues/3172)).
+
+The floor is fetched from the same `raw.githubusercontent.com` host as the
+fleet list, and the merge follows the dotfiles template:
+`claudePermissions.allow` and `.deny` are unioned into the file's
+`permissions.allow` and `permissions.deny`, then the floor's `withdraw`
+tombstones are removed from `allow`. The file is never overwritten. Every
+other key and every rule already in it survive, a missing file starts from
+`{}`, and the result is written to a copy carrying the original's mode and
+owner, then renamed over it. The step is best-effort like every other. A failed
+fetch, a floor that is not `schemaVersion` 1 with string rows and a non-empty
+`deny`, a settings file that is not a single JSON object, or a failed write
+each log a `WARN` and leave the file as it was.
+
+Running last means no later build step can replace the file. A floor change
+merged in `claude-permissions` reaches an environment on its next cache
+rebuild (see [Update lifecycle](#update-lifecycle)), with no change here.
+
 ## Calling contract (frozen)
 
 The interface between this component and consuming repositories:
@@ -207,7 +235,8 @@ the snapshot.
   instead of `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
-the shared environment baseline, which now includes the fleet plugin list.
+the shared environment baseline, which includes the fleet plugin list and the
+composition of the fleet permission floor.
 Repo-specific dependencies and plugin deltas belong to each repo's committed
 `.claude/cloud-bootstrap.sh` and `.claude/settings.json` (templates in the
 fleet guide above), never to this script.
