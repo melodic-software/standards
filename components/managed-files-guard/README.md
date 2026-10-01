@@ -185,8 +185,10 @@ Two properties of that ride are deliberate:
   is either a real downstream hand-edit of a managed destination (the check
   is doing its job) or a classified defect in the action or manifest; the
   `standards-sync` label / `melodic-standards-sync[bot]` actor exemption
-  keeps sync pull requests green. A false red on a sync pull request, or a
-  green on a hand-edit, is a defect to fix upstream before any promotion.
+  keeps sync pull requests green, and the action's `dependabot[bot]` actor
+  skip passes a Dependabot pull request that edits a managed destination
+  (see above). A false red on a sync pull request, or a green on any other
+  hand-edit, is a defect to fix upstream before any promotion.
 - **Rollback:** move the component to `locally-owned` for a target (the
   next sync stops writing it; the target deletes its copy in its own pull
   request), or remove the component from the manifest to withdraw it
