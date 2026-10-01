@@ -20,6 +20,15 @@ config="components/claude-permissions/claude-permissions.json"
 schema_version="$(jq -r '.claudePermissions.schemaVersion' "$config")"
 assert_eq "schemaVersion is the supported value" "1" "$schema_version"
 
+# The cloud-environment composer (components/cloud-environment/setup.sh)
+# unions these rows into a live settings file and refuses a floor whose rows
+# are not strings or whose deny half is empty, which would leave cloud sessions
+# with no floor at all.
+composable="$(jq -r '.claudePermissions
+  | (.allow | type == "array") and (.deny | type == "array" and length > 0)
+    and ([.allow[], .deny[]] | all(type == "string" and length > 0))' "$config")"
+assert_eq "allow and deny are non-empty-string rows with a non-empty deny" "true" "$composable"
+
 empty_tombstones="$(jq -r '[.claudePermissions.withdraw[] | select((type != "string") or (. == ""))] | length' "$config")"
 assert_eq "every withdraw entry is a non-empty string" "0" "$empty_tombstones"
 

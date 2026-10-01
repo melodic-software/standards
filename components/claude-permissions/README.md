@@ -170,9 +170,11 @@ re-adds those rows to `allow`, and that PR deletes their tombstones as part of t
 
 **`withdraw` is `allow`-shaped only, and deliberately does not generalize to `deny`.** The two carry
 opposite hazards. `allow` accretes through the union and needs a subtract path. `deny` does not, at
-the active consumer: that composition force-sets `permissions.deny` from its own owned list before
-unioning this floor into it, so the live array is rebuilt each apply and a `deny` removal here
-already propagates. Nor should it gain one: dotfiles#337 records that a `deny` row is rendered into
+the user-layer consumer: that composition force-sets `permissions.deny` from its own owned list
+before unioning this floor into it, so the live array is rebuilt each apply and a `deny` removal
+here already propagates. The cloud-layer consumer only unions `deny`, so a `deny` row retired here
+stays in a cloud settings file until that file is built again without it. Nor should either gain a
+subtract path: dotfiles#337 records that a `deny` row is rendered into
 the auto-mode classifier's own prompt as a circumvention instruction, so a lever that makes dropping
 one easy weakens auto mode itself. Retiring a `deny` row stays an ordinary edit to `deny`.
 
@@ -218,6 +220,11 @@ file; the consumer owns the runtime composition that reads it.
   data tree and its `~/.claude/settings.json` modify-template unions the canonical rules
   with locally-accumulated ones on every apply. Local additions survive; the floor is
   always present.
+- **Cloud layer (active)**: chezmoi never runs in a Claude Code cloud session, so the
+  [cloud-environment](../cloud-environment/README.md#permission-floor) setup script fetches
+  this file at each snapshot build and unions `allow` and `deny` into the user settings file
+  sessions boot with, then subtracts `withdraw` from `allow`. A change here reaches cloud
+  sessions on each environment's next cache rebuild.
 - **Machine layer (deferred with trigger)**: materializing the same data through the
   provisioning repository into Claude Code's machine-level managed policy settings would
   make the floor unremovable per machine. Trigger: fleet machines operated by more than one
