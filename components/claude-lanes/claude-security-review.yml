@@ -76,7 +76,7 @@ jobs:
     concurrency:
       group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@d423979c2d906222ac2ead78457678cea31f0906 # d423979 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@906113874c5ea7aac269c3ba902fffa5049a8d15 # 9061138 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
     with:
       runner: melodic-review-ubuntu-24.04-x64
     # Pass only the one named secret (least privilege) rather than

@@ -78,7 +78,7 @@ jobs:
       pull-requests: write   # post review + tracking comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@d423979c2d906222ac2ead78457678cea31f0906 # d423979 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@906113874c5ea7aac269c3ba902fffa5049a8d15 # 9061138 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
     with:
       runner: ubuntu-24.04
     # Pass only the one named secret (least privilege) rather than
