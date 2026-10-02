@@ -6,7 +6,8 @@
 #
 # Three layers, in order:
 #   1. Shape: each parsed YAML carries exactly the locked design: pull_request
-#      trigger, read-only token, the canonical concurrency block, one job on
+#      trigger filtered to the union of every target's managed destinations,
+#      read-only token, the canonical concurrency block, one job on
 #      its approved label, a full-history checkout, and the composite action
 #      pinned by full SHA under the pin-comment convention with
 #      `standards-ref: main` for the soak. The two files differ only in
@@ -50,6 +51,13 @@ source "$root/components/pin-comment-convention/pin-comment-patterns.sh"
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
 
+# Every destination any target manages, through the engine the guard runs.
+managed_union="$(
+  yq -r '.targets | keys[]' "$manifest" | while read -r t; do
+    bash distribution/sync-manifest.sh dest-paths --source-root "$root" --target "$t" || echo "dest-paths failed for $t"
+  done | LC_ALL=C sort -u
+)"
+
 sibling_checkout="$(yq -r '.jobs.repin.steps[] | select(.uses | test("^actions/checkout@")) | .uses' \
   .github/workflows/claude-lanes-repin.yml)"
 
@@ -67,6 +75,18 @@ check_shape() {
 
   assert_eq "$p workflow name is managed-files-guard" 'managed-files-guard' "$(q '.name')"
   assert_eq "$p triggers on pull_request only" 'pull_request' "$(q '.on | keys | join(",")')"
+  assert_eq "$p pull_request carries types and paths only" 'paths,types' \
+    "$(q '.on.pull_request | keys | sort | join(",")')"
+  assert_eq "$p pull_request types are the diff-changing default" 'opened,synchronize,reopened' \
+    "$(q '.on.pull_request.types | join(",")')"
+  # The guard flags only exact destination paths, so the filter must be the
+  # whole managed union: a missing entry would skip a pull request the guard
+  # would fail. `paths` entries are globs, so a metacharacter in a
+  # destination would widen or break the match.
+  assert_eq "$p paths is the sorted union of every target's managed destinations" \
+    "$managed_union" "$(q '.on.pull_request.paths[]')"
+  assert_silent "$p no paths entry carries a glob metacharacter" \
+    "$(q '.on.pull_request.paths[]' | grep -E '[][*?+!]' || true)"
   assert_eq "$p workflow token is contents: read and nothing else" 'contents=read' \
     "$(q '.permissions | to_entries | map(.key + "=" + .value) | join(",")')"
 
