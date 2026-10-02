@@ -36,18 +36,19 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-01.1'
+SCRIPT_VERSION='2026-10-02.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
-# Fleet plugin list: the one standards-hosted, settings-shaped file every
-# cloud snapshot installs at user scope (fleet-plugins.json beside this
-# script). It arrives through the same raw.githubusercontent.com host this
-# script does, and is written into the snapshot at FLEET_PLUGINS so each
-# repo's session bootstrap can repair drift from it without a network round
-# trip. It is the only install source at cache build; a repo's own
-# enabledPlugins block carries deltas beyond the fleet, which the session
-# bootstrap applies as an overlay on top of this list.
-FLEET_PLUGINS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json'
+# Fleet plugin list: every plugin in the melodic-software marketplace catalog
+# whose entry does not set defaultEnabled to false, derived at cache build
+# (fleet_list_from_catalog) into a settings-shaped file every cloud snapshot
+# installs at user scope. It is written into the snapshot at FLEET_PLUGINS so
+# each repo's session bootstrap can repair drift from it without a network
+# round trip. It is the only install source at cache build; a repo's own
+# enabledPlugins block carries deltas beyond the fleet (false to opt out, true
+# to opt in to an off-by-default plugin), which the session bootstrap applies
+# as an overlay on top of this list.
+FLEET_CATALOG_URL='https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/.claude-plugin/marketplace.json'
 FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
 FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
 # Fleet permission floor: the reviewed allow/deny set of the
@@ -114,6 +115,22 @@ install_plugins_from() {
     fi
   done < <(jq -r '(.enabledPlugins // {}) | to_entries[]
     | select(.value == true) | .key' "$file" 2>/dev/null)
+}
+
+# fleet_list_from_catalog <marketplace.json> <out>: write the fleet list, a
+# settings-shaped file that registers the melodic-software marketplace and
+# enables every catalog entry whose defaultEnabled is not false. Returns
+# non-zero and leaves no <out> when the catalog is unreadable or yields no
+# entries.
+fleet_list_from_catalog() {
+  jq -e '{
+      extraKnownMarketplaces: {"melodic-software": {source: {source: "github",
+        repo: "melodic-software/claude-code-plugins"}}},
+      enabledPlugins: ([.plugins[] | select(.defaultEnabled != false)
+        | {key: "\(.name)@melodic-software", value: true}] | from_entries)
+    } | select(.enabledPlugins != {})' "$1" >"$2" 2>/dev/null && return 0
+  rm -f "$2" 2>/dev/null
+  return 1
 }
 
 # compose_permissions_floor <floor json> <settings json>: union the floor's
@@ -369,15 +386,15 @@ for track in "A gh + powershell|$track_a_log" \
 done
 
 # Generic plugin install from one settings-shaped file (extraKnownMarketplaces
-# + enabledPlugins): the fleet list at FLEET_PLUGINS_URL, which every snapshot
-# installs whatever repo it was built for. No repo-specific logic — a repo's
+# + enabledPlugins): the fleet list derived from FLEET_CATALOG_URL, which
+# every snapshot installs whatever repo it was built for. No repo-specific logic — a repo's
 # own enabledPlugins block declares deltas beyond the fleet and the repo
 # bootstrap below applies them as an overlay, so the snapshot itself stays the
 # same for every repo built against it. This must happen here, at cache build:
 # Claude Code reads its plugin registry at process start and never re-reads
 # it, so only snapshot-baked installs are loaded at a session's first turn.
 # It must also happen BEFORE the repo bootstrap: that bootstrap's plugin stage
-# reads this fetched list and skips outright when it is absent, so a bootstrap
+# reads this derived list and skips outright when it is absent, so a bootstrap
 # that ran first would bake none of the repo's deltas and leave them to arrive
 # on a later resume.
 # Github-source marketplaces' install/update semantics already handle
@@ -389,16 +406,17 @@ if ! command -v claude >/dev/null 2>&1; then
 elif ! command -v jq >/dev/null 2>&1; then
   log 'plugins: jq not available; skipping'
 else
-  # The fetched copy lands in the snapshot (FLEET_PLUGINS, or its /tmp
+  # The derived list lands in the snapshot (FLEET_PLUGINS, or its /tmp
   # fallback with a WARN, mirroring the stamp) so the repo bootstrap below —
   # and every later drift repair it runs on resume — reads the same list
   # offline. A fetch failure costs this build's plugin install, never the
   # build: the next rebuild fetches again, and a session on a snapshot without
   # the list installs nothing rather than guessing at a set.
   rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
+  catalog_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-fleet-catalog.$$")"
   if curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$FLEET_PLUGINS_URL" -o "$FLEET_PLUGINS_FALLBACK" >>"$LOG" 2>&1 &&
-    jq -e '(.enabledPlugins // {}) != {}' "$FLEET_PLUGINS_FALLBACK" >/dev/null 2>&1; then
+    "$FLEET_CATALOG_URL" -o "$catalog_file" >>"$LOG" 2>&1 &&
+    fleet_list_from_catalog "$catalog_file" "$FLEET_PLUGINS_FALLBACK"; then
     fleet_file="$FLEET_PLUGINS_FALLBACK"
     if cp "$FLEET_PLUGINS_FALLBACK" "$FLEET_PLUGINS" 2>/dev/null; then
       rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
@@ -406,12 +424,12 @@ else
     else
       log "WARN plugins (fleet): $FLEET_PLUGINS unwritable; list kept at $FLEET_PLUGINS_FALLBACK"
     fi
-    log "plugins (fleet): list fetched to $fleet_file ($(jq -r '.enabledPlugins | length' "$fleet_file") entries)"
+    log "plugins (fleet): list derived from the catalog to $fleet_file ($(jq -r '.enabledPlugins | length' "$fleet_file") entries)"
     install_plugins_from "$fleet_file" fleet
   else
-    rm -f "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
-    log 'WARN plugins (fleet): list fetch failed or empty; no plugins install this build'
+    log 'WARN plugins (fleet): catalog fetch failed or yielded no plugins; no plugins install this build'
   fi
+  rm -f "$catalog_file" 2>/dev/null
 fi
 
 # Bake the checked-out repo's committed bootstrap (.claude/cloud-bootstrap.sh

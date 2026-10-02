@@ -67,46 +67,64 @@ grep -q '>"\$STAMP_FALLBACK"' "$script"
 rc=$?
 assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
-# Fleet plugin list: the settings-shaped file every snapshot installs. It must
-# parse, enable everything it names (a false entry is a per-repo delta, not a
-# fleet decision), keep its keys in byte order so a single entry can be
-# flipped without disturbing the rest, and declare every marketplace its
-# entries name.
-fleet="$root/components/cloud-environment/fleet-plugins.json"
-assert_file_exists 'fleet-plugins.json exists beside setup.sh' "$fleet"
-jq empty "$fleet" 2>/dev/null
+# Fleet plugin list: derived at cache build from the marketplace catalog. An
+# entry with defaultEnabled false is left out; an entry set true, or with no
+# defaultEnabled at all, is enabled. The output is settings-shaped and
+# registers the marketplace its entries name, which is what both
+# install_plugins_from here and the repo bootstrap read. Sourced via
+# MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks do not run.
+# Do not `shellcheck source=` this: LIBONLY returns immediately, and following
+# it marks the test bodies below unreachable (SC2317).
+# shellcheck disable=SC1090,SC1091
+MELODIC_SETUP_LIBONLY=1 source "$script"
+cat_tmp="$(mktemp -d)"
+cat >"$cat_tmp/catalog.json" <<'JSON'
+{
+  "name": "melodic-software",
+  "plugins": [
+    { "name": "on-explicit", "defaultEnabled": true },
+    { "name": "off", "defaultEnabled": false },
+    { "name": "on-default" }
+  ]
+}
+JSON
+fleet_list_from_catalog "$cat_tmp/catalog.json" "$cat_tmp/fleet.json"
 rc=$?
-assert_exit 'fleet-plugins.json parses' 0 "$rc"
-assert_eq 'fleet-plugins.json enables every entry it names' \
-  '0' "$(jq -r '[.enabledPlugins // {} | to_entries[] | select(.value != true)] | length' "$fleet")"
-assert_eq 'fleet-plugins.json keys are in byte order' \
-  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet" | LC_ALL=C sort)" \
-  "$(jq -r '.enabledPlugins | keys_unsorted[]' "$fleet")"
-assert_eq 'fleet-plugins.json declares every marketplace its entries name' \
-  '' "$(jq -r '(.extraKnownMarketplaces // {} | keys) as $mps
-    | [.enabledPlugins // {} | keys[] | split("@") | .[1:] | join("@")] | unique
-    | map(select(IN($mps[]) | not)) | .[]' "$fleet")"
+assert_exit 'fleet list derives from a catalog' 0 "$rc"
+assert_eq 'fleet list enables every entry not set defaultEnabled false' \
+  '{"on-default@melodic-software":true,"on-explicit@melodic-software":true}' \
+  "$(jq -cS '.enabledPlugins' "$cat_tmp/fleet.json")"
+assert_eq 'fleet list registers the marketplace its entries name' \
+  'melodic-software melodic-software/claude-code-plugins' \
+  "$(jq -r '.extraKnownMarketplaces | to_entries[] | "\(.key) \(.value.source.repo)"' "$cat_tmp/fleet.json")"
+printf '%s' '{"plugins":[{"name":"off","defaultEnabled":false}]}' >"$cat_tmp/alloff.json"
+fleet_list_from_catalog "$cat_tmp/alloff.json" "$cat_tmp/none.json"
+rc=$?
+assert_nonzero 'a catalog with no enabled entries yields no fleet list' "$rc"
+assert_eq 'a refused derivation leaves no fleet list file' 'absent' \
+  "$([[ -e "$cat_tmp/none.json" ]] && echo present || echo absent)"
+printf '%s' '{"plugins": ' >"$cat_tmp/broken.json"
+fleet_list_from_catalog "$cat_tmp/broken.json" "$cat_tmp/none.json"
+rc=$?
+assert_nonzero 'an unparsable catalog yields no fleet list' "$rc"
+rm -rf "$cat_tmp"
 
-# Fetch lockstep: the URL setup.sh fetches must name the file this repository
-# publishes, at the same host the README's bootstrap already relies on.
-fleet_url="$(sed -n "s/^FLEET_PLUGINS_URL='\(.*\)'\$/\1/p" "$script")"
-assert_eq 'setup.sh fetches the fleet list from its published path' \
-  'https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/fleet-plugins.json' \
-  "$fleet_url"
+assert_eq 'setup.sh derives the fleet list from the published catalog' \
+  'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/.claude-plugin/marketplace.json' \
+  "$(sed -n "s/^FLEET_CATALOG_URL='\(.*\)'\$/\1/p" "$script")"
 fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$script")"
 if [[ -n "$fleet_path" ]]; then
   pass 'setup.sh declares the snapshot path for the fleet list'
 else
   fail 'setup.sh declares the snapshot path for the fleet list' "no FLEET_PLUGINS='...' assignment found"
 fi
-# shellcheck disable=SC2016 # the $ is a literal in the grep pattern
-grep -q '>"\$FLEET_PLUGINS_FALLBACK"\|-o "\$FLEET_PLUGINS_FALLBACK"' "$script"
-rc=$?
-assert_exit 'setup.sh falls back when the snapshot path for the fleet list is unwritable' 0 "$rc"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh falls back when the snapshot path for the fleet list is unwritable' \
+  "$(cat "$script")" 'fleet_list_from_catalog "$catalog_file" "$FLEET_PLUGINS_FALLBACK"'
 assert_contains 'README documents the fleet list snapshot path' \
   "$(cat "$readme")" "$fleet_path"
-assert_contains 'README documents the fleet list file' \
-  "$(cat "$readme")" 'fleet-plugins.json'
+assert_contains 'README documents the catalog the fleet list derives from' \
+  "$(cat "$readme")" '.claude-plugin/marketplace.json'
 
 # README/script drift guards.
 stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
@@ -182,14 +200,9 @@ fi
 
 # Spawn census for install_plugins_from: two sources must share one
 # marketplace list and one plugin list, the memoization cloud-bootstrap.sh
-# relies on when it reads the fleet list and then the repo overlay. Sourced
-# via MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks do not run.
+# relies on when it reads the fleet list and then the repo overlay.
 # Membership is in-process (no grep -qxF per entry).
 plug_tmp="$(mktemp -d)"
-# Do not `shellcheck source=` this: LIBONLY returns immediately, and following
-# it marks the census body unreachable (SC2317).
-# shellcheck disable=SC1090,SC1091
-MELODIC_SETUP_LIBONLY=1 source "$script"
 mkdir -p "$plug_tmp/bin" "$plug_tmp/counts"
 cat >"$plug_tmp/bin/claude" <<STUB
 #!/usr/bin/env bash
