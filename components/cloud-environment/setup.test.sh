@@ -68,8 +68,8 @@ rc=$?
 assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
 # Fleet plugin list: derived at cache build from the marketplace catalog. An
-# entry with defaultEnabled false is left out; an entry set true, or with no
-# defaultEnabled at all, is enabled. The output is settings-shaped and
+# entry set true, or with no defaultEnabled at all, is enabled; false or any
+# non-boolean value leaves it out. The output is settings-shaped and
 # registers the marketplace its entries name, which is what both
 # install_plugins_from here and the repo bootstrap read. Sourced via
 # MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks do not run.
@@ -84,6 +84,7 @@ cat >"$cat_tmp/catalog.json" <<'JSON'
   "plugins": [
     { "name": "on-explicit", "defaultEnabled": true },
     { "name": "off", "defaultEnabled": false },
+    { "name": "off-string", "defaultEnabled": "false" },
     { "name": "on-default" }
   ]
 }
@@ -91,16 +92,22 @@ JSON
 fleet_list_from_catalog "$cat_tmp/catalog.json" "$cat_tmp/fleet.json"
 rc=$?
 assert_exit 'fleet list derives from a catalog' 0 "$rc"
-assert_eq 'fleet list enables every entry not set defaultEnabled false' \
+assert_eq 'fleet list enables only entries with defaultEnabled absent or true' \
   '{"on-default@melodic-software":true,"on-explicit@melodic-software":true}' \
   "$(jq -cS '.enabledPlugins' "$cat_tmp/fleet.json")"
 assert_eq 'fleet list registers the marketplace its entries name' \
   'melodic-software melodic-software/claude-code-plugins' \
   "$(jq -r '.extraKnownMarketplaces | to_entries[] | "\(.key) \(.value.source.repo)"' "$cat_tmp/fleet.json")"
 printf '%s' '{"plugins":[{"name":"off","defaultEnabled":false}]}' >"$cat_tmp/alloff.json"
-fleet_list_from_catalog "$cat_tmp/alloff.json" "$cat_tmp/none.json"
+fleet_list_from_catalog "$cat_tmp/alloff.json" "$cat_tmp/alloff-fleet.json"
 rc=$?
-assert_nonzero 'a catalog with no enabled entries yields no fleet list' "$rc"
+assert_exit 'an all-off catalog still yields a fleet list for repo opt-ins' 0 "$rc"
+assert_eq 'an all-off catalog enables no plugins' '{}' \
+  "$(jq -c '.enabledPlugins' "$cat_tmp/alloff-fleet.json")"
+printf '%s' '{"plugins":[]}' >"$cat_tmp/empty.json"
+fleet_list_from_catalog "$cat_tmp/empty.json" "$cat_tmp/none.json"
+rc=$?
+assert_nonzero 'a catalog with no entries yields no fleet list' "$rc"
 assert_eq 'a refused derivation leaves no fleet list file' 'absent' \
   "$([[ -e "$cat_tmp/none.json" ]] && echo present || echo absent)"
 printf '%s' '{"plugins": ' >"$cat_tmp/broken.json"

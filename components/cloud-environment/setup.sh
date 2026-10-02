@@ -40,7 +40,7 @@ SCRIPT_VERSION='2026-10-02.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
-# whose entry does not set defaultEnabled to false, derived at cache build
+# whose entry leaves defaultEnabled unset or true, derived at cache build
 # (fleet_list_from_catalog) into a settings-shaped file every cloud snapshot
 # installs at user scope. It is written into the snapshot at FLEET_PLUGINS so
 # each repo's session bootstrap can repair drift from it without a network
@@ -119,16 +119,19 @@ install_plugins_from() {
 
 # fleet_list_from_catalog <marketplace.json> <out>: write the fleet list, a
 # settings-shaped file that registers the melodic-software marketplace and
-# enables every catalog entry whose defaultEnabled is not false. Returns
-# non-zero and leaves no <out> when the catalog is unreadable or yields no
-# entries.
+# enables every catalog entry whose defaultEnabled is absent or true; any other
+# value, a mistyped "false" included, leaves the entry off. A catalog whose
+# entries are all off still yields a list with nothing enabled, so a repo's
+# opt-ins overlay it. Returns non-zero and leaves no <out> when the catalog is
+# unreadable or has no entries.
 fleet_list_from_catalog() {
-  jq -e '{
+  jq -e 'select((.plugins | length) > 0) | {
       extraKnownMarketplaces: {"melodic-software": {source: {source: "github",
         repo: "melodic-software/claude-code-plugins"}}},
-      enabledPlugins: ([.plugins[] | select(.defaultEnabled != false)
+      enabledPlugins: ([.plugins[]
+        | select(.defaultEnabled == null or .defaultEnabled == true)
         | {key: "\(.name)@melodic-software", value: true}] | from_entries)
-    } | select(.enabledPlugins != {})' "$1" >"$2" 2>/dev/null && return 0
+    }' "$1" >"$2" 2>/dev/null && return 0
   rm -f "$2" 2>/dev/null
   return 1
 }
@@ -427,7 +430,7 @@ else
     log "plugins (fleet): list derived from the catalog to $fleet_file ($(jq -r '.enabledPlugins | length' "$fleet_file") entries)"
     install_plugins_from "$fleet_file" fleet
   else
-    log 'WARN plugins (fleet): catalog fetch failed or yielded no plugins; no plugins install this build'
+    log 'WARN plugins (fleet): catalog fetch failed or held no plugins; no plugins install this build'
   fi
   rm -f "$catalog_file" 2>/dev/null
 fi

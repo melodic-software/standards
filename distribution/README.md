@@ -140,7 +140,7 @@ filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 ### Cloud plugin baseline
 
 Every cloud snapshot installs each plugin in the melodic-software marketplace
-catalog whose entry does not set `defaultEnabled: false` (see the
+catalog whose entry leaves `defaultEnabled` unset or sets it `true` (see the
 [cloud-environment component](../components/cloud-environment/README.md#plugin-install)).
 Each repository's checked-in `.claude/settings.json` carries only its deltas
 from that set: `false` to opt out of a plugin, `true` to opt in to an

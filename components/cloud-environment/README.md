@@ -63,8 +63,9 @@ Before the repo bootstrap, a generic, data-driven stage installs plugins from
 one settings-shaped file: **the fleet list**. The script fetches the
 melodic-software marketplace catalog,
 [`.claude-plugin/marketplace.json`](https://github.com/melodic-software/claude-code-plugins/blob/main/.claude-plugin/marketplace.json)
-in claude-code-plugins, and enables every plugin whose catalog entry does not
-set `defaultEnabled: false`. It writes the list into the snapshot at
+in claude-code-plugins, and enables every plugin whose catalog entry leaves
+`defaultEnabled` unset or sets it `true`; any other value leaves the plugin
+off. It writes the list into the snapshot at
 `/opt/melodic-fleet-plugins.json`
 (falling back to `/tmp/melodic-fleet-plugins.json` with a logged `WARN` when
 `/opt` is unwritable, mirroring the stamp), and installs it. Every snapshot
