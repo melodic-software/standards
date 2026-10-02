@@ -1300,6 +1300,32 @@
         "app-client-id": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "app-private-key": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
       }
+    },
+    "melodic-software/ci-workflows/.github/workflows/claude-review.yml@d423979c2d906222ac2ead78457678cea31f0906": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner"],
+      "allowedSecrets": {
+        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+      },
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "pull-requests": "write",
+        "id-token": "write"
+      }
+    },
+    "melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@d423979c2d906222ac2ead78457678cea31f0906": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": ["runner"],
+      "allowedSecrets": {
+        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+      },
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "pull-requests": "write",
+        "id-token": "write"
+      }
     }
   },
   "approvedHostedRunnerLabels": ["ubuntu-24.04", "windows-2025"],
