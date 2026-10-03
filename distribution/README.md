@@ -60,8 +60,11 @@ describe a *downstream* copy's relationship to an upstream source. In
 because there is no synchronization to record. Note the canonical source of a
 component is not always the same-named root file: `review-instructions`
 exports root `REVIEW.md`, while a component may equally export a file that
-lives only under `components/` (the root `AGENTS.md` and `CLAUDE.md` here are
-empty placeholders backing no component). Wherever the source lives, the
+lives only under `components/` (the root `AGENTS.md` and `CLAUDE.md` here back
+no component: `CLAUDE.md` is an empty placeholder, and `AGENTS.md` holds only
+this repository's own `## Code Review Rules` section, whose shape
+[`components/code-review-rules/`](../components/code-review-rules/README.md)
+defines and checks rather than syncs). Wherever the source lives, the
 downstream copy is what carries the `managed` label; this repository's own
 originals never carry an ownership label themselves.
 
