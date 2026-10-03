@@ -75,10 +75,11 @@ jobs:
     if: github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
-      pull-requests: write   # post review + tracking comment
+      pull-requests: write   # post review, tracking comment and the lane's
+                             # reviewed-head marker comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@906113874c5ea7aac269c3ba902fffa5049a8d15 # 9061138 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
+    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@4d4b9a5a2247a8aa2ca34f88b8df0f9785b39305 # 4d4b9a5 2026-10-03 ci-workflows#653 head, repin to its release tag before merge
     with:
       runner: ubuntu-24.04
     # Pass only the one named secret (least privilege) rather than

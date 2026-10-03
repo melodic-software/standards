@@ -21,7 +21,7 @@ name: claude-security-review
 # NEVER add workflow-level `paths:`/`paths-ignore:` to this caller: a check
 # whose workflow never triggers is missing, not green, so a required check
 # would stay Pending forever, and the babysit merge gate, which waits for
-# `security-review / claude-security-review-status`, never arms.
+# `security-review / security-review`, never arms.
 #
 # The reusable skips fork PRs (they receive no secrets and a read-only token)
 # and every `[bot]` actor; a required check does NOT prove a fork PR was
@@ -69,14 +69,15 @@ jobs:
     if: github.event.pull_request.draft == false
     permissions:
       contents: read         # checkout + read the diff
-      pull-requests: write   # post the security review + tracking comment
+      pull-requests: write   # post the security review, tracking comment and
+                             # the lane's reviewed-head marker comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
     # Per-PR serialization without cancellation. See the workflow header.
     concurrency:
       group: claude-security-review-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@906113874c5ea7aac269c3ba902fffa5049a8d15 # 9061138 2026-10-02 ci-workflows#653 head, repin to its release tag before merge
+    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@4d4b9a5a2247a8aa2ca34f88b8df0f9785b39305 # 4d4b9a5 2026-10-03 ci-workflows#653 head, repin to its release tag before merge
     with:
       runner: melodic-review-ubuntu-24.04-x64
     # Pass only the one named secret (least privilege) rather than
