@@ -60,19 +60,22 @@ its next cache rebuild (see [Update lifecycle](#update-lifecycle)).
 ## Plugin install
 
 Before the repo bootstrap, a generic, data-driven stage installs plugins from
-one settings-shaped file: **the fleet list**,
-[`fleet-plugins.json`](fleet-plugins.json) beside this script, the one place
-the organization's cloud plugin set is declared. The script fetches it from
-the same `raw.githubusercontent.com` path the bootstrap fetches this script
-from, writes it into the snapshot at `/opt/melodic-fleet-plugins.json`
+one settings-shaped file: **the fleet list**. The script fetches the
+melodic-software marketplace catalog,
+[`.claude-plugin/marketplace.json`](https://github.com/melodic-software/claude-code-plugins/blob/main/.claude-plugin/marketplace.json)
+in claude-code-plugins, and enables every plugin whose catalog entry leaves
+`defaultEnabled` unset or sets it `true`; any other value leaves the plugin
+off. It writes the list into the snapshot at
+`/opt/melodic-fleet-plugins.json`
 (falling back to `/tmp/melodic-fleet-plugins.json` with a logged `WARN` when
 `/opt` is unwritable, mirroring the stamp), and installs it. Every snapshot
 gets the fleet whatever repo it was built for, and the snapshot stays
 repo-agnostic.
 
 A repo's own `.claude/settings.json` carries only the deltas it declares
-beyond the fleet (an extra marketplace, a plugin beyond the fleet, or a
-`false` opt-out, which project scope applies over the user-scope install).
+beyond the fleet (an extra marketplace, a `true` opt-in to an off-by-default
+plugin, or a `false` opt-out, which project scope applies over the user-scope
+install).
 Those are not installed by this stage: the
 [repo bootstrap](#repo-bootstrap-handoff) that runs next applies them as an
 overlay on top of this list, from the snapshot copy (see the
@@ -88,17 +91,13 @@ add`, skipping ones already registered) and every `enabledPlugins` entry set
 to `true` is installed (`claude plugin install <id> --scope user -y`,
 skipping ones already installed). Every step is best-effort with a `WARN`
 line to the log; the whole stage skips cleanly when the `claude` CLI or `jq`
-is unavailable, and a failed fleet fetch installs no plugins that build (the
-next rebuild fetches the list again).
+is unavailable, and a failed catalog fetch installs no plugins that build (the
+next rebuild fetches the catalog again).
 
-The fleet list is settings-shaped on purpose: `jq` expressions written for a
-repo's settings file read it unchanged, and
-[`distribution/check-plugin-baseline.sh`](../../distribution/check-plugin-baseline.sh)
-uses it as the baseline every repo and the dotfiles seed are compared
-against. Every entry in it is `true`; a `false` is a per-repo decision and
-belongs in that repo's own file. To add a plugin to the fleet, add its entry
-here in byte order (`setup.test.sh` checks both), then force a snapshot
-rebuild (see [Update lifecycle](#update-lifecycle)).
+The fleet list is settings-shaped so the repo bootstrap reads it with the
+same `jq` expressions it uses on a repo's settings file. To add a plugin to or
+remove one from the cloud fleet, change its `defaultEnabled` in the catalog,
+then force a snapshot rebuild (see [Update lifecycle](#update-lifecycle)).
 
 The timing is load-bearing: Claude Code builds its plugin registry at
 process start and never re-reads it, so only installs already in the
@@ -121,7 +120,7 @@ unattended-loop `allow` grants
 ([claude-code-plugins#3172](https://github.com/melodic-software/claude-code-plugins/issues/3172)).
 
 The floor is fetched from the same `raw.githubusercontent.com` host as the
-fleet list, and the merge follows the dotfiles template:
+plugin catalog, and the merge follows the dotfiles template:
 `claudePermissions.allow` and `.deny` are unioned into the file's
 `permissions.allow` and `permissions.deny`, then the floor's `withdraw`
 tombstones are removed from `allow`. The file is never overwritten. Every
@@ -232,12 +231,12 @@ the snapshot.
 - Rollback: environments keep booting from their cached snapshot until
   rebuilt, so reverting the commit and forcing a rebuild restores the prior
   state; in an emergency the bootstrap can pin a commit SHA in the raw URL
-  instead of `main`. The pin covers this script only: the fleet list and the
-  permission floor are still fetched from `main`.
+  instead of `main`. The pin covers this script only: the plugin catalog and
+  the permission floor are still fetched from `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
-the shared environment baseline, which includes the fleet plugin list and the
-composition of the fleet permission floor.
+the shared environment baseline, which includes deriving the fleet plugin
+list and composing the fleet permission floor.
 Repo-specific dependencies and plugin deltas belong to each repo's committed
 `.claude/cloud-bootstrap.sh` and `.claude/settings.json` (templates in the
 fleet guide above), never to this script.

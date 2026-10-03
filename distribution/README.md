@@ -137,64 +137,21 @@ take `--target OWNER/REPO`, and `apply` additionally takes `--target-root DIR`
 for the disposable checkout. The consumer-facing summary of every target
 filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 
-### Plugin-catalog drift report
+### Cloud plugin baseline
 
-The fleet cloud plugin list,
-[`components/cloud-environment/fleet-plugins.json`](../components/cloud-environment/fleet-plugins.json),
-is the baseline: every cloud snapshot installs it, and each repository's
-checked-in `.claude/settings.json` carries what that repo declares beyond it
-(cloud sessions install the fleet list, then the repo file).
-[`check-plugin-baseline.sh`](check-plugin-baseline.sh) makes divergence
-visible. It is report-only, never an edit, because a repo may diverge on purpose:
+Every cloud snapshot installs each plugin in the melodic-software marketplace
+catalog whose entry leaves `defaultEnabled` unset or sets it `true` (see the
+[cloud-environment component](../components/cloud-environment/README.md#plugin-install)).
+Each repository's checked-in `.claude/settings.json` carries only its deltas
+from that set: `false` to opt out of a plugin, `true` to opt in to an
+off-by-default one. Cloud sessions install the catalog-derived list, then the
+repo file's `true` entries. `cloud-bootstrap.sh` also prints an inventory line
+naming catalog plugins that neither source enables, reading the marketplace
+clone already on disk.
 
-```sh
-distribution/check-plugin-baseline.sh                  # every manifest target
-distribution/check-plugin-baseline.sh owner/repo ...   # specific repositories
-distribution/check-plugin-baseline.sh --compare-seed <claude.json>   # dotfiles seed
-distribution/check-plugin-baseline.sh --compare-seed-strict <claude.json>  # gateable
-```
-
-A repository still carrying a full mirrored block reports as matching; one
-that has reduced its block to deltas reports every fleet entry as `missing vs
-baseline`, which is the expected shape during that migration, not drift. The
-`--compare-seed` mode reads a dotfiles data file
-(`claudeSettings.seed.enabledPlugins`) and reports fleet plugins the seed
-never names, fleet plugins the seed opts out of, and seed entries for a fleet
-marketplace that the fleet list lacks; entries for other marketplaces are the
-seed's own. Any of those exits 1. The steady state carries deliberate
-opt-outs, so a gate wants only the first class:
-`--compare-seed-strict` runs the same comparison and prints the same report,
-but exits 3 when the seed is missing a fleet plugin, so a caller keys on an
-exit code rather than on a report line it would have to keep in step by hand.
-Either mode exits 2 on a seed that parses but carries no
-`claudeSettings.seed.enabledPlugins` object, which a comparison would
-otherwise read as an empty seed or as a match.
-
-Fleet mode fetches each target's settings via `gh api`, so it reads private
-repositories with the caller's own auth. Before the per-target diffs it reports
-how the baseline itself compares to each marketplace catalog it declares,
-because measuring every repo against the baseline cannot show the baseline
-falling behind: when a plugin is added to the marketplace and no settings file
-learns about it, every repo reports `matches baseline` while none of them
-installs it, and the gap surfaces only as a slash command that does not
-resolve. Coverage is reported for the baseline alone: a target carrying a
-deliberate subset would otherwise emit that subset as drift on every run. The
-same comparison runs offline for a single pair:
-
-```sh
-distribution/check-plugin-baseline.sh --compare-catalog \
-  <marketplace.json> <settings.json> <marketplace-name>
-```
-
-Each repository also names undeclared catalog plugins in its own cloud
-sessions: `cloud-bootstrap.sh` prints them as an inventory line beside its
-install summary, reading the marketplace clone already on disk.
-
-To propagate a baseline change for a materialized target, edit that repo's file
-under
-`components/claude-settings/targets/` in this repository; sync delivers
-exact bytes. Targets not yet materialized still use ordinary per-repo pull
-requests. The report tells you which entries moved.
+To change a materialized target's deltas, edit that repo's file under
+`components/claude-settings/targets/` in this repository; sync delivers exact
+bytes. Targets not yet materialized still use ordinary per-repo pull requests.
 
 ## Adopting a new repository
 

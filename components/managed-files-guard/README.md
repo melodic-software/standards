@@ -31,8 +31,8 @@ that.
 ## Rollout: advisory first, one caller per runner inventory
 
 **Advisory soak.** The check is not aggregated into any target's `ci-status`
-and is not a required context anywhere. It runs on every pull request,
-reports, and blocks nothing. This follows the action's own contract
+and is not a required context anywhere. It runs on every pull request that
+touches a managed path (see "Path filter" below), reports, and blocks nothing. This follows the action's own contract
 ("advisory-first: wire into ci-status only after a clean soak") and the
 enforcement-rollout steps in `docs/component-lifecycle.md`: observe against
 the live consumers, classify every finding, then promote per target once the
@@ -89,6 +89,34 @@ revision, so ci-workflows carries the component `locally-owned`. Removal
 trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 `standards` is the manifest source, not a target, and carries no caller.
+
+## Path filter
+
+The action fails only when the diff touches an exact managed destination
+path (`run.sh` in the action: `git diff --name-only` checked against the
+engine's `dest-paths` set). Both callers therefore carry
+`on.pull_request.paths` set to the sorted union of every target's
+`dest-paths`, which includes the two caller destinations, so a pull request
+that touches no managed path starts no job. The list is the union, not a
+per-target set, because one file ships byte-identical to every target; on a
+target that does not manage a listed path, a match runs the guard and it
+passes. `types` restates GitHub's documented default (`opened`,
+`synchronize`, `reopened`).
+
+The contract test computes the union through the engine and requires the
+list to equal it, so a manifest change that adds, moves or drops a
+destination fails CI here until both callers follow in the same pull
+request; the next sync then delivers the new list together with the new
+file. A required check could not take this filter (a workflow skipped by
+`paths` leaves its check pending), which is one more thing promotion has to
+decide; today only `ci-status` is required on any target.
+
+Known gaps, both fail-open on an advisory check: GitHub skips a filtered
+workflow when the diff exceeds 3,000 files and no match is among the first
+3,000
+([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#git-diff-comparisons));
+and between a standards merge that adds a destination and that target's sync,
+the consumer's caller still carries the old list.
 
 ## The two pins
 
@@ -218,7 +246,8 @@ Two properties of that ride are deliberate:
 ## Verification
 
 `managed-files-guard.test.sh` asserts, against the parsed YAML of each file:
-the `pull_request` trigger; `contents: read` as the whole grant; the
+the `pull_request` trigger with the default `types` and a `paths` list equal
+to the managed union, free of glob metacharacters; `contents: read` as the whole grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; a
 full-history, credential-free checkout pinned like the sibling workflows; the
