@@ -1301,7 +1301,7 @@
         "app-private-key": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
       }
     },
-    "melodic-software/ci-workflows/.github/workflows/claude-review.yml@4d4b9a5a2247a8aa2ca34f88b8df0f9785b39305": {
+    "melodic-software/ci-workflows/.github/workflows/claude-review.yml@0a99a32989ec1303fcbca233370f4210e888a0f4": {
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner", "incremental-review"],
@@ -1314,7 +1314,7 @@
         "id-token": "write"
       }
     },
-    "melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@4d4b9a5a2247a8aa2ca34f88b8df0f9785b39305": {
+    "melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@0a99a32989ec1303fcbca233370f4210e888a0f4": {
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": ["runner", "incremental-review"],
