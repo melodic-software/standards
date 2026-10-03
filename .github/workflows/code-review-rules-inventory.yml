@@ -1,0 +1,98 @@
+name: code-review-rules-inventory
+
+# Flags a repository whose root AGENTS.md lacks the `## Code Review Rules`
+# section that components/code-review-rules/README.md defines, so a new
+# repository is caught without anyone remembering to add it. Same shape as
+# lychee-private-inventory: the workflow token reads the org's public
+# repositories, and a read-only standards-sync App token reads the private
+# repositories in that App's installation (every private sync target). A
+# private repository outside the installation is visible to neither token.
+# Drift fails the run; it opens no issue.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1`,
+    # claude-lanes-repin's `41 14 * * *` and lychee-private-inventory's
+    # `23 15 * * *`.
+    - cron: "47 15 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # A boolean, never the credential (same shape as claude-lanes-repin).
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mint a read-only App token over the installation
+        id: app-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          # `owner` without `repositories` scopes the token to every repository
+          # in the installation, which is the set being checked. It can read
+          # names, visibility and file contents, and write nothing.
+          owner: melodic-software # zizmor: ignore[github-app] whole-installation scope is the set being checked; the token is read-only
+          permission-metadata: read
+          permission-contents: read
+
+      - name: Report the missing App credential
+        if: env.HAS_APP_CREDENTIAL != 'true'
+        run: |
+          echo "::warning::STANDARDS_SYNC_APP_* is not configured, so only public repositories are checked."
+
+      - name: Check public repositories
+        id: public
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          # Exit code captured through `|| rc=$?`: the default shell carries
+          # `-e`, which `set -uo` does not clear.
+          rc=0
+          bash components/code-review-rules/code-review-rules.sh fleet >"$RUNNER_TEMP/public.out" || rc=$?
+          cat "$RUNNER_TEMP/public.out"
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+          [[ "$rc" -ne 2 ]] || { echo "::error::the public check could not run (see above)"; exit 2; }
+
+      - name: Check private installation repositories
+        id: private
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          gh api --paginate 'installation/repositories?per_page=100' \
+            --jq '.repositories[] | select(.private and (.archived | not)) | .name' >"$RUNNER_TEMP/private.txt"
+          printf 'Private installation repositories: %s\n' "$(wc -l <"$RUNNER_TEMP/private.txt")"
+          rc=0
+          bash components/code-review-rules/code-review-rules.sh fleet --repos "$RUNNER_TEMP/private.txt" >"$RUNNER_TEMP/private.out" || rc=$?
+          cat "$RUNNER_TEMP/private.out"
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+          [[ "$rc" -ne 2 ]] || { echo "::error::the private check could not run (see above)"; exit 2; }
+
+      - name: Fail on drift
+        if: steps.public.outputs.rc == '1' || steps.private.outputs.rc == '1'
+        run: |
+          cat "$RUNNER_TEMP"/*.out | grep '^MISSING: ' | while IFS= read -r line; do
+            echo "::error::${line} (see components/code-review-rules/README.md)"
+          done
+          exit 1
