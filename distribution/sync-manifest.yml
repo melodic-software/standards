@@ -319,8 +319,7 @@ components:
     files:
       _typos.toml: _typos.toml
 
-# Automerge is restored (standards-sync-audit remediation,
-# docs/topics/standards-sync-audit/): the watchdog's tracking-issue
+# Automerge is restored: the watchdog's tracking-issue
 # create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
 # (proof artifact in that plan, 2026-08-17), and the melodic-software/.github
 # canary was observed end-to-end on 2026-08-23 — PR 62 armed on open and
@@ -510,8 +509,7 @@ targets:
   #   Rationale mirrored here per the plan so the manifest, not only the
   #   plan file, records why it is absent.
   # Beyond the Phase 4 hygiene set, claude-code-proxy manages the lefthook
-  # lanes, psscriptanalyzer, and pyright per its own plan's Phase 1 adoption
-  # (docs/topics/claude-code-logging-proxy/PLAN.md, approved 2026-07-26):
+  # lanes, psscriptanalyzer, and pyright per its own Phase 1 adoption:
   # lefthook-base + lefthook-powershell + lefthook-python with their closure
   # (node-runtime, psscriptanalyzer). ruff stays locally-owned (below) and
   # satisfies lefthook-python's requirement as a repo-owned implementation.

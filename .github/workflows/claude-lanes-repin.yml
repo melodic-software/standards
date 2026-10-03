@@ -5,8 +5,7 @@ name: claude-lanes-repin
 # ci-workflows release reaches the fleet only along
 # release tag -> caller-component re-pin -> standards-sync cascade. This job
 # automates the middle hop; `sync.yml` already carries it the rest of the way.
-# Approved 2026-07-26 in melodic-software/ci-workflows
-# `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12 — "3g").
+# Approved 2026-07-26 in melodic-software/ci-workflows.
 #
 # It only ever proposes: the pull request it opens is reviewed and merged by a
 # human like any other, and nothing here arms auto-merge.
@@ -242,7 +241,6 @@ jobs:
             ## Related
 
             - No linked issue.
-            - Phase 3g of `melodic-software/ci-workflows`
-              `docs/topics/claude-review-lanes/PLAN.md` (Approval record, item 12).
+            - Phase 3g of the `melodic-software/ci-workflows` review-lanes plan.
             - Upstream release:
               https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}

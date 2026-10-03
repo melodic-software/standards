@@ -772,8 +772,7 @@ actual_review_instructions_targets="$(
 assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
   "$expected_review_instructions_targets" "$actual_review_instructions_targets"
 
-# agent-orientation was retired by the standards sync audit (audit topic
-# docs/topics/standards-sync-audit/, Phase 2): no component ships AGENTS.md
+# agent-orientation was retired: no component ships AGENTS.md
 # anywhere anymore.
 assert_eq 'no component named agent-orientation exists (retired)' '0' \
   "$(yq -r '[.components | keys[] | select(. == "agent-orientation")] | length' \
