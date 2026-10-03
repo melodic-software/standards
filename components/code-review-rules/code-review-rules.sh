@@ -67,15 +67,17 @@ done
 problems() {
   local text="$1" has_review="$2"
   local count section pointers expected unclosed
-  # Fenced code is an example, never an operative line: drop it first. A fence
-  # closes only on its own character (``` or ~~~); as in CommonMark, an
-  # unclosed fence runs to the end of the document.
+  # Fenced code is an example, never an operative line: drop it first. As in
+  # CommonMark, a fence closes only on a bare run of its own character at
+  # least as long as the opening run, and an unclosed fence runs to the end of
+  # the document.
   # shellcheck disable=SC2016 # awk program text, not a shell expansion
   local fences='
-    match($0, /^[[:space:]]*(```|~~~)/) {
-      c = substr($0, RSTART + RLENGTH - 1, 1)
-      if (!fenced) { fenced = 1; fc = c; next }
-      if (c == fc) { fenced = 0; next }
+    match($0, /^[[:space:]]*(```+|~~~+)/) {
+      run = substr($0, RSTART, RLENGTH); sub(/^[[:space:]]*/, "", run)
+      c = substr(run, 1, 1); n = length(run); rest = substr($0, RSTART + RLENGTH)
+      if (!fenced) { fenced = 1; fc = c; fn = n; next }
+      if (c == fc && n >= fn && rest ~ /^[[:space:]]*$/) { fenced = 0; next }
     }
     !fenced && !flag { print }
     END { if (flag && fenced) print "unclosed" }'

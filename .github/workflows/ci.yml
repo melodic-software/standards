@@ -1260,6 +1260,7 @@ jobs:
             ${{ needs.dotnet-format.result }}
             ${{ needs.dotnet-fixtures.result }}
             ${{ needs.harness.result }}
+            ${{ needs.code-review-rules.result }}
             ${{ needs.cloud-environment.result }}
             ${{ needs.distribution.result }}
             ${{ needs.lefthook.result }}

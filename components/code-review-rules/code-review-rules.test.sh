@@ -48,6 +48,7 @@ repo pointer-fenced "$(section "$intro" "$(printf '%smarkdown\n%s\n%s' "$fence" 
 repo heading-fenced "$(printf '# Repo\n\n%smarkdown\n## Code Review Rules\n\n%s\n\n%s\n%s\n' "$fence" "$intro" "$synced" "$fence")" review
 repo unclosed-fence "$(printf '# Repo\n\n%s\nsnippet\n\n' "$fence"; section "$intro" "$synced")" review
 repo mixed-fences "$(printf '# Repo\n\n~~~text\n%s\n~~~\n\n' "$fence"; section "$intro" "$synced")" review
+repo nested-fence "$(printf '# Repo\n\n%s`markdown\n%s\n' "$fence" "$fence"; section "$intro" "$synced"; printf '%s`\n' "$fence")" review
 
 # --- file ------------------------------------------------------------------
 out="$(bash "$script" file --root "$work/fleet/synced" 2>&1)"
@@ -95,6 +96,10 @@ assert_contains 'the unclosed fence is named as the cause' "$out" 'a code fence 
 
 out="$(bash "$script" file --root "$work/fleet/mixed-fences" 2>&1)"
 assert_exit 'a backtick fence inside a tilde fence does not close it' 0 $?
+
+out="$(bash "$script" file --root "$work/fleet/nested-fence" 2>&1)"
+assert_exit 'a shorter fence inside a four-backtick fence does not close it' 1 $?
+assert_contains 'a section inside the longer fence does not count' "$out" "no '## Code Review Rules' heading"
 
 # --- fleet -----------------------------------------------------------------
 printf '%s\n' synced remote >"$work/ok.txt"
