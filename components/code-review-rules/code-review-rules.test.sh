@@ -42,6 +42,10 @@ repo no-intro "$(section 'Some other intro.' "$synced")" review
 repo no-pointer "$(section "$intro" '- Local rule: [rule](docs/rule.md).')" review
 repo wrong-target "$(section "$intro" "$remote")" review
 repo pointer-outside "$(printf '# Repo\n\n## Code Review Rules\n\n%s\n\n## Next\n\n%s\n' "$intro" "$synced")" review
+# shellcheck disable=SC2016 # a literal Markdown fence, not an expansion
+fence='```'
+repo pointer-fenced "$(section "$intro" "$(printf '%smarkdown\n%s\n%s' "$fence" "$synced" "$fence")")" review
+repo heading-fenced "$(printf '# Repo\n\n%smarkdown\n## Code Review Rules\n\n%s\n\n%s\n%s\n' "$fence" "$intro" "$synced" "$fence")" review
 
 # --- file ------------------------------------------------------------------
 out="$(bash "$script" file --root "$work/fleet/synced" 2>&1)"
@@ -74,6 +78,14 @@ assert_contains 'the expected target is named' "$out" 'must link REVIEW.md'
 out="$(bash "$script" file --root "$work/fleet/pointer-outside" 2>&1)"
 assert_exit 'file fails when the pointer sits under a later heading' 1 $?
 assert_contains 'a pointer outside the section does not count' "$out" 'REVIEW.md pointer line is missing'
+
+out="$(bash "$script" file --root "$work/fleet/pointer-fenced" 2>&1)"
+assert_exit 'file fails when the pointer sits only in a fenced example' 1 $?
+assert_contains 'a fenced pointer does not count' "$out" 'REVIEW.md pointer line is missing'
+
+out="$(bash "$script" file --root "$work/fleet/heading-fenced" 2>&1)"
+assert_exit 'file fails when the whole section sits in a fenced example' 1 $?
+assert_contains 'a fenced heading does not count' "$out" "no '## Code Review Rules' heading"
 
 # --- fleet -----------------------------------------------------------------
 printf '%s\n' synced remote >"$work/ok.txt"

@@ -67,6 +67,8 @@ done
 problems() {
   local text="$1" has_review="$2"
   local count section pointers expected
+  # Fenced code is an example, never an operative line: drop it first.
+  text="$(printf '%s\n' "$text" | awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; next } !fenced')"
   count="$(printf '%s\n' "$text" | grep -cxF -- "$heading" || true)"
   if [[ "$count" -eq 0 ]]; then
     echo "no '${heading}' heading"
@@ -79,7 +81,7 @@ problems() {
     inside && /^##? / { exit }
     inside { print }')"
   printf '%s\n' "$section" | grep -qxF -- "$intro" || echo "the inherited intro line is missing"
-  pointers="$(printf '%s\n' "$section" | grep -F -- "$pointer_prefix" || true)"
+  pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_prefix" 'index($0, p) == 1')"
   if [[ -z "$pointers" ]]; then
     echo "the inherited REVIEW.md pointer line is missing"
     return

@@ -99,11 +99,13 @@ canonical URL when it does not.
   sync target. A private repository outside the installation is not visible to
   either token.
 
-The fleet run is report-only while `standards#656` rolls the section out: it
-annotates each nonconforming repository with a warning and passes. Once every
-repository conforms, set `REPORT_ONLY` in that workflow to `false` so drift
-fails the run, as `lychee-private-inventory` does. Like that workflow, it opens
-no issue.
+Drift fails the fleet run with one error annotation per nonconforming
+repository, as `lychee-private-inventory` does, and opens no issue. It blocks
+from admission without a report-only period: the run gates no pull request,
+and the observation run on 2026-10-03 (all 17 non-archived repositories) found
+exactly the expected baseline, the pilot passing and every other repository
+missing the section, so its failures stay red only until the `standards#656`
+rollout lands each repository's section.
 
 ## Ownership
 

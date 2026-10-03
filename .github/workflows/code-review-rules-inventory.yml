@@ -7,7 +7,7 @@ name: code-review-rules-inventory
 # repositories, and a read-only standards-sync App token reads the private
 # repositories in that App's installation (every private sync target). A
 # private repository outside the installation is visible to neither token.
-# Drift is reported in the run; it opens no issue.
+# Drift fails the run; it opens no issue.
 on:
   workflow_dispatch:
   schedule:
@@ -30,10 +30,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # Report-only while melodic-software/standards#656 rolls the section out
-      # (component-lifecycle "Enforcement rollout"). Set to 'false' once every
-      # repository conforms, so drift fails the run.
-      REPORT_ONLY: 'true'
       # A boolean, never the credential (same shape as claude-lanes-repin).
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
@@ -93,12 +89,10 @@ jobs:
           echo "rc=$rc" >>"$GITHUB_OUTPUT"
           [[ "$rc" -ne 2 ]] || { echo "::error::the private check could not run (see above)"; exit 2; }
 
-      - name: Report drift
+      - name: Fail on drift
         if: steps.public.outputs.rc == '1' || steps.private.outputs.rc == '1'
         run: |
-          level=error
-          [[ "$REPORT_ONLY" != true ]] || level=warning
           cat "$RUNNER_TEMP"/*.out | grep '^MISSING: ' | while IFS= read -r line; do
-            echo "::${level}::${line} (see components/code-review-rules/README.md)"
+            echo "::error::${line} (see components/code-review-rules/README.md)"
           done
-          [[ "$REPORT_ONLY" == true ]] || exit 1
+          exit 1

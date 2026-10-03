@@ -117,7 +117,7 @@ with the decisions in that repository's ADRs 0008 and 0014. Read them there
 rather than a copy here.
 
 Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
-schedule or otherwise; `lychee-private-inventory.yml` fails the run on drift,
-and `code-review-rules-inventory.yml` reports it in the run.
+schedule or otherwise; `lychee-private-inventory.yml` and
+`code-review-rules-inventory.yml` fail the run on drift.
 No lane checks external URLs: the blocking `lychee` lane is offline-only, over
 local files and fragments.
