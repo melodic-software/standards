@@ -46,6 +46,8 @@ repo pointer-outside "$(printf '# Repo\n\n## Code Review Rules\n\n%s\n\n## Next\
 fence='```'
 repo pointer-fenced "$(section "$intro" "$(printf '%smarkdown\n%s\n%s' "$fence" "$synced" "$fence")")" review
 repo heading-fenced "$(printf '# Repo\n\n%smarkdown\n## Code Review Rules\n\n%s\n\n%s\n%s\n' "$fence" "$intro" "$synced" "$fence")" review
+repo unclosed-fence "$(printf '# Repo\n\n%s\nsnippet\n\n' "$fence"; section "$intro" "$synced")" review
+repo mixed-fences "$(printf '# Repo\n\n~~~text\n%s\n~~~\n\n' "$fence"; section "$intro" "$synced")" review
 
 # --- file ------------------------------------------------------------------
 out="$(bash "$script" file --root "$work/fleet/synced" 2>&1)"
@@ -86,6 +88,13 @@ assert_contains 'a fenced pointer does not count' "$out" 'REVIEW.md pointer line
 out="$(bash "$script" file --root "$work/fleet/heading-fenced" 2>&1)"
 assert_exit 'file fails when the whole section sits in a fenced example' 1 $?
 assert_contains 'a fenced heading does not count' "$out" "no '## Code Review Rules' heading"
+
+out="$(bash "$script" file --root "$work/fleet/unclosed-fence" 2>&1)"
+assert_exit 'file fails when an unclosed fence above swallows the section' 1 $?
+assert_contains 'the unclosed fence is named as the cause' "$out" 'a code fence is never closed'
+
+out="$(bash "$script" file --root "$work/fleet/mixed-fences" 2>&1)"
+assert_exit 'a backtick fence inside a tilde fence does not close it' 0 $?
 
 # --- fleet -----------------------------------------------------------------
 printf '%s\n' synced remote >"$work/ok.txt"

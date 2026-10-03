@@ -66,12 +66,28 @@ done
 # conforms.
 problems() {
   local text="$1" has_review="$2"
-  local count section pointers expected
-  # Fenced code is an example, never an operative line: drop it first.
-  text="$(printf '%s\n' "$text" | awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; next } !fenced')"
+  local count section pointers expected unclosed
+  # Fenced code is an example, never an operative line: drop it first. A fence
+  # closes only on its own character (``` or ~~~); as in CommonMark, an
+  # unclosed fence runs to the end of the document.
+  # shellcheck disable=SC2016 # awk program text, not a shell expansion
+  local fences='
+    match($0, /^[[:space:]]*(```|~~~)/) {
+      c = substr($0, RSTART + RLENGTH - 1, 1)
+      if (!fenced) { fenced = 1; fc = c; next }
+      if (c == fc) { fenced = 0; next }
+    }
+    !fenced && !flag { print }
+    END { if (flag && fenced) print "unclosed" }'
+  unclosed="$(printf '%s\n' "$text" | awk -v flag=1 "$fences")"
+  text="$(printf '%s\n' "$text" | awk -v flag=0 "$fences")"
   count="$(printf '%s\n' "$text" | grep -cxF -- "$heading" || true)"
   if [[ "$count" -eq 0 ]]; then
-    echo "no '${heading}' heading"
+    if [[ -n "$unclosed" ]]; then
+      echo "no '${heading}' heading outside code fences (a code fence is never closed)"
+    else
+      echo "no '${heading}' heading"
+    fi
     return
   fi
   [[ "$count" -eq 1 ]] || echo "${count} '${heading}' headings, expected one"
