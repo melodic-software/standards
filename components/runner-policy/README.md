@@ -1005,6 +1005,15 @@ v1.0.231 to v1.0.235, and `standards-sync` is byte-identical. The repin lane
 declined the lanes because the step carrying their credential references
 changed its `uses`, and `standards-sync` on the standing `needs` decline. No
 input, secret, caller permission or `runs-on` routing moved.
+`claude-intake-triage` is registered at the v0.33.0 tag
+`632130a974770e50825c8747e87b0e18ecb2b36e`, its first revision. Its one job
+declares `contents: read` and `issues: write`, which is the exact
+`allowedCallerPermissions` map; it takes the single `CLAUDE_CODE_OAUTH_TOKEN`
+mapping, and its allowed inputs are `runner`, `allowed-labels`,
+`escalation-label`, `instructions` and `cli-version`. Its `claude-args` input is
+left out, so a caller cannot change the model or turn budget. Hosted
+`ubuntu-24.04` with `issues: write` needs no exception on a public repository;
+a private consumer needs a `privileged-control-plane` exception or the fleet.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
