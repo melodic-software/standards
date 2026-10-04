@@ -23,6 +23,7 @@ source "$root/harness/shell/lib.sh"
 
 script="$root/components/claude-lanes/repin-callers.sh"
 fixture_corpus="$root/components/pin-comment-convention/fixtures"
+rename_map="$root/components/github-actions-conventions/rename-map.json"
 upstream='melodic-software/ci-workflows'
 old_sha='c136b27f404dd32ce3873f39a6f3443891d1c16e'
 new_sha='a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4'
@@ -32,7 +33,7 @@ trap 'rm -rf -- "$scratch"' EXIT
 
 assert_file_exists 'subject script exists' "$script"
 
-for tool in git sed grep sort paste cmp; do
+for tool in git sed grep sort paste cmp jq; do
   command -v "$tool" >/dev/null 2>&1 ||
     fail 'required tool present' "$tool is missing; this environment cannot run the subject"
 done
@@ -103,6 +104,21 @@ case "$path" in
       exit 1
     fi
     printf '%s\n' "${STUB_COMPARE_STATUS:?stub gh: STUB_COMPARE_STATUS unset}"
+    ;;
+  */contents/*)
+    # apply's renamed-path probe. STUB_PRESENT_PATHS lists, space-separated,
+    # the upstream paths that exist at the probed ref; unset means every path
+    # exists, the pre-rename world the older cases assume.
+    # STUB_CONTENTS_STATUS=500 forces a non-404 lookup failure.
+    if [[ "${STUB_CONTENTS_STATUS:-200}" == '500' ]]; then
+      echo 'gh: Server Error (HTTP 500)' >&2
+      exit 1
+    fi
+    probed="${path#*/contents/}"
+    probed="${probed%%\?*}"
+    if [[ -n "${STUB_PRESENT_PATHS+x}" && " ${STUB_PRESENT_PATHS} " != *" ${probed} "* ]]; then
+      not_found
+    fi
     ;;
   repos/*/*)
     # Bare `repos/<owner>/<repo>` — the repository-readable probe. Reached only
@@ -297,8 +313,10 @@ lane_repo() {
   # rewrite between checkout and comparison would be indistinguishable from
   # the rewrite under test.
   git -C "$dir" config core.autocrlf false
-  mkdir -p "$dir/components/claude-lanes" "$dir/components/pin-comment-convention"
+  mkdir -p "$dir/components/claude-lanes" "$dir/components/pin-comment-convention" \
+    "$dir/components/github-actions-conventions"
   cp -R "$fixture_corpus" "$dir/components/pin-comment-convention/fixtures"
+  cp "$rename_map" "$dir/components/github-actions-conventions/rename-map.json"
 
   cat > "$dir/components/claude-lanes/claude-review.yml" <<YAML
 name: claude-review
@@ -666,6 +684,62 @@ assert_contains 'apply: no-diff run reports changed=false' "$(cat "$out_file")" 
 assert_not_contains 'apply: no-diff run never reports a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: no-diff run is a notice' "$out" '::notice::'
 assert_silent 'apply: no-diff run leaves the tree clean' "$(git -C "$repo" status --porcelain)"
+
+# ------------------------------------------------- apply: renamed upstream paths
+
+# A release that renamed a pinned reusable no longer carries the old path, so
+# rewriting the SHA alone would pin a path that does not exist at it. The
+# expected new paths are the ci-workflows entries of rename-map.json.
+renamed_paths='.github/workflows/pr-review.yml .github/workflows/pr-review-security.yml'
+repo="$scratch/repo-renamed"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+export STUB_PRESENT_PATHS="$renamed_paths"
+out_file="$scratch/out-apply-renamed"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'apply: a renamed upstream path exits 0' 0 "$rc"
+assert_contains 'apply: the review caller moves to the renamed path' \
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
+  "uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@${new_sha} # v0.9.2"
+assert_contains 'apply: the security caller moves to the renamed path' \
+  "$(cat "$repo/components/claude-lanes/claude-security-review.yml")" \
+  "uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@${new_sha} # v0.9.2"
+assert_not_contains 'apply: no caller keeps an old path' \
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'claude-review.yml@'
+# shellcheck disable=SC2016  # markdown code spans in the expected note, not shell expansions
+assert_contains 'apply: the version note names the rename' "$(cat "$out_file")" \
+  '`.github/workflows/claude-review.yml` to `.github/workflows/pr-review.yml`'
+
+# A release cut before the rename still carries the old path: the SHA moves,
+# the path stays.
+repo="$scratch/repo-pre-rename"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+export STUB_PRESENT_PATHS='.github/workflows/claude-review.yml .github/workflows/claude-security-review.yml'
+out_file="$scratch/out-apply-pre-rename"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'apply: a pre-rename release exits 0' 0 "$rc"
+assert_contains 'apply: a pre-rename release keeps the review path' \
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
+  "uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${new_sha} # v0.9.2"
+assert_not_contains 'apply: a pre-rename release maps no path' \
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'pr-review'
+
+# Neither path at the release: no pin can be right, so nothing is rewritten.
+repo="$scratch/repo-path-gone"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+export STUB_PRESENT_PATHS=''
+rc=0; out="$(run_apply "$repo" "$scratch/out-apply-path-gone" 'v0.9.2' "$new_sha")" || rc=$?
+assert_nonzero 'apply: a pinned path absent under both names fails' "$rc"
+assert_contains 'apply: the absent path is named' "$out" '.github/workflows/claude-review.yml'
+assert_silent 'apply: an absent path touches nothing' "$(git -C "$repo" status --porcelain)"
+
+# A probe that fails for any reason but 404 proves nothing about the path.
+repo="$scratch/repo-probe-fail"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+export STUB_PRESENT_PATHS="$renamed_paths" STUB_CONTENTS_STATUS=500
+rc=0; out="$(run_apply "$repo" "$scratch/out-apply-probe-fail" 'v0.9.2' "$new_sha")" || rc=$?
+assert_nonzero 'apply: a failed path probe is a hard failure' "$rc"
+assert_silent 'apply: a failed path probe touches nothing' "$(git -C "$repo" status --porcelain)"
+unset STUB_PRESENT_PATHS STUB_CONTENTS_STATUS
 
 # ------------------------------------------------------------ apply: controls
 

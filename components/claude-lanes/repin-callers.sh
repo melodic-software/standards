@@ -51,6 +51,10 @@ readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{
 readonly FALLBACK_PIN_RE="${PIN_RE}[[:space:]]+# [0-9a-f]{7,40} [0-9]{4}-[0-9]{2}-[0-9]{2}"
 readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 readonly UPSTREAM_REPO='melodic-software/ci-workflows'
+# Old -> new upstream paths. Its `repo: ci-workflows` entries with a path
+# `to` are the only renames apply follows; it keeps no copy of its own.
+readonly RENAME_MAP='components/github-actions-conventions/rename-map.json'
+readonly UPSTREAM_PATH_RE='^[A-Za-z0-9._/-]+$'
 
 usage() {
   cat >&2 <<'USAGE'
@@ -236,6 +240,72 @@ repin::ahead_of() {
   done < <(grep -hE "$FALLBACK_PIN_RE" "$file" || true)
 }
 
+# repin::path_state <path> <sha>
+#
+# Prints `present` or `absent` for <path> on the upstream at <sha>, through
+# the contents API, which answers for one exact path and ref (a file or a
+# directory) and, unlike a recursive tree read, never truncates. Any failure
+# but a 404 is fatal: it says nothing about the path.
+repin::path_state() {
+  local path="$1" sha="$2" err
+  err="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$err'" RETURN
+  if gh api "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" --silent 2>"$err"; then
+    echo present
+  elif grep -q 'HTTP 404' "$err"; then
+    echo absent
+  else
+    echo "::error::Could not probe ${path} at ${sha} on ${UPSTREAM_REPO}." >&2
+    cat "$err" >&2
+    return 1
+  fi
+}
+
+# repin::path_map <sha> <file>...
+#
+# Prints `from<TAB>to` for each upstream path pinned in <file>... that
+# RENAME_MAP renames and that <sha> carries only under its new name. A
+# release cut before the rename still has the old path, so it maps nothing.
+# A pinned path absent under both names is fatal: no rewrite could be right.
+repin::path_map() {
+  local sha="$1" entries pinned from to old_state new_state
+  shift
+  if [[ ! -f "$RENAME_MAP" ]]; then
+    echo "::error::${RENAME_MAP} is missing; renamed upstream paths cannot be resolved." >&2
+    return 1
+  fi
+  # Called through command substitution, where bash clears errexit: every
+  # failure below returns explicitly.
+  entries="$(jq -r '.[] | select(.repo == "ci-workflows" and (.to | startswith(".github/")))
+    | [.from, .to] | @tsv' "$RENAME_MAP")" || return 1
+  pinned="$(grep -hoE "$PIN_RE" "$@" | sed -E 's|^uses: [^/]+/[^/]+/||; s|@.*||' | sort -u)"
+  while IFS=$'\t' read -r from to; do
+    if [[ -z "$from" ]] || ! grep -qxF -- "$from" <<<"$pinned"; then
+      continue
+    fi
+    if [[ ! "$from" =~ $UPSTREAM_PATH_RE || ! "$to" =~ $UPSTREAM_PATH_RE ]]; then
+      echo "::error::${RENAME_MAP} maps '${from}' to '${to}', which is not a plain repository path." >&2
+      return 1
+    fi
+    old_state="$(repin::path_state "$from" "$sha")"
+    case "$old_state" in
+      present) continue ;;
+      absent) ;;
+      *) return 1 ;;
+    esac
+    new_state="$(repin::path_state "$to" "$sha")"
+    case "$new_state" in
+      present) printf '%s\t%s\n' "$from" "$to" ;;
+      absent)
+        echo "::error::Neither ${from} nor its renamed path ${to} exists at ${sha}." >&2
+        return 1
+        ;;
+      *) return 1 ;;
+    esac
+  done <<<"$entries"
+}
+
 # repin::apply <tag> <sha> <date>
 #
 # Emits changed=false and exits 0 when the callers already carry <sha>/<tag>;
@@ -246,7 +316,8 @@ repin::ahead_of() {
 repin::apply() {
   local tag="$1" sha="$2" release_date="$3"
   local root expected rewritten old_sha old_tags new_major old_major old_tag note ahead_sha ahead_list delim
-  local -a targets rewrite ahead excludes
+  local path_map from to renamed
+  local -a targets rewrite ahead excludes sed_args
 
   if [[ ! "$release_date" =~ $DATE_RE ]]; then
     echo "::error::Release date '${release_date}' is not YYYY-MM-DD." >&2
@@ -315,8 +386,17 @@ repin::apply() {
   old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${rewrite[@]}" \
     | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
 
-  sed -i -E "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${sha} # ${tag}|" \
-    "${rewrite[@]}"
+  path_map="$(repin::path_map "$sha" "${rewrite[@]}")"
+  sed_args=()
+  renamed=''
+  while IFS=$'\t' read -r from to; do
+    [[ -n "$from" ]] || continue
+    echo "::notice::${tag} carries ${from} as ${to}; the pins follow the rename."
+    sed_args+=(-e "s|(uses: melodic-software/ci-workflows/)${from//./\\.}@|\1${to}@|")
+    renamed+="\`${from}\` to \`${to}\`, "
+  done <<<"$path_map"
+  sed_args+=(-e "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${sha} # ${tag}|")
+  sed -i -E "${sed_args[@]}" "${rewrite[@]}"
 
   rewritten="$(grep -hoE "${PIN_RE}[[:space:]]+# ${tag}\$" "${rewrite[@]}" | wc -l || true)"
   if [[ "$expected" -eq 0 || "$expected" -ne "$rewritten" ]]; then
@@ -357,6 +437,11 @@ repin::apply() {
 > **Major-version jump** from \`${old_tags}\` to \`${tag}\`. This is not a drop-in bump: read the upstream release notes for breaking changes to the lane callers' inputs, secrets, and required check names before merging."
   else
     note="Same major version as the pin it replaces (\`${old_tags}\` to \`${tag}\`)."
+  fi
+  if [[ -n "$renamed" ]]; then
+    note+="
+
+Renamed upstream at ${tag}, so these pins moved path as well as SHA: ${renamed%, }."
   fi
   if [[ "${#ahead[@]}" -gt 0 ]]; then
     ahead_list="$(printf "\`%s\`, " "${ahead[@]}")"
