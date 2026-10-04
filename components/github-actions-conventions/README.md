@@ -90,6 +90,8 @@ these in each workflow that needs them:
 - The called workflow's own top-level `concurrency` block applies when it is
   called. Put the concurrency block in the workflow that should own the group;
   a reusable that its callers run inside their own group carries none.
+  [concurrency-policy](../concurrency-policy/README.md#what-it-checks) checks
+  the caller's block and leaves reusable workflows out of its scope.
 - The caller's `defaults.run.shell` does not reach the called workflow's
   steps. Set `defaults.run.shell` (or `shell:` per step) in the reusable
   itself.
@@ -211,3 +213,16 @@ in `rename-map.json` land there, then enforcing. The switch to enforcing is
 tracked in [#672](https://github.com/melodic-software/standards/issues/672),
 due 2026-11-30. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
 31 of them blocking in enforcing mode.
+
+### Ownership and operation
+
+- **Owner:** the standards maintainers own the conventions, vocabulary and
+  analyzer; each consumer owns its wrapper and its renames.
+- **Outcome:** every workflow, job and action in a consumer passes
+  `--mode enforcing`, so check names read `<slot> / <unit>` and `ci-status`
+  stays the only required check.
+- **Rollback:** switch the consumer's wrapper back to `--mode advisory`, or
+  remove the wrapper job. Nothing else reads the analyzer's output.
+- **Failure behavior:** read-only over `.github/`, no network or credentials,
+  `contents: read` only. An unparsable workflow is a `workflow-unparsable`
+  finding; bad arguments or a bad vocabulary exit 2.
