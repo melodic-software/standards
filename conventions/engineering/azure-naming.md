@@ -112,6 +112,10 @@ than in the name, and it matters because most of these types cannot be renamed a
 groups, key vaults, storage accounts and blob containers are all immutable once created, and only a
 subscription display name can be changed in place
 (<https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/frequently-asked-questions>).
+A service principal is the exception on the identity side: its display name can be changed in place,
+while its application ID and object ID never change
+(<https://learn.microsoft.com/en-us/graph/api/resources/application>), so callers and role
+assignments bind to those IDs, not to the name.
 A deleted key vault's name stays blocked for the whole soft-delete retention period, up to 90 days
 (<https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview>).
 
