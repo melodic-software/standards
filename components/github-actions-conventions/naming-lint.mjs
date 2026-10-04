@@ -31,19 +31,45 @@ function parseJson(source, location) {
   if (document.errors.length > 0) {
     throw new ConfigurationError(`${location} is not valid JSON: ${document.errors[0].message}`);
   }
-  return JSON.parse(source);
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new ConfigurationError(`${location} is not valid JSON: ${error.message}`);
+  }
 }
 
-const validateVocabularyStructure = new Ajv2020({
-  allErrors: false,
-  strict: true,
-  validateFormats: false,
-}).compile(parseJson(await readFile(VOCABULARY_SCHEMA_PATH, "utf8"), VOCABULARY_SCHEMA_PATH));
+function compilePattern(pattern, location) {
+  try {
+    return new RegExp(pattern, "u");
+  } catch (error) {
+    throw new ConfigurationError(`${location} is not a valid regular expression: ${error.message}`);
+  }
+}
+
+// A schema that cannot be read or compiled is a configuration error, reported
+// when a vocabulary is validated so the CLI maps it to exit status 2.
+let validateVocabularyStructure;
+let schemaError;
+try {
+  validateVocabularyStructure = new Ajv2020({
+    allErrors: false,
+    strict: true,
+    validateFormats: false,
+  }).compile(parseJson(await readFile(VOCABULARY_SCHEMA_PATH, "utf8"), VOCABULARY_SCHEMA_PATH));
+} catch (error) {
+  schemaError =
+    error instanceof ConfigurationError
+      ? error
+      : new ConfigurationError(`cannot load ${VOCABULARY_SCHEMA_PATH}: ${error.message}`);
+}
 
 // Cross-field rules JSON Schema cannot state: the function table is keyed by
 // exactly the stage list, every function word leads with an accepted verb,
 // and a name exemption says which name it accepts.
 export function validateVocabulary(vocabulary, location = "vocabulary") {
+  if (schemaError !== undefined) {
+    throw schemaError;
+  }
   if (!validateVocabularyStructure(vocabulary)) {
     const [error] = validateVocabularyStructure.errors;
     throw new ConfigurationError(
@@ -84,7 +110,8 @@ export function validateVocabulary(vocabulary, location = "vocabulary") {
       );
     }
   }
-  const appPattern = new RegExp(vocabulary.apps.pattern, "u");
+  compilePattern(vocabulary.activityGrammar.pattern, `${location} activityGrammar.pattern`);
+  const appPattern = compilePattern(vocabulary.apps.pattern, `${location} apps.pattern`);
   for (const app of vocabulary.apps.names) {
     if (!appPattern.test(app.name)) {
       throw new ConfigurationError(`${location} app ${app.name} does not match apps.pattern`);
@@ -145,11 +172,11 @@ export function checkActivityName(name, vocabulary) {
     return `activity \`${name}\` does not match ${grammar.pattern}`;
   }
   const [activity, mode] = name.split("#");
-  if (vocabulary.engines.includes(activity)) {
-    return undefined;
-  }
   if (mode !== undefined && !grammar.modes.flat().includes(mode)) {
     return `activity \`${name}\` uses mode \`${mode}\`, which is not one of ${grammar.modes.flat().join(", ")}`;
+  }
+  if (vocabulary.engines.includes(activity)) {
+    return undefined;
   }
   // Only a leading stage word repeats the slot (`pr-explainer` in slot
   // `pr-verify`). A stage word later in the name is an ordinary word, as in
@@ -267,7 +294,7 @@ async function workflowFindings(root, repository, vocabulary) {
       exemptions.find(
         (exemption) => exemption.rules.includes("*") || exemption.rules.includes(rule),
       );
-    if (waived("*")?.rules.includes("*")) {
+    if (exemptions.some((exemption) => exemption.rules.includes("*"))) {
       continue;
     }
     const stem = entry.name.replace(/\.ya?ml$/u, "");

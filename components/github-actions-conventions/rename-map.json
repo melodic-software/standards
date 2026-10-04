@@ -1961,6 +1961,18 @@
     "note": "Tool wrapper: tool name"
   },
   {
+    "repo": "claude-code-plugins",
+    "kind": "action",
+    "from": ".github/actions/checkout-with-base",
+    "to": ".github/actions/download-full-history",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": [],
+    "consumers": "claude-code-plugins (ci.yml, dependabot-plugin-release.yml, silent-revert-canary.yml; ADR 0019)",
+    "note": "It does not check out: it unshallows the clone and fetches origin/$BASE_REF after actions/checkout. `download` is an accepted verb; both steps download history"
+  },
+  {
     "repo": "medley",
     "kind": "action",
     "from": ".github/actions/setup-dotnet-ci",

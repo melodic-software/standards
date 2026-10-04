@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -228,7 +228,7 @@ test("every target name in the approved rename map passes the vocabulary", async
 
 test("slot names the pull request pipeline model relies on parse as stage plus function", () => {
   // cant-fail-ok: these names are the contract the Automation Lanes pipeline
-  // model refers to (handed over 2026-10-03); dropping one breaks that model.
+  // model refers to; dropping one breaks that model.
   for (const name of [
     "pr-refine",
     "pr-run-checks",
@@ -273,6 +273,8 @@ test("activity names follow the grammar", () => {
   assert.match(checkActivityName("pr-explainer", vocabulary), /stage word `pr`/u);
   assert.match(checkActivityName("intent-check", vocabulary), /accepted verb/u);
   assert.match(checkActivityName("simplify#bogus", vocabulary), /mode `bogus`/u);
+  assert.match(checkActivityName("claude#bogus", vocabulary), /mode `bogus`/u);
+  assert.equal(checkActivityName("claude#diff", vocabulary), undefined);
   assert.match(checkActivityName("Fix_Docs", vocabulary), /does not match/u);
 });
 
@@ -304,12 +306,51 @@ test("the vocabulary loader rejects cross-field drift the schema cannot express"
   assert.throws(() => validateVocabulary(nounFunction), /accepted verb/u);
 
   const nameWithoutValue = clone();
-  delete nameWithoutValue.exemptions[1].expectedName;
+  delete nameWithoutValue.exemptions[0].expectedName;
   assert.throws(() => validateVocabulary(nameWithoutValue), /expectedName/u);
 
   const badShape = clone();
   badShape.stages[0].name = "Intake";
   assert.throws(() => validateVocabulary(badShape), /vocabulary.schema.json/u);
+
+  for (const field of ["apps", "activityGrammar"]) {
+    const badPattern = clone();
+    badPattern[field].pattern = "^[a-z";
+    assert.throws(
+      () => validateVocabulary(badPattern),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.includes(`${field}.pattern is not a valid regular expression`),
+    );
+  }
+});
+
+test("a malformed vocabulary file is a configuration error that names the file", async () => {
+  const root = await repository({});
+  const file = path.join(root, "vocabulary.json");
+  // YAML's JSON schema accepts a single-quoted string; JSON.parse does not.
+  await writeFile(file, `{"stages": 'x'}`);
+  await assert.rejects(
+    loadVocabulary(file),
+    (error) => error instanceof ConfigurationError && error.message.includes(file),
+  );
+});
+
+test("a missing vocabulary schema exits 2, not 1", async () => {
+  const copy = await repository({});
+  for (const name of ["naming-lint.mjs", "vocabulary.json"]) {
+    await writeFile(path.join(copy, name), await readFile(path.join(HERE, name)));
+  }
+  await symlink(path.join(HERE, "node_modules"), path.join(copy, "node_modules"), "dir");
+  const result = await new Promise((resolve) => {
+    execFile(
+      process.execPath,
+      [path.join(copy, "naming-lint.mjs"), "--root", copy],
+      (error, _stdout, stderr) => resolve({ code: error === null ? 0 : error.code, stderr }),
+    );
+  });
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /vocabulary\.schema\.json/u);
 });
 
 test("the README stage table lists the vocabulary's stages in order", async () => {

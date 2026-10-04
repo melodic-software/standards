@@ -205,11 +205,6 @@
   },
   "exemptions": [
     {
-      "path": ".github/workflows/dynamic/*",
-      "rules": ["*"],
-      "reason": "GitHub-managed dynamic workflows (Dependabot, CodeQL default setup, Pages) have no file in the repository to rename."
-    },
-    {
       "path": ".github/workflows/release-deploy-oidc-negative-test.yml",
       "repository": "melodic-software/github-iac",
       "rules": ["workflow-name"],

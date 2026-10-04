@@ -94,7 +94,7 @@ these in each workflow that needs them:
   steps. Set `defaults.run.shell` (or `shell:` per step) in the reusable
   itself.
 
-Both were confirmed on github.com in a throwaway repository on 2026-10-03.
+Both were confirmed on github.com.
 
 ## Renaming a workflow, job or action
 
@@ -121,7 +121,10 @@ renaming, find each of these and change it in the same rollout:
    file.
 
 [`rename-map.json`](rename-map.json) records the approved renames and the
-couplings each one touches.
+couplings each one touches. The tests check that every target passes the
+lint. They cannot check that the map is complete, because the other
+repositories are not available to them: run naming-lint in enforcing mode on
+each repository, and every blocking finding must have an entry in the map.
 
 ## Lane configuration
 
@@ -137,13 +140,12 @@ what it does. The Apps in use are listed under `apps` in `vocabulary.json`.
 
 ## Exemptions
 
-The complete list is `exemptions` in `vocabulary.json`:
-
-- GitHub's dynamic workflows (`dynamic/*`), which have no file to rename.
-- github-iac's OIDC negative test, `release-deploy-oidc-negative-test.yml`,
-  whose `name:` is `release-deploy-x`: the deploy workflow's name plus one
-  character, so the identity policy that trusts `release-deploy` must reject
-  it.
+The complete list is `exemptions` in `vocabulary.json`. It holds one entry:
+github-iac's OIDC negative test, `release-deploy-oidc-negative-test.yml`,
+whose `name:` is `release-deploy-x`: the deploy workflow's name plus one
+character, so the identity policy that trusts `release-deploy` must reject it.
+GitHub's dynamic workflows (Dependabot, CodeQL default setup, Pages) need no
+entry: they have no file in `.github/workflows/`.
 
 Any other exception is added to that list with its reason, scoped to one
 repository where it applies to one.
@@ -178,7 +180,8 @@ node components/github-actions-conventions/naming-lint.mjs --root . --mode advis
 | `--repository` | `$GITHUB_REPOSITORY` | `owner/name`, used to apply repository-scoped exemptions |
 | `--vocabulary` | the bundled `vocabulary.json` | Vocabulary file to check against |
 
-Exit status 2 means bad arguments or an invalid vocabulary.
+Exit status 2 means bad arguments, or a missing or invalid vocabulary or
+vocabulary schema.
 
 It checks top-level `.github/workflows/*.yml` and `*.yaml` files and every
 directory under `.github/actions/` that holds an `action.yml` or
@@ -202,7 +205,9 @@ activity and slot names outside workflow files.
 
 The analyzer starts in advisory mode, following the
 [enforcement rollout](../../docs/component-lifecycle.md#enforcement-rollout).
-The standards CI runs it advisory over this repository. ci-workflows wraps it,
-in advisory mode until the renames in `rename-map.json` land there, then
-enforcing. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
+The standards CI runs it advisory over this repository and writes the findings
+to the step summary. ci-workflows wraps it, in advisory mode until the renames
+in `rename-map.json` land there, then enforcing. The switch to enforcing is
+tracked in [#672](https://github.com/melodic-software/standards/issues/672),
+due 2026-11-30. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
 31 of them blocking in enforcing mode.
