@@ -92,7 +92,7 @@ canonical URL when it does not.
   contract test [`code-review-rules.test.sh`](code-review-rules.test.sh).
 - `code-review-rules.sh fleet` checks repositories through the GitHub contents
   API. The scheduled
-  [`code-review-rules-inventory`](../../.github/workflows/code-review-rules-inventory.yml)
+  [`maintenance-audit-code-review-rules`](../../.github/workflows/maintenance-audit-code-review-rules.yml)
   workflow runs it over the org's public repositories with the workflow token
   and over the standards-sync App installation's private repositories with a
   read-only App token, so a new repository is flagged once it is public or a
@@ -100,7 +100,7 @@ canonical URL when it does not.
   either token.
 
 Drift fails the fleet run with one error annotation per nonconforming
-repository, as `lychee-private-inventory` does, and opens no issue. It blocks
+repository, as `maintenance-audit-link-check-excludes` does, and opens no issue. It blocks
 from admission without a report-only period: the run gates no pull request,
 and the observation run on 2026-10-03 (all 17 non-archived repositories) found
 exactly the expected baseline, the pilot passing and every other repository

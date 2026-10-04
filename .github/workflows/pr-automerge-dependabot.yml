@@ -1,0 +1,26 @@
+name: pr-automerge-dependabot
+
+# Thin caller of the org's pr-automerge-dependabot reusable workflow
+# (melodic-software/ci-workflows). It arms GitHub auto-merge (squash) on a
+# Dependabot pull request that bumps only actions/*, github/* or anthropics/*
+# GitHub Actions by a minor or patch version. Arming never merges: GitHub
+# merges once every required check, `ci-status` included, passes.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  pr-automerge-dependabot:
+    permissions:
+      contents: write # enablePullRequestAutoMerge
+      pull-requests: write # enable or disable auto-merge on the PR
+    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
+    with:
+      # Public repository: runner-policy admits only a hosted label here.
+      runner: ubuntu-24.04

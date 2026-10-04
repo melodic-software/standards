@@ -1,4 +1,4 @@
-name: code-review-rules-inventory
+name: maintenance-audit-code-review-rules
 
 # Flags a repository whose root AGENTS.md lacks the `## Code Review Rules`
 # section that components/code-review-rules/README.md defines, so a new
@@ -11,8 +11,8 @@ name: code-review-rules-inventory
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1`,
-    # claude-lanes-repin's `41 14 * * *` and lychee-private-inventory's
+    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`,
+    # maintenance-repin-ci-workflows's `41 14 * * *` and maintenance-audit-link-check-excludes's
     # `23 15 * * *`.
     - cron: "47 15 * * *"
 
@@ -24,13 +24,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inventory:
+  audit:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # A boolean, never the credential (same shape as claude-lanes-repin).
+      # A boolean, never the credential (same shape as maintenance-repin-ci-workflows).
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}

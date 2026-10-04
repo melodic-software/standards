@@ -144,7 +144,7 @@ what it does. The Apps in use are listed under `apps` in `vocabulary.json`.
 
 The complete list is `exemptions` in `vocabulary.json`. It holds one entry:
 github-iac's OIDC negative test, `release-deploy-oidc-negative-test.yml`,
-whose `name:` is `release-deploy-x`: the deploy workflow's name plus one
+whose `name:` is `release-deployx`: the deploy workflow's name plus one
 character, so the identity policy that trusts `release-deploy` must reject it.
 GitHub's dynamic workflows (Dependabot, CodeQL default setup, Pages) need no
 entry: they have no file in `.github/workflows/`.

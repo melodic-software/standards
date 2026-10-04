@@ -1,10 +1,10 @@
-name: claude-lanes-repin
+name: maintenance-repin-ci-workflows
 
 # Fleet action-currency for the Claude review lanes. Every consumer's
 # Dependabot config `ignore`s `melodic-software/ci-workflows/*`, so a new
 # ci-workflows release reaches the fleet only along
 # release tag -> caller-component re-pin -> standards-sync cascade. This job
-# automates the middle hop; `sync.yml` already carries it the rest of the way.
+# automates the middle hop; `maintenance-sync-standards.yml` already carries it the rest of the way.
 # Approved 2026-07-26 in melodic-software/ci-workflows.
 #
 # It only ever proposes: the pull request it opens is reviewed and merged by a
@@ -12,7 +12,7 @@ name: claude-lanes-repin
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, deliberately clear of `sync.yml`'s weekly
+    # Off-minute daily poll, deliberately clear of `maintenance-sync-standards.yml`'s weekly
     # `17 6 * * 1` reconciliation. GitHub queues every scheduled workflow on the platform
     # against one dispatcher, so the top of the hour and each quarter-hour are
     # the most contended and most delayed slots; :41 is neither.
@@ -197,9 +197,9 @@ jobs:
             components/managed-files-guard
             components/runner-policy/policy.json
             components/runner-policy/runner-policy.test.mjs
-            .github/workflows/claude-review.yml
-            .github/workflows/claude-security-review.yml
-            .github/workflows/sync.yml
+            .github/workflows/pr-review.yml
+            .github/workflows/pr-review-security.yml
+            .github/workflows/maintenance-sync-standards.yml
           commit-message: |
             chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
 
@@ -216,7 +216,7 @@ jobs:
             `${{ steps.repin.outputs.old-tags }}`
             to `${{ steps.release.outputs.tag }}`
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
-            release. Opened by `.github/workflows/claude-lanes-repin.yml`.
+            release. Opened by `.github/workflows/maintenance-repin-ci-workflows.yml`.
 
             ## Fix
 
@@ -224,7 +224,7 @@ jobs:
 
             ${{ steps.policy-lockstep.outputs.policy-note }}
 
-            Merging this cascades: `sync.yml` re-materializes the callers
+            Merging this cascades: `maintenance-sync-standards.yml` re-materializes the callers
             into every target `distribution/sync-manifest.yml` marks a lane
             caller (fleet or hosted) or a `managed-files-guard` caller
             managed for, as a reviewed pull
