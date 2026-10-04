@@ -344,17 +344,8 @@ components:
 # and their keys were dropped with the dated evidence recorded at each target.
 # The key stays available fleet-wide as a per-target opt-out for any future
 # staged rollout.
-#
-# Staged rollout in progress: the lane and guard callers moved to their
-# v0.34.0 names (`pr-review*.yml`, `pr-check-managed-files*.yml`). Every target
-# except the pilot pair (claude-code-proxy, claude-code-account-rotation)
-# carries `automerge: false` until the pilot passes, so the new callers land
-# in one private fleet repository and one public hosted repository first.
-# Removal trigger: the user approves the pilot; one change then drops every
-# `automerge: false` below.
 targets:
   melodic-software/.github:
-    automerge: false
     managed:
       - cloud-bootstrap
       - editorconfig-checker
@@ -372,7 +363,6 @@ targets:
   # (PR 1, merged 2026-08-19) created those payloads; the repo is converged now
   # and syncs incrementally like any other target.
   melodic-software/agent-plugins:
-    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -389,7 +379,6 @@ targets:
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
   melodic-software/ci-runner:
-    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -407,7 +396,6 @@ targets:
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
-    automerge: false
     managed:
       # Flipped to managed after byte-parity held: the pre-existing local copy
       # (the file this component's content was derived from) differed from
@@ -474,7 +462,6 @@ targets:
     # contract as steps of that one check, and github-iac#528 extends the org
     # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
-    automerge: false
     managed:
       - actionlint
       - claude-review-hosted-caller
@@ -576,7 +563,6 @@ targets:
   # 2026-08-23 — pr-title, pr-issue-linkage, do-not-merge and ci-status all
   # SUCCESS). Its two siblings joined it on 2026-09-04 via github-iac#367.
   melodic-software/codex-plugins:
-    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -590,7 +576,6 @@ targets:
       - repository-text
       - typos
   melodic-software/cursor-plugins:
-    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -607,7 +592,6 @@ targets:
     # four contexts SUCCESS, and github-iac#367 extended the org ci-gate
     # ruleset to this repository.
   melodic-software/dotfiles:
-    automerge: false
     managed:
       - actionlint
       - claude-permissions
@@ -636,7 +620,6 @@ targets:
     locally-owned:
       - shellcheck
   melodic-software/github-iac:
-    automerge: false
     managed:
       - claude-review-caller
       - claude-security-review-caller
@@ -660,7 +643,6 @@ targets:
     locally-owned:
       - actionlint
   melodic-software/medley:
-    automerge: false
     managed:
       - architecture-decisions
       # claude-review-caller replaces medley's hand-written caller: its
@@ -737,7 +719,6 @@ targets:
       # 174 lines vs 58). Recorded 2026-08-16 (audit).
       - typos
   melodic-software/provisioning:
-    automerge: false
     managed:
       - actionlint
       - claude-review-caller
