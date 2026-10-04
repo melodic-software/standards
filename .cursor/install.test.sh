@@ -2,7 +2,7 @@
 # Contract tests for .cursor/install.sh: the PATH-link helpers must not abort
 # when nvm already owns the first writable directory, and the four Lefthook
 # hygiene-engine pins must match the ci-workflows action defaults at the SHA
-# this repository already pins in ci.yml.
+# this repository already pins in pr-require-checks.yml.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -74,7 +74,7 @@ parse_ci_action_sha() {
       print parts[n]
       exit
     }
-  ' "$root/.github/workflows/ci.yml"
+  ' "$root/.github/workflows/pr-require-checks.yml"
 }
 
 parse_action_defaults() {
@@ -94,7 +94,7 @@ parse_ci_shellcheck_inline() {
     $1 ~ /^ver=/ { split($1, a, "="); ver = a[2] }
     $1 ~ /^sha=/ { split($1, a, "="); sha = a[2] }
     ver != "" && sha != "" { print ver, sha; exit }
-  ' "$root/.github/workflows/ci.yml"
+  ' "$root/.github/workflows/pr-require-checks.yml"
 }
 
 for engine in shellcheck typos gitleaks editorconfig-checker; do
@@ -106,20 +106,13 @@ for engine in shellcheck typos gitleaks editorconfig-checker; do
   fi
 done
 
-action_name_for() {
-  case "$1" in
-    editorconfig-checker) printf '%s\n' editorconfig ;;
-    *) printf '%s\n' "$1" ;;
-  esac
-}
-
 tmp_actions="$scratch/actions"
 mkdir -p "$tmp_actions"
 for engine in shellcheck typos gitleaks editorconfig-checker; do
-  action="$(action_name_for "$engine")"
+  action="$engine"
   sha="$(parse_ci_action_sha "$action")"
   if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-    fail "ci.yml pins ci-workflows $action at a full SHA" "got ${sha:-empty}"
+    fail "pr-require-checks.yml pins ci-workflows $action at a full SHA" "got ${sha:-empty}"
     continue
   fi
   url="https://raw.githubusercontent.com/melodic-software/ci-workflows/${sha}/.github/actions/${action}/action.yml"
@@ -144,6 +137,6 @@ done
 
 inline="$(parse_ci_shellcheck_inline)"
 install_shellcheck="$(parse_install_pin shellcheck)"
-assert_eq 'shellcheck pin matches the in-repo ci.yml lockstep duplicate' "$inline" "$install_shellcheck"
+assert_eq 'shellcheck pin matches the in-repo pr-require-checks.yml lockstep duplicate' "$inline" "$install_shellcheck"
 
 [[ $FAILED -eq 0 ]] || exit 1

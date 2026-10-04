@@ -1,7 +1,7 @@
 version: 2
 updates:
   # Keep SHA-pinned actions current — including the cross-repo ci-workflows
-  # composite actions referenced from .github/workflows/ci.yml. Merge lanes per
+  # composite actions referenced from .github/workflows/pr-require-checks.yml. Merge lanes per
   # components/dependabot-policy: the vendor-actions group (non-major only) may
   # auto-merge once ci-status passes; every other PR is reviewed by hand. Bumping
   # the pin to the private ci-workflows repo requires the org-level "Grant
@@ -17,10 +17,6 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-      # First-party melodic-software/* actions skip the supply-chain wait so our
-      # own ci-workflows fixes propagate without the cooldown delay.
-      exclude:
-        - "melodic-software/*"
     # Vendor bumps get their own PR so a community bump never blocks the
     # auto-merge lane; a dependency joins the first group that matches it.
     groups:
@@ -34,7 +30,8 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # Reusable bumps to an unreviewed SHA fail the Runner policy contract fleet-wide; composites move by hand in the convergence pass so the fleet stays on one ci-workflows SHA; see melodic-software/github-iac#378 Phase 6b-ii item L.
+    # Temporary until the GitHub Actions naming-convention migration close-out
+    # sweep: ci-workflows pins move by hand until then.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
   # Keep the npm dev-dependencies current — the root devDependency pins

@@ -1,4 +1,4 @@
-name: claude-review
+name: pr-review
 
 # Automated PR code review via the ci-workflows reusable workflow. The caller
 # owns the triggers + GITHUB_TOKEN permission grant (a called workflow can only
@@ -33,14 +33,14 @@ permissions:
 #
 # The `${{ github.workflow }}`-prefixed canonical group is what this
 # repository's own `concurrency-policy` component requires
-# (`.github/workflows/ci.yml`, `Enforce concurrency policy on standards`),
+# (`.github/workflows/pr-require-checks.yml`, `Enforce concurrency policy on standards`),
 # and it is the form the component ships.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  review:
+  pr-review:
     # A draft is work in progress and does not spend a review; the
     # ready_for_review trigger above is what delivers one when it is ready.
     if: github.event.pull_request.draft == false
@@ -49,7 +49,7 @@ jobs:
       pull-requests: write   # post review + track_progress tracking comment
       id-token: write        # OIDC — mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@35880dcbb2f174aac90159e276dc7eddf1bc20b9 # v0.30.1
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
     with:
       # DEVIATION from the component, which names the managed fleet label:
       # this repository is PUBLIC, and runner-policy admits a fleet label only

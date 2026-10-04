@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavioral tests for repin-callers.sh — the re-pin logic the scheduled
-# .github/workflows/claude-lanes-repin.yml executes.
+# .github/workflows/maintenance-repin-ci-workflows.yml executes.
 #
 # The subject branches on API failures and tag object types, rewrites files in
 # place, detects major-version jumps, and decides whether a privileged pull
@@ -405,21 +405,21 @@ repo="$scratch/repo-mixed"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 other_sha='b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5'
 mkdir -p "$repo/.github/workflows"
-cat > "$repo/.github/workflows/sync.yml" <<YAML
+cat > "$repo/.github/workflows/maintenance-sync-standards.yml" <<YAML
 name: sync
 on: workflow_dispatch
 jobs:
   sync:
     uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${other_sha} # v0.8.0
 YAML
-cat > "$repo/.github/workflows/claude-review.yml" <<YAML
+cat > "$repo/.github/workflows/pr-review.yml" <<YAML
 name: local-review
 on: pull_request
 jobs:
   review:
     uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
 YAML
-cat > "$repo/.github/workflows/claude-security-review.yml" <<YAML
+cat > "$repo/.github/workflows/pr-review-security.yml" <<YAML
 name: local-security-review
 on: pull_request
 jobs:
@@ -461,9 +461,9 @@ assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' 
 assert_not_contains 'apply: a fallback pin dated before the release is not reported as ahead' "$out" 'left as is'
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/components/claude-lanes-hosted/*.yml \
-  "$repo"/.github/workflows/sync.yml \
-  "$repo"/.github/workflows/claude-review.yml \
-  "$repo"/.github/workflows/claude-security-review.yml \
+  "$repo"/.github/workflows/maintenance-sync-standards.yml \
+  "$repo"/.github/workflows/pr-review.yml \
+  "$repo"/.github/workflows/pr-review-security.yml \
   "$repo/$guard_caller" "$repo/$guard_fleet_caller" | wc -l | tr -d ' ')"
 assert_eq 'apply: every enumerated pin is rewritten under mixed SHAs' '9' "$mixed_pins"
 assert_contains 'apply: the guard caller fallback comment becomes the tag form' \
@@ -471,9 +471,9 @@ assert_contains 'apply: the guard caller fallback comment becomes the tag form' 
 assert_not_contains 'apply: the guard caller keeps no stale fallback comment' \
   "$(cat "$repo/$guard_caller")" '2026-08-01'
 mixed_paths="$(git -C "$repo" diff --name-only | sort | paste -sd, -)"
-assert_contains 'apply: mixed-SHA extras include sync.yml' "$mixed_paths" '.github/workflows/sync.yml'
+assert_contains 'apply: mixed-SHA extras include the sync caller' "$mixed_paths" '.github/workflows/maintenance-sync-standards.yml'
 assert_contains 'apply: mixed-SHA extras include the local review caller' "$mixed_paths" \
-  '.github/workflows/claude-review.yml'
+  '.github/workflows/pr-review.yml'
 assert_contains 'apply: mixed-SHA extras include the guard caller component' "$mixed_paths" "$guard_caller"
 assert_contains 'apply: mixed-SHA extras include the fleet guard caller component' "$mixed_paths" \
   "$guard_fleet_caller"
@@ -491,13 +491,13 @@ export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml claude-security-review.yml; do
-  cat > "$repo/.github/workflows/$extra" <<YAML
+for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
+  cat > "$repo/.github/workflows/${extra%%:*}" <<YAML
 name: extra
 on: pull_request
 jobs:
   job:
-    uses: melodic-software/ci-workflows/.github/workflows/${extra}@${old_sha} # v0.9.1
+    uses: melodic-software/ci-workflows/.github/workflows/${extra#*:}@${old_sha} # v0.9.1
 YAML
 done
 cat > "$repo/$guard_caller" <<YAML
@@ -535,9 +535,9 @@ assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 repo="$scratch/repo-same-day-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml claude-security-review.yml; do
+for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
-    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
@@ -557,9 +557,9 @@ assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard
 repo="$scratch/repo-same-day-behind"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml claude-security-review.yml; do
+for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
-    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
@@ -579,9 +579,9 @@ assert_contains 'apply: a same-day contained pin advances to the tag form' \
 repo="$scratch/repo-compare-fail"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in sync.yml claude-review.yml claude-security-review.yml; do
+for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
   printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
-    "$extra" "$old_sha" > "$repo/.github/workflows/$extra"
+    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
   "$guard_sha" > "$repo/$guard_caller"
@@ -626,7 +626,7 @@ assert_silent 'apply: a malformed release date touches nothing' "$(git -C "$repo
 repo="$scratch/repo-partial-extras"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows"
-cat > "$repo/.github/workflows/claude-review.yml" <<YAML
+cat > "$repo/.github/workflows/pr-review.yml" <<YAML
 name: local-review
 on: pull_request
 jobs:
@@ -638,7 +638,7 @@ git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'partial ex
 out_file="$scratch/out-apply-partial-extras"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a partial extra-caller set is a hard failure' "$rc"
-assert_contains 'apply: missing extra caller is named' "$out" 'sync.yml'
+assert_contains 'apply: missing extra caller is named' "$out" 'maintenance-sync-standards.yml'
 
 # A file that is not in the enumerated set must still fail if the rewrite
 # somehow touches it — the extra-caller allowlist is not a blanket LANE_DIR

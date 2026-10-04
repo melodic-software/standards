@@ -1,4 +1,4 @@
-name: publish-packages
+name: release-publish-packages
 
 # Package components are published directly from their cohesive source slices.
 # There is no staging copy: the authored, tested, packed, and published config
@@ -10,7 +10,7 @@ on:
     paths:
       - components/biome/**
       - components/tsconfig/**
-      - .github/workflows/publish-packages.yml
+      - .github/workflows/release-publish-packages.yml
   workflow_dispatch:
 
 permissions:

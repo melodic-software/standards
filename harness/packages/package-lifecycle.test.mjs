@@ -176,13 +176,13 @@ test("publish workflow matrix and component triggers match discovered packages",
   const root = join(import.meta.dirname, "..", "..");
   const packages = await discoverPublishablePackages(root);
   const workflow = parse(
-    await readFile(join(root, ".github", "workflows", "publish-packages.yml"), "utf8"),
+    await readFile(join(root, ".github", "workflows", "release-publish-packages.yml"), "utf8"),
   );
   const names = packages.map((directory) => directory.slice("components/".length));
   assert.deepEqual(workflow.jobs.publish.strategy.matrix.component, names);
   assert.deepEqual(workflow.on.push.paths, [
     ...packages.map((directory) => `${directory}/**`),
-    ".github/workflows/publish-packages.yml",
+    ".github/workflows/release-publish-packages.yml",
   ]);
 });
 

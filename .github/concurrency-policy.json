@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "exceptions": {
-    ".github/workflows/claude-security-review.yml": {
+    ".github/workflows/pr-review-security.yml": {
       "reason": "delegated-job-level",
       "justification": "Security reviews are never cancelled: the caller serializes per PR at job level with cancel-in-progress false, matching components/claude-lanes/claude-security-review.yml."
     }

@@ -1,4 +1,4 @@
-name: ci
+name: pr-require-checks
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
   # explicit on each one rather than transitive: a dependent whose `needs` all
   # skipped is skipped by default, but a job with `if: always()` or
   # `!cancelled()` runs regardless, so only the explicit form is reliable.
-  markdown:
+  markdownlint:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -91,12 +91,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdown@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/markdownlint@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: .markdownlint-cli2.jsonc
           globs: '**/*.md !components/**/fixtures/bad/**'
 
-  powershell:
+  psscriptanalyzer:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -108,7 +108,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/powershell@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/psscriptanalyzer@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           settings: PSScriptAnalyzerSettings.psd1
           exclude: components/psscriptanalyzer/fixtures/bad
@@ -125,7 +125,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
-        uses: melodic-software/ci-workflows/.github/actions/shellcheck@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/shellcheck@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           rcfile: .shellcheckrc
           exclude: components/shellcheck/fixtures/bad
@@ -142,12 +142,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Check links (offline)
-        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/lychee-offline@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: lychee.toml
           exclude: 'components/[^/]+/fixtures/bad'
 
-  editorconfig:
+  editorconfig-checker:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -159,7 +159,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/editorconfig@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/editorconfig-checker@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: .editorconfig-checker.json
           exclude: 'components/[^/]+/fixtures/bad/'
@@ -178,7 +178,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
-        uses: melodic-software/ci-workflows/.github/actions/gitleaks@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/gitleaks@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: .gitleaks.toml
       - name: Gitleaks contract test
@@ -196,14 +196,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
-        uses: melodic-software/ci-workflows/.github/actions/typos@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/typos@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: _typos.toml
           exclude: 'components/*/fixtures/bad/'
       - name: Typos contract test
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
 
-  markdown-fixtures:
+  test-fixtures-markdown:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -228,7 +228,7 @@ jobs:
       - name: Markdownlint schema-pin contract test
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
 
-  runner-policy:
+  test-runner-policy:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     name: Runner policy
     permissions:
@@ -268,7 +268,7 @@ jobs:
         env:
           CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 
-  concurrency-policy:
+  test-concurrency-policy:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -325,7 +325,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           tail -n 2 "$GITHUB_STEP_SUMMARY" | head -n 1
 
-  dependabot-policy:
+  test-dependabot-policy:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -357,7 +357,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run lint:dependabot-automerge-lockstep
 
-  pr-convention-policy:
+  test-pr-convention-policy:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -387,7 +387,7 @@ jobs:
   # over the network, and that non-hermetic dependency must not contaminate
   # the hermetic component lane. The fixture tests run first so a parser
   # regression reads as a test failure, not as drift.
-  pr-convention-lockstep:
+  verify-pr-convention-lockstep:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -414,7 +414,7 @@ jobs:
         run: npm run test:pr-convention-lockstep
       # Four gate callers are private repositories, so the live check reads
       # every source through the contents API with a contents-read token from
-      # the standards-sync App (the lychee-private-inventory precedent). The
+      # the standards-sync App (the maintenance-audit-link-check-excludes precedent). The
       # mint step is guarded on the secrets being present so an absent
       # credential reaches the enforcement step tokenless instead of dying
       # inside the mint action; the private fetches then fail as
@@ -437,7 +437,7 @@ jobs:
           LOCKSTEP_GITHUB_TOKEN: ${{ steps.lockstep-token.outputs.token }}
         run: npm run lint:pr-convention-lockstep
 
-  powershell-fixtures:
+  test-fixtures-powershell:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -469,7 +469,7 @@ jobs:
         shell: pwsh
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
-  shellcheck-fixtures:
+  test-fixtures-shellcheck:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -495,7 +495,7 @@ jobs:
       - name: ShellCheck contract test
         run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
 
-  lychee-fixtures:
+  test-fixtures-lychee:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -528,7 +528,7 @@ jobs:
       # that went public fails here, and the two alternations are held sorted
       # and identical. The other direction (a new private repository missing
       # from the list) needs the App installation's view and runs in the
-      # scheduled lychee-private-inventory workflow.
+      # scheduled maintenance-audit-link-check-excludes workflow.
       - name: Private-repo inventory agrees with public visibility
         env:
           GH_TOKEN: ${{ github.token }}
@@ -546,7 +546,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/ruff@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: ruff.toml
           exclude: components/ruff/fixtures/bad
@@ -566,7 +566,7 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/pyright@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: components/pyright/pyrightconfig.json
           paths: components/pyright/fixtures/good
@@ -586,12 +586,12 @@ jobs:
         # Scope at authored runtime surfaces and the conforming fixture. Bad
         # fixtures are non-conforming by design; node_modules and locks are
         # excluded by Biome's normal traversal rules.
-        uses: melodic-software/ci-workflows/.github/actions/biome@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/biome@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: components/biome/biome.json
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
 
-  tsc:
+  test-tsconfig:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     name: TypeScript ${{ matrix.typescript }}
     permissions:
@@ -641,7 +641,7 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -659,7 +659,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
@@ -675,7 +675,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: melodic-software/ci-workflows/.github/actions/actionlint@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/actionlint@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
       - name: Test actionlint component
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
       # The lane caller test materializes each target through the distribution
@@ -729,7 +729,7 @@ jobs:
       - name: Test lockstep argv accepts a mixed old-sha set
         run: node --test components/claude-lanes/repin-policy-lockstep.test.mjs
 
-  zizmor:
+  pr-audit-workflows:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -750,24 +750,24 @@ jobs:
     # components/managed-files-guard/, which become consumers'
     # .github/workflows/ files, are invisible to a repo-root scan. They are named explicitly so the lane audits what it
     # ships.
-    uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+    uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
     with:
       runner: ubuntu-24.04
       paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/claude-lanes-hosted/claude-review.yml components/claude-lanes-hosted/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml components/managed-files-guard/managed-files-guard-fleet.yml
       fail-on-severity: high
 
-  osv-scanner:
+  pr-scan-dependencies:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     # Advisory dependency vuln scan; reports against package-lock.json without
     # blocking (fail-on-vuln defaults false). Annotation mode needs no
     # security-events write grant.
-    uses: melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+    uses: melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
     with:
       runner: ubuntu-24.04
 
-  go-fixtures:
+  test-fixtures-go:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -813,7 +813,7 @@ jobs:
       - name: Go analysis contract test
         run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
-  python-fixtures:
+  test-fixtures-python:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -850,7 +850,7 @@ jobs:
       - name: Pyright contract test
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
-  typescript-fixtures:
+  test-fixtures-typescript:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -883,7 +883,7 @@ jobs:
       - name: TypeScript config contract test
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
-  dotnet-fixtures:
+  test-fixtures-dotnet:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -922,7 +922,7 @@ jobs:
         env:
           DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
 
-  harness:
+  test-harness:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -938,8 +938,8 @@ jobs:
 
   # The pull-request half of the Code Review Rules check: this repository's own
   # AGENTS.md. Other repositories are checked by the scheduled
-  # code-review-rules-inventory workflow.
-  code-review-rules:
+  # maintenance-audit-code-review-rules workflow.
+  check-code-review-rules:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -955,7 +955,7 @@ jobs:
       - name: This repository's AGENTS.md carries the section
         run: bash components/code-review-rules/code-review-rules.sh file
 
-  cloud-environment:
+  test-cloud-environment:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -973,7 +973,7 @@ jobs:
           components/cloud-bootstrap/cloud-bootstrap.test.sh
           .cursor/install.test.sh
 
-  mcp-launcher:
+  test-mcp-launcher:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -991,7 +991,7 @@ jobs:
       - name: Launcher --vault tests
         run: node --test components/mcp-launcher/launcher.test.mjs
 
-  distribution:
+  test-distribution:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1032,7 +1032,7 @@ jobs:
       - name: Validate production manifest
         run: bash distribution/sync-manifest.sh validate
 
-  exec-bit:
+  check-exec-bit:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1044,9 +1044,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/exec-bit@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/check-exec-bit@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
 
-  machine-specific-paths:
+  check-machine-paths:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1058,13 +1058,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
-        uses: melodic-software/ci-workflows/.github/actions/machine-specific-paths@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/check-machine-paths@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
         with:
           exclude: ':(exclude)components/path-detection/**'
       - name: Path-detection contract test
         run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
 
-  eol-renormalize:
+  check-line-endings:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1076,9 +1076,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/eol-renormalize@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/check-line-endings@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
 
-  comment-hygiene:
+  check-comment-markers:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1090,13 +1090,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan comment hygiene (excludes contract fixtures and policy source)
-        uses: melodic-software/ci-workflows/.github/actions/comment-hygiene@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/check-comment-markers@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
         with:
           exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
       - name: Comment-hygiene contract test
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
 
-  local-lane-guards:
+  test-local-lane-wrappers:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1110,7 +1110,7 @@ jobs:
       - name: Local-lane-guards contract test
         run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
 
-  pin-comment-convention:
+  check-pin-comment-convention:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1149,7 +1149,7 @@ jobs:
       - name: Pin-comment-convention contract test
         run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
 
-  lefthook:
+  test-lefthook:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -1206,53 +1206,53 @@ jobs:
       pull-requests: write
       statuses: write
     needs:
-      - markdown
-      - powershell
+      - markdownlint
+      - psscriptanalyzer
       - shellcheck
       - lychee
-      - editorconfig
+      - editorconfig-checker
       - gitleaks
       - typos
-      - markdown-fixtures
-      - runner-policy
-      - concurrency-policy
+      - test-fixtures-markdown
+      - test-runner-policy
+      - test-concurrency-policy
       - github-actions-conventions
-      - dependabot-policy
-      - pr-convention-policy
-      - pr-convention-lockstep
-      - powershell-fixtures
-      - shellcheck-fixtures
-      - lychee-fixtures
+      - test-dependabot-policy
+      - test-pr-convention-policy
+      - verify-pr-convention-lockstep
+      - test-fixtures-powershell
+      - test-fixtures-shellcheck
+      - test-fixtures-lychee
       - ruff
       - pyright
-      - python-fixtures
-      - go-fixtures
+      - test-fixtures-python
+      - test-fixtures-go
       - biome
-      - tsc
-      - typescript-fixtures
+      - test-tsconfig
+      - test-fixtures-typescript
       - dotnet-build
       - dotnet-format
-      - dotnet-fixtures
-      - harness
-      - code-review-rules
-      - cloud-environment
-      - mcp-launcher
-      - distribution
-      - lefthook
-      - exec-bit
-      - machine-specific-paths
-      - eol-renormalize
-      - comment-hygiene
-      - local-lane-guards
-      - pin-comment-convention
+      - test-fixtures-dotnet
+      - test-harness
+      - check-code-review-rules
+      - test-cloud-environment
+      - test-mcp-launcher
+      - test-distribution
+      - test-lefthook
+      - check-exec-bit
+      - check-machine-paths
+      - check-line-endings
+      - check-comment-markers
+      - test-local-lane-wrappers
+      - check-pin-comment-convention
       - actionlint
-      - zizmor
-      - osv-scanner
+      - pr-audit-workflows
+      - pr-scan-dependencies
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check the pull-request contract
-        uses: melodic-software/ci-workflows/.github/actions/pr-contract@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           token: ${{ github.token }}
           # Carried over from the pr-issue-linkage.yml caller this step
@@ -1266,56 +1266,56 @@ jobs:
         # and the `ci-lanes` status is on the SHA for the next contract-only
         # run.
         if: ${{ !cancelled() }}
-        uses: melodic-software/ci-workflows/.github/actions/ci-status@4610c31e92eb1c4b24981e2f200ac87bdb2a1753 # v0.27.1
+        uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/aggregate-results@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           treat-skipped-as: fail
           token: ${{ github.token }}
           # The job's `timeout-minutes: 15` minus 60 s, so the wait always
           # loses to the job timeout and a stuck earlier run cannot turn this
           # into a silent 15-minute hang. The ceiling has to cover the full
-          # run it waits on: this repository's `ci` p95 wall is ~2 minutes
+          # run it waits on: this repository's `pr-require-checks` p95 wall is ~2 minutes
           # (last 20 pull-request runs, 79-127 s), so 840 s is generous.
           carry-forward-wait-seconds: '840'
           results: >-
-            ${{ needs.markdown.result }}
-            ${{ needs.powershell.result }}
+            ${{ needs.markdownlint.result }}
+            ${{ needs.psscriptanalyzer.result }}
             ${{ needs.shellcheck.result }}
             ${{ needs.lychee.result }}
-            ${{ needs.editorconfig.result }}
+            ${{ needs.editorconfig-checker.result }}
             ${{ needs.gitleaks.result }}
             ${{ needs.typos.result }}
-            ${{ needs.markdown-fixtures.result }}
-            ${{ needs.runner-policy.result }}
-            ${{ needs.concurrency-policy.result }}
+            ${{ needs.test-fixtures-markdown.result }}
+            ${{ needs.test-runner-policy.result }}
+            ${{ needs.test-concurrency-policy.result }}
             ${{ needs.github-actions-conventions.result }}
-            ${{ needs.dependabot-policy.result }}
-            ${{ needs.pr-convention-policy.result }}
-            ${{ needs.pr-convention-lockstep.result }}
-            ${{ needs.powershell-fixtures.result }}
-            ${{ needs.shellcheck-fixtures.result }}
-            ${{ needs.lychee-fixtures.result }}
+            ${{ needs.test-dependabot-policy.result }}
+            ${{ needs.test-pr-convention-policy.result }}
+            ${{ needs.verify-pr-convention-lockstep.result }}
+            ${{ needs.test-fixtures-powershell.result }}
+            ${{ needs.test-fixtures-shellcheck.result }}
+            ${{ needs.test-fixtures-lychee.result }}
             ${{ needs.ruff.result }}
             ${{ needs.pyright.result }}
-            ${{ needs.python-fixtures.result }}
-            ${{ needs.go-fixtures.result }}
+            ${{ needs.test-fixtures-python.result }}
+            ${{ needs.test-fixtures-go.result }}
             ${{ needs.biome.result }}
-            ${{ needs.tsc.result }}
-            ${{ needs.typescript-fixtures.result }}
+            ${{ needs.test-tsconfig.result }}
+            ${{ needs.test-fixtures-typescript.result }}
             ${{ needs.dotnet-build.result }}
             ${{ needs.dotnet-format.result }}
-            ${{ needs.dotnet-fixtures.result }}
-            ${{ needs.harness.result }}
-            ${{ needs.code-review-rules.result }}
-            ${{ needs.cloud-environment.result }}
-            ${{ needs.mcp-launcher.result }}
-            ${{ needs.distribution.result }}
-            ${{ needs.lefthook.result }}
-            ${{ needs.exec-bit.result }}
-            ${{ needs.machine-specific-paths.result }}
-            ${{ needs.eol-renormalize.result }}
-            ${{ needs.comment-hygiene.result }}
-            ${{ needs.local-lane-guards.result }}
-            ${{ needs.pin-comment-convention.result }}
+            ${{ needs.test-fixtures-dotnet.result }}
+            ${{ needs.test-harness.result }}
+            ${{ needs.check-code-review-rules.result }}
+            ${{ needs.test-cloud-environment.result }}
+            ${{ needs.test-mcp-launcher.result }}
+            ${{ needs.test-distribution.result }}
+            ${{ needs.test-lefthook.result }}
+            ${{ needs.check-exec-bit.result }}
+            ${{ needs.check-machine-paths.result }}
+            ${{ needs.check-line-endings.result }}
+            ${{ needs.check-comment-markers.result }}
+            ${{ needs.test-local-lane-wrappers.result }}
+            ${{ needs.check-pin-comment-convention.result }}
             ${{ needs.actionlint.result }}
-            ${{ needs.zizmor.result }}
-            ${{ needs.osv-scanner.result }}
+            ${{ needs.pr-audit-workflows.result }}
+            ${{ needs.pr-scan-dependencies.result }}

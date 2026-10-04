@@ -1,4 +1,4 @@
-name: standards-sync
+name: maintenance-sync-standards
 
 # Exact-file distribution: standards owns desired bytes and ci-workflows owns
 # GitHub orchestration. Every real run opens or refreshes one reviewed PR per
@@ -27,10 +27,10 @@ permissions:
   contents: read
 
 jobs:
-  sync:
+  maintenance-sync-standards:
     # Real runs attest App access for the complete unfiltered manifest before
     # mutation; `targets` limits reconciliation only, never attestation.
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@35880dcbb2f174aac90159e276dc7eddf1bc20b9 # v0.30.1
+    uses: melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
     with:
       runner: ubuntu-24.04
       # Schedule and push run for real (inputs is empty on those events, so
