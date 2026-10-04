@@ -13,6 +13,9 @@ Thumbs.db
 # Claude Code worktrees (per-checkout; PR worktree workflow)
 .claude/worktrees/
 
+# Local scratch (backups, copies, intermediate output)
+.work/
+
 # Node
 node_modules/
 
