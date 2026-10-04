@@ -599,6 +599,25 @@ test("a composite called from pr-require-checks.yml is found on the first read",
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 
+test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", async () => {
+  const reads = [];
+  const files = {
+    "ci.yml": `jobs:\n  ci-status:\n        uses: ./${LEGACY_DIRECTORY}\n`,
+    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${RENAMED_DIRECTORY}\n`,
+  };
+  const found = await resolveConsumerArtifact(
+    "ci-workflows",
+    async (url) => {
+      const name = url.match(/\.github\/workflows\/([^?]+)/)[1];
+      reads.push(name);
+      return files[name];
+    },
+    async () => Object.keys(files),
+  );
+  assert.deepEqual(found, { kind: "composite", sha: "main", directory: RENAMED_DIRECTORY });
+  assert.deepEqual(reads, ["pr-require-checks.yml"]);
+});
+
 // ci-workflows `main` carries one composite path or the other across the
 // rename; the copy check reads the renamed one when it exists.
 function gateReader(directories) {

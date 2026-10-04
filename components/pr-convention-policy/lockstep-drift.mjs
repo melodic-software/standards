@@ -862,14 +862,13 @@ async function fetchDirectory(url) {
 }
 
 function scanOrder(names) {
-  const rank = (name) => (WORKFLOW_SCAN_PRIORITY.includes(name) ? 0 : 1);
+  const rank = (name) => {
+    const index = WORKFLOW_SCAN_PRIORITY.indexOf(name);
+    return index === -1 ? WORKFLOW_SCAN_PRIORITY.length : index;
+  };
   return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
-// Reads a repository's workflow directory and returns the artifact it runs.
-// The composite short-circuits the scan; a reusable pin is remembered but the
-// scan continues, because a repository mid-transition can carry both and the
-// composite is the one that gates.
 async function listWorkflowNames(repo) {
   const entries = await fetchDirectory(`${API_BASE}/${repo}/contents/.github/workflows?ref=main`);
   return entries
@@ -877,6 +876,10 @@ async function listWorkflowNames(repo) {
     .map((entry) => entry.name);
 }
 
+// Reads a repository's workflow directory and returns the artifact it runs.
+// The composite short-circuits the scan; a reusable pin is remembered but the
+// scan continues, because a repository mid-transition can carry both and the
+// composite is the one that gates.
 export async function resolveConsumerArtifact(repo, cachedText, listNames = listWorkflowNames) {
   const names = await listNames(repo);
   let reusable = null;
