@@ -94,13 +94,15 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 The action fails only when the diff touches an exact managed destination
 path (`run.sh` in the action: `git diff --name-only` checked against the
-engine's `dest-paths` set). Both callers therefore carry
-`on.pull_request.paths` set to the sorted union of every target's
-`dest-paths`, which includes the two caller destinations, so a pull request
-that touches no managed path starts no job. The list is the union, not a
-per-target set, because one file ships byte-identical to every target; on a
-target that does not manage a listed path, a match runs the guard and it
-passes. `types` restates GitHub's documented default (`opened`,
+engine's `dest-paths` set). Each caller therefore carries
+`on.pull_request.paths` set to the sorted union of the `dest-paths` of every
+target that receives that caller, its own destination included, so a pull
+request that touches no managed path starts no job. The hosted caller lists
+only hosted targets' destinations and the fleet-routed caller only
+fleet-routed targets', so neither names the other's workflow files
+(standards#698). The list is a union, not a per-target set, because one file
+ships byte-identical to every target that receives it; on a target that does
+not manage a listed path, a match runs the guard and it passes. `types` restates GitHub's documented default (`opened`,
 `synchronize`, `reopened`).
 
 The contract test computes the union through the engine and requires the
@@ -249,13 +251,14 @@ Two properties of that ride are deliberate:
 
 `managed-files-guard.test.sh` asserts, against the parsed YAML of each file:
 the `pull_request` trigger with the default `types` and a `paths` list equal
-to the managed union, free of glob metacharacters; `contents: read` as the whole grant; the
+to the managed union of the targets that receive that file, free of glob
+metacharacters; `contents: read` as the whole grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; a
 full-history, credential-free checkout pinned like the sibling workflows; the
 action pinned by full SHA with a comment the `pin-comment-convention` library
 accepts; and `standards-ref: main`. It asserts the two files carry the same
-action pin and differ only in comments and `runs-on`. It then checks the
+action pin and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
 manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
 accounted for) and materializes each managing target through the real engine, asserting byte-identity at the

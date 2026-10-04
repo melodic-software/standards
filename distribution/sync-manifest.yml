@@ -231,7 +231,8 @@ components:
   # at the same pin, and the sync is the one mechanism that holds that.
   #
   # Two components, one per runner-policy inventory. The files are identical
-  # except for `runs-on`, the workflow `name:` and their headers: same action
+  # except for `runs-on`, the workflow `name:`, their headers and their
+  # `paths` entries (each lists its own targets' destinations): same action
   # pin, same job name, so the check context is `pr-check-managed-files` on
   # every target. Destinations must be unique across components, so each has
   # its own path (`pr-check-managed-files-hosted.yml` for the hosted caller).
