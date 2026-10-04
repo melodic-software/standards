@@ -344,14 +344,6 @@ components:
 # and their keys were dropped with the dated evidence recorded at each target.
 # The key stays available fleet-wide as a per-target opt-out for any future
 # staged rollout.
-#
-# Staged rollout in progress: the lane and guard callers moved to their
-# v0.34.0 names (`pr-review*.yml`, `pr-check-managed-files*.yml`). Every target
-# except the pilot pair (claude-code-proxy, claude-code-account-rotation)
-# carries `automerge: false` until the pilot passes, so the new callers land
-# in one private fleet repository and one public hosted repository first.
-# Removal trigger: the user approves the pilot; one change then drops every
-# `automerge: false` below.
 targets:
   melodic-software/.github:
     managed:
