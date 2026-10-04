@@ -145,6 +145,9 @@ and execs the command, so stdin, stdout and the exit code pass through. A
 failed read exits 1 without running the command; with `--optional` it leaves
 `NAME` unset, warns on stderr, and runs the command. Bad usage exits 2.
 Diagnostics name the secret and the HTTP status, never the value.
+Each read gets up to three 10-second attempts, retrying only transport errors
+and HTTP 408, 429 and 5xx, and all reads in one run share a 45-second budget,
+so the command starts or the run fails inside a 60-second launcher timeout.
 
 After the permission floor, the script fetches `vault-exec` from the same
 `raw.githubusercontent.com` path as this component and installs it, mode

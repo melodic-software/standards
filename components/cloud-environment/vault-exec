@@ -14,6 +14,7 @@
 # exits 1 without running the command; with --optional, NAME is left unset and
 # the command still runs. Bad usage exits 2. Diagnostics go to stderr and name
 # the secret and HTTP status, never the value. No value is ever in argv.
+# Transient failures are retried; all reads together stop after about 45 seconds.
 set -u
 
 usage() {
@@ -56,19 +57,47 @@ vault="${VAULT_EXEC_VAULT:-kv-melo-devtools-prod}"
 [[ "$vault" =~ ^[A-Za-z][A-Za-z0-9-]{1,22}[A-Za-z0-9]$ ]] ||
   usage "invalid VAULT_EXEC_VAULT '$vault': 3-24 alphanumerics and hyphens"
 
+# One deadline covers every secret, so a slow or failing vault hands control
+# back well inside a 60 s launcher startup timeout. The overrides exist for
+# tests.
+budget="${VAULT_EXEC_BUDGET_SEC:-45}"
+delay="${VAULT_EXEC_RETRY_DELAY_SEC:-1}"
+deadline=$((SECONDS + budget))
+
+# fetch <url>: one attempt, capped by the time left. Sets resp (the body, then
+# the status on its last line) and curl_rc. curl reads /dev/null, never this
+# script's stdin, which belongs to the command; the body stays in memory.
+fetch() {
+  local max=$((deadline - SECONDS))
+  [[ $max -le 10 ]] || max=10
+  resp="$(curl -sS --fail-with-body --proto '=https' --connect-timeout 5 \
+    --max-time "$max" -w '\n%{http_code}' "$1" </dev/null 2>/dev/null)"
+  curl_rc=$?
+}
+
 failed=0
 for i in "${!names[@]}"; do
   name="${names[$i]}"
   secret="${secrets[$i]}"
-  # curl and python3 read from /dev/null and a pipe, never this script's
-  # stdin, which belongs to the command. The response carries the status on
-  # its last line; the body never reaches a log.
-  resp="$(curl -sS --fail-with-body --proto '=https' --connect-timeout 5 \
-    --max-time 20 --retry 2 --retry-delay 1 -w '\n%{http_code}' \
-    "https://${vault}.vault.azure.net/secrets/${secret}?api-version=7.4" \
-    </dev/null 2>/dev/null)"
-  curl_rc=$?
-  status="${resp##*$'\n'}"
+  url="https://${vault}.vault.azure.net/secrets/${secret}?api-version=7.4"
+  resp=''
+  curl_rc=0
+  status=''
+  # Up to three attempts, each a separate curl call. Only a transport error or
+  # HTTP 408, 429 or 5xx is retried, and only the last response is parsed.
+  for attempt in 1 2 3; do
+    if [[ $((deadline - SECONDS)) -lt 1 ]]; then
+      status="${status:-none}, time budget spent"
+      break
+    fi
+    fetch "$url"
+    status="${resp##*$'\n'}"
+    if [[ $curl_rc -eq 0 ]] ||
+      [[ $curl_rc -eq 22 && ! "$status" =~ ^(408|429|5[0-9][0-9])$ ]]; then
+      break
+    fi
+    [[ $attempt -eq 3 ]] || sleep "$delay"
+  done
   body="${resp%$'\n'*}"
   value=''
   if [[ $curl_rc -eq 0 && "$status" == 200 ]]; then
