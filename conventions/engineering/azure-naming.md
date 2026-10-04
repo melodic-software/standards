@@ -11,7 +11,7 @@ How Melodic Software names and tags Azure resources. Every rule below either cit
 | `<region>` | `usc` (Central US), `use2` (East US 2); used only once the estate spans a second region |
 | `<nnn>` | a three-digit instance suffix, starting at `001` |
 | `<workload>` | what the resource is for |
-| `<consumer>` | the identity that reads a key vault |
+| `<class>` | the isolation class of the secrets a key vault holds |
 
 ## Patterns by resource type
 
@@ -19,10 +19,11 @@ How Melodic Software names and tags Azure resources. Every rule below either cit
 |---|---|---|
 | Subscription display name | `Melodic Software` | |
 | Resource group | `rg-<workload>-<env>` | `rg-billing-prod` |
-| Key vault | `kv-melo-<consumer>-<env>` | `kv-melo-billing-prod` |
+| Key vault | `kv-melo-<class>-<env>` | `kv-melo-billing-prod` |
 | Log Analytics workspace | `log-<workload>-<env>` | `log-billing-prod` |
 | Storage account | `stmelo<workload>` or `stmelo<workload><nnn>` | `stmeloreports001` |
 | Blob container | `<workload>` or `<workload>-<nnn>` | `invoices` |
+| Service principal | `sp-<workload>-<env>` | `sp-billing-prod` |
 
 The example workloads are illustrative, not resources that exist.
 
@@ -36,8 +37,9 @@ ASCII phrase as the safe shape (judgment).
 The abbreviations `rg`, `kv`, `log`, `st` come from
 <https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations>.
 They are bare tokens; the hyphen comes from the delimiter rule below, not from the abbreviation.
-That page carries no subscription row and no blob-container row, so those two patterns are
-judgment.
+That page carries no subscription, blob-container or service-principal row, so those three
+patterns are judgment. A service principal's display name need not be unique, so it carries no
+`melo` token.
 
 ### The hyphen rule
 
@@ -110,19 +112,38 @@ than in the name, and it matters because most of these types cannot be renamed a
 groups, key vaults, storage accounts and blob containers are all immutable once created, and only a
 subscription display name can be changed in place
 (<https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/frequently-asked-questions>).
+A service principal is the exception on the identity side: its display name can be changed in place,
+while its application ID and object ID never change
+(<https://learn.microsoft.com/en-us/graph/api/resources/application>), so callers and role
+assignments bind to those IDs, not to the name.
 A deleted key vault's name stays blocked for the whole soft-delete retention period, up to 90 days
 (<https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview>).
 
-## The consumer-split rule
+## The isolation-class rule
 
-A key vault's workload token names its **consumer**, not its contents: `kv-melo-<consumer>-<env>`,
-never `kv-melo-secrets-<env>`. A vault obviously holds secrets, so `secrets` as a workload token
-tells a reader nothing, while the consumer is the boundary Microsoft states:
+A key vault's workload token names the **isolation class** of the secrets it holds, not one reader
+and not the bare fact that it holds secrets: `kv-melo-<class>-<env>`, never
+`kv-melo-secrets-<env>`. A vault obviously holds secrets, so `secrets` as a token tells a reader
+nothing. An isolation class is a set of secrets that every reader granted the vault may see, so the
+vault is the access boundary Microsoft states:
 
 > consider what secrets a specific application should have access to, and then separate your key
 > vaults based on this delineation
 
 <https://learn.microsoft.com/en-us/azure/key-vault/general/secure-key-vault>
+
+- Readers get roles per vault, which is per class. A reader is granted a vault only when it may
+  read every secret in it.
+- A class splits when a reader needs part of it: move the part that reader may not see into a vault
+  of its own rather than granting the reader the whole vault.
+- Readers that need the same class share its vault; a class is not split per reader.
+- An existing vault's token is read as its class name. Key vaults cannot be renamed (see name
+  permanence above), so a vault named for its first reader keeps that name, and its class is what
+  that reader may see.
+
+Naming the class rather than the reader is judgment: the quoted guidance draws the boundary by what
+a reader may access, and a vault named for one reader misleads once a second reader with the same
+access shares it.
 
 Extra vaults carry no standing charge (same source, verified 2026-09-23; recheck against
 <https://azure.microsoft.com/en-us/pricing/details/key-vault/> before splitting a vault), so the
@@ -130,7 +151,7 @@ split costs configuration effort rather than money.
 
 The one documented exception is a resource group whose job is lifecycle co-location of several
 vaults. A resource group groups by shared lifecycle, not by classification, so such a group names
-the plane it serves rather than any one consumer
+the plane it serves rather than any one class
 (<https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview>).
 
 ## The nonsecret-placement rule
@@ -146,7 +167,7 @@ explicit that you should not treat nonsecrets like secrets
 | Public identifier consumed by infrastructure code | Plain committed key in the stack configuration file | Stack configuration files are meant to be committed, and encryption is opt-in per value rather than the default | <https://www.pulumi.com/docs/iac/concepts/secrets/> |
 | Public identifier consumed by a workstation tool | Committed structured-data file in the dotfiles repository | Static data files cannot be templates, so they cannot route through a secret resolver, which makes them the correct side of the boundary for identifiers | <https://www.chezmoi.io/reference/special-files/chezmoidata-format/> |
 | Runtime feature flag or runtime application setting | A configuration service, once a runtime reader exists | Every capability a configuration service charges for presumes an application reading settings at run time; without one it is a paid indirection with a manual write path | <https://learn.microsoft.com/en-us/azure/azure-app-configuration/overview> |
-| A true secret | Key vault, in the vault whose consumer reads it | The vault is the security boundary and the place access control is assigned | <https://learn.microsoft.com/en-us/azure/key-vault/general/secure-key-vault> |
+| A true secret | Key vault, in the vault for its isolation class | The vault is the security boundary and the place access control is assigned | <https://learn.microsoft.com/en-us/azure/key-vault/general/secure-key-vault> |
 
 No located source prohibits parking a nonsecret in a vault, so moving one out is a tidiness
 decision rather than a compliance one. Judgment.
