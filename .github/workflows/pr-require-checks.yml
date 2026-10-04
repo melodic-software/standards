@@ -85,6 +85,14 @@ jobs:
   # the check, and held a runner slot for each. Every step after checkout runs
   # `if: !cancelled()`, so one failing check does not hide the ones after it
   # in the same job.
+  #
+  # The slow jobs (test-lefthook, check-python, check-dotnet, check-go) start
+  # with ci-workflows detect-changes and gate every later step on their filter
+  # group, so a pull request that touches none of a job's inputs runs only the
+  # detection step and the job still reports success to ci-status. On push and
+  # on any other non-pull_request event the action reports every group as
+  # changed, so main always runs everything. Gating is per step, not per job:
+  # a skipped job fails ci-status (`treat-skipped-as: fail`).
   check-shell:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
@@ -313,29 +321,47 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      pull-requests: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Detect relevant changes
+        id: changes
+        uses: melodic-software/ci-workflows/.github/actions/detect-changes@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          filters: |
+            lefthook:
+              .github/workflows/pr-require-checks.yml
+              harness/shell/**
+              .node-version
+              package.json
+              package-lock.json
+              lefthook.yml
+              .lefthook/**
+              components/lefthook-*/**
+              PSScriptAnalyzerSettings.psd1
+              .shellcheckrc
       - name: Check out
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Node
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
       - name: Install pinned dependencies
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: npm ci
       - name: Put npm bin on PATH
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install ShellCheck 0.11.0
         # The component test drives the ShellCheck lane as its representative tool,
         # so the engine must be on PATH (kept in lockstep with check-shell).
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: |
           set -euo pipefail
           ver=0.11.0
@@ -348,22 +374,22 @@ jobs:
           rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
           shellcheck --version
       - name: Validate the merged hook config (root + all fragments)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: lefthook validate
       - name: Lefthook base contract test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh
       - name: Lefthook merge/rebase skip placement test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-merge-skip.test.sh
       - name: Lefthook ShellCheck contract test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
       - name: Test .NET staged adapter
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: npm run test:lefthook-dotnet
       - name: Ensure PSScriptAnalyzer 1.25.0
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         shell: pwsh
         run: |
           $required = '1.25.0'
@@ -379,7 +405,7 @@ jobs:
           Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
           Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
       - name: PSScriptAnalyzer staged-adapter regression
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         shell: pwsh
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
@@ -387,6 +413,7 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      pull-requests: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -397,14 +424,32 @@ jobs:
       RUFF_VERSION: 0.15.14
       PYRIGHT_VERSION: 1.1.409
     steps:
+      - name: Detect relevant changes
+        id: changes
+        uses: melodic-software/ci-workflows/.github/actions/detect-changes@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          filters: |
+            python:
+              .github/workflows/pr-require-checks.yml
+              harness/shell/**
+              ruff.toml
+              .gitignore
+              components/ruff/**
+              components/pyright/**
+              **/*.py
+              **/*.pyi
+              **/*.ipynb
+              **/pyproject.toml
+              **/pyrightconfig.json
       - name: Check out
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # The two actions run before the inline install so the contract tests
       # find the inline-installed tools first on PATH.
       - name: Lint and format-check Python
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/ruff@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: ruff.toml
@@ -413,33 +458,33 @@ jobs:
         # The shipped ruleset carries no project-scope `include`, so scope Pyright
         # at the conforming fixture explicitly (the bad fixture is non-conforming
         # by design).
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/pyright@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: components/pyright/pyrightconfig.json
           paths: components/pyright/fixtures/good
       - name: Set up uv
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.14"
       - name: Install ruff and pyright
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: |
           uv tool install --force "ruff==${RUFF_VERSION}"
           uv tool install --force "pyright==${PYRIGHT_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify toolchain
         # Also warms pyright's first-run Node download so the test step is fast.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: |
           ruff --version
           pyright --version
       - name: Ruff contract test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/ruff/ruff.test.sh
       - name: Pyright contract test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   check-typescript:
@@ -504,6 +549,7 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      pull-requests: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -516,7 +562,26 @@ jobs:
       # ci-workflows and with medley.
       DOTNET_VERSION: 10.0.301
     steps:
+      - name: Detect relevant changes
+        id: changes
+        uses: melodic-software/ci-workflows/.github/actions/detect-changes@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          filters: |
+            dotnet:
+              .github/workflows/pr-require-checks.yml
+              harness/shell/**
+              .node-version
+              .editorconfig
+              .lefthook/dotnet-format.json
+              components/dotnet-analysis/**
+              components/lefthook-dotnet/**
+              Directory.Build.*
+              Directory.Packages.props
+              global.json
+              nuget.config
+              NuGet.config
       - name: Check out
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -524,25 +589,25 @@ jobs:
       # DOTNET_INSTALL_DIR. The build and format actions then install the SDK
       # they pin, which is newer, so each step runs the SDK it ran alone.
       - name: Set up .NET
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Set up Node
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
       - name: Verify toolchain
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         run: |
           dotnet --version
           node --version
       - name: .NET analysis contract test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
       - name: .NET staged-adapter integration
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         run: >-
           node components/lefthook-dotnet/dotnet-format-staged.mjs
           components/dotnet-analysis/fixtures/good/Calculator.cs
@@ -552,12 +617,12 @@ jobs:
         # The shipped base carries no project scope, so scope the build at the
         # conforming fixture, which imports the base props (the bad fixture is
         # non-conforming by design).
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-build@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
       - name: Verify .NET whitespace
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-format@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           project: components/dotnet-analysis/fixtures/good/good.csproj
@@ -566,6 +631,7 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
+      pull-requests: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -573,16 +639,31 @@ jobs:
       GOLANGCI_LINT_VERSION: 2.12.2
       GOLANGCI_LINT_SHA256: 8df580d2670fed8fa984aac0507099af8df275e665215f5c7a2ae3943893a553
     steps:
+      - name: Detect relevant changes
+        id: changes
+        uses: melodic-software/ci-workflows/.github/actions/detect-changes@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          filters: |
+            go:
+              .github/workflows/pr-require-checks.yml
+              harness/shell/**
+              .golangci.yml
+              go.work
+              go.work.sum
+              components/go-analysis/**
       - name: Check out
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['go'] != 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Go
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['go'] != 'false' }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
       - name: Install golangci-lint from the official release
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['go'] != 'false' }}
         run: |
           set -euo pipefail
           archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
@@ -602,10 +683,12 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
           rm -rf "$archive" "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
       - name: Verify exact toolchain
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['go'] != 'false' }}
         run: |
           test "$(go env GOVERSION)" = "go${GO_VERSION}"
           golangci-lint version | grep -F "version ${GOLANGCI_LINT_VERSION}"
       - name: Go analysis contract test
+        if: ${{ fromJSON(steps.changes.outputs.results || '{}')['go'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
   check-policies:
