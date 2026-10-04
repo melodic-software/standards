@@ -50,4 +50,30 @@ assert_nonzero 'fleet-label workflow fails without the config (removal tripwire)
 assert_contains 'control run reports the build fleet label' "$out" "$fleet_message"
 assert_contains 'control run reports the review fleet label' "$out" "$review_message"
 
+# `$/` same-release reference: the scoped ignore admits it, and only it.
+cp "$config" "$project/.github/"
+rm -f "$project"/.github/workflows/*.yml
+cp components/actionlint/fixtures/good/dollar-local-ref.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_exit 'a $/ same-release reference lints clean with the config' 0 "$rc"
+assert_silent 'the $/ run emits no findings' "$out"
+
+cp components/actionlint/fixtures/bad/missing-ref.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'a ref-less owner/repo/path still fails with the config' "$rc"
+assert_contains 'the ref-less reference is still rejected' "$out" 'specifying action "owner/repo/path"'
+assert_not_contains 'the $/ reference stays admitted' "$out" 'specifying action "$/'
+
+# Control: without the config the $/ reference must be rejected. When this
+# case fails, actionlint accepts `$/` natively; drop the ignore instead of
+# patching this test.
+rm "$project/.github/actionlint.yaml" \
+  "$project/.github/workflows/missing-ref.yml"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'a $/ reference fails without the config (removal tripwire)' "$rc"
+assert_contains 'control run reports the $/ reference' "$out" 'specifying action "$/.github/actions/typos"'
+
 [[ $FAILED -eq 0 ]] || exit 1

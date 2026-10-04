@@ -1,0 +1,9 @@
+# A `{owner}/{repo}/{path}` reference with no ref: the `$/` ignore must not
+# admit it.
+name: missing-ref fixture
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: owner/repo/path
