@@ -32,7 +32,7 @@ The canonical values live in [`policy.json`](policy.json). Each `updates` entry
 in `.github/dependabot.yml` must:
 
 - schedule on the standard interval (`weekly`);
-- set `cooldown.default-days` to at least the minimum (`7`), so a compromised or
+- set `cooldown.default-days` to at least the minimum (`3`), so a compromised or
   yanked release is caught before adoption while security updates still bypass
   the soak;
 - declare a `groups` block, so related bumps batch into one reviewed pull
@@ -40,10 +40,41 @@ in `.github/dependabot.yml` must:
 - keep `open-pull-requests-limit` at or below the maximum (`5`); an omitted
   limit is accepted because GitHub's default is already the maximum.
 
-A default 3-day cooldown now applies with no configuration, and the standard
-tightens it to 7. As of the 2026-07-14 Dependabot change these are the
-supported `dependabot.yml` options; the standard configures them explicitly
-rather than relying on defaults.
+One 3-day floor covers every ecosystem and every outside publisher, with no
+exemption for any vendor action. The analyzer still accepts a narrow
+`cooldown.exclude`; the fleet uses it only for its own `melodic-software/*`
+actions, which this organization publishes. GitHub made 3 days Dependabot's
+default in July 2026 and found that
+malicious versions were pulled within hours of publication
+([GitHub blog](https://github.blog/security/supply-chain-security/the-case-for-a-cooldown-why-dependabot-now-waits-before-issuing-version-updates/)),
+so 3 days catches them while keeping bumps current. Security updates skip the
+cooldown natively: the option applies only to version updates
+([options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)).
+The standard still sets the value explicitly rather than relying on the default.
+
+## Merge lanes for GitHub Actions bumps
+
+A GitHub Actions bump takes one of two lanes, recorded as data in the
+`autoMerge` block of [`policy.json`](policy.json):
+
+- **Auto lane.** The action's publisher is on the vendor allowlist
+  (`actions/*`, `github/*`, `anthropics/*`) and the update is not a semver
+  major. The pull request merges itself once the required `ci-status` check
+  passes, with no human review. Every repository already trusts these
+  publishers, who run the platform and the review agents, so a non-major
+  release from them adds no new trust; the cooldown and `ci-status` catch a
+  bad one.
+- **Manual lane.** Everything else: actions from community or
+  single-maintainer publishers, and semver majors from any publisher. A human
+  reviews and merges the pull request, and a stale bump is acceptable. A
+  community publisher is a trust decision a person makes, and a major can
+  change behavior that `ci-status` does not exercise.
+
+Prefer removing manual-lane actions over reviewing their bumps: replace a
+community action with a vendor action or a `gh` or script step.
+
+This component records the lanes but does not enforce them; a shared
+auto-merge workflow in `ci-workflows` is the planned consumer of `autoMerge`.
 
 ## What it checks
 

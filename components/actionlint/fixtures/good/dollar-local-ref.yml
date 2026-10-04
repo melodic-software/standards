@@ -1,0 +1,9 @@
+# A same-release `$/` reference to a sibling action, which actionlint 1.7.12
+# rejects as `ref is missing` without the scoped ignore in the config.
+name: dollar-ref fixture
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: $/.github/actions/typos

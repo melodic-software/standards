@@ -6,12 +6,18 @@ import test from "node:test";
 
 import { validatePolicy } from "../runner-policy/runner-policy.mjs";
 import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
+import * as lockstep from "./repin-policy-lockstep.mjs";
 import {
   appliedPolicyNote,
   copyForwardContracts,
   manualPolicyNote,
+  pairCallerPins,
+  planLockstep,
   rewriteCallerFiles,
+  settleLockstep,
 } from "./repin-policy-lockstep.mjs";
+
+const SYNC_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/standards-sync.yml";
 
 const oldA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const oldB = "d26c750691b5498fab529d115b63f84aa7aecebe";
@@ -186,6 +192,157 @@ test("copy-forward clones one real claude-review contract onto a new SHA", async
   assertNoSelectorKeys(policy);
 });
 
+// Renamed-path fixtures: the old -> new pair is the claude-review entry of
+// components/github-actions-conventions/rename-map.json.
+const RENAMED_REVIEW_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/pr-review.yml";
+const callerText = (workflowPath, sha, tag) =>
+  `jobs:\n  review:\n    uses: ${workflowPath}@${sha} # ${tag}\n    with:\n      runner: x\n`;
+
+test("pairCallerPins follows a pin that apply moved to its renamed path", () => {
+  const pairs = pairCallerPins(
+    callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"),
+    callerText(RENAMED_REVIEW_WORKFLOW, next, "v0.34.0"),
+  );
+  assert.deepEqual(pairs, [
+    { oldWorkflowPath: REVIEW_WORKFLOW, oldSha: oldA, newWorkflowPath: RENAMED_REVIEW_WORKFLOW },
+  ]);
+});
+
+test("pairCallerPins keeps the path for a release cut before the rename", () => {
+  const pairs = pairCallerPins(
+    callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"),
+    callerText(REVIEW_WORKFLOW, next, "v0.33.1"),
+  );
+  assert.deepEqual(pairs, [
+    { oldWorkflowPath: REVIEW_WORKFLOW, oldSha: oldA, newWorkflowPath: REVIEW_WORKFLOW },
+  ]);
+});
+
+test("pairCallerPins refuses a pin line that apply did not leave as a pin", () => {
+  assert.throws(
+    () => pairCallerPins(callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"), "jobs:\n  review:\n"),
+    /line 3/u,
+  );
+});
+
+test("a renamed pin with an unchanged surface writes no contract and lands on the human checklist", async () => {
+  const policy = JSON.parse(
+    await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
+  );
+  const before = structuredClone(policy);
+  const pins = [
+    {
+      kind: "lane",
+      oldWorkflowPath: REVIEW_WORKFLOW,
+      oldSha: CURRENT_REVIEW_SHA,
+      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
+    },
+  ];
+
+  const { reasons, copyForwards } = await planLockstep(pins, FRESH_SHA, () => ({
+    unchanged: true,
+  }));
+  copyForwardContracts(policy, copyForwards);
+
+  assert.deepEqual(copyForwards, []);
+  assert.deepEqual(policy, before, "no contract is written for a renamed path");
+  const note = manualPolicyNote(reasons.join("; "), "v0.34.0");
+  assert.ok(
+    note.includes(
+      `${REVIEW_WORKFLOW} is renamed to ${RENAMED_REVIEW_WORKFLOW} (from 91d06c9); ` +
+        "a renamed path needs a hand-reviewed approvedReusableWorkflowContracts entry",
+    ),
+    note,
+  );
+});
+
+test("a same-path pin beside a rename still plans its copy-forward, and the rename declines the run", async () => {
+  const pins = [
+    {
+      kind: "lane",
+      oldWorkflowPath: REVIEW_WORKFLOW,
+      oldSha: CURRENT_REVIEW_SHA,
+      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
+    },
+    {
+      kind: "reusable",
+      oldWorkflowPath: SYNC_WORKFLOW,
+      oldSha: oldA,
+      newWorkflowPath: SYNC_WORKFLOW,
+    },
+  ];
+  const compared = [];
+  const plan = await planLockstep(pins, FRESH_SHA, (pin) => {
+    compared.push(pin.newWorkflowPath);
+    return { unchanged: true };
+  });
+
+  assert.deepEqual(compared, [SYNC_WORKFLOW], "a renamed pin is never surface-compared");
+  assert.equal(plan.reasons.length, 1);
+  assert.deepEqual(plan.copyForwards, [
+    { kind: "reusable", workflowPath: SYNC_WORKFLOW, oldSha: oldA, newSha: FRESH_SHA },
+  ]);
+});
+
+test("a same-path pin whose surface changed is declined, not copied forward", async () => {
+  const plan = await planLockstep(
+    [
+      {
+        kind: "lane",
+        oldWorkflowPath: REVIEW_WORKFLOW,
+        oldSha: CURRENT_REVIEW_SHA,
+        newWorkflowPath: REVIEW_WORKFLOW,
+      },
+    ],
+    FRESH_SHA,
+    () => ({ unchanged: false, reason: "x" }),
+  );
+  assert.deepEqual(plan.copyForwards, []);
+  assert.deepEqual(plan.reasons, [`${REVIEW_WORKFLOW} x (from 91d06c9)`]);
+});
+
+async function policyRoot() {
+  const root = await mkdtemp(path.join(tmpdir(), "repin-settle-"));
+  temporaryRoots.push(root);
+  const rel = "components/runner-policy/policy.json";
+  await mkdir(path.join(root, path.dirname(rel)), { recursive: true });
+  const bytes = await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8");
+  await writeFile(path.join(root, rel), bytes);
+  return { file: path.join(root, rel), root, bytes };
+}
+
+const reviewCopyForward = {
+  kind: "lane",
+  workflowPath: REVIEW_WORKFLOW,
+  oldSha: CURRENT_REVIEW_SHA,
+  newSha: FRESH_SHA,
+};
+
+test("settleLockstep writes no policy.json when any pin was declined", async () => {
+  const { file, root, bytes } = await policyRoot();
+  const output = await settleLockstep(
+    { reasons: ["x"], copyForwards: [reviewCopyForward] },
+    FRESH_SHA,
+    "v0.34.0",
+    root,
+  );
+  assert.equal(await readFile(file, "utf8"), bytes);
+  assert.deepEqual(output[0], ["lockstep", "manual"]);
+});
+
+test("settleLockstep writes the copy-forward when nothing was declined", async () => {
+  const { file, root } = await policyRoot();
+  const output = await settleLockstep(
+    { reasons: [], copyForwards: [reviewCopyForward] },
+    FRESH_SHA,
+    "v0.34.0",
+    root,
+  );
+  const written = JSON.parse(await readFile(file, "utf8"));
+  assert.ok(written.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${FRESH_SHA}`]);
+  assert.deepEqual(output[0], ["lockstep", "applied"]);
+});
+
 test("a selector copy-forward throws and adds no selector key", async () => {
   const onDisk = JSON.parse(
     await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
@@ -206,4 +363,136 @@ test("a selector copy-forward throws and adds no selector key", async () => {
   );
   assert.deepEqual(policy, before);
   assertNoSelectorKeys(policy);
+});
+
+// Commit-relative fixtures: a reusable whose step runs a `$/` action, served by
+// a fetch stub that answers the two GitHub surfaces runner-policy reads (the
+// recursive git tree on api.github.com, raw file bytes on
+// raw.githubusercontent.com). Every other request is a 404.
+const DOLLAR_ACTION = ".github/actions/review-setup";
+const DOLLAR_REUSABLE_SOURCE = `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+permissions: {}
+jobs:
+  review:
+    runs-on: \${{ inputs.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: $/${DOLLAR_ACTION}
+`;
+const DOLLAR_ACTION_SOURCE = `name: review-setup
+runs:
+  using: composite
+  steps:
+    - run: echo setup
+      shell: bash
+`;
+const TREE_URL =
+  /^https:\/\/api\.github\.com\/repos\/melodic-software\/ci-workflows\/git\/trees\/([0-9a-f]{40})\?recursive=1$/u;
+
+function actionTree(treeSha) {
+  return [
+    { path: DOLLAR_ACTION, type: "tree", sha: treeSha },
+    { path: `${DOLLAR_ACTION}/action.yml`, type: "blob", sha: "1".repeat(40), mode: "100644" },
+  ];
+}
+
+function upstreamFetch(treesBySha, requests = []) {
+  return async (url) => {
+    requests.push(url);
+    const treeMatch = TREE_URL.exec(url);
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
+    const tree = treeMatch && treesBySha[treeMatch[1]];
+    if (tree) {
+      return { ok: true, json: async () => ({ truncated: false, tree }) };
+    }
+    if (url.endsWith(`/${DOLLAR_ACTION}/action.yml`)) {
+      return { ok: true, text: async () => DOLLAR_ACTION_SOURCE };
+    }
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+}
+
+function samePathPin() {
+  return {
+    kind: "lane",
+    oldWorkflowPath: REVIEW_WORKFLOW,
+    oldSha: CURRENT_REVIEW_SHA,
+    newWorkflowPath: REVIEW_WORKFLOW,
+  };
+}
+
+async function planWithFetch(pins, fetchImpl) {
+  const policy = validatePolicy(
+    JSON.parse(await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8")),
+  );
+  return planLockstep(pins, FRESH_SHA, (pin) =>
+    lockstep.laneSecuritySurfacesMatch({
+      oldSource: DOLLAR_REUSABLE_SOURCE,
+      newSource: DOLLAR_REUSABLE_SOURCE,
+      workflowPath: pin.newWorkflowPath,
+      oldSha: pin.oldSha,
+      newSha: FRESH_SHA,
+      policy,
+      fetchImpl,
+    }),
+  );
+}
+
+test("a same-path $/ reusable whose action tree is unchanged copies forward", async () => {
+  const tree = actionTree("2".repeat(40));
+  const plan = await planWithFetch(
+    [samePathPin()],
+    upstreamFetch({ [CURRENT_REVIEW_SHA]: tree, [FRESH_SHA]: tree }),
+  );
+  assert.deepEqual(plan.reasons, []);
+  assert.deepEqual(plan.copyForwards, [reviewCopyForward]);
+});
+
+test("a same-path $/ reusable whose action tree changed declines onto the checklist", async () => {
+  const plan = await planWithFetch(
+    [samePathPin()],
+    upstreamFetch({
+      [CURRENT_REVIEW_SHA]: actionTree("2".repeat(40)),
+      [FRESH_SHA]: actionTree("3".repeat(40)),
+    }),
+  );
+  assert.deepEqual(plan.copyForwards, []);
+  assert.equal(plan.reasons.length, 1);
+  assert.ok(
+    plan.reasons[0].includes(`commit-relative reference ${DOLLAR_ACTION} changed`),
+    plan.reasons[0],
+  );
+  assert.ok(manualPolicyNote(plan.reasons.join("; "), "v0.34.0").includes(plan.reasons[0]));
+});
+
+test("a same-path $/ reusable declines when the object fetch fails", async () => {
+  const plan = await planWithFetch([samePathPin()], async () => {
+    throw new Error("network down");
+  });
+  assert.deepEqual(plan.copyForwards, []);
+  assert.equal(plan.reasons.length, 1);
+  assert.match(
+    plan.reasons[0],
+    /could not fetch the git tree of melodic-software\/ci-workflows@[0-9a-f]{40}: network down/u,
+  );
+});
+
+test("a renamed $/ reusable declines without fetching anything", async () => {
+  const requests = [];
+  const plan = await planWithFetch(
+    [{ ...samePathPin(), newWorkflowPath: RENAMED_REVIEW_WORKFLOW }],
+    upstreamFetch({}, requests),
+  );
+  assert.deepEqual(requests, []);
+  assert.deepEqual(plan.copyForwards, []);
+  assert.deepEqual(plan.reasons, [
+    `${REVIEW_WORKFLOW} is renamed to ${RENAMED_REVIEW_WORKFLOW} (from 91d06c9); ` +
+      "a renamed path needs a hand-reviewed approvedReusableWorkflowContracts entry",
+  ]);
 });

@@ -22,6 +22,8 @@ import {
   parseMarkdownHeadings,
   parseValidatorPatterns,
   parseValidatorSections,
+  readGateComposite,
+  resolveConsumerArtifact,
 } from "./lockstep-drift.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
@@ -498,10 +500,32 @@ const COMPOSITE_STEP =
 const REUSABLE_CALL =
   "    uses: melodic-software/ci-workflows/.github/workflows/pr-issue-linkage.yml@0f8176e87e0be518f382664779655011bf95784a # v0.17.2";
 
-test("a composite consumer is detected at its pin", () => {
+const LEGACY_DIRECTORY = ".github/actions/pr-contract";
+const RENAMED_DIRECTORY = ".github/actions/pr-require-checks/check-contract";
+
+test("a consumer pinned to the pr-contract composite is detected at its pin", () => {
   assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${COMPOSITE_STEP}\n`), {
     kind: "composite",
     sha: "449157aaa8e30f7b1457305d8048ebe6168e174a",
+    directory: LEGACY_DIRECTORY,
+  });
+});
+
+test("a consumer pinned to the renamed check-contract composite is detected at its pin", () => {
+  const step =
+    "      - uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@1234567890abcdef1234567890abcdef12345678 # v0.34.0";
+  assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${step}\n`), {
+    kind: "composite",
+    sha: "1234567890abcdef1234567890abcdef12345678",
+    directory: RENAMED_DIRECTORY,
+  });
+});
+
+test("a local reference to the renamed composite resolves to main", () => {
+  assert.deepEqual(detectArtifactPin(`        uses: ./${RENAMED_DIRECTORY}\n`), {
+    kind: "composite",
+    sha: "main",
+    directory: RENAMED_DIRECTORY,
   });
 });
 
@@ -524,7 +548,7 @@ test("the composite wins when a repository carries both mid-transition", () => {
 test("a local composite reference resolves to main, and a bare path does not", () => {
   assert.deepEqual(
     detectArtifactPin("      - name: Contract\n        uses: ./.github/actions/pr-contract\n"),
-    { kind: "composite", sha: "main" },
+    { kind: "composite", sha: "main", directory: LEGACY_DIRECTORY },
   );
   assert.equal(
     detectArtifactPin(
@@ -550,6 +574,78 @@ test("a commented-out call site is not a call site", () => {
     detectArtifactPin(`      # - uses: ./.github/actions/pr-contract\n${REUSABLE_CALL}\n`).kind,
     "reusable",
   );
+});
+
+// The ci-workflows rename moves the gate from `ci.yml` to
+// `pr-require-checks.yml`. The scan reads that file before any other, so a
+// repository calling the composite from there costs one read.
+test("a composite called from pr-require-checks.yml is found on the first read", async () => {
+  const reads = [];
+  const files = {
+    "build.yml": "jobs:\n  build:\n    runs-on: ubuntu-24.04\n",
+    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${RENAMED_DIRECTORY}\n`,
+    "lint.yml": "jobs:\n  lint:\n    runs-on: ubuntu-24.04\n",
+  };
+  const found = await resolveConsumerArtifact(
+    "ci-workflows",
+    async (url) => {
+      const name = url.match(/\.github\/workflows\/([^?]+)/)[1];
+      reads.push(name);
+      return files[name];
+    },
+    async () => Object.keys(files),
+  );
+  assert.deepEqual(found, { kind: "composite", sha: "main", directory: RENAMED_DIRECTORY });
+  assert.deepEqual(reads, ["pr-require-checks.yml"]);
+});
+
+test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", async () => {
+  const reads = [];
+  const files = {
+    "ci.yml": `jobs:\n  ci-status:\n        uses: ./${LEGACY_DIRECTORY}\n`,
+    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${RENAMED_DIRECTORY}\n`,
+  };
+  const found = await resolveConsumerArtifact(
+    "ci-workflows",
+    async (url) => {
+      const name = url.match(/\.github\/workflows\/([^?]+)/)[1];
+      reads.push(name);
+      return files[name];
+    },
+    async () => Object.keys(files),
+  );
+  assert.deepEqual(found, { kind: "composite", sha: "main", directory: RENAMED_DIRECTORY });
+  assert.deepEqual(reads, ["pr-require-checks.yml"]);
+});
+
+// ci-workflows `main` carries one composite path or the other across the
+// rename; the copy check reads the renamed one when it exists.
+function gateReader(directories) {
+  return async (url) => {
+    const directory = directories.find((candidate) => url.includes(`/${candidate}/`));
+    if (directory === undefined) {
+      return null;
+    }
+    return url.includes("/run.sh") ? `run.sh at ${directory}` : `action.yml at ${directory}`;
+  };
+}
+
+test("the gate composite is read from the renamed path when it exists", async () => {
+  assert.deepEqual(await readGateComposite(gateReader([RENAMED_DIRECTORY, LEGACY_DIRECTORY])), {
+    gateRun: `run.sh at ${RENAMED_DIRECTORY}`,
+    gateAction: `action.yml at ${RENAMED_DIRECTORY}`,
+  });
+});
+
+test("the gate composite falls back to pr-contract before the rename", async () => {
+  assert.deepEqual(await readGateComposite(gateReader([LEGACY_DIRECTORY])), {
+    gateRun: `run.sh at ${LEGACY_DIRECTORY}`,
+    gateAction: `action.yml at ${LEGACY_DIRECTORY}`,
+  });
+});
+
+test("a gate composite missing at both paths is a fetch error", async () => {
+  await assert.rejects(readGateComposite(gateReader([])), /fetch-error: .*pr-contract/);
 });
 
 // ---------------------------------------------------------------------------

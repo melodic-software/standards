@@ -9,13 +9,35 @@
     "scheduleInterval",
     "cooldownMinimumDays",
     "maxOpenPullRequests",
-    "requireGroups"
+    "requireGroups",
+    "autoMerge"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
     "scheduleInterval": { "enum": ["daily", "weekly", "monthly"] },
     "cooldownMinimumDays": { "type": "integer", "minimum": 1 },
     "maxOpenPullRequests": { "type": "integer", "minimum": 1 },
-    "requireGroups": { "type": "boolean" }
+    "requireGroups": { "type": "boolean" },
+    "autoMerge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystems", "publisherAllowlist", "excludeSemverMajor", "requiredCheck"],
+      "properties": {
+        "ecosystems": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "publisherAllowlist": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*/\\*$" }
+        },
+        "excludeSemverMajor": { "type": "boolean" },
+        "requiredCheck": { "type": "string", "minLength": 1 }
+      }
+    }
   }
 }
