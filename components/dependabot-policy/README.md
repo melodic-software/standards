@@ -40,8 +40,11 @@ in `.github/dependabot.yml` must:
 - keep `open-pull-requests-limit` at or below the maximum (`5`); an omitted
   limit is accepted because GitHub's default is already the maximum.
 
-One 3-day floor covers every ecosystem and every publisher, with no per-action
-exemption. GitHub made 3 days Dependabot's default on 2026-07-14 and found that
+One 3-day floor covers every ecosystem and every outside publisher, with no
+exemption for any vendor action. The analyzer still accepts a narrow
+`cooldown.exclude`; the fleet uses it only for its own `melodic-software/*`
+actions, which this organization publishes. GitHub made 3 days Dependabot's
+default in July 2026 and found that
 malicious versions were pulled within hours of publication
 ([GitHub blog](https://github.blog/security/supply-chain-security/the-case-for-a-cooldown-why-dependabot-now-waits-before-issuing-version-updates/)),
 so 3 days catches them while keeping bumps current. Security updates skip the

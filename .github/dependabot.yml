@@ -1,8 +1,9 @@
 version: 2
 updates:
   # Keep SHA-pinned actions current — including the cross-repo ci-workflows
-  # composite actions referenced from .github/workflows/ci.yml. Review every PR
-  # before merge; never auto-merge (a SHA bump is executable CI logic). Bumping
+  # composite actions referenced from .github/workflows/ci.yml. Merge lanes per
+  # components/dependabot-policy: the vendor-actions group (non-major only) may
+  # auto-merge once ci-status passes; every other PR is reviewed by hand. Bumping
   # the pin to the private ci-workflows repo requires the org-level "Grant
   # Dependabot access to private repositories" setting to include ci-workflows.
   # Delay version bumps so a compromised or yanked release is caught before we
@@ -28,6 +29,8 @@ updates:
           - "actions/*"
           - "github/*"
           - "anthropics/*"
+        # Majors fall through to the reviewed group below.
+        update-types: ["minor", "patch"]
       github-actions:
         patterns:
           - "*"
