@@ -105,8 +105,11 @@ MCP_LAUNCHER_FNM_ACTIVE = "1"
 ```
 
 The secret name after `=` is the `vault-exec` secret name, never the value.
-In a cloud session, set the variable in that surface's own environment or
-secret store; the launcher then never looks for `vault-exec`.
+In a cloud session, either set the variable in that surface's own environment
+or secret store, and the launcher never looks for `vault-exec`, or rely on the
+`~/.local/bin/vault-exec` the
+[cloud-environment component](../cloud-environment/README.md#key-vault-resolver)
+installs, which step 3 finds like a workstation's.
 
 ## Tests
 

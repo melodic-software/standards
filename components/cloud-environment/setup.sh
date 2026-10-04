@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-02.1'
+SCRIPT_VERSION='2026-10-04.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -55,6 +55,12 @@ FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
 # claude-permissions component, fetched from the same host and unioned into
 # the user settings file sessions boot with (see compose_permissions_floor).
 CLAUDE_PERMISSIONS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/claude-permissions/claude-permissions.json'
+# Key Vault resolver: this component's vault-exec, fetched from the same host
+# and installed to the container user's ~/.local/bin (see install_vault_exec).
+# The marker line identifies our copy, so a vault-exec someone else put there
+# is never replaced.
+VAULT_EXEC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/vault-exec'
+VAULT_EXEC_MARKER='# melodic-software/standards cloud-environment vault-exec'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
@@ -184,7 +190,28 @@ compose_permissions_floor() {
   return 1
 }
 
-# Sourced by setup.test.sh for the plugin-list and permission-floor helpers only.
+# install_vault_exec <fetched script> <dest>: install the fetched resolver at
+# <dest> with mode 0755. Returns 1 and leaves <dest> untouched when the fetched
+# file does not parse or lacks VAULT_EXEC_MARKER, when <dest> exists without
+# the marker (not ours), or when any write fails. A copy of ours is replaced.
+install_vault_exec() {
+  local src="$1" dest="$2" tmp="$2.install.$$"
+  if ! bash -n "$src" 2>/dev/null || ! grep -qxF "$VAULT_EXEC_MARKER" "$src"; then
+    return 1
+  fi
+  if [[ -e "$dest" ]] && ! grep -qxF "$VAULT_EXEC_MARKER" "$dest" 2>/dev/null; then
+    return 1
+  fi
+  mkdir -p "${dest%/*}" || return 1
+  if cp "$src" "$tmp" && chmod 0755 "$tmp" && mv -f "$tmp" "$dest"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# Sourced by setup.test.sh for the plugin-list, permission-floor and vault-exec
+# helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -488,6 +515,27 @@ else
   fi
 fi
 rm -f "$floor_file" 2>/dev/null
+
+# Key Vault resolver: install this component's vault-exec where the
+# mcp-launcher looks for one (~/.local/bin/vault-exec). Install only: the agent
+# proxy adds the environment's API credential only once Claude Code launches,
+# so no read can happen here. A vault-exec already there without our marker is
+# left alone with a WARN.
+if [[ -z "${HOME:-}" ]]; then
+  log 'WARN vault-exec: HOME is not set; not installed'
+else
+  vault_exec_dest="$HOME/.local/bin/vault-exec"
+  vault_exec_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-vault-exec.$$")"
+  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
+    "$VAULT_EXEC_URL" -o "$vault_exec_file" >>"$LOG" 2>&1; then
+    log 'WARN vault-exec: fetch failed; not installed this build'
+  elif install_vault_exec "$vault_exec_file" "$vault_exec_dest" >>"$LOG" 2>&1; then
+    log "vault-exec installed to $vault_exec_dest"
+  else
+    log "WARN vault-exec: install refused (fetched file invalid, $vault_exec_dest is not ours, or a failed write)"
+  fi
+  rm -f "$vault_exec_file" 2>/dev/null
+fi
 
 # Temp-file hygiene: without this the fetched installers — and this script
 # itself, which the environment bootstrap curls to /tmp — persist into the

@@ -1,0 +1,107 @@
+#!/bin/bash
+# melodic-software/standards cloud-environment vault-exec
+#
+# Cloud-session Key Vault resolver, installed by setup.sh to
+# ~/.local/bin/vault-exec. Same argv contract as the workstation resolver:
+#
+#   vault-exec [--optional] --env NAME=secret-name [--env ...] -- <command> [args...]
+#
+# Each secret is read from https://$VAULT_EXEC_VAULT.vault.azure.net (default
+# kv-melo-devtools-prod) with no auth header: the environment's OAuth
+# client-credentials API credential makes the agent proxy add the bearer token.
+# NAME is set in the command's environment, then the command is exec'd, so its
+# stdin, stdout and exit code pass through. A secret that cannot be resolved
+# exits 1 without running the command; with --optional, NAME is left unset and
+# the command still runs. Bad usage exits 2. Diagnostics go to stderr and name
+# the secret and HTTP status, never the value. No value is ever in argv.
+set -u
+
+usage() {
+  printf 'vault-exec: %s\n' "$1" >&2
+  printf 'usage: vault-exec [--optional] --env NAME=secret-name [--env ...] -- <command> [args...]\n' >&2
+  exit 2
+}
+
+optional=0
+names=()
+secrets=()
+while [[ $# -gt 0 && "$1" != '--' ]]; do
+  case "$1" in
+    --optional)
+      optional=1
+      shift
+      ;;
+    --env)
+      [[ $# -ge 2 ]] || usage '--env needs NAME=secret-name'
+      pair="$2"
+      name="${pair%%=*}"
+      secret="${pair#*=}"
+      [[ "$pair" == *=* && "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] ||
+        usage "invalid --env '$pair': NAME must be an environment variable name"
+      [[ "$secret" =~ ^[A-Za-z0-9-]{1,127}$ ]] ||
+        usage "invalid secret name for $name: alphanumerics and hyphens, 1-127 characters"
+      names+=("$name")
+      secrets+=("$secret")
+      shift 2
+      ;;
+    *) usage "unknown argument '$1'" ;;
+  esac
+done
+[[ $# -gt 0 ]] || usage "missing '--' before the command"
+shift
+[[ $# -gt 0 ]] || usage 'missing command after --'
+[[ ${#names[@]} -gt 0 ]] || usage 'at least one --env NAME=secret-name is required'
+
+vault="${VAULT_EXEC_VAULT:-kv-melo-devtools-prod}"
+[[ "$vault" =~ ^[A-Za-z][A-Za-z0-9-]{1,22}[A-Za-z0-9]$ ]] ||
+  usage "invalid VAULT_EXEC_VAULT '$vault': 3-24 alphanumerics and hyphens"
+
+failed=0
+for i in "${!names[@]}"; do
+  name="${names[$i]}"
+  secret="${secrets[$i]}"
+  # curl and python3 read from /dev/null and a pipe, never this script's
+  # stdin, which belongs to the command. The response carries the status on
+  # its last line; the body never reaches a log.
+  resp="$(curl -sS --fail-with-body --proto '=https' --connect-timeout 5 \
+    --max-time 20 --retry 2 --retry-delay 1 -w '\n%{http_code}' \
+    "https://${vault}.vault.azure.net/secrets/${secret}?api-version=7.4" \
+    </dev/null 2>/dev/null)"
+  curl_rc=$?
+  status="${resp##*$'\n'}"
+  body="${resp%$'\n'*}"
+  value=''
+  if [[ $curl_rc -eq 0 && "$status" == 200 ]]; then
+    # The trailing sentinel keeps a value's own trailing newlines intact
+    # through the command substitution.
+    if value="$(printf '%s' "$body" | python3 -c '
+import json, sys
+v = json.load(sys.stdin).get("value")
+if not isinstance(v, str):
+    sys.exit(1)
+sys.stdout.write(v + "x")
+' 2>/dev/null)"; then
+      value="${value%x}"
+    else
+      value=''
+      status="$status, no string value in the response"
+      curl_rc=0
+    fi
+  fi
+  unset resp body
+  if [[ $curl_rc -eq 0 && "$status" == 200 ]]; then
+    export "${name}=${value}"
+  elif [[ $optional -eq 1 ]]; then
+    unset "$name"
+    printf "vault-exec: %s not set: secret '%s' in %s failed (HTTP %s, curl exit %s); starting without it\n" \
+      "$name" "$secret" "$vault" "${status:-none}" "$curl_rc" >&2
+  else
+    printf "vault-exec: secret '%s' in %s failed (HTTP %s, curl exit %s)\n" \
+      "$secret" "$vault" "${status:-none}" "$curl_rc" >&2
+    failed=1
+  fi
+  unset value
+done
+[[ $failed -eq 0 ]] || exit 1
+
+exec "$@"
