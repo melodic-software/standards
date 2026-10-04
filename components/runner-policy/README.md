@@ -1050,8 +1050,8 @@ lanes bump `anthropics/claude-code-action` from v1.0.235 to v1.0.240
 v4.38.0 to v4.38.1 (`1c5b675`), and `pr-run-checks`, `intake-triage` and the lanes resolve their
 composites through `$/` at the release commit instead of v0.27.0 pins. Both
 upstream SHAs match their release tags. No input, secret, caller permission or
-`runs-on` routing moved. The old keys stay for consumers pinned at v0.33.0 or
-earlier.
+`runs-on` routing moved. Every consumer now pins v0.36.0, so the v0.34.0 keys
+are retired (see below).
 `pr-automerge-dependabot` is registered at the v0.35.0 tag
 `69e506b7c119517ef1dfc421479232b386b93a52`, its first revision, security-reviewed
 on ci-workflows#676. It arms squash auto-merge, passing the verified head SHA as
@@ -1079,6 +1079,11 @@ composite paths (`machine-specific-paths` to `check-machine-paths`,
 `comment-hygiene` to `check-comment-markers`), whose trees are identical; a
 renamed path never auto-copies, so it was hand-reviewed. No input, secret,
 caller permission or `runs-on` routing moved.
+Once every consumer pinned v0.36.0, the ci-workflows entries at older SHAs were
+retired under step 4 of the lockstep below, including every `7446b51` and
+`69e506b` key. The older entries that remain are the ones a
+`runner-policy.test.mjs` case still reads; the review notes in this section
+stay as the record the v0.36.0 terms were copied from.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
@@ -1259,8 +1264,8 @@ Two public repositories execute this gate today: `standards` and
 
 The gate scopes these review reusables by path: `claude-review.yml` and
 `claude-security-review.yml`, and their renamed paths `pr-review.yml` and
-`pr-review-security.yml`. The old paths stay listed while any consumer still
-pins an old SHA.
+`pr-review-security.yml`. No consumer pins an old path; the old paths stay
+listed because older entries for them remain in `policy.json`.
 
 > **Invariant:** No `claude-review` or `claude-security-review` contract may list
 > `standards-ref` or the `STANDARDS_REVIEW_APP_*` secrets while **any**
