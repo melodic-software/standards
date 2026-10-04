@@ -28,10 +28,13 @@ const UPSTREAM = "melodic-software/ci-workflows";
 const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
 
 /**
- * Each entry is one upstream reusable plus the caller files that pin it.
- * Old SHAs are read per caller file — do not assume a single-SHA world.
- * `kind` is lane or reusable. Both copy forward approvedReusableWorkflowContracts.
- * Any other kind throws and does not add a property.
+ * Each entry is the caller files that pin one upstream reusable. The
+ * reusable's path is read from each pin, never named here: repin-callers.sh
+ * apply moves a pin to its renamed path (rename-map.json) when the release
+ * carries only the new one. Old SHAs are read per caller file — do not assume
+ * a single-SHA world. `kind` is lane or reusable. Both copy forward
+ * approvedReusableWorkflowContracts. Any other kind throws and does not add a
+ * property.
  *
  * The hosted lane callers (components/claude-lanes-hosted/) are deliberately
  * absent: runner-policy.test.mjs holds them to the fleet callers' pin, so the
@@ -40,7 +43,6 @@ const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
  */
 const REPIN_TARGETS = [
   {
-    workflowPath: `${UPSTREAM}/.github/workflows/claude-review.yml`,
     callerFiles: [
       "components/claude-lanes/claude-review.yml",
       ".github/workflows/claude-review.yml",
@@ -48,18 +50,16 @@ const REPIN_TARGETS = [
     kind: "lane",
   },
   {
-    workflowPath: `${UPSTREAM}/.github/workflows/claude-security-review.yml`,
     callerFiles: ["components/claude-lanes/claude-security-review.yml"],
     kind: "lane",
   },
   {
-    workflowPath: `${UPSTREAM}/.github/workflows/standards-sync.yml`,
     callerFiles: [".github/workflows/sync.yml"],
     kind: "reusable",
   },
 ];
 
-const PIN_RE = /uses:\s+melodic-software\/ci-workflows\/[^@\s]+@([0-9a-fA-F]{40})/u;
+const PIN_RE = /uses:\s+(melodic-software\/ci-workflows\/[^@\s]+)@([0-9a-fA-F]{40})/u;
 
 function emitError(message) {
   process.stderr.write(`${message}\n`);
@@ -174,15 +174,28 @@ function rewritePinLine(line, newSha, tag) {
   );
 }
 
-function pinsInFile(text, workflowPath) {
-  const needle = `${workflowPath}@`;
-  const shas = [];
-  for (const line of text.split("\n")) {
-    if (!line.includes(needle)) continue;
-    const match = line.match(PIN_RE);
-    if (match) shas.push(match[1].toLowerCase());
-  }
-  return shas;
+/**
+ * Pairs each pin in a caller's committed text with the same line after
+ * repin-callers.sh apply rewrote it in place. The rewritten line names the
+ * path the new SHA's contract is keyed under, renamed or not.
+ */
+export function pairCallerPins(headText, worktreeText) {
+  const after = worktreeText.split("\n");
+  const pairs = [];
+  headText.split("\n").forEach((line, index) => {
+    const before = line.match(PIN_RE);
+    if (!before) return;
+    const rewritten = after[index]?.match(PIN_RE);
+    if (!rewritten) {
+      throw new Error(`line ${index + 1} no longer carries a ci-workflows pin after apply`);
+    }
+    pairs.push({
+      oldWorkflowPath: before[1],
+      oldSha: before[2].toLowerCase(),
+      newWorkflowPath: rewritten[1],
+    });
+  });
+  return pairs;
 }
 
 function readHeadFile(rel) {
@@ -197,16 +210,14 @@ function readHeadFile(rel) {
   }
 }
 
-function readCallerPins(workflowPath, callerFiles) {
+async function readCallerPins(callerFiles) {
   const found = [];
   for (const rel of callerFiles) {
     // apply rewrites the worktree first. Read the committed pin so each
     // path keeps its own old SHA instead of collapsing to the new one.
     const text = readHeadFile(rel);
     if (text === undefined) continue;
-    for (const sha of pinsInFile(text, workflowPath)) {
-      found.push({ callerFile: rel, oldSha: sha });
-    }
+    found.push(...pairCallerPins(text, await readFile(path.join(ROOT, rel), "utf8")));
   }
   return found;
 }
@@ -240,9 +251,9 @@ export async function rewriteCallerFiles(newSha, tag, root = ROOT) {
   return anyChanged;
 }
 
-function copyReusableContract(policy, workflowPath, oldSha, newSha) {
+function copyReusableContract(policy, workflowPath, newWorkflowPath, oldSha, newSha) {
   const oldKey = `${workflowPath}@${oldSha}`;
-  const newKey = `${workflowPath}@${newSha}`;
+  const newKey = `${newWorkflowPath}@${newSha}`;
   const contract = policy.approvedReusableWorkflowContracts?.[oldKey];
   if (!contract) {
     throw new Error(`policy.json has no contract entry for ${oldKey}`);
@@ -258,7 +269,15 @@ export function copyForwardContracts(policy, copyForwards) {
     switch (item.kind) {
       case "lane":
       case "reusable":
-        if (copyReusableContract(policy, item.workflowPath, item.oldSha, item.newSha)) {
+        if (
+          copyReusableContract(
+            policy,
+            item.workflowPath,
+            item.newWorkflowPath ?? item.workflowPath,
+            item.oldSha,
+            item.newSha,
+          )
+        ) {
           changed = true;
         }
         break;
@@ -306,38 +325,38 @@ async function main() {
   const reasons = [];
   const copyForwards = [];
 
+  const repoPathOf = (workflowPath) => workflowPath.replace(`${UPSTREAM}/`, "");
   for (const target of REPIN_TARGETS) {
-    const pins = readCallerPins(target.workflowPath, target.callerFiles);
-    const pinnedOldShas = [
-      ...new Set(pins.map((pin) => pin.oldSha).filter((sha) => sha !== newSha)),
-    ];
-    if (pinnedOldShas.length === 0) continue;
+    const pins = (await readCallerPins(target.callerFiles)).filter((pin) => pin.oldSha !== newSha);
+    const unique = new Map(
+      pins.map((pin) => [`${pin.oldWorkflowPath}@${pin.oldSha}>${pin.newWorkflowPath}`, pin]),
+    );
 
-    const repoPath = target.workflowPath.replace(`${UPSTREAM}/`, "");
-    let newSource = newSourceByRepoPath.get(repoPath);
-    if (newSource === undefined) {
-      newSource = fetchUpstreamFile(repoPath, newSha);
-      newSourceByRepoPath.set(repoPath, newSource);
-    }
-
-    for (const fromSha of pinnedOldShas) {
-      const oldSource = fetchUpstreamFile(repoPath, fromSha);
-      const surface = laneSecuritySurfacesMatch(oldSource, newSource, target.workflowPath, policy);
+    for (const { oldWorkflowPath, oldSha, newWorkflowPath } of unique.values()) {
+      const repoPath = repoPathOf(newWorkflowPath);
+      let newSource = newSourceByRepoPath.get(repoPath);
+      if (newSource === undefined) {
+        newSource = fetchUpstreamFile(repoPath, newSha);
+        newSourceByRepoPath.set(repoPath, newSource);
+      }
+      const oldSource = fetchUpstreamFile(repoPathOf(oldWorkflowPath), oldSha);
+      const surface = laneSecuritySurfacesMatch(oldSource, newSource, newWorkflowPath, policy);
       if (!surface.unchanged) {
-        reasons.push(`${target.workflowPath} ${surface.reason} (from ${fromSha.slice(0, 7)})`);
+        reasons.push(`${newWorkflowPath} ${surface.reason} (from ${oldSha.slice(0, 7)})`);
         continue;
       }
       copyForwards.push({
         kind: target.kind,
-        workflowPath: target.workflowPath,
-        oldSha: fromSha,
+        workflowPath: oldWorkflowPath,
+        newWorkflowPath,
+        oldSha,
         newSha,
       });
     }
   }
 
   if (reasons.length > 0) {
-    const unchangedPaths = [...new Set(copyForwards.map((item) => item.workflowPath))];
+    const unchangedPaths = [...new Set(copyForwards.map((item) => item.newWorkflowPath))];
     const note = manualPolicyNote(reasons.join("; "), tag, unchangedPaths);
     emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
     await appendOutput(outputFile, [

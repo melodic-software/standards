@@ -10,6 +10,7 @@ import {
   appliedPolicyNote,
   copyForwardContracts,
   manualPolicyNote,
+  pairCallerPins,
   rewriteCallerFiles,
 } from "./repin-policy-lockstep.mjs";
 
@@ -184,6 +185,67 @@ test("copy-forward clones one real claude-review contract onto a new SHA", async
   assert.deepEqual(policy.approvedReusableWorkflowContracts[oldKey], original);
   assert.doesNotThrow(() => validatePolicy(policy));
   assertNoSelectorKeys(policy);
+});
+
+// Renamed-path fixtures: the old -> new pair is the claude-review entry of
+// components/github-actions-conventions/rename-map.json.
+const RENAMED_REVIEW_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/pr-review.yml";
+const callerText = (workflowPath, sha, tag) =>
+  `jobs:\n  review:\n    uses: ${workflowPath}@${sha} # ${tag}\n    with:\n      runner: x\n`;
+
+test("pairCallerPins follows a pin that apply moved to its renamed path", () => {
+  const pairs = pairCallerPins(
+    callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"),
+    callerText(RENAMED_REVIEW_WORKFLOW, next, "v0.34.0"),
+  );
+  assert.deepEqual(pairs, [
+    { oldWorkflowPath: REVIEW_WORKFLOW, oldSha: oldA, newWorkflowPath: RENAMED_REVIEW_WORKFLOW },
+  ]);
+});
+
+test("pairCallerPins keeps the path for a release cut before the rename", () => {
+  const pairs = pairCallerPins(
+    callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"),
+    callerText(REVIEW_WORKFLOW, next, "v0.33.1"),
+  );
+  assert.deepEqual(pairs, [
+    { oldWorkflowPath: REVIEW_WORKFLOW, oldSha: oldA, newWorkflowPath: REVIEW_WORKFLOW },
+  ]);
+});
+
+test("pairCallerPins refuses a pin line that apply did not leave as a pin", () => {
+  assert.throws(
+    () => pairCallerPins(callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"), "jobs:\n  review:\n"),
+    /line 3/u,
+  );
+});
+
+test("copy-forward moves a real claude-review contract onto its renamed path", async () => {
+  const policy = JSON.parse(
+    await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
+  );
+  const original =
+    policy.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${CURRENT_REVIEW_SHA}`];
+  assert.ok(original, "on-disk policy is missing the current claude-review contract");
+
+  copyForwardContracts(policy, [
+    {
+      kind: "lane",
+      workflowPath: REVIEW_WORKFLOW,
+      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
+      oldSha: CURRENT_REVIEW_SHA,
+      newSha: FRESH_SHA,
+    },
+  ]);
+
+  assert.deepEqual(
+    policy.approvedReusableWorkflowContracts[`${RENAMED_REVIEW_WORKFLOW}@${FRESH_SHA}`],
+    original,
+  );
+  assert.equal(
+    policy.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${FRESH_SHA}`],
+    undefined,
+  );
 });
 
 test("a selector copy-forward throws and adds no selector key", async () => {
