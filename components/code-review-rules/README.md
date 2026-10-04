@@ -87,8 +87,8 @@ appears once, its section holds the intro line verbatim, and its `REVIEW.md`
 pointer links `REVIEW.md` when the repository has a root `REVIEW.md` and the
 canonical URL when it does not.
 
-- `code-review-rules.sh file` checks one checkout. The `code-review-rules` lane
-  in `ci.yml` runs it on this repository on every pull request, beside the
+- `code-review-rules.sh file` checks one checkout. The `check-repo-hygiene` job
+  in `pr-require-checks.yml` runs it on this repository on every pull request, beside the
   contract test [`code-review-rules.test.sh`](code-review-rules.test.sh).
 - `code-review-rules.sh fleet` checks repositories through the GitHub contents
   API. The scheduled
@@ -115,5 +115,5 @@ rollout lands each repository's section.
   distribution model has no partial-merge layer
   ([distribution contract](../../distribution/README.md)), so the section is
   copied once by a rollout pull request and held in place by the check.
-- **Rollback**: delete the workflow and the `code-review-rules` lane; the
+- **Rollback**: delete the workflow and the code-review-rules steps in `check-repo-hygiene`; the
   sections already landed stay valid `AGENTS.md` content.

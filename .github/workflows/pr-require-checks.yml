@@ -79,41 +79,13 @@ jobs:
   # explicit on each one rather than transitive: a dependent whose `needs` all
   # skipped is skipped by default, but a job with `if: always()` or
   # `!cancelled()` runs regardless, so only the explicit form is reliable.
-  markdownlint:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Lint markdown
-        uses: melodic-software/ci-workflows/.github/actions/markdownlint@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          config: .markdownlint-cli2.jsonc
-          globs: '**/*.md !components/**/fixtures/bad/**'
-
-  psscriptanalyzer:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Analyze PowerShell
-        uses: melodic-software/ci-workflows/.github/actions/psscriptanalyzer@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          settings: PSScriptAnalyzerSettings.psd1
-          exclude: components/psscriptanalyzer/fixtures/bad
-
-  shellcheck:
+  #
+  # One job per ecosystem or domain. Most checks here finish in seconds, so a
+  # job per check spent more time on runner start, checkout and setup than on
+  # the check, and held a runner slot for each. Every step after checkout runs
+  # `if: !cancelled()`, so one failing check does not hide the ones after it
+  # in the same job.
+  check-shell:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -125,12 +97,35 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint shell
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/shellcheck@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           rcfile: .shellcheckrc
           exclude: components/shellcheck/fixtures/bad
+      - name: Install ShellCheck 0.11.0
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          ver=0.11.0
+          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
+          curl -fsSL "$url" -o shellcheck.tar.gz
+          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
+          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
+          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
+          shellcheck --version
+      - name: ShellCheck contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
+      - name: Harness self-test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
+      - name: Local-lane-guards contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
 
-  lychee:
+  check-markdown-and-links:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -141,13 +136,71 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Before Set up Node: the markdownlint action installs its own Node, and
+      # the contract tests below run on the repository's .node-version.
+      - name: Lint markdown
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/markdownlint@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          config: .markdownlint-cli2.jsonc
+          globs: '**/*.md !components/**/fixtures/bad/**'
+      - name: Set up Node
+        if: ${{ !cancelled() }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install pinned dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci
+      - name: Markdownlint contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
+      - name: Markdownlint home contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-home.test.sh
+      - name: Markdownlint schema-pin contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
       - name: Check links (offline)
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/lychee-offline@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: lychee.toml
           exclude: 'components/[^/]+/fixtures/bad'
+      - name: Install lychee 0.24.2
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          ver=0.24.2
+          sha=1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
+          asset=lychee-x86_64-unknown-linux-gnu
+          url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${ver}/${asset}.tar.gz"
+          curl -fsSL "$url" -o lychee.tar.gz
+          echo "${sha}  lychee.tar.gz" | sha256sum -c -
+          tar -xzf lychee.tar.gz --strip-components=1 "${asset}/lychee"
+          sudo install lychee /usr/local/bin/lychee
+          rm -f lychee.tar.gz lychee
+          lychee --version
+      - name: Lychee contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
+      - name: Private-repo inventory contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/lychee/private-repo-inventory.test.sh
+      # The credential-free half of the inventory check: a public repository's
+      # token lists the org's public repositories, so an excluded repository
+      # that went public fails here, and the two alternations are held sorted
+      # and identical. The other direction (a new private repository missing
+      # from the list) needs the App installation's view and runs in the
+      # scheduled maintenance-audit-link-check-excludes workflow.
+      - name: Private-repo inventory agrees with public visibility
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash components/lychee/private-repo-inventory.sh check --config lychee.toml
 
-  editorconfig-checker:
+  check-repo-hygiene:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -159,51 +212,104 @@ jobs:
         with:
           persist-credentials: false
       - name: Self-lint repository (installs ec, excludes intentionally-bad fixtures)
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/editorconfig-checker@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: .editorconfig-checker.json
           exclude: 'components/[^/]+/fixtures/bad/'
       - name: EditorConfig checker contract test
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/editorconfig-checker/editorconfig-checker.test.sh
-
-  gitleaks:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Scan repository for secrets (installs gitleaks)
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/gitleaks@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: .gitleaks.toml
       - name: Gitleaks contract test
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/gitleaks/gitleaks.test.sh
-
-  typos:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Spell-check repository (installs typos, excludes intentionally-bad fixtures)
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/typos@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           config: _typos.toml
           exclude: 'components/*/fixtures/bad/'
       - name: Typos contract test
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/typos/typos.test.sh
+      - name: Verify shebang files are executable
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/check-exec-bit@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+      - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/check-machine-paths@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
+        with:
+          exclude: ':(exclude)components/path-detection/**'
+      - name: Path-detection contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
+      - name: Check index-level EOL drift
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/check-line-endings@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+      - name: Scan comment hygiene (excludes contract fixtures and policy source)
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/check-comment-markers@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
+        with:
+          exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
+      - name: Comment-hygiene contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
+      # The pull-request half of the Code Review Rules check: this repository's
+      # own AGENTS.md. Other repositories are checked by the scheduled
+      # maintenance-audit-code-review-rules workflow.
+      - name: Code Review Rules contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/code-review-rules/code-review-rules.test.sh
+      - name: This repository's AGENTS.md carries the section
+        if: ${{ !cancelled() }}
+        run: bash components/code-review-rules/code-review-rules.sh file
 
-  test-fixtures-markdown:
+  check-powershell:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Analyze PowerShell
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/psscriptanalyzer@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          settings: PSScriptAnalyzerSettings.psd1
+          exclude: components/psscriptanalyzer/fixtures/bad
+      - name: Ensure PSScriptAnalyzer 1.25.0
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $required = '1.25.0'
+          $have = Get-Module -ListAvailable PSScriptAnalyzer |
+              Where-Object { $_.Version -eq [version]$required }
+          if (-not $have) {
+              try {
+                  Install-Module PSScriptAnalyzer -RequiredVersion $required -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+              } catch {
+                  Install-PSResource PSScriptAnalyzer -Version $required -Scope CurrentUser -TrustRepository -Reinstall -ErrorAction Stop
+              }
+          }
+          Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
+          Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
+      - name: PSScriptAnalyzer contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
+
+  # Holds the PowerShell staged-adapter regression, the slowest step in this
+  # workflow (about 70 s); it stays out of check-powershell so neither job
+  # becomes the sum of both.
+  test-lefthook:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -215,22 +321,295 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node
+        if: ${{ !cancelled() }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
       - name: Install pinned dependencies
+        if: ${{ !cancelled() }}
         run: npm ci
-      - name: Markdownlint contract test
-        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint.test.sh
-      - name: Markdownlint home contract test
-        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-home.test.sh
-      - name: Markdownlint schema-pin contract test
-        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
+      - name: Put npm bin on PATH
+        if: ${{ !cancelled() }}
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install ShellCheck 0.11.0
+        # The component test drives the ShellCheck lane as its representative tool,
+        # so the engine must be on PATH (kept in lockstep with check-shell).
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          ver=0.11.0
+          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
+          curl -fsSL "$url" -o shellcheck.tar.gz
+          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
+          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
+          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
+          shellcheck --version
+      - name: Validate the merged hook config (root + all fragments)
+        if: ${{ !cancelled() }}
+        run: lefthook validate
+      - name: Lefthook base contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh
+      - name: Lefthook merge/rebase skip placement test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-merge-skip.test.sh
+      - name: Lefthook ShellCheck contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
+      - name: Test .NET staged adapter
+        if: ${{ !cancelled() }}
+        run: npm run test:lefthook-dotnet
+      - name: Ensure PSScriptAnalyzer 1.25.0
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $required = '1.25.0'
+          $have = Get-Module -ListAvailable PSScriptAnalyzer |
+              Where-Object { $_.Version -eq [version]$required }
+          if (-not $have) {
+              try {
+                  Install-Module PSScriptAnalyzer -RequiredVersion $required -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+              } catch {
+                  Install-PSResource PSScriptAnalyzer -Version $required -Scope CurrentUser -TrustRepository -Reinstall -ErrorAction Stop
+              }
+          }
+          Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
+          Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
+      - name: PSScriptAnalyzer staged-adapter regression
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
-  test-runner-policy:
+  check-python:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    name: Runner policy
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Inline install — component contract tests assert specific rule codes on
+      # bad fixtures, which needs the tools on PATH (the Ruff/Pyright actions
+      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
+      # and with medley.
+      RUFF_VERSION: 0.15.14
+      PYRIGHT_VERSION: 1.1.409
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The two actions run before the inline install so the contract tests
+      # find the inline-installed tools first on PATH.
+      - name: Lint and format-check Python
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/ruff@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          config: ruff.toml
+          exclude: components/ruff/fixtures/bad
+      - name: Type-check Python
+        # The shipped ruleset carries no project-scope `include`, so scope Pyright
+        # at the conforming fixture explicitly (the bad fixture is non-conforming
+        # by design).
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/pyright@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          config: components/pyright/pyrightconfig.json
+          paths: components/pyright/fixtures/good
+      - name: Set up uv
+        if: ${{ !cancelled() }}
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.14"
+      - name: Install ruff and pyright
+        if: ${{ !cancelled() }}
+        run: |
+          uv tool install --force "ruff==${RUFF_VERSION}"
+          uv tool install --force "pyright==${PYRIGHT_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify toolchain
+        # Also warms pyright's first-run Node download so the test step is fast.
+        if: ${{ !cancelled() }}
+        run: |
+          ruff --version
+          pyright --version
+      - name: Ruff contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/ruff/ruff.test.sh
+      - name: Pyright contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
+
+  check-typescript:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Inline install — component tests assert specific rule/error codes on
+      # the bad fixture, which needs the tools on PATH (the biome/tsc actions
+      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
+      # and with medley.
+      BIOME_VERSION: 2.5.1
+      TYPESCRIPT_VERSION: 6.0.3
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint and format-check JS/TS
+        # Scope at authored runtime surfaces and the conforming fixture. Bad
+        # fixtures are non-conforming by design; node_modules and locks are
+        # excluded by Biome's normal traversal rules.
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/biome@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          config: components/biome/biome.json
+          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
+      - name: Set up Node
+        if: ${{ !cancelled() }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      # Each supported TypeScript release in turn, installed on PATH so the
+      # packed tsconfig contract test drives that exact tsc.
+      - name: Test packed tsconfig contract on TypeScript 5.9.3
+        if: ${{ !cancelled() }}
+        run: npm install --global typescript@5.9.3 && test "$(tsc --version)" = "Version 5.9.3" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
+      - name: Test packed tsconfig contract on TypeScript 6.0.3
+        if: ${{ !cancelled() }}
+        run: npm install --global typescript@6.0.3 && test "$(tsc --version)" = "Version 6.0.3" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
+      - name: Test packed tsconfig contract on TypeScript 7.0.2
+        if: ${{ !cancelled() }}
+        run: npm install --global typescript@7.0.2 && test "$(tsc --version)" = "Version 7.0.2" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
+      - name: Install biome and tsc
+        if: ${{ !cancelled() }}
+        run: npm install -g "@biomejs/biome@${BIOME_VERSION}" "typescript@${TYPESCRIPT_VERSION}" # zizmor: ignore[adhoc-packages] exact-pinned tools installed on PATH so the biome/tsconfig contract tests can assert rule codes directly
+      - name: Verify toolchain
+        if: ${{ !cancelled() }}
+        run: |
+          biome --version
+          tsc --version
+      - name: Biome contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/biome/biome.test.sh
+      - name: TypeScript config contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
+
+  check-dotnet:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # The rootless fleet has no write access to setup-dotnet's Linux default.
+      # Keep hosted/local parity by selecting a per-job ephemeral directory.
+      DOTNET_INSTALL_DIR: ~/.dotnet
+      # Inline install — the fixtures suite asserts specific rule codes fire on
+      # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
+      # actions only pass/fail). Keep in lockstep with the action defaults in
+      # ci-workflows and with medley.
+      DOTNET_VERSION: 10.0.301
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The fixture tests run first, while DOTNET_VERSION is the only SDK in
+      # DOTNET_INSTALL_DIR. The build and format actions then install the SDK
+      # they pin, which is newer, so each step runs the SDK it ran alone.
+      - name: Set up .NET
+        if: ${{ !cancelled() }}
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Set up Node
+        if: ${{ !cancelled() }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - name: Verify toolchain
+        if: ${{ !cancelled() }}
+        run: |
+          dotnet --version
+          node --version
+      - name: .NET analysis contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
+      - name: .NET staged-adapter integration
+        if: ${{ !cancelled() }}
+        run: >-
+          node components/lefthook-dotnet/dotnet-format-staged.mjs
+          components/dotnet-analysis/fixtures/good/Calculator.cs
+        env:
+          DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
+      - name: Build .NET (analyzers + code-style as errors)
+        # The shipped base carries no project scope, so scope the build at the
+        # conforming fixture, which imports the base props (the bad fixture is
+        # non-conforming by design).
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          project: components/dotnet-analysis/fixtures/good/good.csproj
+      - name: Verify .NET whitespace
+        if: ${{ !cancelled() }}
+        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
+        with:
+          project: components/dotnet-analysis/fixtures/good/good.csproj
+
+  check-go:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GO_VERSION: 1.26.5
+      GOLANGCI_LINT_VERSION: 2.12.2
+      GOLANGCI_LINT_SHA256: 8df580d2670fed8fa984aac0507099af8df275e665215f5c7a2ae3943893a553
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Install golangci-lint from the official release
+        run: |
+          set -euo pipefail
+          archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
+          url="https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${archive}"
+          curl -q --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 120 \
+            --retry 2 --retry-max-time 300 \
+            --output "$archive" -- "$url"
+          echo "${GOLANGCI_LINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive"
+          install_dir="$RUNNER_TEMP/standards-bin"
+          mkdir -p "$install_dir"
+          install -m 0755 \
+            "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint" \
+            "$install_dir/golangci-lint"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          rm -rf "$archive" "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
+      - name: Verify exact toolchain
+        run: |
+          test "$(go env GOVERSION)" = "go${GO_VERSION}"
+          golangci-lint version | grep -F "version ${GOLANGCI_LINT_VERSION}"
+      - name: Go analysis contract test
+        run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
+
+  check-policies:
+    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -242,6 +621,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up Node
+        if: ${{ !cancelled() }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
@@ -249,140 +629,62 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             components/runner-policy/package-lock.json
-      - name: Install pinned dependencies
-        run: npm ci
-      - name: Install runner-policy dependencies
-        run: npm ci --prefix components/runner-policy
+            components/concurrency-policy/package-lock.json
+            components/dependabot-policy/package-lock.json
+            components/pr-convention-policy/package-lock.json
+      - name: Install policy dependencies
+        if: ${{ !cancelled() }}
+        run: |
+          npm ci
+          npm ci --prefix components/runner-policy
+          npm ci --prefix components/concurrency-policy
+          npm ci --prefix components/dependabot-policy
+          npm ci --prefix components/pr-convention-policy
       - name: Test package lifecycle
+        if: ${{ !cancelled() }}
         run: npm run test:packages
       - name: Enforce package lifecycle
+        if: ${{ !cancelled() }}
         env:
           PACKAGE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: node harness/packages/package-lifecycle.mjs
       - name: Test runner policy
+        if: ${{ !cancelled() }}
         run: npm run test:runner-policy
-      - name: Test .NET staged adapter
-        run: npm run test:lefthook-dotnet
       - name: Enforce runner policy on standards
+        if: ${{ !cancelled() }}
         run: npm run lint:runner-policy
         env:
           CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
-
-  test-concurrency-policy:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: components/concurrency-policy/package-lock.json
-      - name: Install concurrency-policy dependencies
-        run: npm ci --prefix components/concurrency-policy
       - name: Test concurrency policy
+        if: ${{ !cancelled() }}
         run: npm run test:concurrency-policy
       - name: Enforce concurrency policy on standards
+        if: ${{ !cancelled() }}
         run: npm run lint:concurrency-policy
-
-  github-actions-conventions:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: components/github-actions-conventions/package-lock.json
-      - name: Install github-actions-conventions dependencies
-        run: npm ci --prefix components/github-actions-conventions
-      - name: Test naming conventions
-        run: npm run test:github-actions-conventions
-      # Findings go to the step summary, not annotations: GitHub shows only
-      # ten annotations per step. The last line is the finding count.
-      - name: Report naming findings on standards (advisory)
-        run: |
-          {
-            echo '### naming-lint (advisory)'
-            echo '```text'
-            npm run --silent lint:github-actions-conventions -- --format text
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          tail -n 2 "$GITHUB_STEP_SUMMARY" | head -n 1
-
-  test-dependabot-policy:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: components/dependabot-policy/package-lock.json
-      - name: Install dependabot-policy dependencies
-        run: npm ci --prefix components/dependabot-policy
       - name: Test dependabot policy
+        if: ${{ !cancelled() }}
         run: npm run test:dependabot-policy
       - name: Enforce dependabot policy on standards
+        if: ${{ !cancelled() }}
         run: npm run lint:dependabot-policy
       # Reads the public ci-workflows reusable at an immutable pinned SHA, so
-      # the only non-hermetic input is the fetch itself; a separate job would
-      # add a needs edge for no isolation gain. Blocking from admission: see
-      # components/dependabot-policy/README.md "Merge lanes".
+      # the only non-hermetic input is the fetch itself. Blocking from
+      # admission: see components/dependabot-policy/README.md "Merge lanes".
       - name: Enforce the auto-merge allowlist lockstep with ci-workflows
+        if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run lint:dependabot-automerge-lockstep
-
-  test-pr-convention-policy:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: components/pr-convention-policy/package-lock.json
-      - name: Install pr-convention-policy dependencies
-        run: npm ci --prefix components/pr-convention-policy
       - name: Test pr-convention policy
+        if: ${{ !cancelled() }}
         run: npm run test:pr-convention-policy
       - name: Enforce pr-convention policy sample
+        if: ${{ !cancelled() }}
         run: npm run lint:pr-convention-policy
 
   # Lockstep drift check (ADR-0008). Separate job, not a step in
-  # pr-convention-policy: the live enforcement run fetches the gate reusable,
+  # check-policies: the live enforcement run fetches the gate reusable,
   # the plugin hook validator, the org PR template, and every caller's pin
   # over the network, and that non-hermetic dependency must not contaminate
   # the hermetic component lane. The fixture tests run first so a parser
@@ -437,233 +739,7 @@ jobs:
           LOCKSTEP_GITHUB_TOKEN: ${{ steps.lockstep-token.outputs.token }}
         run: npm run lint:pr-convention-lockstep
 
-  test-fixtures-powershell:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Ensure PSScriptAnalyzer 1.25.0
-        shell: pwsh
-        run: |
-          $required = '1.25.0'
-          $have = Get-Module -ListAvailable PSScriptAnalyzer |
-              Where-Object { $_.Version -eq [version]$required }
-          if (-not $have) {
-              try {
-                  Install-Module PSScriptAnalyzer -RequiredVersion $required -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
-              } catch {
-                  Install-PSResource PSScriptAnalyzer -Version $required -Scope CurrentUser -TrustRepository -Reinstall -ErrorAction Stop
-              }
-          }
-          Import-Module PSScriptAnalyzer -RequiredVersion $required -ErrorAction Stop
-          Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version) on pwsh $($PSVersionTable.PSVersion)"
-      - name: PSScriptAnalyzer contract test
-        run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
-      - name: PSScriptAnalyzer staged-adapter regression
-        shell: pwsh
-        run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
-
-  test-fixtures-shellcheck:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install ShellCheck 0.11.0
-        run: |
-          set -euo pipefail
-          ver=0.11.0
-          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
-          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
-          curl -fsSL "$url" -o shellcheck.tar.gz
-          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
-          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
-          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
-          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
-          shellcheck --version
-      - name: ShellCheck contract test
-        run: bash harness/shell/run-tests.sh components/shellcheck/shellcheck.test.sh
-
-  test-fixtures-lychee:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install lychee 0.24.2
-        run: |
-          set -euo pipefail
-          ver=0.24.2
-          sha=1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
-          asset=lychee-x86_64-unknown-linux-gnu
-          url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${ver}/${asset}.tar.gz"
-          curl -fsSL "$url" -o lychee.tar.gz
-          echo "${sha}  lychee.tar.gz" | sha256sum -c -
-          tar -xzf lychee.tar.gz --strip-components=1 "${asset}/lychee"
-          sudo install lychee /usr/local/bin/lychee
-          rm -f lychee.tar.gz lychee
-          lychee --version
-      - name: Lychee contract test
-        run: bash harness/shell/run-tests.sh components/lychee/lychee.test.sh
-      - name: Private-repo inventory contract test
-        run: bash harness/shell/run-tests.sh components/lychee/private-repo-inventory.test.sh
-      # The credential-free half of the inventory check: a public repository's
-      # token lists the org's public repositories, so an excluded repository
-      # that went public fails here, and the two alternations are held sorted
-      # and identical. The other direction (a new private repository missing
-      # from the list) needs the App installation's view and runs in the
-      # scheduled maintenance-audit-link-check-excludes workflow.
-      - name: Private-repo inventory agrees with public visibility
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash components/lychee/private-repo-inventory.sh check --config lychee.toml
-
-  ruff:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Lint and format-check Python
-        uses: melodic-software/ci-workflows/.github/actions/ruff@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          config: ruff.toml
-          exclude: components/ruff/fixtures/bad
-
-  pyright:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Type-check Python
-        # The shipped ruleset carries no project-scope `include`, so scope Pyright
-        # at the conforming fixture explicitly (the bad fixture is non-conforming
-        # by design).
-        uses: melodic-software/ci-workflows/.github/actions/pyright@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          config: components/pyright/pyrightconfig.json
-          paths: components/pyright/fixtures/good
-
-  biome:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Lint and format-check JS/TS
-        # Scope at authored runtime surfaces and the conforming fixture. Bad
-        # fixtures are non-conforming by design; node_modules and locks are
-        # excluded by Biome's normal traversal rules.
-        uses: melodic-software/ci-workflows/.github/actions/biome@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          config: components/biome/biome.json
-          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
-
-  test-tsconfig:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    name: TypeScript ${{ matrix.typescript }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        typescript: [5.9.3, 6.0.3, 7.0.2]
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-      - name: Install exact TypeScript release
-        env:
-          TYPESCRIPT_VERSION: ${{ matrix.typescript }}
-        run: npm install --global "typescript@$TYPESCRIPT_VERSION" # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
-      - name: Verify exact TypeScript release
-        env:
-          TYPESCRIPT_VERSION: ${{ matrix.typescript }}
-        run: test "$(tsc --version)" = "Version $TYPESCRIPT_VERSION"
-      - name: Test packed tsconfig contract
-        run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
-
-  dotnet-build:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      # The rootless fleet has no write access to setup-dotnet's Linux default.
-      # Keep hosted/local parity by selecting a per-job ephemeral directory.
-      DOTNET_INSTALL_DIR: ~/.dotnet
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Build .NET (analyzers + code-style as errors)
-        # The shipped base carries no project scope, so scope the build at the
-        # conforming fixture, which imports the base props (the bad fixture is
-        # non-conforming by design).
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-build@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          project: components/dotnet-analysis/fixtures/good/good.csproj
-
-  dotnet-format:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      DOTNET_INSTALL_DIR: ~/.dotnet
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Verify .NET whitespace
-        uses: melodic-software/ci-workflows/.github/actions/dotnet-format@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-        with:
-          project: components/dotnet-analysis/fixtures/good/good.csproj
-
-  actionlint:
+  check-github-actions:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -675,13 +751,16 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
+        if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/actionlint@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
       - name: Test actionlint component
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
-      # The lane caller test materializes each target through the distribution
-      # engine before linting, so this job needs the engine's yq the same way
-      # the distribution and pin-comment-convention jobs do.
+      # The lane caller tests materialize each target through the distribution
+      # engine before linting, and the pin-comment scan reads YAML, so this job
+      # needs the engine's yq the same way test-distribution does.
       - name: Install yq 4.53.3
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           version=4.53.3
@@ -696,38 +775,75 @@ jobs:
       # the engine this job runs through claude-lanes.test.sh needs Node and
       # the distribution dependencies. Inert while the Bash engine is live.
       - name: Set up Node
+        if: ${{ !cancelled() }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
-          cache-dependency-path: distribution/package-lock.json
-      - name: Install distribution dependencies
-        run: npm ci --prefix distribution
+          cache-dependency-path: |
+            distribution/package-lock.json
+            components/runner-policy/package-lock.json
+            components/github-actions-conventions/package-lock.json
+      # The lockstep suite imports repin-policy-lockstep.mjs, which imports
+      # runner-policy.mjs and therefore needs that component's ajv install.
+      - name: Install distribution, runner-policy and naming-lint dependencies
+        if: ${{ !cancelled() }}
+        run: |
+          npm ci --prefix distribution
+          npm ci --prefix components/runner-policy
+          npm ci --prefix components/github-actions-conventions
       # The lint above covers .github/workflows only, so the lane caller
       # components — workflow bytes that live outside it until a sync
       # materializes them — need the consumer entrypoint run over them here,
       # in the one job that has the pinned engine installed.
       - name: Test claude lane caller components
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
       # Same shape, same reason: the managed-files-guard caller is workflow
       # bytes that live outside .github/workflows until a sync materializes
       # them, so the consumer entrypoint runs over them here too.
       - name: Test the managed-files-guard caller component
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/managed-files-guard/managed-files-guard.test.sh
-      # Behavioral coverage for the scheduled re-pin job's logic. It needs no
-      # yq and no actionlint — it lives in this job because this is where the
-      # rest of the claude-lanes coverage already runs, keeping one lane
-      # responsible for that component rather than adding a lane to ci-status
-      # for one script.
       - name: Test the lane caller re-pin script
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
-      # The lockstep suite imports repin-policy-lockstep.mjs, which imports
-      # runner-policy.mjs and therefore needs that component's ajv install —
-      # the same dependency root the runner-policy job installs.
-      - name: Install runner-policy dependencies
-        run: npm ci --prefix components/runner-policy
       - name: Test lockstep argv accepts a mixed old-sha set
+        if: ${{ !cancelled() }}
         run: node --test components/claude-lanes/repin-policy-lockstep.test.mjs
+      - name: Check ci-workflows pin-comment convention (this repo's own workflow files)
+        # GitHub accepts both .yml and .yaml for workflow files (this repo's own
+        # index has only .yml today, but a future .yaml workflow must not silently
+        # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
+        # already tolerates a glob with no current matches).
+        #
+        # components/claude-lanes/, components/claude-lanes-hosted/ and
+        # components/managed-files-guard/ hold workflow BYTES that ship to
+        # consumers' .github/workflows/. Every workflow-shaped lane in this
+        # repo discovers files by that location,
+        # so the caller components are invisible to all of them; scanning them
+        # here keeps their pins under the same convention the files they
+        # become are held to.
+        if: ${{ !cancelled() }}
+        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml components/claude-lanes-hosted/*.yml components/managed-files-guard/*.yml
+      - name: Pin-comment-convention contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
+      - name: Test naming conventions
+        if: ${{ !cancelled() }}
+        run: npm run test:github-actions-conventions
+      # Findings go to the step summary, not annotations: GitHub shows only
+      # ten annotations per step. The last line is the finding count.
+      - name: Report naming findings on standards (advisory)
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo '### naming-lint (advisory)'
+            echo '```text'
+            npm run --silent lint:github-actions-conventions -- --format text
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          tail -n 2 "$GITHUB_STEP_SUMMARY" | head -n 1
 
   pr-audit-workflows:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -767,194 +883,6 @@ jobs:
     with:
       runner: ubuntu-24.04
 
-  test-fixtures-go:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      GO_VERSION: 1.26.5
-      GOLANGCI_LINT_VERSION: 2.12.2
-      GOLANGCI_LINT_SHA256: 8df580d2670fed8fa984aac0507099af8df275e665215f5c7a2ae3943893a553
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
-      - name: Install golangci-lint from the official release
-        run: |
-          set -euo pipefail
-          archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
-          url="https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${archive}"
-          curl -q --fail --silent --show-error --location \
-            --proto '=https' --proto-redir '=https' \
-            --connect-timeout 10 --max-time 120 \
-            --retry 2 --retry-max-time 300 \
-            --output "$archive" -- "$url"
-          echo "${GOLANGCI_LINT_SHA256}  ${archive}" | sha256sum -c -
-          tar -xzf "$archive"
-          install_dir="$RUNNER_TEMP/standards-bin"
-          mkdir -p "$install_dir"
-          install -m 0755 \
-            "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint" \
-            "$install_dir/golangci-lint"
-          echo "$install_dir" >> "$GITHUB_PATH"
-          rm -rf "$archive" "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
-      - name: Verify exact toolchain
-        run: |
-          test "$(go env GOVERSION)" = "go${GO_VERSION}"
-          golangci-lint version | grep -F "version ${GOLANGCI_LINT_VERSION}"
-      - name: Go analysis contract test
-        run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
-
-  test-fixtures-python:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      # Inline install — component contract tests assert specific rule codes on
-      # bad fixtures, which needs the tools on PATH (the Ruff/Pyright actions
-      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
-      # and with medley.
-      RUFF_VERSION: 0.15.14
-      PYRIGHT_VERSION: 1.1.409
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          python-version: "3.14"
-      - name: Install ruff and pyright
-        run: |
-          uv tool install "ruff==${RUFF_VERSION}"
-          uv tool install "pyright==${PYRIGHT_VERSION}"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Verify toolchain
-        # Also warms pyright's first-run Node download so the test step is fast.
-        run: |
-          ruff --version
-          pyright --version
-      - name: Ruff contract test
-        run: bash harness/shell/run-tests.sh components/ruff/ruff.test.sh
-      - name: Pyright contract test
-        run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
-
-  test-fixtures-typescript:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      # Inline install — component tests assert specific rule/error codes on
-      # the bad fixture, which needs the tools on PATH (the biome/tsc actions
-      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
-      # and with medley.
-      BIOME_VERSION: 2.5.1
-      TYPESCRIPT_VERSION: 6.0.3
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-      - name: Install biome and tsc
-        run: npm install -g "@biomejs/biome@${BIOME_VERSION}" "typescript@${TYPESCRIPT_VERSION}" # zizmor: ignore[adhoc-packages] exact-pinned tools installed on PATH so the biome/tsconfig contract tests can assert rule codes directly
-      - name: Verify toolchain
-        run: |
-          biome --version
-          tsc --version
-      - name: Biome contract test
-        run: bash harness/shell/run-tests.sh components/biome/biome.test.sh
-      - name: TypeScript config contract test
-        run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
-
-  test-fixtures-dotnet:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      # Inline install — the fixtures suite asserts specific rule codes fire on
-      # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
-      # actions only pass/fail). Keep in lockstep with the action defaults in
-      # ci-workflows and with medley.
-      DOTNET_INSTALL_DIR: ~/.dotnet
-      DOTNET_VERSION: 10.0.301
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-      - name: Verify toolchain
-        run: |
-          dotnet --version
-          node --version
-      - name: .NET analysis contract test
-        run: bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh
-      - name: .NET staged-adapter integration
-        run: >-
-          node components/lefthook-dotnet/dotnet-format-staged.mjs
-          components/dotnet-analysis/fixtures/good/Calculator.cs
-        env:
-          DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
-
-  test-harness:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Harness self-test
-        run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
-
-  # The pull-request half of the Code Review Rules check: this repository's own
-  # AGENTS.md. Other repositories are checked by the scheduled
-  # maintenance-audit-code-review-rules workflow.
-  check-code-review-rules:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Code Review Rules contract test
-        run: bash harness/shell/run-tests.sh components/code-review-rules/code-review-rules.test.sh
-      - name: This repository's AGENTS.md carries the section
-        run: bash components/code-review-rules/code-review-rules.sh file
-
   test-cloud-environment:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
@@ -967,29 +895,20 @@ jobs:
         with:
           persist-credentials: false
       - name: Cloud contract tests (environment + bootstrap)
+        if: ${{ !cancelled() }}
         run: >-
           bash harness/shell/run-tests.sh
           components/cloud-environment/setup.test.sh
           components/cloud-environment/vault-exec.test.sh
           components/cloud-bootstrap/cloud-bootstrap.test.sh
           .cursor/install.test.sh
-
-  test-mcp-launcher:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Set up Node
+        if: ${{ !cancelled() }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-      - name: Launcher --vault tests
+      - name: MCP launcher --vault tests
+        if: ${{ !cancelled() }}
         run: node --test components/mcp-launcher/launcher.test.mjs
 
   test-distribution:
@@ -1023,175 +942,20 @@ jobs:
           rm yq
           yq --version
       - name: Test distribution engine
+        if: ${{ !cancelled() }}
         run: bash distribution/sync-manifest.test.sh
       - name: Claude-permissions tombstone contract test
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/claude-permissions/claude-permissions.test.sh
       - name: Trusted-actors list contract test
+        if: ${{ !cancelled() }}
         run: node --test components/trusted-actors/trusted-actors.test.mjs
       - name: Claude-settings target conformance test
+        if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh distribution/check-claude-settings-targets.test.sh
       - name: Validate production manifest
+        if: ${{ !cancelled() }}
         run: bash distribution/sync-manifest.sh validate
-
-  check-exec-bit:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Verify shebang files are executable
-        uses: melodic-software/ci-workflows/.github/actions/check-exec-bit@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-
-  check-machine-paths:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
-        uses: melodic-software/ci-workflows/.github/actions/check-machine-paths@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
-        with:
-          exclude: ':(exclude)components/path-detection/**'
-      - name: Path-detection contract test
-        run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
-
-  check-line-endings:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Check index-level EOL drift
-        uses: melodic-software/ci-workflows/.github/actions/check-line-endings@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
-
-  check-comment-markers:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Scan comment hygiene (excludes contract fixtures and policy source)
-        uses: melodic-software/ci-workflows/.github/actions/check-comment-markers@69e506b7c119517ef1dfc421479232b386b93a52 # v0.35.0
-        with:
-          exclude: ':(exclude)components/*/fixtures/bad/** :(exclude)components/comment-hygiene/**'
-      - name: Comment-hygiene contract test
-        run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
-
-  test-local-lane-wrappers:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Local-lane-guards contract test
-        run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
-
-  check-pin-comment-convention:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install yq 4.53.3
-        run: |
-          set -euo pipefail
-          version=4.53.3
-          sha=fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
-          url="https://github.com/mikefarah/yq/releases/download/v${version}/yq_linux_amd64"
-          curl -fsSL "$url" -o yq
-          echo "${sha}  yq" | sha256sum -c -
-          sudo install yq /usr/local/bin/yq
-          rm yq
-          yq --version
-      - name: Check ci-workflows pin-comment convention (this repo's own workflow files)
-        # GitHub accepts both .yml and .yaml for workflow files (this repo's own
-        # index has only .yml today, but a future .yaml workflow must not silently
-        # escape the scan — the driver's `[[ -f "$file" ]] || continue` guard
-        # already tolerates a glob with no current matches).
-        #
-        # components/claude-lanes/, components/claude-lanes-hosted/ and
-        # components/managed-files-guard/ hold workflow BYTES that ship to
-        # consumers' .github/workflows/. Every workflow-shaped lane in this
-        # repo discovers files by that location,
-        # so the caller components are invisible to all of them; scanning them
-        # here keeps their pins under the same convention the files they
-        # become are held to.
-        run: bash components/pin-comment-convention/scan-workflow-files.sh .github/workflows/*.yml .github/workflows/*.yaml components/claude-lanes/*.yml components/claude-lanes-hosted/*.yml components/managed-files-guard/*.yml
-      - name: Pin-comment-convention contract test
-        run: bash harness/shell/run-tests.sh components/pin-comment-convention/pin-comment-convention.test.sh
-
-  test-lefthook:
-    if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-      - name: Install pinned dependencies
-        run: npm ci
-      - name: Put npm bin on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Install ShellCheck 0.11.0
-        # The component test drives the ShellCheck lane as its representative tool,
-        # so the engine must be on PATH (kept in lockstep with shellcheck-fixtures).
-        run: |
-          set -euo pipefail
-          ver=0.11.0
-          sha=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
-          url="https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.gz"
-          curl -fsSL "$url" -o shellcheck.tar.gz
-          echo "${sha}  shellcheck.tar.gz" | sha256sum -c -
-          tar -xzf shellcheck.tar.gz "shellcheck-v${ver}/shellcheck"
-          sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
-          rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
-          shellcheck --version
-      - name: Validate the merged hook config (root + all fragments)
-        run: lefthook validate
-      - name: Lefthook base contract test
-        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh
-      - name: Lefthook merge/rebase skip placement test
-        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-merge-skip.test.sh
-      - name: Lefthook ShellCheck contract test
-        run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
 
   ci-status:
     if: ${{ !cancelled() }}
@@ -1207,48 +971,22 @@ jobs:
       pull-requests: write
       statuses: write
     needs:
-      - markdownlint
-      - psscriptanalyzer
-      - shellcheck
-      - lychee
-      - editorconfig-checker
-      - gitleaks
-      - typos
-      - test-fixtures-markdown
-      - test-runner-policy
-      - test-concurrency-policy
-      - github-actions-conventions
-      - test-dependabot-policy
-      - test-pr-convention-policy
-      - verify-pr-convention-lockstep
-      - test-fixtures-powershell
-      - test-fixtures-shellcheck
-      - test-fixtures-lychee
-      - ruff
-      - pyright
-      - test-fixtures-python
-      - test-fixtures-go
-      - biome
-      - test-tsconfig
-      - test-fixtures-typescript
-      - dotnet-build
-      - dotnet-format
-      - test-fixtures-dotnet
-      - test-harness
-      - check-code-review-rules
-      - test-cloud-environment
-      - test-mcp-launcher
-      - test-distribution
+      - check-shell
+      - check-markdown-and-links
+      - check-repo-hygiene
+      - check-powershell
       - test-lefthook
-      - check-exec-bit
-      - check-machine-paths
-      - check-line-endings
-      - check-comment-markers
-      - test-local-lane-wrappers
-      - check-pin-comment-convention
-      - actionlint
+      - check-python
+      - check-typescript
+      - check-dotnet
+      - check-go
+      - check-policies
+      - verify-pr-convention-lockstep
+      - check-github-actions
       - pr-audit-workflows
       - pr-scan-dependencies
+      - test-cloud-environment
+      - test-distribution
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -1278,45 +1016,19 @@ jobs:
           # (last 20 pull-request runs, 79-127 s), so 840 s is generous.
           carry-forward-wait-seconds: '840'
           results: >-
-            ${{ needs.markdownlint.result }}
-            ${{ needs.psscriptanalyzer.result }}
-            ${{ needs.shellcheck.result }}
-            ${{ needs.lychee.result }}
-            ${{ needs.editorconfig-checker.result }}
-            ${{ needs.gitleaks.result }}
-            ${{ needs.typos.result }}
-            ${{ needs.test-fixtures-markdown.result }}
-            ${{ needs.test-runner-policy.result }}
-            ${{ needs.test-concurrency-policy.result }}
-            ${{ needs.github-actions-conventions.result }}
-            ${{ needs.test-dependabot-policy.result }}
-            ${{ needs.test-pr-convention-policy.result }}
-            ${{ needs.verify-pr-convention-lockstep.result }}
-            ${{ needs.test-fixtures-powershell.result }}
-            ${{ needs.test-fixtures-shellcheck.result }}
-            ${{ needs.test-fixtures-lychee.result }}
-            ${{ needs.ruff.result }}
-            ${{ needs.pyright.result }}
-            ${{ needs.test-fixtures-python.result }}
-            ${{ needs.test-fixtures-go.result }}
-            ${{ needs.biome.result }}
-            ${{ needs.test-tsconfig.result }}
-            ${{ needs.test-fixtures-typescript.result }}
-            ${{ needs.dotnet-build.result }}
-            ${{ needs.dotnet-format.result }}
-            ${{ needs.test-fixtures-dotnet.result }}
-            ${{ needs.test-harness.result }}
-            ${{ needs.check-code-review-rules.result }}
-            ${{ needs.test-cloud-environment.result }}
-            ${{ needs.test-mcp-launcher.result }}
-            ${{ needs.test-distribution.result }}
+            ${{ needs.check-shell.result }}
+            ${{ needs.check-markdown-and-links.result }}
+            ${{ needs.check-repo-hygiene.result }}
+            ${{ needs.check-powershell.result }}
             ${{ needs.test-lefthook.result }}
-            ${{ needs.check-exec-bit.result }}
-            ${{ needs.check-machine-paths.result }}
-            ${{ needs.check-line-endings.result }}
-            ${{ needs.check-comment-markers.result }}
-            ${{ needs.test-local-lane-wrappers.result }}
-            ${{ needs.check-pin-comment-convention.result }}
-            ${{ needs.actionlint.result }}
+            ${{ needs.check-python.result }}
+            ${{ needs.check-typescript.result }}
+            ${{ needs.check-dotnet.result }}
+            ${{ needs.check-go.result }}
+            ${{ needs.check-policies.result }}
+            ${{ needs.verify-pr-convention-lockstep.result }}
+            ${{ needs.check-github-actions.result }}
             ${{ needs.pr-audit-workflows.result }}
             ${{ needs.pr-scan-dependencies.result }}
+            ${{ needs.test-cloud-environment.result }}
+            ${{ needs.test-distribution.result }}

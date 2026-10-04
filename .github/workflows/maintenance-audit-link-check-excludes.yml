@@ -3,7 +3,7 @@ name: maintenance-audit-link-check-excludes
 # Keeps lychee.toml's private-repo exclude inventory honest against actual
 # repository visibility, the drift that hit twice by hand-maintenance
 # (standards#212, #483). The pull-request half of this check lives in pr-require-checks.yml's
-# `test-fixtures-lychee` lane and needs no credential: a public repository's token
+# `check-markdown-and-links` job and needs no credential: a public repository's token
 # can list the org's public repositories, which catches an excluded repository
 # that went public. This scheduled half adds the direction a public token
 # cannot see — a NEW private repository that nobody added to the list — by

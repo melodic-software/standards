@@ -105,7 +105,7 @@ CI installs pinned engines and runs the complete suite.
 
 ### CI posture
 
-This repository is public, so every `ci.yml` lane runs on GitHub-hosted
+This repository is public, so every `pr-require-checks.yml` job runs on GitHub-hosted
 `ubuntu-24.04` under a literal label, with no runner selector. `ci-status` is
 the one required status-check context; the org `ci-gate` ruleset requires
 nothing else, and lanes are added or removed behind it without touching the
@@ -116,5 +116,5 @@ ADRs 0008 and 0014. Read them there rather than a copy here.
 Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
 schedule or otherwise; `maintenance-audit-link-check-excludes.yml` and
 `maintenance-audit-code-review-rules.yml` fail the run on drift.
-No lane checks external URLs: the blocking `lychee` lane is offline-only, over
+No CI check reads external URLs: the blocking lychee check is offline-only, over
 local files and fragments.
