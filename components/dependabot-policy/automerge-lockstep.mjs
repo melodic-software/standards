@@ -97,8 +97,9 @@ async function fetchText(url) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const readJson = async (...segments) =>
     JSON.parse(await readFile(path.join(import.meta.dirname, ...segments), "utf8"));
+  let sha;
   try {
-    const sha = resolveApprovedSha(await readJson("..", "runner-policy", "policy.json"));
+    sha = resolveApprovedSha(await readJson("..", "runner-policy", "policy.json"));
     const workflowText = await fetchText(
       `https://api.github.com/repos/melodic-software/ci-workflows/contents/${REUSABLE_PATH}?ref=${sha}`,
     );
@@ -109,7 +110,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     );
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
-    console.error(error.message);
+    console.error(sha ? `${error.message} (checked at ${sha})` : error.message);
     process.exit(1);
   }
 }
