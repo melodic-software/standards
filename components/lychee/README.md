@@ -21,7 +21,7 @@ repository visibility (`generate --write`, using the maintainer's `gh`
 credential) and `check` fails when the two disagree, in the `lychee-fixtures`
 CI lane for the direction a public token can see (an excluded repository that
 went public; the alternations sorted and identical) and in the scheduled
-`lychee-private-inventory` workflow for the direction it cannot (a new private
+`maintenance-audit-link-check-excludes` workflow for the direction it cannot (a new private
 sync target missing from the list, read from the standards-sync App
 installation). Private repositories outside the sync roster are the residual
 the check reports as unverified. A new private repository therefore fails

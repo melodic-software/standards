@@ -1,9 +1,9 @@
-name: lychee-private-inventory
+name: maintenance-audit-link-check-excludes
 
 # Keeps lychee.toml's private-repo exclude inventory honest against actual
 # repository visibility, the drift that hit twice by hand-maintenance
-# (standards#212, #483). The pull-request half of this check lives in ci.yml's
-# `lychee-fixtures` lane and needs no credential: a public repository's token
+# (standards#212, #483). The pull-request half of this check lives in pr-require-checks.yml's
+# `test-fixtures-lychee` lane and needs no credential: a public repository's token
 # can list the org's public repositories, which catches an excluded repository
 # that went public. This scheduled half adds the direction a public token
 # cannot see — a NEW private repository that nobody added to the list — by
@@ -18,8 +18,8 @@ name: lychee-private-inventory
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of sync.yml's `17 6 * * 1` and
-    # claude-lanes-repin's `41 14 * * *`.
+    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1` and
+    # maintenance-repin-ci-workflows's `41 14 * * *`.
     - cron: "23 15 * * *"
 
 permissions:
@@ -30,13 +30,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inventory:
+  audit:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # A boolean, never the credential (same shape as claude-lanes-repin).
+      # A boolean, never the credential (same shape as maintenance-repin-ci-workflows).
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}

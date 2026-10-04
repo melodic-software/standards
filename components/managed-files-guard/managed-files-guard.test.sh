@@ -60,7 +60,7 @@ managed_union="$(
 )"
 
 sibling_checkout="$(yq -r '.jobs.repin.steps[] | select(.uses | test("^actions/checkout@")) | .uses' \
-  .github/workflows/claude-lanes-repin.yml)"
+  .github/workflows/maintenance-repin-ci-workflows.yml)"
 
 # ------------------------------------------------------------------ 1. shape
 

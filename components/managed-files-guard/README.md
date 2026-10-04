@@ -166,8 +166,8 @@ the guard executes); do not pin it in this hop.
 
 ## Pin-advance path
 
-The action pin rides the existing `claude-lanes-repin` cascade
-(`.github/workflows/claude-lanes-repin.yml`, daily), which resolves the
+The action pin rides the existing `maintenance-repin-ci-workflows` cascade
+(`.github/workflows/maintenance-repin-ci-workflows.yml`, daily), which resolves the
 newest full-SemVer ci-workflows release and rewrites every enumerated caller
 to its SHA with a `# vX.Y.Z` comment. Both files are enumerated in
 `components/claude-lanes/repin-callers.sh`'s `EXTRA_CALLER_FILES`, and the

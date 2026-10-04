@@ -416,7 +416,7 @@ github-iac and its `ci.yml` runs on the fleet label, though it has no
 already runs the guard from its own tree. The check is advisory (not in any
 `ci-status`) during its soak, and the caller passes `standards-ref: main`
 until the soak completes. Rationale, pins, the advance path through the
-`claude-lanes-repin` cascade, and the promotion record live in
+`maintenance-repin-ci-workflows` cascade, and the promotion record live in
 [`components/managed-files-guard/README.md`](../components/managed-files-guard/README.md).
 
 ## Review-instructions reconciliation (medley)

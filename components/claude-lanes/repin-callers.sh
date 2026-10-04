@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Re-pin the Claude lane caller components to a melodic-software/ci-workflows
-# release. Extracted from .github/workflows/claude-lanes-repin.yml so the
+# release. Extracted from .github/workflows/maintenance-repin-ci-workflows.yml so the
 # branching, the API-failure handling, and the file transformation are
 # executable outside GitHub Actions and covered by repin-callers.test.sh.
 #
@@ -32,9 +32,9 @@ readonly LANE_DIR='components/claude-lanes'
 # runner-policy contract for the lockstep half to copy forward
 # (components/managed-files-guard/README.md).
 readonly -a EXTRA_CALLER_FILES=(
-  '.github/workflows/claude-review.yml'
-  '.github/workflows/claude-security-review.yml'
-  '.github/workflows/sync.yml'
+  '.github/workflows/pr-review.yml'
+  '.github/workflows/pr-review-security.yml'
+  '.github/workflows/maintenance-sync-standards.yml'
   'components/claude-lanes-hosted/claude-review.yml'
   'components/claude-lanes-hosted/claude-security-review.yml'
   'components/managed-files-guard/managed-files-guard.yml'

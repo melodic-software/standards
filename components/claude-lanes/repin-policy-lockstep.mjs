@@ -7,7 +7,7 @@
  * emit the human checklist. schemaVersion 4 has no selector key; this
  * script does not read or write one.
  *
- * Invoked from .github/workflows/claude-lanes-repin.yml after repin-callers.sh
+ * Invoked from .github/workflows/maintenance-repin-ci-workflows.yml after repin-callers.sh
  * apply. Reports through GITHUB_OUTPUT (lockstep, policy-note).
  */
 import { execFileSync } from "node:child_process";
@@ -44,10 +44,7 @@ const POLICY_PATH = path.join(ROOT, POLICY_REL);
  */
 const REPIN_TARGETS = [
   {
-    callerFiles: [
-      "components/claude-lanes/claude-review.yml",
-      ".github/workflows/claude-review.yml",
-    ],
+    callerFiles: ["components/claude-lanes/claude-review.yml", ".github/workflows/pr-review.yml"],
     kind: "lane",
   },
   {
@@ -55,7 +52,7 @@ const REPIN_TARGETS = [
     kind: "lane",
   },
   {
-    callerFiles: [".github/workflows/sync.yml"],
+    callerFiles: [".github/workflows/maintenance-sync-standards.yml"],
     kind: "reusable",
   },
 ];

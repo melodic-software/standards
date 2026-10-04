@@ -179,9 +179,9 @@ install_engine shellcheck 0.11.0 \
   b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6 \
   shellcheck-v0.11.0/shellcheck
 
-install_engine typos 1.50.1 \
-  "https://github.com/crate-ci/typos/releases/download/v1.50.1/typos-v1.50.1-x86_64-unknown-linux-musl.tar.gz" \
-  edf0545109aee6a22751d04ddecb97c45be47d3aa0409564fb895eeeace91b1e \
+install_engine typos 1.50.3 \
+  "https://github.com/crate-ci/typos/releases/download/v1.50.3/typos-v1.50.3-x86_64-unknown-linux-musl.tar.gz" \
+  aca6b5d546307092b8d0a8e0a89dd80f9da51f2f7617c5e45c5607c1684ffbf2 \
   ./typos
 
 install_engine gitleaks 8.30.1 \
@@ -189,10 +189,10 @@ install_engine gitleaks 8.30.1 \
   551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb \
   gitleaks
 
-install_engine editorconfig-checker 3.11.2 \
-  "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v3.11.2/ec-linux-amd64.tar.gz" \
-  bc815e5b3b1891a0ee9e1242fe3475312655f8b0f4c4a79510be0a009294571a \
-  bin/ec-linux-amd64
+install_engine editorconfig-checker 4.0.2 \
+  "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-amd64.tar.gz" \
+  44efaef3ed14c6ab52eb87481d78e5e5c204796dccf26e2f4598a61ba17f8003 \
+  editorconfig-checker
 
 hash -r
 log "install complete"
