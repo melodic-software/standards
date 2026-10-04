@@ -116,5 +116,5 @@ ADRs 0008 and 0014. Read them there rather than a copy here.
 Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
 schedule or otherwise; `maintenance-audit-link-check-excludes.yml` and
 `maintenance-audit-code-review-rules.yml` fail the run on drift.
-No CI check reads external URLs: the blocking lychee check is offline-only, over
+No link check reads external URLs: the blocking lychee check is offline-only, over
 local files and fragments.

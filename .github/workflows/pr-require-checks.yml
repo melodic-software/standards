@@ -84,7 +84,8 @@ jobs:
   # job per check spent more time on runner start, checkout and setup than on
   # the check, and held a runner slot for each. Every step after checkout runs
   # `if: !cancelled()`, so one failing check does not hide the ones after it
-  # in the same job.
+  # in the same job. check-go is the exception: its steps are one chain (set
+  # up Go, install golangci-lint, test), so they keep the default success().
   #
   # The slow jobs (test-lefthook, check-python, check-dotnet, check-go) start
   # with ci-workflows detect-changes and gate every later step on their filter
