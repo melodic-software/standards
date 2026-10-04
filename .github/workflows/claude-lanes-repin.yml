@@ -206,6 +206,8 @@ jobs:
             Co-Authored-By: claude-lanes-repin <noreply@github.com>
           title: "chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}"
           body: |
+            No related issue: automated re-pin to the newest ci-workflows release
+
             ## Summary
 
             Re-pins every `melodic-software/ci-workflows` reference under
@@ -216,7 +218,7 @@ jobs:
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
             release. Opened by `.github/workflows/claude-lanes-repin.yml`.
 
-            No linked issue.
+            ## Fix
 
             ${{ steps.repin.outputs.version-note }}
 
@@ -228,7 +230,7 @@ jobs:
             managed for, as a reviewed pull
             request per target. This pull request is never auto-merged.
 
-            ## Test plan
+            ## Verification
 
             - `pin-comment-convention` covers `components/claude-lanes/*.yml`
               and validates the rewritten pin comments' form.
@@ -240,7 +242,6 @@ jobs:
 
             ## Related
 
-            - No linked issue.
             - Phase 3g of the `melodic-software/ci-workflows` review-lanes plan.
             - Upstream release:
               https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}
