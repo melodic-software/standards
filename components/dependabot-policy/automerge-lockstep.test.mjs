@@ -5,7 +5,7 @@ import {
   checkLockstep,
   extractPublisherAllowlist,
   LockstepError,
-  resolveApprovedSha,
+  resolveApprovedShas,
 } from "./automerge-lockstep.mjs";
 
 const SHA_A = "a".repeat(40);
@@ -79,23 +79,23 @@ test("a PUBLISHER_ALLOWLIST that is not JSON fails", () => {
   throwsLockstep(() => extractPublisherAllowlist(workflow("actions/*")), /not valid JSON/u);
 });
 
-test("the SHA comes from the single runner-policy contract key", () => {
+test("the SHAs come from the reusable's runner-policy contract keys only", () => {
   const runnerPolicy = {
     approvedReusableWorkflowContracts: {
       [contractKey(SHA_A)]: {},
       "melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml@cccc": {},
     },
   };
-  assert.equal(resolveApprovedSha(runnerPolicy), SHA_A);
+  assert.deepEqual(resolveApprovedShas(runnerPolicy), [SHA_A]);
 });
 
 test("no contract key for the reusable fails", () => {
-  throwsLockstep(() => resolveApprovedSha({ approvedReusableWorkflowContracts: {} }), /found 0/u);
+  throwsLockstep(() => resolveApprovedShas({ approvedReusableWorkflowContracts: {} }), /found 0/u);
 });
 
-test("two contract keys for the reusable fail", () => {
+test("every contract key for the reusable is returned for checking", () => {
   const runnerPolicy = {
     approvedReusableWorkflowContracts: { [contractKey(SHA_A)]: {}, [contractKey(SHA_B)]: {} },
   };
-  throwsLockstep(() => resolveApprovedSha(runnerPolicy), /found 2/u);
+  assert.deepEqual(resolveApprovedShas(runnerPolicy), [SHA_A, SHA_B]);
 });

@@ -77,8 +77,8 @@ This component records the lanes; the ci-workflows
 `pr-automerge-dependabot.yml` reusable enforces the auto lane by arming
 auto-merge, and its `PUBLISHER_ALLOWLIST` constant copies
 `autoMerge.publisherAllowlist`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
-fetches that reusable at the SHA its `runner-policy` contract approves and
-fails when the two lists differ. It blocks from admission, with no report-only
+fetches that reusable at every SHA its `runner-policy` contracts approve and
+fails when the two lists differ at any of them. It blocks from admission, with no report-only
 period: it compares two files at fixed revisions, so a run either matches or
 names the differing lists, and the admitting change's run against the pinned
 reusable matched.
