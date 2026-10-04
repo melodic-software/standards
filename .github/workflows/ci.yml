@@ -725,8 +725,8 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
-      # The reusable's own job declares security-events: write unconditionally
-      # at v0.22.0: its upload-sarif step stays gated on the input, but
+      # The reusable's own job declares security-events: write unconditionally;
+      # its upload-sarif step stays gated on the input, but
       # expressions are not legal in a permissions scope. A called workflow can
       # only narrow the caller's GITHUB_TOKEN and never widen it, so the grant
       # has to be here for the job to start. The lane stays annotations-only
@@ -1297,6 +1297,7 @@ jobs:
             ${{ needs.harness.result }}
             ${{ needs.code-review-rules.result }}
             ${{ needs.cloud-environment.result }}
+            ${{ needs.mcp-launcher.result }}
             ${{ needs.distribution.result }}
             ${{ needs.lefthook.result }}
             ${{ needs.exec-bit.result }}
