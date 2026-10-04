@@ -135,6 +135,40 @@ Running last means no later build step can replace the file. A floor change
 merged in `claude-permissions` reaches an environment on its next cache
 rebuild (see [Update lifecycle](#update-lifecycle)), with no change here.
 
+## Key Vault resolver
+
+[`vault-exec`](vault-exec) is the cloud counterpart of the workstation
+resolver in the operator's dotfiles, with the same argv contract:
+`vault-exec [--optional] --env NAME=secret-name [--env ...] -- <command> [args...]`.
+It reads each secret from Key Vault, sets `NAME` in the command's environment,
+and execs the command, so stdin, stdout and the exit code pass through. A
+failed read exits 1 without running the command; with `--optional` it leaves
+`NAME` unset, warns on stderr, and runs the command. Bad usage exits 2.
+Diagnostics name the secret and the HTTP status, never the value.
+Each read gets up to three 10-second attempts, retrying only transport errors
+and HTTP 408, 429 and 5xx, and all reads in one run share a 45-second budget,
+so the command starts or the run fails inside a 60-second launcher timeout.
+
+After the permission floor, the script fetches `vault-exec` from the same
+`raw.githubusercontent.com` path as this component and installs it, mode
+0755, to `~/.local/bin/vault-exec` under the build's `HOME`, the path the
+[mcp-launcher](../mcp-launcher/README.md) looks for. Each copy carries a marker
+line; a `vault-exec` already there without it is left alone with a `WARN`.
+The step is best-effort like every other.
+
+Reads work only in a session whose environment has an
+[API credential](https://code.claude.com/docs/en/cloud-environments#add-api-credentials)
+of the OAuth 2.0 client-credentials type for `*.vault.azure.net` with scope
+`https://vault.azure.net/.default`. The agent proxy adds the bearer token, so
+`vault-exec` sends no auth header and no token or secret is stored in the VM.
+The proxy does not serve setup-script requests
+([requests that never get the credential](https://code.claude.com/docs/en/cloud-environments#requests-that-never-get-the-credential),
+as of 2026-10-04), so the cache build can install `vault-exec` but never read a
+secret with it.
+
+Every name resolves in `kv-melo-devtools-prod`, the one vault the cloud
+identity is granted. Set `VAULT_EXEC_VAULT` to read another vault.
+
 ## Calling contract (frozen)
 
 The interface between this component and consuming repositories:
@@ -231,8 +265,8 @@ the snapshot.
 - Rollback: environments keep booting from their cached snapshot until
   rebuilt, so reverting the commit and forcing a rebuild restores the prior
   state; in an emergency the bootstrap can pin a commit SHA in the raw URL
-  instead of `main`. The pin covers this script only: the plugin catalog and
-  the permission floor are still fetched from `main`.
+  instead of `main`. The pin covers this script only: the plugin catalog, the
+  permission floor and `vault-exec` are still fetched from `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
 the shared environment baseline, which includes deriving the fleet plugin

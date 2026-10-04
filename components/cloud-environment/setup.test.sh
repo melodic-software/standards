@@ -373,4 +373,58 @@ assert_eq 'refusals leave no temp file behind' '' \
   "$(find "$perm_tmp" -name '*.compose.*' 2>/dev/null)"
 rm -rf "$perm_tmp"
 
+# Key Vault resolver: setup.sh fetches this component's vault-exec from its
+# published path, so the file in this directory is the one source. It installs
+# only a file carrying the marker and never replaces a vault-exec that lacks it.
+vault_exec_rel='components/cloud-environment/vault-exec'
+vault_exec_src="$root/$vault_exec_rel"
+assert_eq 'setup.sh fetches vault-exec from its published path' \
+  "https://raw.githubusercontent.com/melodic-software/standards/main/$vault_exec_rel" \
+  "$(sed -n "s/^VAULT_EXEC_URL='\(.*\)'\$/\1/p" "$script")"
+vault_marker="$(sed -n "s/^VAULT_EXEC_MARKER='\(.*\)'\$/\1/p" "$script")"
+grep -qxF "$vault_marker" "$vault_exec_src"
+rc=$?
+assert_exit 'vault-exec carries the marker setup.sh installs by' 0 "$rc"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh installs vault-exec under the user home' \
+  "$(cat "$script")" 'vault_exec_dest="$HOME/.local/bin/vault-exec"'
+# shellcheck disable=SC2088 # the ~ is literal README text
+assert_contains 'README documents the vault-exec install path' \
+  "$(cat "$readme")" '~/.local/bin/vault-exec'
+
+ve_tmp="$(mktemp -d)"
+ve_dest="$ve_tmp/home/.local/bin/vault-exec"
+install_vault_exec "$vault_exec_src" "$ve_dest"
+rc=$?
+assert_exit 'vault-exec installs into a missing ~/.local/bin' 0 "$rc"
+cmp -s "$vault_exec_src" "$ve_dest"
+rc=$?
+assert_exit 'the installed vault-exec is the component file' 0 "$rc"
+if [[ -n "$(find "$ve_dest" -perm 0755 2>/dev/null)" ]]; then
+  pass 'the installed vault-exec has mode 0755'
+else
+  fail 'the installed vault-exec has mode 0755' "$(ls -l "$ve_dest")"
+fi
+printf '%s\n%s\n' '#!/bin/bash' "$vault_marker" >"$ve_dest"
+install_vault_exec "$vault_exec_src" "$ve_dest"
+rc=$?
+assert_exit 'an older copy of ours is replaced' 0 "$rc"
+cmp -s "$vault_exec_src" "$ve_dest"
+rc=$?
+assert_exit 'the replaced copy is the component file' 0 "$rc"
+printf '%s\n' '#!/bin/bash' 'echo someone else' >"$ve_dest"
+cp "$ve_dest" "$ve_tmp/foreign"
+install_vault_exec "$vault_exec_src" "$ve_dest"
+rc=$?
+assert_nonzero 'a vault-exec without the marker is not replaced' "$rc"
+cmp -s "$ve_dest" "$ve_tmp/foreign"
+rc=$?
+assert_exit 'the foreign vault-exec is left byte-identical' 0 "$rc"
+printf '%s\n' '<html>not found</html>' >"$ve_tmp/fetched"
+install_vault_exec "$ve_tmp/fetched" "$ve_tmp/fresh/vault-exec"
+rc=$?
+assert_nonzero 'a fetched file without the marker is refused' "$rc"
+assert_file_absent 'a refused fetch installs nothing' "$ve_tmp/fresh/vault-exec"
+rm -rf "$ve_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1
