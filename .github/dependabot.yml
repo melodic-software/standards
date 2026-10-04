@@ -15,13 +15,19 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
       # First-party melodic-software/* actions skip the supply-chain wait so our
       # own ci-workflows fixes propagate without the cooldown delay.
       exclude:
         - "melodic-software/*"
-    # Collapse all action bumps into one PR to cut review noise.
+    # Vendor bumps get their own PR so a community bump never blocks the
+    # auto-merge lane; a dependency joins the first group that matches it.
     groups:
+      vendor-actions:
+        patterns:
+          - "actions/*"
+          - "github/*"
+          - "anthropics/*"
       github-actions:
         patterns:
           - "*"
@@ -37,7 +43,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     # Batch minor and patch bumps into one PR; majors stay individual so
     # breaking changes get their own review.
     groups:
@@ -57,7 +63,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -74,7 +80,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -89,7 +95,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -106,7 +112,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -123,7 +129,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -137,7 +143,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
