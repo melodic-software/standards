@@ -1,8 +1,8 @@
 # managed-files-guard caller
 
-Sync-managed caller for the `managed-files-guard` composite action in
+Sync-managed caller for the `check-managed-files` composite action in
 `melodic-software/ci-workflows`
-(`.github/actions/managed-files-guard`, ci-workflows#208). The action reads
+(`.github/actions/check-managed-files`, ci-workflows#208). The action reads
 this repository's `distribution/sync-manifest.yml` at a given ref, resolves
 the calling repository's managed destination paths, and fails the pull
 request when its diff touches one of them. That failing check is the signal
@@ -11,16 +11,16 @@ ADR-0007 assigned to a downstream hand-edit of a managed file
 binary, the fix path is always a standards change, and the guard is what
 makes a hand-edit visible before the next sync silently reverts it.
 
-Two files, one per `runner-policy` inventory, identical except for `runs-on`
-and their headers:
+Two files, one per `runner-policy` inventory, identical except for `runs-on`,
+the workflow `name:` (each equals its destination stem) and their headers:
 
 | Manifest component | Source | Destination | `runs-on` |
 | --- | --- | --- | --- |
-| `managed-files-guard-caller` | `managed-files-guard.yml` | `.github/workflows/managed-files-guard.yml` | `ubuntu-24.04` |
-| `managed-files-guard-fleet-caller` | `managed-files-guard-fleet.yml` | `.github/workflows/managed-files-guard-fleet.yml` | `melodic-ubuntu-24.04-x64` |
+| `managed-files-guard-caller` | `managed-files-guard.yml` | `.github/workflows/pr-check-managed-files-hosted.yml` | `ubuntu-24.04` |
+| `managed-files-guard-fleet-caller` | `managed-files-guard-fleet.yml` | `.github/workflows/pr-check-managed-files.yml` | `melodic-ubuntu-24.04-x64` |
 
 Both carry the same action pin and the same job name, so the check context is
-`managed-files-guard` on every target. The destinations differ because the
+`pr-check-managed-files` on every target. The destinations differ because the
 manifest requires each destination to have one owning component.
 The guard caller is the second recorded exception to the rule that workflow callers stay
 consumer-owned (`distribution/README.md`), for the same reason as the Claude
@@ -122,8 +122,10 @@ the consumer's caller still carries the old list.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
-Both files pin `35880dcbb2f174aac90159e276dc7eddf1bc20b9` (v0.30.1) today,
-and the pin moves with each ci-workflows release through the cascade below.
+Both files pin `.github/actions/check-managed-files` at
+`7446b5165511796b7b0d30b68d341689ebb8de61` (v0.34.0) today, the release that
+gave the action that path; the pins below name its old path,
+`.github/actions/managed-files-guard`. The pin moves with each ci-workflows release through the cascade below.
 The earlier pins are recorded because of what they fixed:
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
 `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn

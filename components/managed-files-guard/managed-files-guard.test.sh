@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Contract tests for the two managed-files-guard caller components: the
-# hosted `managed-files-guard-caller` (.github/workflows/managed-files-guard.yml)
-# and the fleet-routed `managed-files-guard-fleet-caller`
-# (.github/workflows/managed-files-guard-fleet.yml).
+# hosted `managed-files-guard-caller`
+# (.github/workflows/pr-check-managed-files-hosted.yml) and the fleet-routed
+# `managed-files-guard-fleet-caller` (.github/workflows/pr-check-managed-files.yml).
 #
 # Three layers, in order:
 #   1. Shape: each parsed YAML carries exactly the locked design: pull_request
@@ -10,8 +10,9 @@
 #      read-only token, the canonical concurrency block, one job on
 #      its approved label, a full-history checkout, and the composite action
 #      pinned by full SHA under the pin-comment convention with
-#      `standards-ref: main` for the soak. The two files differ only in
-#      `runs-on` and comments.
+#      `standards-ref: main` for the soak, and a workflow name equal to the
+#      destination stem. The two files differ only in `runs-on`, the workflow
+#      name and comments.
 #   2. Manifest wiring: each component maps to its locked destination; a
 #      target that manages a `components/claude-lanes/`-sourced caller takes
 #      the fleet sibling, never the hosted caller; no target manages both;
@@ -35,13 +36,13 @@ command -v yq >/dev/null 2>&1 || skip_suite 'Mike Farah yq v4 is not installed'
 
 hosted_component='managed-files-guard-caller'
 hosted_source='components/managed-files-guard/managed-files-guard.yml'
-hosted_destination='.github/workflows/managed-files-guard.yml'
+hosted_destination='.github/workflows/pr-check-managed-files-hosted.yml'
 fleet_component='managed-files-guard-fleet-caller'
 fleet_source='components/managed-files-guard/managed-files-guard-fleet.yml'
-fleet_destination='.github/workflows/managed-files-guard-fleet.yml'
+fleet_destination='.github/workflows/pr-check-managed-files.yml'
 manifest='distribution/sync-manifest.yml'
 actionlint_config='.github/actionlint.yaml'
-action_path='melodic-software/ci-workflows/.github/actions/managed-files-guard'
+action_path='melodic-software/ci-workflows/.github/actions/check-managed-files'
 # shellcheck disable=SC2016  # a GitHub Actions expression, compared literally
 canonical_group='${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}'
 
@@ -63,9 +64,9 @@ sibling_checkout="$(yq -r '.jobs.repin.steps[] | select(.uses | test("^actions/c
 
 # ------------------------------------------------------------------ 1. shape
 
-# check_shape <source> <component> <runs-on>: the locked design, per file.
+# check_shape <source> <component> <runs-on> <destination>: the locked design, per file.
 check_shape() {
-  local source="$1" component="$2" runs_on="$3" p="$1:"
+  local source="$1" component="$2" runs_on="$3" destination="$4" p="$1:" stem
   q() { yq -r "$1" "$source"; }
 
   assert_file_exists "$p the caller component exists" "$source"
@@ -73,7 +74,8 @@ check_shape() {
   assert_contains "$p header names the standards source path" "$(head -n 12 "$source")" "$source"
   assert_contains "$p header names the manifest component" "$(head -n 12 "$source")" "$component"
 
-  assert_eq "$p workflow name is managed-files-guard" 'managed-files-guard' "$(q '.name')"
+  stem="${destination##*/}"
+  assert_eq "$p workflow name equals the destination stem" "${stem%.yml}" "$(q '.name')"
   assert_eq "$p triggers on pull_request only" 'pull_request' "$(q '.on | keys | join(",")')"
   assert_eq "$p pull_request carries types and paths only" 'paths,types' \
     "$(q '.on.pull_request | keys | sort | join(",")')"
@@ -97,22 +99,22 @@ check_shape() {
     "$(q '.concurrency | keys | sort | join(",")')"
 
   assert_eq "$p exactly one job" '1' "$(q '.jobs | length')"
-  assert_eq "$p the job is named managed-files-guard" 'managed-files-guard' "$(q '.jobs | keys | .[0]')"
-  assert_eq "$p the job display name equals its id (check context stays managed-files-guard)" \
-    'managed-files-guard' "$(q '.jobs["managed-files-guard"].name')"
+  assert_eq "$p the job is named pr-check-managed-files" 'pr-check-managed-files' "$(q '.jobs | keys | .[0]')"
+  assert_eq "$p the job display name equals its id (check context is pr-check-managed-files)" \
+    'pr-check-managed-files' "$(q '.jobs["pr-check-managed-files"].name')"
   assert_eq "$p the job runs on $runs_on directly" "$runs_on" \
-    "$(q '.jobs["managed-files-guard"]["runs-on"]')"
-  assert_eq "$p the job has a 10-minute timeout" '10' "$(q '.jobs["managed-files-guard"]["timeout-minutes"]')"
+    "$(q '.jobs["pr-check-managed-files"]["runs-on"]')"
+  assert_eq "$p the job has a 10-minute timeout" '10' "$(q '.jobs["pr-check-managed-files"]["timeout-minutes"]')"
   assert_eq "$p no job calls a reusable workflow" '0' "$(q '[.jobs[] | select(has("uses"))] | length')"
   assert_eq "$p runs-on is a literal, not an expression" '0' \
     "$(q '[.jobs[]["runs-on"] | select(test("\\$\\{\\{"))] | length')"
   assert_eq "$p no job-level permissions block (the workflow grant is the whole grant)" '0' \
     "$(q '[.jobs[] | select(has("permissions"))] | length')"
 
-  assert_eq "$p two steps: checkout, then the guard" '2' "$(q '.jobs["managed-files-guard"].steps | length')"
+  assert_eq "$p two steps: checkout, then the guard" '2' "$(q '.jobs["pr-check-managed-files"].steps | length')"
 
   local checkout_uses guard_uses guard_sha rc out
-  checkout_uses="$(q '.jobs["managed-files-guard"].steps[0].uses')"
+  checkout_uses="$(q '.jobs["pr-check-managed-files"].steps[0].uses')"
   assert_contains "$p first step is actions/checkout" "$checkout_uses" 'actions/checkout@'
   assert_eq "$p checkout is pinned to the same SHA as the sibling workflows" "$sibling_checkout" "$checkout_uses"
   if [[ "$checkout_uses" =~ @[0-9a-f]{40}$ ]]; then
@@ -121,12 +123,12 @@ check_shape() {
     fail "$p checkout pin is a full 40-character SHA" "got $checkout_uses"
   fi
   assert_eq "$p checkout does not persist credentials" 'false' \
-    "$(q '.jobs["managed-files-guard"].steps[0].with["persist-credentials"]')"
+    "$(q '.jobs["pr-check-managed-files"].steps[0].with["persist-credentials"]')"
   assert_eq "$p checkout fetches full history so the guard can diff base...head" '0' \
-    "$(q '.jobs["managed-files-guard"].steps[0].with["fetch-depth"]')"
+    "$(q '.jobs["pr-check-managed-files"].steps[0].with["fetch-depth"]')"
 
-  guard_uses="$(q '.jobs["managed-files-guard"].steps[1].uses')"
-  assert_contains "$p second step calls the ci-workflows managed-files-guard action" "$guard_uses" "${action_path}@"
+  guard_uses="$(q '.jobs["pr-check-managed-files"].steps[1].uses')"
+  assert_contains "$p second step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
   guard_sha="${guard_uses##*@}"
   if [[ "$guard_sha" =~ ^[0-9a-f]{40}$ ]]; then
     pass "$p guard action pin is a full lowercase 40-character SHA"
@@ -136,9 +138,9 @@ check_shape() {
   assert_eq "$p guard action pin line is unique in the file" '1' \
     "$(grep -c "uses: ${action_path}@" "$source")"
   assert_eq "$p standards-ref is main for the soak" 'main' \
-    "$(q '.jobs["managed-files-guard"].steps[1].with["standards-ref"]')"
+    "$(q '.jobs["pr-check-managed-files"].steps[1].with["standards-ref"]')"
   assert_eq "$p the guard step passes standards-ref and nothing else" 'standards-ref' \
-    "$(q '.jobs["managed-files-guard"].steps[1].with | keys | join(",")')"
+    "$(q '.jobs["pr-check-managed-files"].steps[1].with | keys | join(",")')"
 
   # The pin comment: exactly one of the convention's two forms, checked by the
   # convention's own library. A bare SHA, prose, or a fallback short-sha that
@@ -149,19 +151,19 @@ check_shape() {
   assert_silent "$p the pin-comment scan reports no violation" "$out"
 }
 
-check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04'
-check_shape "$fleet_source" "$fleet_component" 'melodic-ubuntu-24.04-x64'
+check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"
+check_shape "$fleet_source" "$fleet_component" 'melodic-ubuntu-24.04-x64' "$fleet_destination"
 
-# Beyond comments and `runs-on`, the siblings are the same bytes, so one pin
-# advance and one review cover both.
+# Beyond comments, the workflow name and `runs-on`, the siblings are the same
+# bytes, so one pin advance and one review cover both.
 pin_of() { grep -oE "${action_path}@[0-9a-f]{40}" "$1"; }
 assert_eq 'the fleet sibling pins the same guard action SHA as the hosted caller' \
   "$(pin_of "$hosted_source")" "$(pin_of "$fleet_source")"
-strip() { grep -vE '^[[:space:]]*(#|runs-on:)' "$1"; }
+strip() { grep -vE '^([[:space:]]*(#|runs-on:)|name:)' "$1"; }
 if diff <(strip "$hosted_source") <(strip "$fleet_source") >/dev/null; then
-  pass 'the fleet sibling equals the hosted caller apart from comments and runs-on'
+  pass 'the fleet sibling equals the hosted caller apart from comments, the workflow name and runs-on'
 else
-  fail 'the fleet sibling equals the hosted caller apart from comments and runs-on' \
+  fail 'the fleet sibling equals the hosted caller apart from comments, the workflow name and runs-on' \
     "$(diff <(strip "$hosted_source") <(strip "$fleet_source"))"
 fi
 

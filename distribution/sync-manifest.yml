@@ -77,11 +77,11 @@ components:
   # except for comments and `runner: ubuntu-24.04`, which runner-policy admits
   # on a public repository and GitHub recommends there (self-hosted runners
   # "should almost never be used for public repositories",
-  # docs.github.com/en/actions/reference/security/secure-use). Same workflow
-  # and job names, so the check contexts match the fleet callers. The
-  # destinations differ (`.github/workflows/claude-review-hosted.yml`,
-  # `.github/workflows/claude-security-review-hosted.yml`) because a
-  # destination has exactly one owning component. The files live outside
+  # docs.github.com/en/actions/reference/security/secure-use). Same job ids,
+  # so the check contexts match the fleet callers. The destinations differ
+  # (`.github/workflows/pr-review-hosted.yml`,
+  # `.github/workflows/pr-review-security-hosted.yml`) because a destination
+  # has exactly one owning component; each workflow `name:` equals its stem. The files live outside
   # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on
   # that directory stay as strict as they are; runner-policy.test.mjs holds
   # the hosted pair to its own rules and forbids a target managing both
@@ -123,16 +123,16 @@ components:
   # whatever label the caller names.
   claude-review-caller:
     files:
-      components/claude-lanes/claude-review.yml: .github/workflows/claude-review.yml
+      components/claude-lanes/claude-review.yml: .github/workflows/pr-review.yml
   claude-review-hosted-caller:
     files:
-      components/claude-lanes-hosted/claude-review.yml: .github/workflows/claude-review-hosted.yml
+      components/claude-lanes-hosted/claude-review.yml: .github/workflows/pr-review-hosted.yml
   claude-security-review-caller:
     files:
-      components/claude-lanes/claude-security-review.yml: .github/workflows/claude-security-review.yml
+      components/claude-lanes/claude-security-review.yml: .github/workflows/pr-review-security.yml
   claude-security-review-hosted-caller:
     files:
-      components/claude-lanes-hosted/claude-security-review.yml: .github/workflows/claude-security-review-hosted.yml
+      components/claude-lanes-hosted/claude-security-review.yml: .github/workflows/pr-review-security-hosted.yml
   # Per-target exact settings.json (issue 404). Not a transform: each
   # consumer has its own source file. Shared marketplace + bootstrap hook
   # are asserted against components/claude-settings/base/settings.json.
@@ -223,7 +223,7 @@ components:
     files:
       lychee.toml: lychee.toml
   # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
-  # workflow calling the ci-workflows `managed-files-guard` composite action,
+  # workflow calling the ci-workflows `check-managed-files` composite action,
   # which fails a consumer PR that hand-edits one of that repository's
   # managed destinations. The second recorded exception to the
   # workflow-caller exclusion in README.md, for the same reason as the first:
@@ -231,10 +231,11 @@ components:
   # at the same pin, and the sync is the one mechanism that holds that.
   #
   # Two components, one per runner-policy inventory. The files are identical
-  # except for `runs-on` and their headers: same action pin, same job name, so
-  # the check context is `managed-files-guard` on every target. Destinations
-  # must be unique across components, so each has its own path. A target
-  # takes one or the other, never both.
+  # except for `runs-on`, the workflow `name:` and their headers: same action
+  # pin, same job name, so the check context is `pr-check-managed-files` on
+  # every target. Destinations must be unique across components, so each has
+  # its own path (`pr-check-managed-files-hosted.yml` for the hosted caller).
+  # A target takes one or the other, never both.
   # - managed-files-guard-caller: the approved hosted label, which
   #   runner-policy admits on a public repository and on a private one not
   #   enrolled for local routing.
@@ -251,10 +252,10 @@ components:
   # recorded in components/managed-files-guard/README.md.
   managed-files-guard-caller:
     files:
-      components/managed-files-guard/managed-files-guard.yml: .github/workflows/managed-files-guard.yml
+      components/managed-files-guard/managed-files-guard.yml: .github/workflows/pr-check-managed-files-hosted.yml
   managed-files-guard-fleet-caller:
     files:
-      components/managed-files-guard/managed-files-guard-fleet.yml: .github/workflows/managed-files-guard-fleet.yml
+      components/managed-files-guard/managed-files-guard-fleet.yml: .github/workflows/pr-check-managed-files.yml
   markdownlint:
     files:
       .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
@@ -343,8 +344,17 @@ components:
 # and their keys were dropped with the dated evidence recorded at each target.
 # The key stays available fleet-wide as a per-target opt-out for any future
 # staged rollout.
+#
+# Staged rollout in progress: the lane and guard callers moved to their
+# v0.34.0 names (`pr-review*.yml`, `pr-check-managed-files*.yml`). Every target
+# except the pilot pair (claude-code-proxy, claude-code-account-rotation)
+# carries `automerge: false` until the pilot passes, so the new callers land
+# in one private fleet repository and one public hosted repository first.
+# Removal trigger: the user approves the pilot; one change then drops every
+# `automerge: false` below.
 targets:
   melodic-software/.github:
+    automerge: false
     managed:
       - cloud-bootstrap
       - editorconfig-checker
@@ -362,6 +372,7 @@ targets:
   # (PR 1, merged 2026-08-19) created those payloads; the repo is converged now
   # and syncs incrementally like any other target.
   melodic-software/agent-plugins:
+    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -378,6 +389,7 @@ targets:
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
   melodic-software/ci-runner:
+    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -395,6 +407,7 @@ targets:
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
+    automerge: false
     managed:
       # Flipped to managed after byte-parity held: the pre-existing local copy
       # (the file this component's content was derived from) differed from
@@ -461,6 +474,7 @@ targets:
     # contract as steps of that one check, and github-iac#528 extends the org
     # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
+    automerge: false
     managed:
       - actionlint
       - claude-review-hosted-caller
@@ -562,6 +576,7 @@ targets:
   # 2026-08-23 — pr-title, pr-issue-linkage, do-not-merge and ci-status all
   # SUCCESS). Its two siblings joined it on 2026-09-04 via github-iac#367.
   melodic-software/codex-plugins:
+    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -575,6 +590,7 @@ targets:
       - repository-text
       - typos
   melodic-software/cursor-plugins:
+    automerge: false
     managed:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
@@ -591,6 +607,7 @@ targets:
     # four contexts SUCCESS, and github-iac#367 extended the org ci-gate
     # ruleset to this repository.
   melodic-software/dotfiles:
+    automerge: false
     managed:
       - actionlint
       - claude-permissions
@@ -619,6 +636,7 @@ targets:
     locally-owned:
       - shellcheck
   melodic-software/github-iac:
+    automerge: false
     managed:
       - claude-review-caller
       - claude-security-review-caller
@@ -642,6 +660,7 @@ targets:
     locally-owned:
       - actionlint
   melodic-software/medley:
+    automerge: false
     managed:
       - architecture-decisions
       # claude-review-caller replaces medley's hand-written caller: its
@@ -718,6 +737,7 @@ targets:
       # 174 lines vs 58). Recorded 2026-08-16 (audit).
       - typos
   melodic-software/provisioning:
+    automerge: false
     managed:
       - actionlint
       - claude-review-caller
