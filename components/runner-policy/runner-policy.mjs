@@ -1429,10 +1429,9 @@ function dynamicRoutingReferenceJobIds(workflow) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-// Two `uses:` prefixes resolve from the same commit as the reusable workflow
-// that contains them: a job-level `./.github/workflows/<file>.yml` or
-// `$/.github/workflows/<file>.yml` nested workflow, and a step-level
-// `$/path/to/action`. A SHA bump changes what those byte-identical reference
+// Two `uses:` shapes resolve from the same commit as the reusable workflow
+// that contains them: a job-level `./.github/workflows/<file>.yml` nested
+// workflow and a step-level `$/path/to/action`. A SHA bump changes what those byte-identical reference
 // strings execute, so the single-file surface diff alone cannot prove them
 // unchanged. Auto-approval closes that gap by comparing the git object each
 // reference names at the reviewed basis and at the candidate (see
@@ -1505,6 +1504,11 @@ function commitRelativeWorkflowReferences(workflow, location) {
       continue;
     }
     const jobLocation = `${location} job ${jobId}`;
+    if (typeof job.uses === "string" && job.uses.startsWith("$/")) {
+      throw new ConfigurationError(
+        `${jobLocation} uses ${job.uses}; GitHub documents $/ for actions only, so a job-level $/ reference cannot be safely diffed for auto-approval`,
+      );
+    }
     if (isCommitRelativeReference(job.uses)) {
       const workflowPath = job.uses.slice(2);
       if (!COMMIT_RELATIVE_WORKFLOW_PATH.test(workflowPath)) {
@@ -1519,20 +1523,28 @@ function commitRelativeWorkflowReferences(workflow, location) {
   return references;
 }
 
-async function fetchCommitTree(repository, revision, fetchImpl) {
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function fetchCommitTree(repository, revision, fetchImpl, githubToken) {
   const label = `${repository}@${revision}`;
+  const headers = { accept: "application/vnd.github+json" };
+  if (githubToken) {
+    headers.authorization = `Bearer ${githubToken}`;
+  }
   let body;
   try {
     const response = await fetchImpl(
       `${GITHUB_API_BASE}/repos/${repository}/git/trees/${revision}?recursive=1`,
-      { headers: { accept: "application/vnd.github+json" } },
+      { headers },
     );
     if (!response.ok) {
       throw new Error(`${response.status} ${response.statusText}`);
     }
     body = await response.json();
   } catch (error) {
-    throw new ConfigurationError(`could not fetch the git tree of ${label}: ${error.message}`);
+    throw new ConfigurationError(`could not fetch the git tree of ${label}: ${errorText(error)}`);
   }
   if (!isMapping(body) || !Array.isArray(body.tree) || body.truncated !== false) {
     throw new ConfigurationError(`the git tree of ${label} is truncated or malformed`);
@@ -1545,7 +1557,7 @@ async function fetchCommitTree(repository, revision, fetchImpl) {
       typeof entry.type === "string" &&
       typeof entry.sha === "string"
     ) {
-      entries.set(entry.path, { type: entry.type, sha: entry.sha });
+      entries.set(entry.path, { type: entry.type, sha: entry.sha, mode: entry.mode });
     }
   }
   return entries;
@@ -1553,33 +1565,33 @@ async function fetchCommitTree(repository, revision, fetchImpl) {
 
 async function fetchRepositoryFile(repository, revision, filePath, fetchImpl) {
   const label = `${repository}/${filePath}@${revision}`;
-  let response;
   try {
-    response = await fetchImpl(`${RAW_GITHUB_CONTENT_BASE}/${repository}/${revision}/${filePath}`);
-  } catch (error) {
-    throw new ConfigurationError(`could not fetch ${label}: ${error.message}`);
-  }
-  if (!response.ok) {
-    throw new ConfigurationError(
-      `could not fetch ${label}: ${response.status} ${response.statusText}`,
+    const response = await fetchImpl(
+      `${RAW_GITHUB_CONTENT_BASE}/${repository}/${revision}/${filePath}`,
     );
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    return await response.text();
+  } catch (error) {
+    throw new ConfigurationError(`could not fetch ${label}: ${errorText(error)}`);
   }
-  return response.text();
 }
 
 // One reader per audit. Trees are cached per (repository, commit): one
 // recursive-tree request answers every path lookup at that commit. File
 // content is cached per (repository, blob SHA), so a blob identical at the
 // basis and the candidate is fetched once. A rejected fetch stays cached, so
-// every later lookup against that commit fails closed the same way.
-function commitRelativeObjectReader(fetchImpl) {
+// every later lookup against that commit fails closed the same way. A token,
+// when given, authenticates only the api.github.com tree requests.
+function commitRelativeObjectReader(fetchImpl, githubToken) {
   const trees = new Map();
   const files = new Map();
   return {
     tree(repository, revision) {
       const key = `${repository}@${revision}`;
       if (!trees.has(key)) {
-        trees.set(key, fetchCommitTree(repository, revision, fetchImpl));
+        trees.set(key, fetchCommitTree(repository, revision, fetchImpl, githubToken));
       }
       return trees.get(key);
     },
@@ -1596,10 +1608,15 @@ function commitRelativeObjectReader(fetchImpl) {
 // Returns path -> git object SHA for every commit-relative reference the
 // workflow reaches at `revision`, following nested workflows and composite
 // actions' own `$/` steps. Git object SHAs are content hashes: a tree SHA
-// covers every file under the directory and a blob SHA covers the file's
-// bytes, so an identical SHA at two commits means identical executed content.
-// A missing path, a wrong object type, an unreadable action.yml, or any fetch
-// failure throws, and the caller declines auto-approval.
+// covers every entry under the directory and a blob SHA covers the file's
+// bytes, so an identical SHA at two commits means identical directory
+// contents. A symlink or submodule inside an action directory, or action
+// metadata pointing outside it with `..`, could reach content the tree SHA
+// does not cover, so those decline. A composite `run:` step can still reach
+// outside the directory; that is the same accepted class as the top-level
+// `run:` bodies the surface diff does not compare. A missing path, a wrong
+// object type, an unreadable action.yml, or any fetch failure throws, and the
+// caller declines auto-approval.
 async function commitRelativeObjects(repository, revision, workflow, reader) {
   const objects = new Map();
   const pending = commitRelativeWorkflowReferences(workflow, `${repository}@${revision}`);
@@ -1629,6 +1646,15 @@ async function commitRelativeObjects(repository, revision, workflow, reader) {
       pending.push(...commitRelativeWorkflowReferences(nested, location));
       continue;
     }
+    const outsideEntry = [...tree].find(
+      ([entryPath, { type, mode }]) =>
+        entryPath.startsWith(`${objectPath}/`) && (mode === "120000" || type === "commit"),
+    );
+    if (outsideEntry) {
+      throw new ConfigurationError(
+        `${location} contains the symlink or submodule ${outsideEntry[0]}, whose target the directory tree SHA does not cover`,
+      );
+    }
     const metadataPath = [`${objectPath}/action.yml`, `${objectPath}/action.yaml`].find(
       (candidate) => tree.get(candidate)?.type === "blob",
     );
@@ -1647,7 +1673,21 @@ async function commitRelativeObjects(repository, revision, workflow, reader) {
     } catch (error) {
       throw new ConfigurationError(`could not parse ${location}: ${error.message}`);
     }
-    if (isMapping(action.runs) && Array.isArray(action.runs.steps)) {
+    if (!isMapping(action.runs)) {
+      throw new ConfigurationError(`${location} action metadata has no runs mapping`);
+    }
+    for (const field of ["main", "pre", "post", "image"]) {
+      const value = action.runs[field];
+      if (typeof value === "string" && value.split(/[\\/]/u).includes("..")) {
+        throw new ConfigurationError(
+          `${location} runs.${field} ${value} leaves the action directory`,
+        );
+      }
+    }
+    if (action.runs.using === "composite") {
+      if (!Array.isArray(action.runs.steps)) {
+        throw new ConfigurationError(`${location} composite runs.steps is not a list`);
+      }
       pending.push(...commitRelativeStepReferences(action.runs.steps, location));
     }
   }
@@ -1812,11 +1852,12 @@ async function resolveAutoApprovedContracts({
   policy,
   workflowIndex,
   fetchImpl = fetch,
+  githubToken,
   now = () => new Date(),
 }) {
   const approved = new Map();
   const diagnostics = new Map();
-  const objectReader = commitRelativeObjectReader(fetchImpl);
+  const objectReader = commitRelativeObjectReader(fetchImpl, githubToken);
 
   const basesByWorkflowPath = new Map();
   for (const [reference, contract] of policy.approvedReusableWorkflowContracts) {
@@ -3045,6 +3086,7 @@ export async function auditRepository({
   githubRepository,
   disableAutoApproval = process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL === "true",
   fetchImpl = fetch,
+  githubToken = process.env.GITHUB_TOKEN,
 } = {}) {
   const resolvedRoot = path.resolve(root);
   const resolvedConfig = path.isAbsolute(configPath)
@@ -3076,7 +3118,12 @@ export async function auditRepository({
   const consumedRequiredReusableCallInputs = new Set();
   const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
   if (!disableAutoApproval) {
-    const autoApproval = await resolveAutoApprovedContracts({ policy, workflowIndex, fetchImpl });
+    const autoApproval = await resolveAutoApprovedContracts({
+      policy,
+      workflowIndex,
+      fetchImpl,
+      githubToken,
+    });
     if (autoApproval.approved.size > 0) {
       policy.approvedReusableWorkflowContracts = new Map([
         ...policy.approvedReusableWorkflowContracts,

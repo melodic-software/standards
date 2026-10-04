@@ -330,23 +330,34 @@ All of these fail closed with a specific diagnostic and require a human to
 add a new contract entry.
 
 Third, commit-relative `uses:` references: a job-level
-`./.github/workflows/<file>.yml` or `$/.github/workflows/<file>.yml` nested
-reusable workflow, and a step-level `$/<dir>` action. GitHub resolves these
-from the same commit as the file that contains them, so a SHA bump changes
-what a byte-identical reference executes without moving anything the single
-fetched workflow file shows. Auto-approval compares the git object each one
-names, read from the source repository's recursive tree
-(`GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`, one request per
-commit): the blob SHA of a nested workflow and the tree SHA of an action
-directory. Git object SHAs hash content, so an identical tree SHA covers every
-file under the directory. The walk follows each nested workflow's own
-references and each composite action's `$/` steps. The candidate is approved
-only when the basis and candidate reach the same set of paths with identical
-object SHAs and the surface diff above also matches. A missing path, an
-object of the wrong type, an action directory without `action.yml`, a
-truncated tree, or any fetch or parse failure declines. A step-level `./…`
-action always declines: GitHub resolves it from the job's checked-out
-workspace, which no object in the source repository describes.
+`./.github/workflows/<file>.yml` nested reusable workflow and a step-level
+`$/<dir>` action. GitHub resolves these from the same commit as the file that
+contains them, so a SHA bump changes what a byte-identical reference executes
+without moving anything the single fetched workflow file shows. Auto-approval
+compares the git object each one names, read from the source repository's
+recursive tree (`GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`, one
+request per commit, sent with `Authorization: Bearer $GITHUB_TOKEN` when that
+variable is set): the blob SHA of a nested workflow and the tree SHA of an
+action directory. Git object SHAs hash content, so an identical tree SHA
+proves identical directory contents. It does not prove identical executed
+bytes: a composite `run:` step can reach files outside the directory, the same
+accepted class as the top-level `run:` bodies the surface diff does not
+compare. The walk follows each nested workflow's own references and each
+composite action's `$/` steps. The candidate is approved only when the basis
+and candidate reach the same set of paths with identical object SHAs and the
+surface diff above also matches.
+
+These decline:
+
+- a missing path, an object of the wrong type, an action directory without
+  `action.yml`, a truncated tree, or any fetch or parse failure;
+- a symlink (mode `120000`) or submodule (type `commit`) under an action
+  directory, or a `runs.main`, `runs.pre`, `runs.post` or `runs.image` with a
+  `..` segment, since each can reach content the tree SHA does not cover;
+- a composite action whose `runs.steps` is not a list;
+- a job-level `$/` reference, because GitHub documents `$/` for actions only;
+- a step-level `./…` action, because GitHub resolves it from the job's
+  checked-out workspace, which no object in the source repository describes.
 
 Set `disableAutoApproval: true` (or `CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true`
 in CI) to restore today's behavior and require an explicit contract for every

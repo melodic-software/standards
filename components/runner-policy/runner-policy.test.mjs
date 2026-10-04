@@ -5493,7 +5493,7 @@ function scanSetupTree(treeSha, { actionSource = SCAN_SETUP_ACTION_BLOB_SHA, ext
 // of a commit (api.github.com) and raw file content at a commit
 // (raw.githubusercontent.com). `files` maps "<sha>:<path>" or "<path>" to
 // content; every other request is a 404.
-function commitRelativeFetchImpl({ workflows, trees, files = {} }) {
+function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = false }) {
   return async (url) => {
     const treeMatch = COMMIT_RELATIVE_TREE_URL.exec(url);
     // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
@@ -5502,7 +5502,7 @@ function commitRelativeFetchImpl({ workflows, trees, files = {} }) {
       if (!tree) {
         return { ok: false, status: 404, statusText: "Not Found" };
       }
-      return { ok: true, json: async () => ({ sha: treeMatch[1], truncated: false, tree }) };
+      return { ok: true, json: async () => ({ sha: treeMatch[1], truncated, tree }) };
     }
     const rawMatch = COMMIT_RELATIVE_RAW_URL.exec(url);
     // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
@@ -5694,6 +5694,190 @@ test("Dependabot SHA bump declines a ./ nested workflow whose blob changed", asy
     ),
   );
 });
+
+function dollarStepWorkflow(uses) {
+  return REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE.replace(
+    "- uses: $/.github/actions/scan-setup",
+    `- uses: ${JSON.stringify(uses)}`,
+  );
+}
+
+// Serves the same workflow, tree, and files at the basis and the candidate,
+// so any decline comes from the reference shape or the shared content.
+function unchangedCommitRelativeFetchImpl({
+  workflow = REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+  tree = scanSetupTree(SCAN_SETUP_TREE_SHA),
+  actionSource = SCAN_SETUP_COMPOSITE_SOURCE,
+  truncated = false,
+} = {}) {
+  return commitRelativeFetchImpl({
+    workflows: { [SHA]: workflow, [DEPENDABOT_BUMP_SHA]: workflow },
+    trees: { [SHA]: tree, [DEPENDABOT_BUMP_SHA]: tree },
+    files: { ".github/actions/scan-setup/action.yml": actionSource },
+    truncated,
+  });
+}
+
+async function unchangedBumpDecline(options) {
+  const root = await dependabotBumpRepository();
+  return contractFindingMessage(
+    await audit(root, { fetchImpl: unchangedCommitRelativeFetchImpl(options) }),
+  );
+}
+
+for (const uses of ["$/.github/actions/../../x", "$/./x", "$//x", "$/x@main", "$/%2e%2e/x", "$/"]) {
+  test(`Dependabot SHA bump declines the non-plain $/ reference ${uses}`, async () => {
+    const message = await unchangedBumpDecline({ workflow: dollarStepWorkflow(uses) });
+    assert.ok(
+      message.includes(`uses ${uses}, which is not a plain repository directory path`),
+      message,
+    );
+  });
+}
+
+test("Dependabot SHA bump declines a $/ reference that names a file, not a directory", async () => {
+  const message = await unchangedBumpDecline({
+    tree: [{ path: ".github/actions/scan-setup", type: "blob", sha: SCAN_SETUP_TREE_SHA }],
+  });
+  assert.match(
+    message,
+    /commit-relative reference \.github\/actions\/scan-setup is not a directory/,
+  );
+});
+
+test("Dependabot SHA bump declines a $/ action directory without action.yml", async () => {
+  const message = await unchangedBumpDecline({
+    tree: [{ path: ".github/actions/scan-setup", type: "tree", sha: SCAN_SETUP_TREE_SHA }],
+  });
+  assert.match(
+    message,
+    /\.github\/actions\/scan-setup@[0-9a-f]{40} has no action\.yml or action\.yaml/,
+  );
+});
+
+test("Dependabot SHA bump declines when the commit tree is truncated", async () => {
+  const message = await unchangedBumpDecline({ truncated: true });
+  assert.match(
+    message,
+    /the git tree of melodic-software\/ci-workflows@[0-9a-f]{40} is truncated or malformed/,
+  );
+});
+
+test("Dependabot SHA bump declines with a readable reason when action content rejects with a non-Error", async () => {
+  const root = await dependabotBumpRepository();
+  const inner = unchangedCommitRelativeFetchImpl();
+  const findings = await audit(root, {
+    fetchImpl: async (url, init) =>
+      url.endsWith("/.github/actions/scan-setup/action.yml")
+        ? {
+            ok: true,
+            text: () => Promise.reject("connection reset"),
+          }
+        : inner(url, init),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    /could not fetch melodic-software\/ci-workflows\/\.github\/actions\/scan-setup\/action\.yml@[0-9a-f]{40}: connection reset/,
+  );
+});
+
+test("Dependabot SHA bump declines when only the reviewed basis reaches a $/ action", async () => {
+  const root = await dependabotBumpRepository();
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    new RegExp(
+      `commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
+    ),
+  );
+});
+
+for (const [shape, entry] of [
+  ["symlink", { type: "blob", mode: "120000" }],
+  ["submodule", { type: "commit", mode: "160000" }],
+]) {
+  test(`Dependabot SHA bump declines a $/ action directory holding a ${shape}`, async () => {
+    const message = await unchangedBumpDecline({
+      tree: scanSetupTree(SCAN_SETUP_TREE_SHA, {
+        extra: [{ path: ".github/actions/scan-setup/outside", sha: SHARED_TREE_SHA, ...entry }],
+      }),
+    });
+    assert.match(
+      message,
+      /contains the symlink or submodule \.github\/actions\/scan-setup\/outside/,
+    );
+  });
+}
+
+for (const field of ["main", "pre", "post", "image"]) {
+  test(`Dependabot SHA bump declines a $/ action whose runs.${field} leaves its directory`, async () => {
+    const message = await unchangedBumpDecline({
+      actionSource: `name: scan-setup\nruns:\n  using: node24\n  ${field}: ../other/index.js\n`,
+    });
+    assert.ok(
+      message.includes(`runs.${field} ../other/index.js leaves the action directory`),
+      message,
+    );
+  });
+}
+
+test("Dependabot SHA bump declines a composite $/ action whose steps are not a list", async () => {
+  const message = await unchangedBumpDecline({
+    actionSource: "name: scan-setup\nruns:\n  using: composite\n  steps:\n    run: echo setup\n",
+  });
+  assert.match(message, /composite runs\.steps is not a list/);
+});
+
+test("Dependabot SHA bump declines a job-level $/ nested workflow", async () => {
+  const workflow = REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE.replace(
+    "uses: ./.github/workflows/nested-scan.yml",
+    "uses: $/.github/workflows/nested-scan.yml",
+  );
+  const nestedTree = [
+    { path: ".github/workflows/nested-scan.yml", type: "blob", sha: NESTED_SCAN_BLOB_SHA },
+  ];
+  const message = await unchangedBumpDecline({ workflow, tree: nestedTree });
+  assert.match(
+    message,
+    /job nested uses \$\/\.github\/workflows\/nested-scan\.yml; GitHub documents \$\/ for actions only/,
+  );
+});
+
+for (const [label, githubToken, expected] of [
+  ["sends GITHUB_TOKEN as a bearer token", "test-token", "Bearer test-token"],
+  ["stays unauthenticated without GITHUB_TOKEN", "", undefined],
+]) {
+  test(`commit tree request ${label}`, async () => {
+    const root = await dependabotBumpRepository();
+    const inner = unchangedCommitRelativeFetchImpl();
+    const authorizations = new Map();
+    const findings = await audit(root, {
+      githubToken,
+      fetchImpl: async (url, init) => {
+        authorizations.set(
+          url.startsWith("https://api.github.com/") ? "api" : "raw",
+          init?.headers?.authorization,
+        );
+        return inner(url, init);
+      },
+    });
+    assert.deepEqual(findings, []);
+    assert.equal(authorizations.get("api"), expected);
+    assert.equal(authorizations.get("raw"), undefined);
+  });
+}
 
 // Regression test for a gap where workflow-level `defaults` sat outside
 // every compared surface field. GitHub applies `defaults.run.shell` and
