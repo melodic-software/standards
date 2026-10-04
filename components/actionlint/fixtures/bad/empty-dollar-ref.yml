@@ -1,0 +1,8 @@
+# A bare `$/` with no path: the `$/` ignore must not admit it.
+name: empty-dollar-ref fixture
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: $/
