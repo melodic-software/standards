@@ -2,9 +2,9 @@
 
 // Lockstep check: the ci-workflows `pr-automerge-dependabot.yml` reusable
 // carries its own copy of `autoMerge.publisherAllowlist` as the
-// PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at the
+// PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at every
 // SHA runner-policy approves for it and fails when that constant differs from
-// `policy.json`. The pure checks are exported for automerge-lockstep.test.mjs.
+// `policy.json` at any of them. The pure checks are exported for automerge-lockstep.test.mjs.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -23,16 +23,16 @@ export class LockstepError extends Error {
   }
 }
 
-export function resolveApprovedSha(runnerPolicy) {
+export function resolveApprovedShas(runnerPolicy) {
   const pins = Object.keys(runnerPolicy.approvedReusableWorkflowContracts ?? {})
     .filter((key) => key.startsWith(CONTRACT_PREFIX))
     .map((key) => key.slice(CONTRACT_PREFIX.length));
-  if (pins.length !== 1) {
+  if (pins.length === 0) {
     throw new LockstepError(
-      `lockstep: expected exactly one runner-policy contract for ${REUSABLE_PATH}, found ${pins.length} (${pins.join(", ")}); this check reads its SHA from that key`,
+      `lockstep: expected a runner-policy contract for ${REUSABLE_PATH}, found 0; this check reads its SHAs from those keys`,
     );
   }
-  return pins[0];
+  return pins;
 }
 
 export function extractPublisherAllowlist(workflowText) {
@@ -99,15 +99,17 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     JSON.parse(await readFile(path.join(import.meta.dirname, ...segments), "utf8"));
   let sha;
   try {
-    sha = resolveApprovedSha(await readJson("..", "runner-policy", "policy.json"));
-    const workflowText = await fetchText(
-      `https://api.github.com/repos/melodic-software/ci-workflows/contents/${REUSABLE_PATH}?ref=${sha}`,
-    );
-    checkLockstep(await readJson("policy.json"), workflowText);
-    // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
-    console.log(
-      `dependabot automerge lockstep: PUBLISHER_ALLOWLIST at ${sha.slice(0, 7)} matches policy.json`,
-    );
+    const dependabotPolicy = await readJson("policy.json");
+    for (sha of resolveApprovedShas(await readJson("..", "runner-policy", "policy.json"))) {
+      const workflowText = await fetchText(
+        `https://api.github.com/repos/melodic-software/ci-workflows/contents/${REUSABLE_PATH}?ref=${sha}`,
+      );
+      checkLockstep(dependabotPolicy, workflowText);
+      // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
+      console.log(
+        `dependabot automerge lockstep: PUBLISHER_ALLOWLIST at ${sha.slice(0, 7)} matches policy.json`,
+      );
+    }
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
     console.error(sha ? `${error.message} (checked at ${sha})` : error.message);
