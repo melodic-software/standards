@@ -315,6 +315,10 @@ components:
   shellcheck:
     files:
       .shellcheckrc: .shellcheckrc
+  trusted-actors:
+    files:
+      components/trusted-actors/trusted-actors.json: .github/standards/trusted-actors/trusted-actors.json
+      components/trusted-actors/trusted-actors.schema.json: .github/standards/trusted-actors/trusted-actors.schema.json
   typos:
     files:
       _typos.toml: _typos.toml
@@ -470,6 +474,7 @@ targets:
       - review-instructions
       - runner-policy
       - shellcheck
+      - trusted-actors
       - typos
     # Takes the hosted lane pair like the other public targets. Its former
     # hand-written callers sat at the fleet destinations with the same

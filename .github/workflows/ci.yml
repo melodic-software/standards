@@ -1017,6 +1017,8 @@ jobs:
         run: bash distribution/sync-manifest.test.sh
       - name: Claude-permissions tombstone contract test
         run: bash harness/shell/run-tests.sh components/claude-permissions/claude-permissions.test.sh
+      - name: Trusted-actors list contract test
+        run: node --test components/trusted-actors/trusted-actors.test.mjs
       - name: Claude-settings target conformance test
         run: bash harness/shell/run-tests.sh distribution/check-claude-settings-targets.test.sh
       - name: Validate production manifest
