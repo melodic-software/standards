@@ -1069,6 +1069,16 @@ secrets. It pins `dependabot/fetch-metadata` v3.1.0
 `npm run lint:dependabot-automerge-lockstep` enforces. Hosted `ubuntu-24.04`
 with write scopes needs no exception on a public repository; a private consumer
 needs a `privileged-control-plane` exception or the fleet.
+All nine reusables consumers pin are registered at the v0.36.0 tag
+`fb56986808750d6856c27de78df15e150027b8dc`, each a verbatim copy of its entry at
+`7446b51` (`pr-automerge-dependabot` at `69e506b`). Six workflow blobs are
+byte-identical and the repin lockstep reports their surface and `$/` object
+trees unchanged. `maintenance-sync-standards` is byte-identical but secret-capable,
+so its copy was signed off by hand. `pr-run-checks` changes only its two `$/`
+composite paths (`machine-specific-paths` to `check-machine-paths`,
+`comment-hygiene` to `check-comment-markers`), whose trees are identical; a
+renamed path never auto-copies, so it was hand-reviewed. No input, secret,
+caller permission or `runs-on` routing moved.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
