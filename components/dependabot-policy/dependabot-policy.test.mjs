@@ -20,7 +20,7 @@ const CONFORMANT = `  - package-ecosystem: npm
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -100,7 +100,7 @@ test("multiple conformant entries including the directories plural form pass", a
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       github-actions:
         patterns:
@@ -111,7 +111,7 @@ test("multiple conformant entries including the directories plural form pass", a
 });
 
 test("a longer cooldown than the floor passes", async () => {
-  const entry = CONFORMANT.replace("default-days: 7", "default-days: 14");
+  const entry = CONFORMANT.replace("default-days: 3", "default-days: 14");
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(await auditRepository({ root }), []);
 });
@@ -145,15 +145,15 @@ test("a missing cooldown is flagged", async () => {
 });
 
 test("a cooldown below the floor is flagged", async () => {
-  const entry = CONFORMANT.replace("default-days: 7", "default-days: 3");
+  const entry = CONFORMANT.replace("default-days: 3", "default-days: 2");
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
 });
 
 test("a match-all cooldown exclude bypasses the soak and is flagged", async () => {
   const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 7\n",
-    '    cooldown:\n      default-days: 7\n      exclude:\n        - "*"\n',
+    "    cooldown:\n      default-days: 3\n",
+    '    cooldown:\n      default-days: 3\n      exclude:\n        - "*"\n',
   );
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
@@ -161,8 +161,8 @@ test("a match-all cooldown exclude bypasses the soak and is flagged", async () =
 
 test("a cooldown include restricts the soak and is flagged", async () => {
   const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 7\n",
-    '    cooldown:\n      default-days: 7\n      include:\n        - "some-dep"\n',
+    "    cooldown:\n      default-days: 3\n",
+    '    cooldown:\n      default-days: 3\n      include:\n        - "some-dep"\n',
   );
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
@@ -170,8 +170,8 @@ test("a cooldown include restricts the soak and is flagged", async () => {
 
 test("a narrow first-party cooldown exclude still passes", async () => {
   const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 7\n",
-    '    cooldown:\n      default-days: 7\n      exclude:\n        - "melodic-software/*"\n',
+    "    cooldown:\n      default-days: 3\n",
+    '    cooldown:\n      default-days: 3\n      exclude:\n        - "melodic-software/*"\n',
   );
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(await auditRepository({ root }), []);
@@ -179,8 +179,8 @@ test("a narrow first-party cooldown exclude still passes", async () => {
 
 test("a cooldown waiver also suppresses a bypassed soak", async () => {
   const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 7\n",
-    '    cooldown:\n      default-days: 7\n      exclude:\n        - "*"\n',
+    "    cooldown:\n      default-days: 3\n",
+    '    cooldown:\n      default-days: 3\n      exclude:\n        - "*"\n',
   );
   const root = await repository({
     dependabotYaml: dependabot(entry),
@@ -215,7 +215,7 @@ test("a missing groups block is flagged", async () => {
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
 `;
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
@@ -240,7 +240,7 @@ test("a groups block that only applies to security updates is flagged", async ()
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       security-only:
         applies-to: security-updates
@@ -258,7 +258,7 @@ test("a groups block that explicitly applies to version updates passes", async (
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       versions:
         applies-to: version-updates
@@ -276,7 +276,7 @@ test("a version group that excludes every pattern is flagged", async () => {
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       versions:
         patterns:
@@ -295,7 +295,7 @@ test("a match-all ignore rule disables updates and is flagged", async () => {
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -315,7 +315,7 @@ test("a narrow ignore rule still passes", async () => {
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -375,7 +375,7 @@ test("single-tool-ecosystem waives the groups requirement", async () => {
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
 `;
   const root = await repository({
     dependabotYaml: dependabot(entry),
@@ -508,8 +508,8 @@ test("an update entry missing identity keys is flagged", async () => {
 
 test("a semver-specific cooldown below the floor is flagged", async () => {
   const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 7\n",
-    "    cooldown:\n      default-days: 7\n      semver-patch-days: 0\n",
+    "    cooldown:\n      default-days: 3\n",
+    "    cooldown:\n      default-days: 3\n      semver-patch-days: 0\n",
   );
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
@@ -549,4 +549,30 @@ test("duplicate JSON members in the config fail closed", () => {
     () => parseUniqueJson('{"schemaVersion":1,"schemaVersion":1}', "config at /tmp/c.json"),
     (error) => error instanceof ConfigurationError && error.message.includes("duplicate"),
   );
+});
+
+test("an auto-merge allowlist entry that is not a whole publisher fails closed", async () => {
+  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+  const policy = {
+    schemaVersion: 1,
+    scheduleInterval: "weekly",
+    cooldownMinimumDays: 3,
+    maxOpenPullRequests: 5,
+    requireGroups: true,
+    autoMerge: {
+      ecosystems: ["github-actions"],
+      publisherAllowlist: ["actions/checkout"],
+      excludeSemverMajor: true,
+      requiredCheck: "ci-status",
+    },
+  };
+  const policyPath = path.join(root, "policy.json");
+  await writeFile(policyPath, JSON.stringify(policy));
+  await assert.rejects(
+    auditRepository({ root, policyPath }),
+    (error) => error instanceof ConfigurationError && error.message.includes("publisherAllowlist"),
+  );
+  policy.autoMerge.publisherAllowlist = ["actions/*"];
+  await writeFile(policyPath, JSON.stringify(policy));
+  assert.deepEqual(await auditRepository({ root, policyPath }), []);
 });

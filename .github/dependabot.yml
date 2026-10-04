@@ -1,8 +1,9 @@
 version: 2
 updates:
   # Keep SHA-pinned actions current — including the cross-repo ci-workflows
-  # composite actions referenced from .github/workflows/ci.yml. Review every PR
-  # before merge; never auto-merge (a SHA bump is executable CI logic). Bumping
+  # composite actions referenced from .github/workflows/ci.yml. Merge lanes per
+  # components/dependabot-policy: the vendor-actions group (non-major only) may
+  # auto-merge once ci-status passes; every other PR is reviewed by hand. Bumping
   # the pin to the private ci-workflows repo requires the org-level "Grant
   # Dependabot access to private repositories" setting to include ci-workflows.
   # Delay version bumps so a compromised or yanked release is caught before we
@@ -15,13 +16,21 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
       # First-party melodic-software/* actions skip the supply-chain wait so our
       # own ci-workflows fixes propagate without the cooldown delay.
       exclude:
         - "melodic-software/*"
-    # Collapse all action bumps into one PR to cut review noise.
+    # Vendor bumps get their own PR so a community bump never blocks the
+    # auto-merge lane; a dependency joins the first group that matches it.
     groups:
+      vendor-actions:
+        patterns:
+          - "actions/*"
+          - "github/*"
+          - "anthropics/*"
+        # Majors fall through to the reviewed group below.
+        update-types: ["minor", "patch"]
       github-actions:
         patterns:
           - "*"
@@ -37,7 +46,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     # Batch minor and patch bumps into one PR; majors stay individual so
     # breaking changes get their own review.
     groups:
@@ -57,7 +66,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -74,7 +83,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -89,7 +98,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -106,7 +115,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -123,7 +132,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
@@ -137,7 +146,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 3
     groups:
       npm-minor-patch:
         update-types:
