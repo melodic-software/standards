@@ -52,12 +52,15 @@ const RULES_FILE_PATH = path.join(
 const API_BASE = "https://api.github.com/repos/melodic-software";
 const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
 
-export const COMPOSITE_DIRECTORY = ".github/actions/pr-contract";
+// The ci-workflows naming rename moves the composite; until every consumer
+// repins, a pin may name either path. The renamed path comes first.
+export const COMPOSITE_DIRECTORIES = [
+  ".github/actions/pr-require-checks/check-contract",
+  ".github/actions/pr-contract",
+];
 const REUSABLE_PATH = ".github/workflows/pr-issue-linkage.yml";
 
 export const COPY_SOURCES = {
-  gateRun: contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/run.sh`),
-  gateAction: contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/action.yml`),
   hookValidator: contentsUrl(
     "claude-code-plugins",
     "main",
@@ -91,10 +94,11 @@ export const CONSUMER_REPOSITORIES = [
 // the required contexts, so a lost caller there is as much a gate removal as
 // anywhere else. Fail closed.
 
-// The composite is called from the `ci-status` job, which lives in `ci.yml`
-// everywhere except medley. Scanning these first lets the common case
-// short-circuit instead of reading a whole workflow directory.
-const WORKFLOW_SCAN_PRIORITY = ["ci.yml", "ci-status.yml"];
+// The composite is called from the `ci-status` job, which lives in
+// `pr-require-checks.yml` after the rename, `ci.yml` before it, and
+// `ci-status.yml` in medley. Scanning these first, in this order, lets the
+// common case short-circuit instead of reading a whole workflow directory.
+const WORKFLOW_SCAN_PRIORITY = ["pr-require-checks.yml", "ci.yml", "ci-status.yml"];
 
 export class DriftError extends Error {
   constructor(message) {
@@ -335,15 +339,18 @@ export function parseValidatorPatterns(shellText, location) {
 // leaves commented-out call sites behind; either one would otherwise select an
 // artifact the repository does not run and suppress the one it does.
 const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
+const COMPOSITE_DIRECTORY_GROUP = `(${COMPOSITE_DIRECTORIES.map((directory) =>
+  directory.replaceAll(".", "\\."),
+).join("|")})`;
 // A `uses:` of the composite, pinned to a 40-hex ci-workflows SHA.
 const COMPOSITE_PIN_PATTERN = new RegExp(
-  `${USES_PREFIX}melodic-software/ci-workflows/\\.github/actions/pr-contract@([0-9a-f]{40})`,
+  `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_GROUP}@([0-9a-f]{40})`,
   "m",
 );
 // ci-workflows dogfoods its own composite through a local `./` reference,
 // which carries no SHA — the artifact is that repository's own tree at `main`.
 const COMPOSITE_LOCAL_PATTERN = new RegExp(
-  `${USES_PREFIX}\\./\\.github/actions/pr-contract(?=\\s|$)`,
+  `${USES_PREFIX}\\./${COMPOSITE_DIRECTORY_GROUP}(?=\\s|$)`,
   "m",
 );
 const REUSABLE_PIN_PATTERN = new RegExp(
@@ -357,10 +364,11 @@ const REUSABLE_PIN_PATTERN = new RegExp(
 export function detectArtifactPin(workflowText) {
   const pinned = workflowText.match(COMPOSITE_PIN_PATTERN);
   if (pinned) {
-    return { kind: "composite", sha: pinned[1] };
+    return { kind: "composite", sha: pinned[2], directory: pinned[1] };
   }
-  if (COMPOSITE_LOCAL_PATTERN.test(workflowText)) {
-    return { kind: "composite", sha: "main" };
+  const local = workflowText.match(COMPOSITE_LOCAL_PATTERN);
+  if (local) {
+    return { kind: "composite", sha: "main", directory: local[1] };
   }
   const reusable = workflowText.match(REUSABLE_PIN_PATTERN);
   if (reusable) {
@@ -816,6 +824,33 @@ async function fetchText(url) {
   return await response.text();
 }
 
+async function fetchTextOrNull(url) {
+  const response = await fetchWithRetry(url, "application/vnd.github.raw+json", {
+    notFoundIsNull: true,
+  });
+  return response === null ? null : await response.text();
+}
+
+// The live gate on ci-workflows `main`, at the first composite path that
+// exists there. `readOrNull` returns null for a missing file.
+export async function readGateComposite(readOrNull) {
+  for (const directory of COMPOSITE_DIRECTORIES) {
+    const gateRun = await readOrNull(contentsUrl("ci-workflows", "main", `${directory}/run.sh`));
+    if (gateRun === null) {
+      continue;
+    }
+    const actionUrl = contentsUrl("ci-workflows", "main", `${directory}/action.yml`);
+    const gateAction = await readOrNull(actionUrl);
+    if (gateAction === null) {
+      throw new FetchError(`fetch-error: ${actionUrl}: HTTP 404`);
+    }
+    return { gateRun, gateAction };
+  }
+  throw new FetchError(
+    `fetch-error: ci-workflows main has no composite at ${COMPOSITE_DIRECTORIES.join(" or ")}`,
+  );
+}
+
 async function fetchDirectory(url) {
   const response = await fetchWithRetry(url, "application/vnd.github+json", {
     notFoundIsNull: true,
@@ -827,19 +862,26 @@ async function fetchDirectory(url) {
 }
 
 function scanOrder(names) {
-  const rank = (name) => (WORKFLOW_SCAN_PRIORITY.includes(name) ? 0 : 1);
+  const rank = (name) => {
+    const index = WORKFLOW_SCAN_PRIORITY.indexOf(name);
+    return index === -1 ? WORKFLOW_SCAN_PRIORITY.length : index;
+  };
   return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+async function listWorkflowNames(repo) {
+  const entries = await fetchDirectory(`${API_BASE}/${repo}/contents/.github/workflows?ref=main`);
+  return entries
+    .filter((entry) => entry.type === "file" && /\.ya?ml$/.test(entry.name))
+    .map((entry) => entry.name);
 }
 
 // Reads a repository's workflow directory and returns the artifact it runs.
 // The composite short-circuits the scan; a reusable pin is remembered but the
 // scan continues, because a repository mid-transition can carry both and the
 // composite is the one that gates.
-async function resolveConsumerArtifact(repo, cachedText) {
-  const entries = await fetchDirectory(`${API_BASE}/${repo}/contents/.github/workflows?ref=main`);
-  const names = entries
-    .filter((entry) => entry.type === "file" && /\.ya?ml$/.test(entry.name))
-    .map((entry) => entry.name);
+export async function resolveConsumerArtifact(repo, cachedText, listNames = listWorkflowNames) {
+  const names = await listNames(repo);
   let reusable = null;
   for (const name of scanOrder(names)) {
     const text = await cachedText(contentsUrl(repo, "main", `.github/workflows/${name}`));
@@ -858,16 +900,16 @@ async function resolveConsumerArtifact(repo, cachedText) {
 export async function runLiveCheck() {
   const policy = parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH);
   const cache = new Map();
-  const cachedText = async (url) => {
+  const cached = (fetcher) => async (url) => {
     if (!cache.has(url)) {
-      cache.set(url, await fetchText(url));
+      cache.set(url, await fetcher(url));
     }
     return cache.get(url);
   };
+  const cachedText = cached(fetchText);
 
   const texts = {
-    gateRun: await cachedText(COPY_SOURCES.gateRun),
-    gateAction: await cachedText(COPY_SOURCES.gateAction),
+    ...(await readGateComposite(cached(fetchTextOrNull))),
     hookValidator: await cachedText(COPY_SOURCES.hookValidator),
     orgTemplate: await cachedText(COPY_SOURCES.orgTemplate),
     rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
@@ -894,10 +936,8 @@ export async function runLiveCheck() {
         resolutions.set(repo, {
           kind: "composite",
           sha: found.sha,
-          runSh: await cachedText(contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/run.sh`)),
-          actionYml: await cachedText(
-            contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/action.yml`),
-          ),
+          runSh: await cachedText(contentsUrl(source, ref, `${found.directory}/run.sh`)),
+          actionYml: await cachedText(contentsUrl(source, ref, `${found.directory}/action.yml`)),
         });
         continue;
       }
