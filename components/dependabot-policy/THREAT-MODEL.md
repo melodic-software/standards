@@ -71,7 +71,11 @@ are trusted only at their reviewed Git revision.
 
 - The analyzer checks policy shape, not dependency safety. It does not evaluate
   whether a specific bump is malicious; the cooldown soak, security-update
-  bypass, and human review of each pull request remain the controls for that.
+  bypass, the required `ci-status` check, and human review of every
+  manual-lane pull request remain the controls for that. An auto-lane bump
+  (a non-major release from an allowlisted vendor publisher) merges with no
+  human review, so for that lane the cooldown and `ci-status` are the only
+  controls; see the [merge lanes](README.md#merge-lanes-for-github-actions-bumps).
 - Dependabot options can change after a passing audit. The standard tracks the
   reviewed option set and values, not all future service behavior.
 - Grouping and the pull-request cap bound bot-pull-request volume but not the

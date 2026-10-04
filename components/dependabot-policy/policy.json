@@ -1,7 +1,13 @@
 {
   "schemaVersion": 1,
   "scheduleInterval": "weekly",
-  "cooldownMinimumDays": 7,
+  "cooldownMinimumDays": 3,
   "maxOpenPullRequests": 5,
-  "requireGroups": true
+  "requireGroups": true,
+  "autoMerge": {
+    "ecosystems": ["github-actions"],
+    "publisherAllowlist": ["actions/*", "github/*", "anthropics/*"],
+    "excludeSemverMajor": true,
+    "requiredCheck": "ci-status"
+  }
 }
