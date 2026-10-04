@@ -1034,6 +1034,24 @@ mapping, and its allowed inputs are `runner`, `allowed-labels`,
 left out, so a caller cannot change the model or turn budget. Hosted
 `ubuntu-24.04` with `issues: write` needs no exception on a public repository;
 a private consumer needs a `privileged-control-plane` exception or the fleet.
+The eight paths ci-workflows#669 renamed are registered at the v0.34.0 tag
+`7446b5165511796b7b0d30b68d341689ebb8de61` under their new names, each a
+verbatim copy of the old path's last reviewed entry: `pr-run-checks` from
+`checks` and `intake-label-needs-triage`, `pr-scan-dependencies` and
+`pr-audit-workflows` from `issue-triage-label`, `osv-scanner` and `zizmor` at
+v0.27.1; `pr-review` and `pr-review-security` from the lanes at v0.32.0
+`0a99a32989ec1303fcbca233370f4210e888a0f4`; `intake-triage` from
+`claude-intake-triage` at v0.33.0; `maintenance-sync-standards` from
+`standards-sync` at v0.30.1. A renamed path is a new key, so the repin lane
+never copies it; these entries are written by review. Besides the renames,
+job-id changes and comment edits, the diffs move three things: both review
+lanes bump `anthropics/claude-code-action` from v1.0.235 to v1.0.240
+(`ed670b4`), `pr-audit-workflows` bumps `codeql-action/upload-sarif` from
+v4.38.0 to v4.38.1 (`1c5b675`), and `pr-run-checks`, `intake-triage` and the lanes resolve their
+composites through `$/` at the release commit instead of v0.27.0 pins. Both
+upstream SHAs match their release tags. No input, secret, caller permission or
+`runs-on` routing moved. The old keys stay for consumers pinned at v0.33.0 or
+earlier.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
