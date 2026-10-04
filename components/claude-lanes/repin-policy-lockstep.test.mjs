@@ -13,6 +13,7 @@ import {
   pairCallerPins,
   planLockstep,
   rewriteCallerFiles,
+  settleLockstep,
 } from "./repin-policy-lockstep.mjs";
 
 const SYNC_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/standards-sync.yml";
@@ -278,6 +279,65 @@ test("a same-path pin beside a rename still plans its copy-forward, and the rena
   assert.deepEqual(plan.copyForwards, [
     { kind: "reusable", workflowPath: SYNC_WORKFLOW, oldSha: oldA, newSha: FRESH_SHA },
   ]);
+});
+
+test("a same-path pin whose surface changed is declined, not copied forward", () => {
+  const plan = planLockstep(
+    [
+      {
+        kind: "lane",
+        oldWorkflowPath: REVIEW_WORKFLOW,
+        oldSha: CURRENT_REVIEW_SHA,
+        newWorkflowPath: REVIEW_WORKFLOW,
+      },
+    ],
+    FRESH_SHA,
+    () => ({ unchanged: false, reason: "x" }),
+  );
+  assert.deepEqual(plan.copyForwards, []);
+  assert.deepEqual(plan.reasons, [`${REVIEW_WORKFLOW} x (from 91d06c9)`]);
+});
+
+async function policyRoot() {
+  const root = await mkdtemp(path.join(tmpdir(), "repin-settle-"));
+  temporaryRoots.push(root);
+  const rel = "components/runner-policy/policy.json";
+  await mkdir(path.join(root, path.dirname(rel)), { recursive: true });
+  const bytes = await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8");
+  await writeFile(path.join(root, rel), bytes);
+  return { file: path.join(root, rel), root, bytes };
+}
+
+const reviewCopyForward = {
+  kind: "lane",
+  workflowPath: REVIEW_WORKFLOW,
+  oldSha: CURRENT_REVIEW_SHA,
+  newSha: FRESH_SHA,
+};
+
+test("settleLockstep writes no policy.json when any pin was declined", async () => {
+  const { file, root, bytes } = await policyRoot();
+  const output = await settleLockstep(
+    { reasons: ["x"], copyForwards: [reviewCopyForward] },
+    FRESH_SHA,
+    "v0.34.0",
+    root,
+  );
+  assert.equal(await readFile(file, "utf8"), bytes);
+  assert.deepEqual(output[0], ["lockstep", "manual"]);
+});
+
+test("settleLockstep writes the copy-forward when nothing was declined", async () => {
+  const { file, root } = await policyRoot();
+  const output = await settleLockstep(
+    { reasons: [], copyForwards: [reviewCopyForward] },
+    FRESH_SHA,
+    "v0.34.0",
+    root,
+  );
+  const written = JSON.parse(await readFile(file, "utf8"));
+  assert.ok(written.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${FRESH_SHA}`]);
+  assert.deepEqual(output[0], ["lockstep", "applied"]);
 });
 
 test("a selector copy-forward throws and adds no selector key", async () => {

@@ -25,7 +25,8 @@ import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const UPSTREAM = "melodic-software/ci-workflows";
-const POLICY_PATH = path.join(ROOT, "components/runner-policy/policy.json");
+const POLICY_REL = "components/runner-policy/policy.json";
+const POLICY_PATH = path.join(ROOT, POLICY_REL);
 
 /**
  * Each entry is the caller files that pin one upstream reusable. The
@@ -323,11 +324,12 @@ export function copyForwardContracts(policy, copyForwards) {
   return changed;
 }
 
-async function updatePolicyJson(copyForwards) {
-  const policy = JSON.parse(await readFile(POLICY_PATH, "utf8"));
+async function updatePolicyJson(copyForwards, root) {
+  const policyPath = path.join(root, POLICY_REL);
+  const policy = JSON.parse(await readFile(policyPath, "utf8"));
   const changed = copyForwardContracts(policy, copyForwards);
   if (changed) {
-    await writeFile(POLICY_PATH, `${JSON.stringify(policy, null, 2)}\n`);
+    await writeFile(policyPath, `${JSON.stringify(policy, null, 2)}\n`);
   }
   return changed;
 }
@@ -373,26 +375,31 @@ async function main() {
     return laneSecuritySurfacesMatch(oldSource, newSource, pin.newWorkflowPath, policy);
   });
 
+  await appendOutput(outputFile, await settleLockstep({ reasons, copyForwards }, newSha, tag));
+}
+
+/**
+ * Any decline suppresses every write: with a reason present, policy.json and
+ * the callers stay as they are and only the human checklist is returned.
+ * Returns the GITHUB_OUTPUT pairs.
+ */
+export async function settleLockstep({ reasons, copyForwards }, newSha, tag, root = ROOT) {
   if (reasons.length > 0) {
     const unchangedPaths = [...new Set(copyForwards.map((item) => item.workflowPath))];
-    const note = manualPolicyNote(reasons.join("; "), tag, unchangedPaths);
     emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
-    await appendOutput(outputFile, [
+    return [
       ["lockstep", "manual"],
-      ["policy-note", note],
-    ]);
-    return;
+      ["policy-note", manualPolicyNote(reasons.join("; "), tag, unchangedPaths)],
+    ];
   }
 
-  const policyChanged = await updatePolicyJson(copyForwards);
-  const callerChanged = await rewriteCallerFiles(newSha, tag);
-  const note = appliedPolicyNote(tag);
-
+  const policyChanged = await updatePolicyJson(copyForwards, root);
+  const callerChanged = await rewriteCallerFiles(newSha, tag, root);
   emitNotice(`Policy lockstep applied (policy=${policyChanged}, caller=${callerChanged}).`);
-  await appendOutput(outputFile, [
+  return [
     ["lockstep", "applied"],
-    ["policy-note", note],
-  ]);
+    ["policy-note", appliedPolicyNote(tag)],
+  ];
 }
 
 if (import.meta.url === pathToFileURL(path.resolve(process.argv[1] ?? "")).href) {
