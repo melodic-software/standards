@@ -234,7 +234,7 @@ Two properties of that ride are deliberate:
   repository, Dependabot's `github-actions` ecosystem scans
   `.github/workflows/` only, so the component's checkout pin never moves on
   its own; the contract test asserts it equals the sibling workflows' pin, so
-  a Dependabot bump of those workflows fails the `actionlint` lane until the
+  a Dependabot bump of those workflows fails the `check-github-actions` job until the
   component follows in the same change. That is the checkout advance path,
   and it is deliberate lockstep, not friction to remove. In a consumer, its
   own Dependabot will propose bumping `actions/checkout` inside the managed

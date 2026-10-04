@@ -172,7 +172,7 @@ the underlying alert visible is an open decision, tracked on
 ## Enforcement gate
 
 The gate installs the component's locked runtime and runs the analyzer against
-the repository. In this repository the `dependabot-policy` CI job does exactly
+the repository. In this repository the `check-policies` CI job does exactly
 that; a consumer adds the equivalent job in its own integration change:
 
 ```yaml
