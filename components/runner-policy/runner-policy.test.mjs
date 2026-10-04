@@ -1079,6 +1079,32 @@ test("public repository rejects claude-review contracts listing visibility-scope
   ]);
 });
 
+for (const workflowFile of ["pr-review.yml", "pr-review-security.yml"]) {
+  test(`public repository rejects ${workflowFile} contracts listing visibility-scoped surface`, async () => {
+    const reference = `melodic-software/ci-workflows/.github/workflows/${workflowFile}@${SHA}`;
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [reference]: claudeReviewSensitiveContract()[CLAUDE_REVIEW_SENSITIVE_REFERENCE],
+        },
+      },
+      workflows: {
+        "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      },
+    });
+    const findings = await audit(root, { repositoryVisibility: "public" });
+    assert.deepEqual(findings, [
+      {
+        rule: "visibility-scoped-reusable-contract",
+        file: "runner-policy-policy.json",
+        message: `reusable workflow contract ${reference} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+      },
+    ]);
+  });
+}
+
 test("private repository permits claude-review contracts listing visibility-scoped surface with evidence", async () => {
   const root = await repository({
     visibility: "private",
@@ -5292,11 +5318,10 @@ test("Dependabot SHA bump is declined when the previously reviewed basis routes 
 // `uses: ./.github/workflows/<file>.yml` was recorded only as its literal
 // string. GitHub resolves the `./` prefix from the same commit as the
 // caller, so a SHA bump can leave the caller byte-identical while the
-// nested workflow changes runners or secrets underneath it -- the diff
-// never fetches the nested file, so both revisions compare as identical.
-// Both sources below are byte-identical on purpose: the decline must fire
-// on the reference shape itself, not on any observable diff.
-test("Dependabot SHA bump is declined when the called workflow delegates to a repository-local nested workflow", async () => {
+// nested workflow changes runners or secrets underneath it. Both sources
+// below are byte-identical on purpose, and the stub serves no git tree: with
+// no object SHA to compare, the decline must still fire.
+test("Dependabot SHA bump is declined when a repository-local nested workflow cannot be proven unchanged", async () => {
   const root = await repository({
     visibility: "public",
     selfHostedCi: false,
@@ -5319,16 +5344,17 @@ test("Dependabot SHA bump is declined when the called workflow delegates to a re
   assert.ok(contractFinding);
   assert.match(
     contractFinding.message,
-    /auto-approval declined: job nested uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval/,
+    new RegExp(
+      `auto-approval declined: could not fetch the git tree of melodic-software/ci-workflows@${DEPENDABOT_BUMP_SHA}: 404 Not Found`,
+    ),
   );
 });
 
-// A step-level `uses: ./path/to/action` is the same commit-relative shape
-// with a wider blast radius: the action is an arbitrary directory of
-// executable content that runs inside the job (and can read the job's
-// environment), and no single-file fetch can prove it unchanged across the
-// bump.
-test("Dependabot SHA bump is declined when a called job's step uses a repository-local action", async () => {
+// A step-level `uses: ./path/to/action` resolves from the job's checked-out
+// workspace, not from the reusable workflow's commit, so no object in the
+// source repository proves its content; it stays ineligible even when the
+// tree at that path is unchanged.
+test("Dependabot SHA bump is declined when a called job's step uses a workspace-relative action", async () => {
   const root = await repository({
     visibility: "public",
     selfHostedCi: false,
@@ -5342,16 +5368,23 @@ test("Dependabot SHA bump is declined when a called job's step uses a repository
     },
   });
   const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
     }),
   });
   const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
   assert.ok(contractFinding);
   assert.match(
     contractFinding.message,
-    /auto-approval declined: job scan uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval/,
+    /auto-approval declined: .* job scan uses the workspace-relative action \.\/\.github\/actions\/scan-setup, whose content comes from the job's checked-out workspace and cannot be safely diffed for auto-approval/,
   );
 });
 
@@ -5379,7 +5412,285 @@ test("Dependabot SHA bump is declined when the previously reviewed basis uses a 
   assert.match(
     contractFinding.message,
     new RegExp(
-      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job nested uses a repository-local action or reusable workflow, which resolves from the bumped commit and cannot be safely diffed for auto-approval`,
+      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: could not fetch the git tree of melodic-software/ci-workflows@${SHA}: 404 Not Found`,
+    ),
+  );
+});
+
+// A `$/` reference resolves from the reusable workflow's own repository at
+// the commit being run, so it moves with the SHA bump exactly as a job-level
+// `./` nested workflow does. Auto-approval compares the git object each such
+// reference names (tree for an action directory, blob for a nested workflow)
+// at the reviewed basis and at the candidate; identical object SHAs mean
+// byte-identical executed content.
+const COMMIT_RELATIVE_TREE_URL =
+  /^https:\/\/api\.github\.com\/repos\/melodic-software\/ci-workflows\/git\/trees\/([0-9a-f]{40})\?recursive=1$/;
+const COMMIT_RELATIVE_RAW_URL =
+  /^https:\/\/raw\.githubusercontent\.com\/melodic-software\/ci-workflows\/([0-9a-f]{40})\/(.+)$/;
+const SCAN_SETUP_TREE_SHA = "5ca75e7a0000000000000000000000000000aaaa";
+const SCAN_SETUP_CHANGED_TREE_SHA = "5ca75e7a0000000000000000000000000000bbbb";
+const SCAN_SETUP_ACTION_BLOB_SHA = "ac710000000000000000000000000000000000aa";
+const SHARED_TREE_SHA = "54a4ed000000000000000000000000000000aaaa";
+const SHARED_CHANGED_TREE_SHA = "54a4ed000000000000000000000000000000bbbb";
+const NESTED_SCAN_BLOB_SHA = "4e57ed000000000000000000000000000000aaaa";
+const NESTED_SCAN_CHANGED_BLOB_SHA = "4e57ed000000000000000000000000000000bbbb";
+
+const REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps:
+      - uses: $/.github/actions/scan-setup
+`;
+
+const SCAN_SETUP_COMPOSITE_SOURCE = `name: scan-setup
+runs:
+  using: composite
+  steps:
+    - run: echo setup
+      shell: bash
+`;
+
+const SCAN_SETUP_DELEGATING_COMPOSITE_SOURCE = `name: scan-setup
+runs:
+  using: composite
+  steps:
+    - uses: $/.github/actions/shared
+`;
+
+const NESTED_SCAN_WORKFLOW_SOURCE = `name: nested-scan
+on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  nested:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo nested
+`;
+
+function scanSetupTree(treeSha, { actionSource = SCAN_SETUP_ACTION_BLOB_SHA, extra = [] } = {}) {
+  return [
+    { path: ".github/actions/scan-setup", type: "tree", sha: treeSha },
+    { path: ".github/actions/scan-setup/action.yml", type: "blob", sha: actionSource },
+    ...extra,
+  ];
+}
+
+// Routes the two GitHub surfaces auto-approval reads: the recursive git tree
+// of a commit (api.github.com) and raw file content at a commit
+// (raw.githubusercontent.com). `files` maps "<sha>:<path>" or "<path>" to
+// content; every other request is a 404.
+function commitRelativeFetchImpl({ workflows, trees, files = {} }) {
+  return async (url) => {
+    const treeMatch = COMMIT_RELATIVE_TREE_URL.exec(url);
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
+    if (treeMatch) {
+      const tree = trees[treeMatch[1]];
+      if (!tree) {
+        return { ok: false, status: 404, statusText: "Not Found" };
+      }
+      return { ok: true, json: async () => ({ sha: treeMatch[1], truncated: false, tree }) };
+    }
+    const rawMatch = COMMIT_RELATIVE_RAW_URL.exec(url);
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
+    if (rawMatch) {
+      const [, revision, filePath] = rawMatch;
+      const body =
+        filePath === ".github/workflows/osv-scanner.yml"
+          ? workflows[revision]
+          : (files[`${revision}:${filePath}`] ?? files[filePath]);
+      if (body !== undefined) {
+        return { ok: true, text: async () => body };
+      }
+    }
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+}
+
+async function dependabotBumpRepository() {
+  return repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+}
+
+function contractFindingMessage(findings) {
+  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+  assert.ok(contractFinding);
+  return contractFinding.message;
+}
+
+test("Dependabot SHA bump auto-approves a $/ action step whose tree is unchanged", async () => {
+  const root = await dependabotBumpRepository();
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
+test("Dependabot SHA bump declines a $/ action step whose tree changed", async () => {
+  const root = await dependabotBumpRepository();
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_CHANGED_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    new RegExp(
+      `auto-approval declined: commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump declines a $/ action step when the commit tree cannot be fetched", async () => {
+  const root = await dependabotBumpRepository();
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: { [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA) },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    new RegExp(
+      `auto-approval declined: could not fetch the git tree of melodic-software/ci-workflows@${DEPENDABOT_BUMP_SHA}: 404 Not Found`,
+    ),
+  );
+});
+
+test("Dependabot SHA bump declines a $/ action whose own $/ dependency tree changed", async () => {
+  const root = await dependabotBumpRepository();
+  const sharedTree = (sha) => [
+    { path: ".github/actions/shared", type: "tree", sha },
+    { path: ".github/actions/shared/action.yml", type: "blob", sha },
+  ];
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA, { extra: sharedTree(SHARED_TREE_SHA) }),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA, {
+          extra: sharedTree(SHARED_CHANGED_TREE_SHA),
+        }),
+      },
+      files: {
+        ".github/actions/scan-setup/action.yml": SCAN_SETUP_DELEGATING_COMPOSITE_SOURCE,
+        ".github/actions/shared/action.yml": SCAN_SETUP_COMPOSITE_SOURCE,
+      },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    /auto-approval declined: commit-relative reference \.github\/actions\/shared changed since the previously reviewed/,
+  );
+});
+
+test("Dependabot SHA bump declines a $/ action step the reviewed basis never referenced", async () => {
+  const root = await dependabotBumpRepository();
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    /auto-approval declined: commit-relative reference \.github\/actions\/scan-setup changed since the previously reviewed/,
+  );
+});
+
+test("Dependabot SHA bump auto-approves a ./ nested workflow whose blob is unchanged", async () => {
+  const root = await dependabotBumpRepository();
+  const nestedTree = [
+    { path: ".github/workflows/nested-scan.yml", type: "blob", sha: NESTED_SCAN_BLOB_SHA },
+  ];
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+      },
+      trees: { [SHA]: nestedTree, [DEPENDABOT_BUMP_SHA]: nestedTree },
+      files: { ".github/workflows/nested-scan.yml": NESTED_SCAN_WORKFLOW_SOURCE },
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
+test("Dependabot SHA bump declines a ./ nested workflow whose blob changed", async () => {
+  const root = await dependabotBumpRepository();
+  const nestedTree = (sha) => [{ path: ".github/workflows/nested-scan.yml", type: "blob", sha }];
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
+      },
+      trees: {
+        [SHA]: nestedTree(NESTED_SCAN_BLOB_SHA),
+        [DEPENDABOT_BUMP_SHA]: nestedTree(NESTED_SCAN_CHANGED_BLOB_SHA),
+      },
+      files: { ".github/workflows/nested-scan.yml": NESTED_SCAN_WORKFLOW_SOURCE },
+    }),
+  });
+  assert.match(
+    contractFindingMessage(findings),
+    new RegExp(
+      `auto-approval declined: commit-relative reference \\.github/workflows/nested-scan\\.yml changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
     ),
   );
 });
