@@ -184,9 +184,12 @@ For each pull-request-triggered workflow that is not excepted:
   shape.
 
 Reusable workflows (`on: workflow_call`) and workflows triggered only by
-`push`, `schedule`, or `workflow_dispatch` are out of scope: a called workflow's
-concurrency is the caller's concern, and a workflow that never runs on a pull
-request has no superseding-pull-request run to cancel.
+`push`, `schedule`, or `workflow_dispatch` are out of scope. A called workflow
+runs inside its caller's run, so the caller's canonical block already cancels
+it; a block the called workflow carries itself still applies, which is why the
+[naming conventions](../github-actions-conventions/README.md#settings-a-called-workflow-does-not-inherit)
+put a block only in the workflow that owns the group. A workflow that never
+runs on a pull request has no superseding-pull-request run to cancel.
 
 ## Exceptions
 

@@ -1,0 +1,2011 @@
+[
+  {
+    "repo": ".github",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "markdown",
+        "to": "markdownlint"
+      },
+      {
+        "from": "editorconfig",
+        "to": "editorconfig-checker"
+      },
+      {
+        "from": "links",
+        "to": "check-links"
+      },
+      {
+        "from": "eol-renormalize",
+        "to": "check-line-endings"
+      },
+      {
+        "from": "pr-section-drift",
+        "to": "check-pr-sections"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; job pr-section-drift is advisory (not in ci-status needs) and becomes check-pr-sections"
+  },
+  {
+    "repo": ".github",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "agent-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "scripts",
+        "to": "check-scripts-and-manifests"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; also merge_group; job `scripts` runs shellcheck, bash -n and jq well-formedness checks"
+  },
+  {
+    "repo": "agent-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "agent-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "agent-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "ci-runner",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "markdown",
+        "to": "markdownlint"
+      },
+      {
+        "from": "editorconfig",
+        "to": "editorconfig-checker"
+      },
+      {
+        "from": "comment-hygiene",
+        "to": "check-comment-markers"
+      },
+      {
+        "from": "exec-bit",
+        "to": "check-exec-bit"
+      },
+      {
+        "from": "machine-specific-paths",
+        "to": "check-machine-paths"
+      },
+      {
+        "from": "eol-renormalize",
+        "to": "check-line-endings"
+      },
+      {
+        "from": "zizmor",
+        "to": "pr-audit-workflows"
+      },
+      {
+        "from": "go-quality",
+        "to": "pr-run-checks-go"
+      },
+      {
+        "from": "policy",
+        "to": "test-policy-contracts"
+      },
+      {
+        "from": "go-windows-build",
+        "to": "build-go-windows"
+      },
+      {
+        "from": "go-fuzz",
+        "to": "fuzz-go"
+      },
+      {
+        "from": "worker-image",
+        "to": "build-worker-image"
+      },
+      {
+        "from": "dependency-review",
+        "to": "review-dependencies"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; also weekly schedule (Mon 05:30) and workflow_dispatch"
+  },
+  {
+    "repo": "ci-runner",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "ci-runner",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "ci-runner",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "ci-runner",
+    "kind": "workflow",
+    "from": ".github/workflows/release.yml",
+    "to": ".github/workflows/release-publish-image.yml",
+    "from_name": "Release",
+    "to_name": "release-publish-image",
+    "job_renames": [],
+    "couplings": ["ACTIONLINT", "RC"],
+    "confidence": "high",
+    "note": "On v* tag: verify tagged source, publish evidence, promote the worker OCI image; name: `Release` becomes the stem. Tag ruleset ci-runner-release-tags keys on refs, not the file"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "changes",
+        "to": "detect-changes"
+      },
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      },
+      {
+        "from": "composites-head",
+        "to": "test-composites-head"
+      },
+      {
+        "from": "powershell",
+        "to": "psscriptanalyzer"
+      },
+      {
+        "from": "reference-integrity",
+        "to": "check-markdown-references"
+      },
+      {
+        "from": "action-metadata-filename",
+        "to": "check-action-filename"
+      },
+      {
+        "from": "managed-files-guard",
+        "to": "check-managed-files"
+      },
+      {
+        "from": "selector-contract",
+        "to": "test-contracts"
+      },
+      {
+        "from": "zizmor",
+        "to": "pr-audit-workflows"
+      },
+      {
+        "from": "osv-scanner",
+        "to": "pr-scan-dependencies"
+      },
+      {
+        "from": "go-quality-dogfood",
+        "to": "pr-run-checks-go"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; dogfood calls of the reusables live here; also hosts the three folded caller jobs `pr-review`, `pr-review-security`, `intake-label-needs-triage` (D3)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/checks.yml",
+    "to": ".github/workflows/pr-run-checks.yml",
+    "from_name": "checks",
+    "to_name": "pr-run-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "check"
+      }
+    ],
+    "couplings": ["PIN", "RP-std", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable: one job running the content-agnostic lint/scan composites. Consumers call it from the gate as job `pr-run-checks` (slot name)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "claude"
+      }
+    ],
+    "couplings": ["PIN", "RP-std", "REPIN", "SYNC", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable; vendor dropped from the name. Every caller path and every approvedReusableWorkflowContracts key moves. Engine job named for the engine only (Q56): `claude`. Check context moves to `<slot> / <engine>`"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "claude"
+      }
+    ],
+    "couplings": ["PIN", "RP-std", "REPIN", "SYNC", "RC", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable. Engine job named for the engine only (Q56): `claude`. Check context moves to `<slot> / <engine>`"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-self.yml",
+    "to": "(fold into pr-require-checks.yml, delete)",
+    "from_name": "Claude Review",
+    "to_name": "—",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "GOV-TESTS", "SELF"],
+    "confidence": "high",
+    "note": "D3: deleted. Becomes thin caller job `pr-review` inside ci-workflows `pr-require-checks.yml` (job id = full slot name), pinned to a merged SHA of the reusable so a PR cannot redefine the reusable it runs"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-self.yml",
+    "to": "(fold into pr-require-checks.yml, delete)",
+    "from_name": "Claude Security Review",
+    "to_name": "—",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "GOV-TESTS", "RC", "SELF"],
+    "confidence": "high",
+    "note": "D3: deleted. Becomes thin caller job `pr-review-security` inside ci-workflows `pr-require-checks.yml` (job id = full slot name), pinned to a merged SHA of the reusable so a PR cannot redefine the reusable it runs"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-intake-triage.yml",
+    "to": ".github/workflows/intake-triage.yml",
+    "from_name": "claude-intake-triage",
+    "to_name": "intake-triage",
+    "job_renames": [
+      {
+        "from": "intake-triage",
+        "to": "claude"
+      }
+    ],
+    "couplings": ["PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Reusable; vendor dropped from the file name. No pinned self-caller exists in ci-workflows. Engine job named for the engine only (Q56): `claude`. Check context moves to `<slot> / <engine>`"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/issue-triage-label.yml",
+    "to": ".github/workflows/intake-label-needs-triage.yml",
+    "from_name": "issue-triage-label",
+    "to_name": "intake-label-needs-triage",
+    "job_renames": [
+      {
+        "from": "issue-triage-label",
+        "to": "apply-label"
+      }
+    ],
+    "couplings": ["PIN", "RP-std", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable: applies the floor label (default `needs-triage`) to an issue with no `priority:` label (D6)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/issue-triage-label-self.yml",
+    "to": "(fold into pr-require-checks.yml, delete)",
+    "from_name": "issue-triage-label-self",
+    "to_name": "—",
+    "job_renames": [
+      {
+        "from": "issue-triage-label",
+        "to": "intake-label-needs-triage"
+      }
+    ],
+    "couplings": ["GOV-TESTS", "SELF"],
+    "confidence": "high",
+    "note": "D3: deleted. Becomes thin caller job `intake-label-needs-triage` inside ci-workflows `pr-require-checks.yml` (job id = full slot name), pinned to a merged SHA of the reusable so a PR cannot redefine the reusable it runs"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/go-quality.yml",
+    "to": ".github/workflows/pr-run-checks-go.yml",
+    "from_name": "go-quality",
+    "to_name": "pr-run-checks-go",
+    "job_renames": [
+      {
+        "from": "linux",
+        "to": "check-linux"
+      },
+      {
+        "from": "windows",
+        "to": "check-windows"
+      }
+    ],
+    "couplings": ["PIN", "GOV-TESTS"],
+    "confidence": "medium",
+    "note": "Reusable: golangci-lint, gofmt, mod tidy/verify, race tests on Linux+Windows, govulncheck. Not in runner-policy contracts today. Engine jobs linux/windows/govulncheck already name what they run"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/osv-scanner.yml",
+    "to": ".github/workflows/pr-scan-dependencies.yml",
+    "from_name": "osv-scanner",
+    "to_name": "pr-scan-dependencies",
+    "job_renames": [],
+    "couplings": ["PIN", "RP-std", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Thin osv-scanner wrapper, named for its purpose (D8). Called from gate lanes (standards) and the medley PR+weekly caller"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/zizmor.yml",
+    "to": ".github/workflows/pr-audit-workflows.yml",
+    "from_name": "zizmor",
+    "to_name": "pr-audit-workflows",
+    "job_renames": [],
+    "couplings": ["PIN", "RP-std", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Thin zizmor wrapper, named for its purpose (D8)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/release.yml",
+    "to": ".github/workflows/release-tag.yml",
+    "from_name": "release",
+    "to_name": "release-tag",
+    "job_renames": [
+      {
+        "from": "release",
+        "to": "tag"
+      }
+    ],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "medium",
+    "note": "Manual dispatch: creates the next SemVer tag + GitHub Release at main HEAD; pushes no commit, publishes no artifact. Docs/runbooks cite `gh workflow run release.yml`"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "workflow",
+    "from": ".github/workflows/standards-sync.yml",
+    "to": ".github/workflows/maintenance-sync-standards.yml",
+    "from_name": "standards-sync",
+    "to_name": "maintenance-sync-standards",
+    "job_renames": [],
+    "couplings": ["PIN", "RP-std", "REPIN", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable exact-file distribution (D5)"
+  },
+  {
+    "repo": "claude-code-account-rotation",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "build-test",
+        "to": "build-and-test"
+      },
+      {
+        "from": "gates",
+        "to": "check-repository"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; `build-test` runs restore, build, test, format and a publish smoke; `gates` runs shellcheck, the machine-path check, page-script tests and the runner-policy enforcement"
+  },
+  {
+    "repo": "claude-code-account-rotation",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "claude-code-account-rotation",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "claude-code-account-rotation",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "claude-code-account-rotation",
+    "kind": "workflow",
+    "from": ".github/workflows/release.yml",
+    "to": ".github/workflows/release-publish-binaries.yml",
+    "from_name": "release",
+    "to_name": "release-publish-binaries",
+    "job_renames": [
+      {
+        "from": "release",
+        "to": "publish"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Push to main touching CHANGELOG.md (or v* tag): publishes leader/follower executables to a GitHub Release. dotfiles' repin workflow reads the Release, not this file"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "scope",
+        "to": "select-tests"
+      }
+    ],
+    "couplings": ["GOV", "WR"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; also schedule (09:17/16:17), workflow_dispatch, merge_group; 84 in-repo files cite ci.yml; selection-audit.yml `workflow_run: workflows: [ci]` must change to `pr-require-checks` in the same PR"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-intake-triage.yml",
+    "to": ".github/workflows/intake-triage.yml",
+    "from_name": "claude-intake-triage",
+    "to_name": "intake-triage",
+    "job_renames": [],
+    "couplings": ["PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; job id = slot"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/dependabot-plugin-release.yml",
+    "to": ".github/workflows/pr-bump-plugin-version.yml",
+    "from_name": "dependabot-plugin-release",
+    "to_name": "pr-bump-plugin-version",
+    "job_renames": [
+      {
+        "from": "release-for-dependabot",
+        "to": "bump-plugin-version"
+      }
+    ],
+    "couplings": [],
+    "confidence": "medium",
+    "note": "On Dependabot PRs touching plugins/**: commits the plugin.json version bump + CHANGELOG entry. It releases nothing, so `release` in the current name is wrong"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/issue-triage-label.yml",
+    "to": ".github/workflows/intake-label-needs-triage.yml",
+    "from_name": "issue-triage-label",
+    "to_name": "intake-label-needs-triage",
+    "job_renames": [
+      {
+        "from": "issue-triage-label",
+        "to": "intake-label-needs-triage"
+      }
+    ],
+    "couplings": ["PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename (D6)"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/selection-audit.yml",
+    "to": ".github/workflows/maintenance-audit-test-selection.yml",
+    "from_name": "selection-audit",
+    "to_name": "maintenance-audit-test-selection",
+    "job_renames": [
+      {
+        "from": "audit-red-replay",
+        "to": "audit-failed-suite-selection"
+      }
+    ],
+    "couplings": ["WR"],
+    "confidence": "high",
+    "note": "Daily strace audit + replay when a main gate run fails. Its own workflow_run keys on `ci`: update to `pr-require-checks` in the gate-rename PR. Job `audit-red-replay` becomes `audit-failed-suite-selection` (D9)"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/silent-revert-canary.yml",
+    "to": ".github/workflows/post-merge-detect-silent-revert.yml",
+    "from_name": "silent-revert-canary",
+    "to_name": "post-merge-detect-silent-revert",
+    "job_renames": [
+      {
+        "from": "silent-revert-canary",
+        "to": "detect-silent-revert"
+      }
+    ],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Push to main: detects a merge that deleted content another recent merge added. `canary` is a metaphor; the function is detection"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/test-windows.yml",
+    "to": ".github/workflows/pr-test-windows.yml",
+    "from_name": "test-windows",
+    "to_name": "pr-test-windows",
+    "job_renames": [
+      {
+        "from": "scope-windows",
+        "to": "select-tests-windows"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Informational Windows test lane (PR + push + schedule), outside ci-status. Job ids test-windows-* already name what they run"
+  },
+  {
+    "repo": "claude-code-proxy",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; job `test` stays (it runs pytest and Pester; its zizmor, OSV and ruff steps are inline)"
+  },
+  {
+    "repo": "claude-code-proxy",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename"
+  },
+  {
+    "repo": "claude-code-proxy",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "claude-code-proxy",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard-fleet.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "codex-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "marketplace",
+        "to": "validate-marketplace"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; `marketplace` runs the validator tests and `npm run validate`"
+  },
+  {
+    "repo": "codex-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "codex-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "codex-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "cursor-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "CI",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "shell",
+        "to": "test-shell"
+      },
+      {
+        "from": "powershell",
+        "to": "psscriptanalyzer"
+      },
+      {
+        "from": "manifests",
+        "to": "validate-manifests"
+      },
+      {
+        "from": "links",
+        "to": "check-links"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; name: `CI` becomes the stem; also merge_group, workflow_dispatch"
+  },
+  {
+    "repo": "cursor-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review-hosted.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "cursor-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review-hosted.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "cursor-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      }
+    ],
+    "couplings": ["GOV", "RP-repo", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; runner-policy.json `ci.yml#ci-status`; RunbookContractTests.cs:1027,1291 read ci.yml and :1299 asserts job ids [checks,test,ci-status], which become [pr-run-checks,test,ci-status]; job `test` stays"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "ACTIONLINT", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "actionlint.yaml:15 and RunbookContractTests.cs:1428 name the file"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/deploy.yml",
+    "to": ".github/workflows/release-deploy.yml",
+    "from_name": "github-iac-production-deploy-v1",
+    "to_name": "release-deploy",
+    "job_renames": [],
+    "couplings": ["OIDC", "PULUMI-GUARD", "RP-repo", "ACTIONLINT", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "D1: `name: github-iac-production-deploy-v1` becomes `release-deploy`. Sequence: (1) change the Pulumi Cloud OIDC issuer policy (outside any repo), (2) release ci-workflows `verify-pulumi-deploy-policy` (name hardcoded at guard.sh:104 and contracts/kyle-sexton-github-iac.json:22), (3) repin github-iac. Until the policy changes, deploys fail closed. Also edit RunbookContractTests.cs:1393-1436 and 1497-1547, runner-policy.json keys, actionlint.yaml:12, README and runbooks (`gh workflow run deploy.yml`)"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/governance-verify.yml",
+    "to": ".github/workflows/maintenance-verify-governance.yml",
+    "from_name": "Governance live verify",
+    "to_name": "maintenance-verify-governance",
+    "job_renames": [],
+    "couplings": ["RP-repo", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Daily read-only org-security assurance. name: `Governance live verify` becomes the stem. runner-policy keys #verify, #verify-predicate"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard-fleet.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/oidc-negative-canary.yml",
+    "to": ".github/workflows/release-deploy-oidc-negative-test.yml",
+    "from_name": "github-iac-production-deploy-v1x",
+    "to_name": "release-deploy-x",
+    "job_renames": [],
+    "couplings": ["OIDC", "PULUMI-GUARD", "RP-repo", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "D1: proves Pulumi rejects a one-character near-match workflow NAME. Its `name:` is the deploy name plus one character (`release-deploy-x`), the single recorded exception to name = stem. It asserts `.workflow_ref == .../oidc-negative-canary.yml@refs/heads/main` (line 100): edit that assertion in the same PR. Ships in the same sequence as the deploy rename"
+  },
+  {
+    "repo": "github-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/reconcile-pull-request-creation-policy.yml",
+    "to": ".github/workflows/maintenance-reconcile-pr-creation-policy.yml",
+    "from_name": "Reconcile pull request creation policy",
+    "to_name": "maintenance-reconcile-pr-creation-policy",
+    "job_renames": [],
+    "couplings": ["RP-repo", "ACTIONLINT", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Weekly apply + dispatch dry-run; imperative interim for a setting Pulumi cannot manage. `pr` abbreviates pull-request inside the function, which is not the pr stage"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/actions-lint.yml",
+    "to": ".github/workflows/pr-audit-workflows.yml",
+    "from_name": "Actions Lint",
+    "to_name": "pr-audit-workflows",
+    "job_renames": [
+      {
+        "from": "zizmor",
+        "to": "pr-audit-workflows"
+      }
+    ],
+    "couplings": ["PIN"],
+    "confidence": "high",
+    "note": "Whole-file caller of the zizmor reusable: takes its filename. Also runs on push to main (paths). name: `Actions Lint`"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/agent-automation-automerge.yml",
+    "to": ".github/workflows/pr-automerge-agent.yml",
+    "from_name": "Agent Automation Auto-Merge",
+    "to_name": "pr-automerge-agent",
+    "job_renames": [],
+    "couplings": ["RP-repo"],
+    "confidence": "high",
+    "note": "Arms auto-merge on routine agent PRs. \"automerge\" is an accepted verb (owner, 2026-10-03), so job id automerge and runner-policy key #automerge stay. Consolidating with the dependabot variant, or folding into pr-merge, is deferred"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/ci-status.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "CI Status",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      },
+      {
+        "from": "dotnet",
+        "to": "build-and-test-dotnet"
+      },
+      {
+        "from": "typescript",
+        "to": "check-typescript"
+      },
+      {
+        "from": "python-shell",
+        "to": "check-python-and-shell"
+      },
+      {
+        "from": "dotnet-integration",
+        "to": "test-dotnet-integration"
+      },
+      {
+        "from": "dotnet-e2e",
+        "to": "test-dotnet-e2e"
+      },
+      {
+        "from": "playwright-visual",
+        "to": "test-playwright-visual"
+      }
+    ],
+    "couplings": ["GOV", "RP-repo", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; medley gate file; name: `CI Status`; also daily schedule; 65 in-repo files cite ci-status.yml; runner-policy keys #ci-status #dotnet-e2e #dotnet-integration #playwright-visual (the last three move with their jobs); GOV CONSUMERS and test fixtures name ci-status.yml; dotnet-integration, dotnet-e2e and playwright-visual are not in ci-status needs"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-assistant.yml",
+    "to": ".github/workflows/work-respond-mention.yml",
+    "from_name": "Claude Assistant",
+    "to_name": "work-respond-mention",
+    "job_renames": [
+      {
+        "from": "assist",
+        "to": "respond"
+      }
+    ],
+    "couplings": ["RP-repo"],
+    "confidence": "high",
+    "note": "Interactive @claude on issue comments and PR review comments; can make signed commits. Fires on issues as well as PRs, so it is not `pr-address-feedback` (D4, confirmed via Automation Lanes). Runner-policy key `#assist` becomes `#respond`: verify in Phase 5"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/dependabot-automerge.yml",
+    "to": ".github/workflows/pr-automerge-dependabot.yml",
+    "from_name": "Dependabot Auto-Merge",
+    "to_name": "pr-automerge-dependabot",
+    "job_renames": [],
+    "couplings": ["RP-repo"],
+    "confidence": "high",
+    "note": "\"automerge\" is an accepted verb (owner, 2026-10-03), so job id automerge and runner-policy key #automerge stay. Consolidation is deferred (medley-specific)"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/dockerfile-lint.yml",
+    "to": ".github/workflows/pr-lint-dockerfile.yml",
+    "from_name": "Dockerfile Lint",
+    "to_name": "pr-lint-dockerfile",
+    "job_renames": [
+      {
+        "from": "hadolint",
+        "to": "pr-lint-dockerfile"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Thin hadolint wrapper (PR + push), named for its purpose (D8); caller job id = slot"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/issue-labeling.yml",
+    "to": ".github/workflows/intake-label.yml",
+    "from_name": "Issue Auto-Labeling",
+    "to_name": "intake-label",
+    "job_renames": [],
+    "couplings": ["RP-repo"],
+    "confidence": "medium",
+    "note": "Labels new issues from the issue form and flags untyped ones; runner-policy key #auto-label. Job `auto-label` kept"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard-fleet.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/onboard-drift.yml",
+    "to": ".github/workflows/pr-validate-onboard-catalog.yml",
+    "from_name": "Onboard Drift",
+    "to_name": "pr-validate-onboard-catalog",
+    "job_renames": [
+      {
+        "from": "schema-validate",
+        "to": "validate-catalog"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Only job validates catalog.json against its schema; the drift scan the name implies runs elsewhere. name: `Onboard Drift`"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/osv-scanner.yml",
+    "to": ".github/workflows/pr-scan-dependencies.yml",
+    "from_name": "OSV Scanner",
+    "to_name": "pr-scan-dependencies",
+    "job_renames": [
+      {
+        "from": "osv-scanner",
+        "to": "pr-scan-dependencies"
+      }
+    ],
+    "couplings": ["PIN"],
+    "confidence": "high",
+    "note": "Whole-file caller of the osv-scanner reusable (PR + weekly): takes its filename"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/regen-lockfiles.yml",
+    "to": ".github/workflows/pr-regenerate-nuget-lockfiles.yml",
+    "from_name": "Regenerate NuGet Lockfiles",
+    "to_name": "pr-regenerate-nuget-lockfiles",
+    "job_renames": [
+      {
+        "from": "regen",
+        "to": "regenerate"
+      }
+    ],
+    "couplings": ["RP-repo"],
+    "confidence": "high",
+    "note": "On PRs changing global.json: regenerates packages.lock.json and commits; runner-policy key #regen"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/secret-scan-scheduled.yml",
+    "to": ".github/workflows/maintenance-scan-secrets.yml",
+    "from_name": "Secret Scan Scheduled",
+    "to_name": "maintenance-scan-secrets",
+    "job_renames": [],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Daily full-history gitleaks. Absorbs secret-scan.yml, its only caller (D7)"
+  },
+  {
+    "repo": "medley",
+    "kind": "workflow",
+    "from": ".github/workflows/secret-scan.yml",
+    "to": "(merge into maintenance-scan-secrets.yml)",
+    "from_name": "Secret Scan",
+    "to_name": "—",
+    "job_renames": [],
+    "couplings": ["SELF"],
+    "confidence": "high",
+    "note": "D7: inlined into maintenance-scan-secrets.yml. Reusable with one caller in the same repo, so it has nothing to share"
+  },
+  {
+    "repo": "provisioning",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      }
+    ],
+    "couplings": ["GOV", "RP-repo"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; runner-policy key ci.yml#ci-status; job `test` stays"
+  },
+  {
+    "repo": "provisioning",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename"
+  },
+  {
+    "repo": "provisioning",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "provisioning",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard-fleet.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "provisioning",
+    "kind": "workflow",
+    "from": ".github/workflows/tailscale-acl.yml",
+    "to": ".github/workflows/release-deploy-tailscale-acl.yml",
+    "from_name": "tailscale-acl",
+    "to_name": "release-deploy-tailscale-acl",
+    "job_renames": [],
+    "couplings": ["OIDC", "RP-repo"],
+    "confidence": "medium",
+    "note": "Push to main on tailscale/**: tests then pushes the tailnet policy. Tailscale trust matches the `sub` claim (environment `tailnet-policy`), per tailscale-acl.yml:15-41,97; the Tailscale-side credential is not visible in the repo, so confirm it does not also match workflow/job_workflow_ref. Job `apply` kept"
+  },
+  {
+    "repo": "songwriting",
+    "kind": "workflow",
+    "from": ".github/workflows/typos.yml",
+    "to": ".github/workflows/pr-check-spelling.yml",
+    "from_name": "typos",
+    "to_name": "pr-check-spelling",
+    "job_renames": [
+      {
+        "from": "typos",
+        "to": "pr-check-spelling"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Thin typos wrapper, named for its purpose (D8); songwriting has no rulesets or required checks"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "markdown",
+        "to": "markdownlint"
+      },
+      {
+        "from": "powershell",
+        "to": "psscriptanalyzer"
+      },
+      {
+        "from": "editorconfig",
+        "to": "editorconfig-checker"
+      },
+      {
+        "from": "zizmor",
+        "to": "pr-audit-workflows"
+      },
+      {
+        "from": "osv-scanner",
+        "to": "pr-scan-dependencies"
+      },
+      {
+        "from": "exec-bit",
+        "to": "check-exec-bit"
+      },
+      {
+        "from": "machine-specific-paths",
+        "to": "check-machine-paths"
+      },
+      {
+        "from": "eol-renormalize",
+        "to": "check-line-endings"
+      },
+      {
+        "from": "comment-hygiene",
+        "to": "check-comment-markers"
+      },
+      {
+        "from": "markdown-fixtures",
+        "to": "test-fixtures-markdown"
+      },
+      {
+        "from": "powershell-fixtures",
+        "to": "test-fixtures-powershell"
+      },
+      {
+        "from": "shellcheck-fixtures",
+        "to": "test-fixtures-shellcheck"
+      },
+      {
+        "from": "lychee-fixtures",
+        "to": "test-fixtures-lychee"
+      },
+      {
+        "from": "go-fixtures",
+        "to": "test-fixtures-go"
+      },
+      {
+        "from": "python-fixtures",
+        "to": "test-fixtures-python"
+      },
+      {
+        "from": "typescript-fixtures",
+        "to": "test-fixtures-typescript"
+      },
+      {
+        "from": "dotnet-fixtures",
+        "to": "test-fixtures-dotnet"
+      },
+      {
+        "from": "runner-policy",
+        "to": "test-runner-policy"
+      },
+      {
+        "from": "concurrency-policy",
+        "to": "test-concurrency-policy"
+      },
+      {
+        "from": "dependabot-policy",
+        "to": "test-dependabot-policy"
+      },
+      {
+        "from": "pr-convention-policy",
+        "to": "test-pr-convention-policy"
+      },
+      {
+        "from": "pr-convention-lockstep",
+        "to": "verify-pr-convention-lockstep"
+      },
+      {
+        "from": "harness",
+        "to": "test-harness"
+      },
+      {
+        "from": "code-review-rules",
+        "to": "check-code-review-rules"
+      },
+      {
+        "from": "cloud-environment",
+        "to": "test-cloud-environment"
+      },
+      {
+        "from": "mcp-launcher",
+        "to": "test-mcp-launcher"
+      },
+      {
+        "from": "distribution",
+        "to": "test-distribution"
+      },
+      {
+        "from": "local-lane-guards",
+        "to": "test-local-lane-wrappers"
+      },
+      {
+        "from": "pin-comment-convention",
+        "to": "check-pin-comment-convention"
+      },
+      {
+        "from": "lefthook",
+        "to": "test-lefthook"
+      },
+      {
+        "from": "tsc",
+        "to": "test-tsconfig"
+      }
+    ],
+    "couplings": ["GOV"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; repo-local; standards concurrency-policy tests use `.github/workflows/ci.yml` as a fixture path, not this file; 30 gate jobs renamed verb-first"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-lanes-repin.yml",
+    "to": ".github/workflows/maintenance-repin-ci-workflows.yml",
+    "from_name": "claude-lanes-repin",
+    "to_name": "maintenance-repin-ci-workflows",
+    "job_renames": [],
+    "couplings": ["REPIN"],
+    "confidence": "high",
+    "note": "Daily: repins callers of ci-workflows reusables (claude lanes, managed-files-guard, sync.yml) to the latest ci-workflows release and opens a PR (D5)"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Repo-local caller (standards is the manifest source); repin-callers.sh:35 and repin-policy-lockstep.mjs:46 list it"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/code-review-rules-inventory.yml",
+    "to": ".github/workflows/maintenance-audit-code-review-rules.yml",
+    "from_name": "code-review-rules-inventory",
+    "to_name": "maintenance-audit-code-review-rules",
+    "job_renames": [
+      {
+        "from": "inventory",
+        "to": "audit"
+      }
+    ],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Daily: fails when a repo's AGENTS.md lacks `## Code Review Rules`"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/lychee-private-inventory.yml",
+    "to": ".github/workflows/maintenance-audit-link-check-excludes.yml",
+    "from_name": "lychee-private-inventory",
+    "to_name": "maintenance-audit-link-check-excludes",
+    "job_renames": [
+      {
+        "from": "inventory",
+        "to": "audit"
+      }
+    ],
+    "couplings": [],
+    "confidence": "medium",
+    "note": "Daily: checks lychee.toml private-repo excludes against live visibility. Named for the purpose, not the tool (D8)"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/publish-packages.yml",
+    "to": ".github/workflows/release-publish-packages.yml",
+    "from_name": "publish-packages",
+    "to_name": "release-publish-packages",
+    "job_renames": [],
+    "couplings": [],
+    "confidence": "high",
+    "note": "Push to main on components/biome|tsconfig: npm publish"
+  },
+  {
+    "repo": "standards",
+    "kind": "workflow",
+    "from": ".github/workflows/sync.yml",
+    "to": ".github/workflows/maintenance-sync-standards.yml",
+    "from_name": "standards-sync",
+    "to_name": "maintenance-sync-standards",
+    "job_renames": [
+      {
+        "from": "sync",
+        "to": "maintenance-sync-standards"
+      }
+    ],
+    "couplings": ["REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller of the standards-sync reusable: takes its filename. Triggers push to main + weekly + dispatch (D5). name: already `standards-sync`"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "workflow",
+    "from": ".github/workflows/ci.yml",
+    "to": ".github/workflows/pr-require-checks.yml",
+    "from_name": "ci",
+    "to_name": "pr-require-checks",
+    "job_renames": [
+      {
+        "from": "checks",
+        "to": "pr-run-checks"
+      }
+    ],
+    "couplings": ["GOV", "RP-repo"],
+    "confidence": "high",
+    "note": "Holds the lanes and the ci-status aggregate; also runs on push to main; runner-policy key ci.yml#ci-status; job `test` stays (many regression suites plus inline lint steps)"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "workflow",
+    "from": ".github/workflows/account-rotation-pin-bump.yml",
+    "to": ".github/workflows/maintenance-repin-account-rotation.yml",
+    "from_name": "account-rotation-pin-bump",
+    "to_name": "maintenance-repin-account-rotation",
+    "job_renames": [
+      {
+        "from": "bump",
+        "to": "repin"
+      }
+    ],
+    "couplings": ["RP-repo"],
+    "confidence": "high",
+    "note": "Every 5 min: stages the claude-code-account-rotation release pin + sha256s on a fixed branch and an issue. Same verb as the standards repin (D5)"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-review.yml",
+    "to": ".github/workflows/pr-review.yml",
+    "from_name": "claude-review",
+    "to_name": "pr-review",
+    "job_renames": [
+      {
+        "from": "review",
+        "to": "pr-review"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std"],
+    "confidence": "high",
+    "note": "Caller takes the reusable filename"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "workflow",
+    "from": ".github/workflows/claude-security-review.yml",
+    "to": ".github/workflows/pr-review-security.yml",
+    "from_name": "claude-security-review",
+    "to_name": "pr-review-security",
+    "job_renames": [
+      {
+        "from": "security-review",
+        "to": "pr-review-security"
+      }
+    ],
+    "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
+    "confidence": "high",
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "workflow",
+    "from": ".github/workflows/managed-files-guard-fleet.yml",
+    "to": ".github/workflows/pr-check-managed-files.yml",
+    "from_name": "managed-files-guard",
+    "to_name": "pr-check-managed-files",
+    "job_renames": [
+      {
+        "from": "managed-files-guard",
+        "to": "pr-check-managed-files"
+      }
+    ],
+    "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
+    "confidence": "high",
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/ci-status",
+    "to": ".github/actions/pr-require-checks/aggregate-results",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": ".github, agent-plugins, ci-runner, ci-workflows, claude-code-account-rotation, claude-code-plugins, claude-code-proxy, codex-plugins, cursor-plugins, dotfiles, github-iac, medley (ci-status.yml), provisioning, standards (gate workflow, every repo)",
+    "note": "Used only by the gate. Unit dir verb-first; the required context is the JOB `ci-status`, which keeps its name"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/pr-contract",
+    "to": ".github/actions/pr-require-checks/check-contract",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN", "SYNC", "MFG"],
+    "consumers": ".github, agent-plugins, ci-runner, ci-workflows, claude-code-account-rotation, claude-code-plugins, claude-code-proxy, codex-plugins, cursor-plugins, dotfiles, github-iac, medley (ci-status.yml), provisioning, standards; standards components/pr-convention-policy/lockstep-drift.mjs (+test)",
+    "note": "Step inside the ci-status job: checks PR title, do-not-merge label, issue linkage. No stage word inside the unit (Q56). Synced rule .claude/rules/pr-body-contract.md names the composite `pr-contract` in prose: edit with it (SYNC)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/claude-lane-outcome",
+    "to": ".github/actions/report-lane-outcome",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-workflows claude-review.yml, claude-security-review.yml, claude-intake-triage.yml",
+    "note": "Shared by three lanes, so flat; verb-first, vendor dropped"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/managed-files-guard",
+    "to": ".github/actions/check-managed-files",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN", "SYNC", "MFG"],
+    "consumers": "every managed-files-guard caller (12 repos), standards components/managed-files-guard/*.yml (+test), ci-workflows ci.yml",
+    "note": "Verb-first and drops the `guard` metaphor; stays flat (single-unit lane, D11). The caller job and check context also become `pr-check-managed-files` in the synced caller change (advisory, not required)"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/pulumi-deploy-guard",
+    "to": ".github/actions/verify-pulumi-deploy-policy",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "github-iac deploy.yml; ci-workflows ci.yml",
+    "note": "Verifies the Pulumi OIDC policy and operational state before apply. Releases with the D1 sequence: the OIDC policy change comes first, then this release, then the github-iac repin"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/change-detection",
+    "to": ".github/actions/detect-changes",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-workflows checks.yml, ci.yml; claude-code-plugins ci.yml; dotfiles ci.yml",
+    "note": "Verb-first"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/action-metadata-filename",
+    "to": ".github/actions/check-action-filename",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-workflows ci.yml",
+    "note": "Verb-first"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/comment-hygiene",
+    "to": ".github/actions/check-comment-markers",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN", "SYNC", "MFG"],
+    "consumers": "checks.yml consumers + .github, ci-runner, claude-code-plugins, medley, standards",
+    "note": "Verb-first, drops `hygiene`. Synced destination .github/actions/comment-hygiene/comment-hygiene-patterns.sh moves: SYNC + MFG"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/eol-renormalize",
+    "to": ".github/actions/check-line-endings",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": ".github, ci-runner, ci-workflows, claude-code-plugins, standards",
+    "note": "Verb-first; states the result, not the git mechanism"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/exec-bit",
+    "to": ".github/actions/check-exec-bit",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-runner, ci-workflows, claude-code-plugins, standards",
+    "note": "Verb-first"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/machine-specific-paths",
+    "to": ".github/actions/check-machine-paths",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN", "SYNC", "MFG"],
+    "consumers": "checks.yml consumers + .github, ci-runner, claude-code-plugins, medley, standards",
+    "note": "Verb-first. Synced destination .github/actions/machine-specific-paths/machine-path-patterns.sh moves: SYNC + MFG"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/reference-integrity",
+    "to": ".github/actions/check-markdown-references",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-workflows ci.yml, medley ci-status.yml",
+    "note": "Verb-first"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/markdown",
+    "to": ".github/actions/markdownlint",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": ".github, ci-runner, ci-workflows, claude-code-plugins, standards",
+    "note": "Tool wrapper: tool name, not file format"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/powershell",
+    "to": ".github/actions/psscriptanalyzer",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": "ci-workflows, dotfiles, medley, provisioning, standards",
+    "note": "Tool wrapper: tool name, not language"
+  },
+  {
+    "repo": "ci-workflows",
+    "kind": "action",
+    "from": ".github/actions/editorconfig",
+    "to": ".github/actions/editorconfig-checker",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": ["PIN", "REPIN"],
+    "consumers": ".github, ci-runner, ci-workflows, claude-code-plugins, standards",
+    "note": "Tool wrapper: tool name"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "action",
+    "from": ".github/actions/checkout-with-base",
+    "to": ".github/actions/download-full-history",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": [],
+    "consumers": "claude-code-plugins (ci.yml, dependabot-plugin-release.yml, silent-revert-canary.yml; ADR 0019)",
+    "note": "It does not check out: it unshallows the clone and fetches origin/$BASE_REF after actions/checkout. `download` is an accepted verb; both steps download history"
+  },
+  {
+    "repo": "medley",
+    "kind": "action",
+    "from": ".github/actions/setup-dotnet-ci",
+    "to": ".github/actions/setup-dotnet",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": [],
+    "consumers": "medley (3 workflows)",
+    "note": "Verb-first already; `-ci` adds nothing"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "action",
+    "from": "tools/install-chezmoi",
+    "to": ".github/actions/install-chezmoi",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": [],
+    "consumers": "dotfiles ci.yml, account-rotation-pin-bump.yml",
+    "note": "Composite outside .github/actions; shared tool installer, flat. Check .chezmoiignore covers .github (it ignores tools/)"
+  },
+  {
+    "repo": "dotfiles",
+    "kind": "action",
+    "from": "tools/install-yq",
+    "to": ".github/actions/install-yq",
+    "from_name": null,
+    "to_name": null,
+    "job_renames": [],
+    "couplings": [],
+    "consumers": "dotfiles ci.yml (uses + tests/install.test.sh), account-rotation-pin-bump.yml; .cursor/install.sh comment",
+    "note": "As above; the action dir also holds install.sh and tests"
+  }
+]
