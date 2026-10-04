@@ -30,3 +30,7 @@ account an agent signs in as.
 
 `github-actions[bot]` is absent on purpose: a canary test posts as that account
 to prove untrusted text is dropped. Do not add it.
+
+`chatgpt-codex-connector[bot]` (id 199175422) is absent until a live test shows
+that a commenter with no write access and no linked Codex account cannot make it
+reply. If one can, a stranger could have a trusted bot post text they chose.

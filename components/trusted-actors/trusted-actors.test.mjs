@@ -47,3 +47,10 @@ test("github-actions[bot] is not trusted", () => {
     false,
   );
 });
+
+test("chatgpt-codex-connector[bot] is not trusted", () => {
+  assert.equal(
+    list.actors.some((actor) => actor.id === 199175422),
+    false,
+  );
+});
