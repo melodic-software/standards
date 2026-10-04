@@ -251,9 +251,50 @@ export async function rewriteCallerFiles(newSha, tag, root = ROOT) {
   return anyChanged;
 }
 
-function copyReusableContract(policy, workflowPath, newWorkflowPath, oldSha, newSha) {
+export function renamedPathReason(pin) {
+  return (
+    `${pin.oldWorkflowPath} is renamed to ${pin.newWorkflowPath} (from ${pin.oldSha.slice(0, 7)}); ` +
+    "a renamed path needs a hand-reviewed approvedReusableWorkflowContracts entry"
+  );
+}
+
+/**
+ * Splits re-pinned callers into contract copy-forwards and declines. A pin
+ * whose path changed is always declined: a contract for a renamed path is
+ * reviewed by hand, never copied, however its surface compares. Every other
+ * pin copies forward only when `surfaceOf(pin)` reports it unchanged.
+ */
+export function planLockstep(pins, newSha, surfaceOf) {
+  const reasons = [];
+  const copyForwards = [];
+  const unique = new Map(
+    pins
+      .filter((pin) => pin.oldSha !== newSha)
+      .map((pin) => [`${pin.oldWorkflowPath}@${pin.oldSha}>${pin.newWorkflowPath}`, pin]),
+  );
+  for (const pin of unique.values()) {
+    if (pin.oldWorkflowPath !== pin.newWorkflowPath) {
+      reasons.push(renamedPathReason(pin));
+      continue;
+    }
+    const surface = surfaceOf(pin);
+    if (!surface.unchanged) {
+      reasons.push(`${pin.newWorkflowPath} ${surface.reason} (from ${pin.oldSha.slice(0, 7)})`);
+      continue;
+    }
+    copyForwards.push({
+      kind: pin.kind,
+      workflowPath: pin.oldWorkflowPath,
+      oldSha: pin.oldSha,
+      newSha,
+    });
+  }
+  return { reasons, copyForwards };
+}
+
+function copyReusableContract(policy, workflowPath, oldSha, newSha) {
   const oldKey = `${workflowPath}@${oldSha}`;
-  const newKey = `${newWorkflowPath}@${newSha}`;
+  const newKey = `${workflowPath}@${newSha}`;
   const contract = policy.approvedReusableWorkflowContracts?.[oldKey];
   if (!contract) {
     throw new Error(`policy.json has no contract entry for ${oldKey}`);
@@ -269,15 +310,7 @@ export function copyForwardContracts(policy, copyForwards) {
     switch (item.kind) {
       case "lane":
       case "reusable":
-        if (
-          copyReusableContract(
-            policy,
-            item.workflowPath,
-            item.newWorkflowPath ?? item.workflowPath,
-            item.oldSha,
-            item.newSha,
-          )
-        ) {
+        if (copyReusableContract(policy, item.workflowPath, item.oldSha, item.newSha)) {
           changed = true;
         }
         break;
@@ -322,41 +355,26 @@ async function main() {
   const outputFile = requireOutputFile();
   const policy = validatePolicy(parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH));
   const newSourceByRepoPath = new Map();
-  const reasons = [];
-  const copyForwards = [];
-
   const repoPathOf = (workflowPath) => workflowPath.replace(`${UPSTREAM}/`, "");
+  const pins = [];
   for (const target of REPIN_TARGETS) {
-    const pins = (await readCallerPins(target.callerFiles)).filter((pin) => pin.oldSha !== newSha);
-    const unique = new Map(
-      pins.map((pin) => [`${pin.oldWorkflowPath}@${pin.oldSha}>${pin.newWorkflowPath}`, pin]),
-    );
-
-    for (const { oldWorkflowPath, oldSha, newWorkflowPath } of unique.values()) {
-      const repoPath = repoPathOf(newWorkflowPath);
-      let newSource = newSourceByRepoPath.get(repoPath);
-      if (newSource === undefined) {
-        newSource = fetchUpstreamFile(repoPath, newSha);
-        newSourceByRepoPath.set(repoPath, newSource);
-      }
-      const oldSource = fetchUpstreamFile(repoPathOf(oldWorkflowPath), oldSha);
-      const surface = laneSecuritySurfacesMatch(oldSource, newSource, newWorkflowPath, policy);
-      if (!surface.unchanged) {
-        reasons.push(`${newWorkflowPath} ${surface.reason} (from ${oldSha.slice(0, 7)})`);
-        continue;
-      }
-      copyForwards.push({
-        kind: target.kind,
-        workflowPath: oldWorkflowPath,
-        newWorkflowPath,
-        oldSha,
-        newSha,
-      });
+    for (const pin of await readCallerPins(target.callerFiles)) {
+      pins.push({ ...pin, kind: target.kind });
     }
   }
+  const { reasons, copyForwards } = planLockstep(pins, newSha, (pin) => {
+    const repoPath = repoPathOf(pin.newWorkflowPath);
+    let newSource = newSourceByRepoPath.get(repoPath);
+    if (newSource === undefined) {
+      newSource = fetchUpstreamFile(repoPath, newSha);
+      newSourceByRepoPath.set(repoPath, newSource);
+    }
+    const oldSource = fetchUpstreamFile(repoPathOf(pin.oldWorkflowPath), pin.oldSha);
+    return laneSecuritySurfacesMatch(oldSource, newSource, pin.newWorkflowPath, policy);
+  });
 
   if (reasons.length > 0) {
-    const unchangedPaths = [...new Set(copyForwards.map((item) => item.newWorkflowPath))];
+    const unchangedPaths = [...new Set(copyForwards.map((item) => item.workflowPath))];
     const note = manualPolicyNote(reasons.join("; "), tag, unchangedPaths);
     emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
     await appendOutput(outputFile, [

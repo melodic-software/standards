@@ -11,8 +11,11 @@ import {
   copyForwardContracts,
   manualPolicyNote,
   pairCallerPins,
+  planLockstep,
   rewriteCallerFiles,
 } from "./repin-policy-lockstep.mjs";
+
+const SYNC_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/standards-sync.yml";
 
 const oldA = "c136b27f404dd32ce3873f39a6f3443891d1c16e";
 const oldB = "d26c750691b5498fab529d115b63f84aa7aecebe";
@@ -220,32 +223,61 @@ test("pairCallerPins refuses a pin line that apply did not leave as a pin", () =
   );
 });
 
-test("copy-forward moves a real claude-review contract onto its renamed path", async () => {
+test("a renamed pin with an unchanged surface writes no contract and lands on the human checklist", async () => {
   const policy = JSON.parse(
     await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
   );
-  const original =
-    policy.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${CURRENT_REVIEW_SHA}`];
-  assert.ok(original, "on-disk policy is missing the current claude-review contract");
-
-  copyForwardContracts(policy, [
+  const before = structuredClone(policy);
+  const pins = [
     {
       kind: "lane",
-      workflowPath: REVIEW_WORKFLOW,
-      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
+      oldWorkflowPath: REVIEW_WORKFLOW,
       oldSha: CURRENT_REVIEW_SHA,
-      newSha: FRESH_SHA,
+      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
     },
-  ]);
+  ];
 
-  assert.deepEqual(
-    policy.approvedReusableWorkflowContracts[`${RENAMED_REVIEW_WORKFLOW}@${FRESH_SHA}`],
-    original,
+  const { reasons, copyForwards } = planLockstep(pins, FRESH_SHA, () => ({ unchanged: true }));
+  copyForwardContracts(policy, copyForwards);
+
+  assert.deepEqual(copyForwards, []);
+  assert.deepEqual(policy, before, "no contract is written for a renamed path");
+  const note = manualPolicyNote(reasons.join("; "), "v0.34.0");
+  assert.ok(
+    note.includes(
+      `${REVIEW_WORKFLOW} is renamed to ${RENAMED_REVIEW_WORKFLOW} (from 91d06c9); ` +
+        "a renamed path needs a hand-reviewed approvedReusableWorkflowContracts entry",
+    ),
+    note,
   );
-  assert.equal(
-    policy.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${FRESH_SHA}`],
-    undefined,
-  );
+});
+
+test("a same-path pin beside a rename still plans its copy-forward, and the rename declines the run", () => {
+  const pins = [
+    {
+      kind: "lane",
+      oldWorkflowPath: REVIEW_WORKFLOW,
+      oldSha: CURRENT_REVIEW_SHA,
+      newWorkflowPath: RENAMED_REVIEW_WORKFLOW,
+    },
+    {
+      kind: "reusable",
+      oldWorkflowPath: SYNC_WORKFLOW,
+      oldSha: oldA,
+      newWorkflowPath: SYNC_WORKFLOW,
+    },
+  ];
+  const compared = [];
+  const plan = planLockstep(pins, FRESH_SHA, (pin) => {
+    compared.push(pin.newWorkflowPath);
+    return { unchanged: true };
+  });
+
+  assert.deepEqual(compared, [SYNC_WORKFLOW], "a renamed pin is never surface-compared");
+  assert.equal(plan.reasons.length, 1);
+  assert.deepEqual(plan.copyForwards, [
+    { kind: "reusable", workflowPath: SYNC_WORKFLOW, oldSha: oldA, newSha: FRESH_SHA },
+  ]);
 });
 
 test("a selector copy-forward throws and adds no selector key", async () => {
