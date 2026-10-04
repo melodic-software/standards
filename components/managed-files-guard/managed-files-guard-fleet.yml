@@ -1,4 +1,4 @@
-name: managed-files-guard
+name: pr-check-managed-files
 
 # SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
 # Source of truth: melodic-software/standards,
@@ -9,7 +9,7 @@ name: managed-files-guard
 # upstream, or move the component to `locally-owned` in the manifest to
 # customize.
 #
-# Thin caller for the org's managed-files-guard composite action
+# Thin caller for the org's check-managed-files composite action
 # (melodic-software/ci-workflows, ci-workflows#208). The action resolves this
 # repository's sync-manifest-managed destination paths from the standards ref
 # it is given and fails the pull request when the diff hand-edits one of them
@@ -26,9 +26,10 @@ name: managed-files-guard
 # directly, which runner-policy admits only on a private repository enrolled
 # for local CI routing. Public and un-enrolled private targets take the
 # hosted sibling, components/managed-files-guard/managed-files-guard.yml.
-# The two files differ only in this paragraph, the source lines above, and
-# `runs-on`; the job name is the same, so the check context is
-# `managed-files-guard` on every target.
+# The two files differ only in this paragraph, the source lines above, the
+# workflow `name:` (each equals its destination stem) and `runs-on`; the job
+# name is the same, so the check context is `pr-check-managed-files` on every
+# target.
 
 # The guard fails only on an exact managed destination path, so the workflow
 # runs only when the pull request touches one. `paths` is the sorted union of
@@ -59,12 +60,12 @@ on:
       - .github/standards/runner-policy/runner-policy.mjs
       - .github/standards/trusted-actors/trusted-actors.json
       - .github/standards/trusted-actors/trusted-actors.schema.json
-      - .github/workflows/claude-review-hosted.yml
-      - .github/workflows/claude-review.yml
-      - .github/workflows/claude-security-review-hosted.yml
-      - .github/workflows/claude-security-review.yml
-      - .github/workflows/managed-files-guard-fleet.yml
-      - .github/workflows/managed-files-guard.yml
+      - .github/workflows/pr-check-managed-files-hosted.yml
+      - .github/workflows/pr-check-managed-files.yml
+      - .github/workflows/pr-review-hosted.yml
+      - .github/workflows/pr-review-security-hosted.yml
+      - .github/workflows/pr-review-security.yml
+      - .github/workflows/pr-review.yml
       - .gitleaks.toml
       - .golangci.yml
       - .lefthook/base.yml
@@ -105,10 +106,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  managed-files-guard:
-    # Equal to the job id so the check context stays `managed-files-guard`;
+  pr-check-managed-files:
+    # Equal to the job id so the check context is `pr-check-managed-files`;
     # zizmor's pedantic `anonymous-definition` audit flags an unnamed job.
-    name: managed-files-guard
+    name: pr-check-managed-files
     runs-on: melodic-ubuntu-24.04-x64
     timeout-minutes: 10
     steps:
@@ -125,7 +126,7 @@ jobs:
         # now contains that commit, so the pin-comment takes the convention's
         # release-tag form rather than the short-SHA fallback
         # (components/managed-files-guard/README.md).
-        uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@35880dcbb2f174aac90159e276dc7eddf1bc20b9 # v0.30.1
+        uses: melodic-software/ci-workflows/.github/actions/check-managed-files@7446b5165511796b7b0d30b68d341689ebb8de61 # v0.34.0
         with:
           # `main` for the soak, per the action's own input contract ("Pin to
           # a full SHA in callers once soak completes"): the guard must read

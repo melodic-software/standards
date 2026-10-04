@@ -305,8 +305,8 @@ discovery is not an accepted default.
 
 `claude-review-caller` and `claude-security-review-caller` materialize the
 thin workflow callers for the `ci-workflows` reusable Claude review lanes at
-`.github/workflows/claude-review.yml` and
-`.github/workflows/claude-security-review.yml`. They are the recorded
+`.github/workflows/pr-review.yml` and
+`.github/workflows/pr-review-security.yml`. They are the recorded
 exception to the rule that workflow callers stay consumer-owned. Hand-written
 lane callers empirically drifted: a missing `reopened` trigger in medley,
 divergent `skip-actors` lists, and reusable-pin skew (v0.6.1 ↔ e295107).
@@ -351,10 +351,11 @@ differently for each lane:
 Public targets take a hosted pair instead, as an interim (#622):
 `claude-review-hosted-caller` and `claude-security-review-hosted-caller`,
 sourced from `components/claude-lanes-hosted/` and materialized at
-`.github/workflows/claude-review-hosted.yml` and
-`.github/workflows/claude-security-review-hosted.yml`. Each file equals its
-fleet sibling except for comments and `runner: ubuntu-24.04`; the workflow and
-job names match, so the check contexts do too. The destinations differ because
+`.github/workflows/pr-review-hosted.yml` and
+`.github/workflows/pr-review-security-hosted.yml`. Each file equals its
+fleet sibling except for comments, `runner: ubuntu-24.04` and the workflow
+`name:`, which equals each file's stem; the job ids match, so the check
+contexts do too. The destinations differ because
 a destination has one owning component. They are `managed` for agent-plugins,
 ci-runner, claude-code-account-rotation, claude-code-plugins, codex-plugins
 and cursor-plugins.
@@ -375,7 +376,7 @@ constraint, now stated over the fleet literal rather than the retired selector:
 "claude lane caller components pass runner policy for a private self-hosted
 consumer", and "a fleet-routed claude lane caller is rejected outright on a
 public consumer". Three more hold the hosted pair: it equals its fleet sibling
-except for comments and `runner`, every target managing it is public and
+except for comments, `runner` and the `-hosted` name, every target managing it is public and
 audits clean, and no target manages both variants of one lane.
 
 Public/shared-shape removal trigger: moving the runner indirection inside the
@@ -387,10 +388,10 @@ public-target test for `components/claude-lanes/`.
 ## managed-files-guard caller component
 
 Two components materialize a thin caller for the `ci-workflows`
-`managed-files-guard` composite action: `managed-files-guard-caller` at
-`.github/workflows/managed-files-guard.yml` (hosted) and
+`check-managed-files` composite action: `managed-files-guard-caller` at
+`.github/workflows/pr-check-managed-files-hosted.yml` (hosted) and
 `managed-files-guard-fleet-caller` at
-`.github/workflows/managed-files-guard-fleet.yml` (fleet-routed). The action
+`.github/workflows/pr-check-managed-files.yml` (fleet-routed). The action
 fails a consumer pull
 request that hand-edits one of that repository's managed destinations, which
 is the signal ADR-0007 assigned to a downstream edit of a managed file. It is
@@ -398,8 +399,12 @@ the second recorded exception to the consumer-owned-caller rule, on the same
 grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
-The two files differ only in `runs-on` and comments, and share the job name,
-so the check context is `managed-files-guard` everywhere. The hosted caller
+Both call `.github/actions/check-managed-files` at the same pin. The two files
+differ only in `runs-on`, comments and the workflow `name:`, which equals each
+destination stem (`pr-check-managed-files-hosted` and
+`pr-check-managed-files`). They share the job id and job name
+`pr-check-managed-files`, so the check context is `pr-check-managed-files`
+on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The
 fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
 the fleet-enrolled private targets (`claude-code-proxy`, `dotfiles`,

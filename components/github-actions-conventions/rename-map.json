@@ -36,9 +36,9 @@
     "repo": ".github",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -47,7 +47,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "agent-plugins",
@@ -70,9 +70,9 @@
     "repo": "agent-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -81,15 +81,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "agent-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -98,15 +98,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "agent-plugins",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -115,7 +115,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "ci-runner",
@@ -186,9 +186,9 @@
     "repo": "ci-runner",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -197,15 +197,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "ci-runner",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -214,15 +214,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "ci-runner",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -231,7 +231,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "ci-runner",
@@ -537,9 +537,9 @@
     "repo": "claude-code-account-rotation",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -548,15 +548,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "claude-code-account-rotation",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -565,15 +565,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "claude-code-account-rotation",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -582,7 +582,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "claude-code-account-rotation",
@@ -634,9 +634,9 @@
     "repo": "claude-code-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -645,15 +645,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "claude-code-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -662,7 +662,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "claude-code-plugins",
@@ -702,9 +702,9 @@
     "repo": "claude-code-plugins",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -713,7 +713,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "claude-code-plugins",
@@ -815,7 +815,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "claude-code-proxy",
@@ -832,7 +832,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "codex-plugins",
@@ -855,9 +855,9 @@
     "repo": "codex-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -866,15 +866,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "codex-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -883,15 +883,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "codex-plugins",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -900,7 +900,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "cursor-plugins",
@@ -935,9 +935,9 @@
     "repo": "cursor-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-review-hosted.yml",
-    "to": ".github/workflows/pr-review.yml",
+    "to": ".github/workflows/pr-review-hosted.yml",
     "from_name": "claude-review",
-    "to_name": "pr-review",
+    "to_name": "pr-review-hosted",
     "job_renames": [
       {
         "from": "review",
@@ -946,15 +946,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller takes the reusable filename; the -hosted/-fleet variants merge into one file with a `runner` input (D13)"
+    "note": "Caller takes the reusable filename; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "cursor-plugins",
     "kind": "workflow",
     "from": ".github/workflows/claude-security-review-hosted.yml",
-    "to": ".github/workflows/pr-review-security.yml",
+    "to": ".github/workflows/pr-review-security-hosted.yml",
     "from_name": "claude-security-review",
-    "to_name": "pr-review-security",
+    "to_name": "pr-review-security-hosted",
     "job_renames": [
       {
         "from": "security-review",
@@ -963,15 +963,15 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "cursor-plugins",
     "kind": "workflow",
     "from": ".github/workflows/managed-files-guard.yml",
-    "to": ".github/workflows/pr-check-managed-files.yml",
+    "to": ".github/workflows/pr-check-managed-files-hosted.yml",
     "from_name": "managed-files-guard",
-    "to_name": "pr-check-managed-files",
+    "to_name": "pr-check-managed-files-hosted",
     "job_renames": [
       {
         "from": "managed-files-guard",
@@ -980,7 +980,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "github-iac",
@@ -1031,7 +1031,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "github-iac",
@@ -1072,7 +1072,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "github-iac",
@@ -1217,7 +1217,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "medley",
@@ -1275,7 +1275,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "medley",
@@ -1401,7 +1401,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "provisioning",
@@ -1418,7 +1418,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "provisioning",
@@ -1630,7 +1630,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "standards",
@@ -1761,7 +1761,7 @@
     ],
     "couplings": ["TRIGGER", "SYNC", "MFG", "REPIN", "PIN", "RP-std", "RC"],
     "confidence": "high",
-    "note": "Caller job id = slot `pr-review-security`; reusable engine job is `claude`, so context `security-review / security-review` becomes `pr-review-security / claude` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
+    "note": "Caller job id = slot `pr-review-security`; reusable engine job `claude` keeps the display name `security-review`, so context `security-review / security-review` becomes `pr-review-security / security-review` (security-review-gate ruleset, github-iac OrgRulesets.cs:141, enforcement disabled; claude-code-plugins ADR 0002)"
   },
   {
     "repo": "dotfiles",
@@ -1778,7 +1778,7 @@
     ],
     "couplings": ["SYNC", "MFG", "HOSTED-FLEET"],
     "confidence": "high",
-    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the -fleet/-hosted variants merge into one file with a `runner` input (D13)"
+    "note": "Thin caller of the check-managed-files composite; job id = slot; the advisory check context moves from `managed-files-guard` to `pr-check-managed-files`; the hosted and fleet callers keep separate files (`-hosted` stem for the hosted one) with the same job id, so the same check context (Q5 (b) supersedes D13)"
   },
   {
     "repo": "ci-workflows",
