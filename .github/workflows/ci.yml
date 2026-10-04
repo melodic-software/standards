@@ -350,7 +350,8 @@ jobs:
         run: npm run lint:dependabot-policy
       # Reads the public ci-workflows reusable at an immutable pinned SHA, so
       # the only non-hermetic input is the fetch itself; a separate job would
-      # add a needs edge for no isolation gain.
+      # add a needs edge for no isolation gain. Blocking from admission: see
+      # components/dependabot-policy/README.md "Merge lanes".
       - name: Enforce the auto-merge allowlist lockstep with ci-workflows
         env:
           GITHUB_TOKEN: ${{ github.token }}

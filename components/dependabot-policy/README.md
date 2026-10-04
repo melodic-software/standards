@@ -73,8 +73,15 @@ A GitHub Actions bump takes one of two lanes, recorded as data in the
 Prefer removing manual-lane actions over reviewing their bumps: replace a
 community action with a vendor action or a `gh` or script step.
 
-This component records the lanes but does not enforce them; a shared
-auto-merge workflow in `ci-workflows` is the planned consumer of `autoMerge`.
+This component records the lanes; the ci-workflows
+`pr-automerge-dependabot.yml` reusable enforces the auto lane by arming
+auto-merge, and its `PUBLISHER_ALLOWLIST` constant copies
+`autoMerge.publisherAllowlist`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
+fetches that reusable at the SHA its `runner-policy` contract approves and
+fails when the two lists differ. It blocks from admission, with no report-only
+period: it compares two files at fixed revisions, so a run either matches or
+names the differing lists, and the admitting change's run against the pinned
+reusable matched.
 
 ## What it checks
 
