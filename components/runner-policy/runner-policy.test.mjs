@@ -68,6 +68,41 @@ const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
 const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
+// Reviewed contracts at ci-workflows revisions no consumer pins any more. The
+// live policy admits only current pins; the tests that prove how each
+// contract was reviewed read them from here.
+const HISTORICAL_CONTRACTS = JSON.parse(
+  await readFile(new URL("./fixtures/historical-contracts.json", import.meta.url), "utf8"),
+).approvedReusableWorkflowContracts;
+const HISTORICAL_POLICY = {
+  ...BASE_POLICY,
+  approvedReusableWorkflowContracts: {
+    ...BASE_POLICY.approvedReusableWorkflowContracts,
+    ...HISTORICAL_CONTRACTS,
+  },
+};
+// Each historical reusable's file name at the revision the live policy admits.
+const LIVE_CI_WORKFLOWS_SHA = "fb56986808750d6856c27de78df15e150027b8dc";
+const LIVE_SUCCESSOR = {
+  checks: "pr-run-checks",
+  "claude-review": "pr-review",
+  "claude-security-review": "pr-review-security",
+  "issue-triage-label": "intake-label-needs-triage",
+  "osv-scanner": "pr-scan-dependencies",
+  "standards-sync": "maintenance-sync-standards",
+  zizmor: "pr-audit-workflows",
+};
+
+function assertLiveSuccessors(reusables) {
+  for (const reusable of reusables) {
+    const key = `melodic-software/ci-workflows/.github/workflows/${LIVE_SUCCESSOR[reusable]}.yml@${LIVE_CI_WORKFLOWS_SHA}`;
+    assert.equal(
+      BASE_POLICY.approvedReusableWorkflowContracts[key]?.routing,
+      "runner-input",
+      `the live policy must admit ${reusable}'s successor ${key}`,
+    );
+  }
+}
 const temporaryRoots = [];
 
 test("duplicate JSON object members fail closed with their policy or schema path", () => {
@@ -2944,8 +2979,23 @@ test("hosted matrix expression policy remains required, unique, and structurally
   }
 });
 
+test("the live policy admits ci-workflows reusables only at the revision consumers pin", () => {
+  const live = Object.keys(BASE_POLICY.approvedReusableWorkflowContracts).filter((key) =>
+    key.startsWith("melodic-software/ci-workflows/"),
+  );
+  assert.deepEqual(
+    live.filter((key) => !key.endsWith(`@${LIVE_CI_WORKFLOWS_SHA}`)),
+    [],
+  );
+  assert.equal(live.length, 9);
+  for (const key of Object.keys(HISTORICAL_CONTRACTS)) {
+    assert.equal(BASE_POLICY.approvedReusableWorkflowContracts[key], undefined, key);
+  }
+});
+
 test("production contracts pin reviewed Windows and selectable Linux workflows", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "standards-sync", "zizmor", "osv-scanner"]);
+  const contracts = HISTORICAL_CONTRACTS;
   assert.deepEqual(
     contracts[
       `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`
@@ -6227,7 +6277,7 @@ test("exact reviewed hosted-only reusable workflow needs no runner input", async
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -6247,7 +6297,7 @@ test("hosted-only reusable contract rejects a caller-added runner input", async 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(
     (await audit(root)).map(({ rule }) => rule),
@@ -6269,7 +6319,7 @@ test("hosted-only reusable contract rejects inherited caller secrets", async () 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -6333,7 +6383,7 @@ test("hosted-only reusable contract accepts its exact reviewed secret mapping", 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -6368,7 +6418,7 @@ jobs:
     });
     await writeFile(
       path.join(root, "runner-policy-policy.json"),
-      `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+      `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
     );
     assert.deepEqual(await audit(root), [], skipActors);
   }
@@ -6397,7 +6447,7 @@ jobs:
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -6424,7 +6474,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -7004,7 +7054,7 @@ test("hosted-only reusable contract rejects an alternate secret expression", asy
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(BASE_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -7913,7 +7963,7 @@ jobs:
 
 const CHECKS_REFERENCE =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1";
-const CHECKS_CONTRACT = BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE];
+const CHECKS_CONTRACT = HISTORICAL_CONTRACTS[CHECKS_REFERENCE];
 const CHECKS_POLICY_OVERRIDES = {
   approvedReusableWorkflowContracts: { [CHECKS_REFERENCE]: CHECKS_CONTRACT },
 };
@@ -7946,6 +7996,7 @@ ${inputs.map((line) => `      ${line}`).join("\n")}
 }
 
 test("the shipped checks.yml contract is the reusable's whole declared surface", () => {
+  assertLiveSuccessors(["checks"]);
   // Pinned so a later narrowing to one caller's subset is a visible diff. The
   // list is on.workflow_call.inputs at the pinned SHA in declaration order, all
   // nineteen; the reusable declares no secrets, and its job asks for exactly
@@ -8072,18 +8123,15 @@ const CHECKS_REFERENCE_WAVE_TAG =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 
 test("the checks.yml contract at the wave tag copies the first contract forward verbatim", () => {
-  assert.deepEqual(
-    BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE_WAVE_TAG],
-    CHECKS_CONTRACT,
-  );
+  assertLiveSuccessors(["checks"]);
+  assert.deepEqual(HISTORICAL_CONTRACTS[CHECKS_REFERENCE_WAVE_TAG], CHECKS_CONTRACT);
 });
 
 test("a private fleet caller of the checks reusable at the wave tag is admitted", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [CHECKS_REFERENCE_WAVE_TAG]:
-          BASE_POLICY.approvedReusableWorkflowContracts[CHECKS_REFERENCE_WAVE_TAG],
+        [CHECKS_REFERENCE_WAVE_TAG]: HISTORICAL_CONTRACTS[CHECKS_REFERENCE_WAVE_TAG],
       },
     },
     workflows: {
@@ -8353,7 +8401,8 @@ test("a fleet-routed claude lane caller is rejected outright on a public consume
 // Equality against the predecessor is the assertion, so a widened input,
 // secret, or caller permission smuggled into the new key fails here.
 test("both claude lane contracts at the wave tag copy their predecessors forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review"]);
+  const contracts = HISTORICAL_CONTRACTS;
   let asserted = 0;
   for (const lane of ["claude-review", "claude-security-review"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${lane}.yml`;
@@ -8373,7 +8422,8 @@ test("both claude lane contracts at the wave tag copy their predecessors forward
 // `allowedCallerPermissions`, which this one does. The declared surface is
 // unchanged at the tag, so equality against the predecessor is the assertion.
 test("issue-triage-label at the wave tag copies its predecessor forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["issue-triage-label"]);
+  const contracts = HISTORICAL_CONTRACTS;
   const workflowPath = "melodic-software/ci-workflows/.github/workflows/issue-triage-label.yml";
   const previous = contracts[`${workflowPath}@c5e729c0af0e55ffed4675ec85c1b57356fef79e`];
   assert.ok(previous, "expected a predecessor contract for issue-triage-label");
@@ -8385,7 +8435,7 @@ test("a governed caller of issue-triage-label at the wave tag is admitted", asyn
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+        [reference]: HISTORICAL_CONTRACTS[reference],
       },
     },
     workflows: {
@@ -8412,7 +8462,8 @@ jobs:
 // caller's token, so an under-granted caller would otherwise pass policy and
 // fail inside the callee with no repository to read.
 test("osv-scanner at the wave tag copies its predecessor forward and adds only the contents floor", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["osv-scanner"]);
+  const contracts = HISTORICAL_CONTRACTS;
   const workflowPath = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
   const previous = contracts[`${workflowPath}@${GH_FREE_GATE_SHA}`];
   assert.ok(previous, "expected a predecessor contract for osv-scanner");
@@ -8431,7 +8482,8 @@ test("osv-scanner at the wave tag copies its predecessor forward and adds only t
 // from `31a5b76c`: routing, runner input, allowed inputs and the empty secret
 // map. `upload-sarif` stays out of `allowedInputs`, as it did at v0.14.2.
 test("zizmor at the wave tag copies its predecessor forward and adds only the reviewed caller-permission waiver", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["zizmor"]);
+  const contracts = HISTORICAL_CONTRACTS;
   const workflowPath = "melodic-software/ci-workflows/.github/workflows/zizmor.yml";
   const previous = contracts[`${workflowPath}@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`];
   assert.ok(previous, "expected a predecessor contract for zizmor");
@@ -8461,7 +8513,7 @@ ${permissions}
 `;
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
-      [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+      [reference]: HISTORICAL_CONTRACTS[reference],
     },
   };
   const granted = await repository({
@@ -8499,7 +8551,7 @@ ${permissions}
 `;
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
-      [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+      [reference]: HISTORICAL_CONTRACTS[reference],
     },
   };
   const granted = await repository({
@@ -8577,7 +8629,8 @@ const WAVE_PATCH_TAG_CALLERS = [
 ];
 
 test("every reusable contract at the wave patch tag copies its v0.22.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(WAVE_PATCH_TAG_CALLERS.map(({ reusable }) => reusable));
+  const contracts = HISTORICAL_CONTRACTS;
   let asserted = 0;
   for (const { reusable } of WAVE_PATCH_TAG_CALLERS) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
@@ -8601,7 +8654,7 @@ test("a governed caller of each reusable at the wave patch tag is admitted", asy
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+          [reference]: HISTORICAL_CONTRACTS[reference],
         },
       },
       workflows: {
@@ -8631,7 +8684,8 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
 // forward of its v0.22.1 entry, and the v0.22.1 and older entries stay as they
 // were reviewed, because the allowlist is historical.
 test("every reusable contract at the convergence tag copies its v0.22.1 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(WAVE_PATCH_TAG_CALLERS.map(({ reusable }) => reusable));
+  const contracts = HISTORICAL_CONTRACTS;
   let asserted = 0;
   for (const { reusable } of WAVE_PATCH_TAG_CALLERS) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
@@ -8655,7 +8709,7 @@ test("a governed caller of each reusable at the convergence tag is admitted", as
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [reference]: BASE_POLICY.approvedReusableWorkflowContracts[reference],
+          [reference]: HISTORICAL_CONTRACTS[reference],
         },
       },
       workflows: {
@@ -8687,7 +8741,7 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
 test("the sync reusable carries no contract at the convergence tag", () => {
   const key = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${REPINE_LANE_SHA_V0_22_2}`;
   assert.equal(
-    BASE_POLICY.approvedReusableWorkflowContracts[key],
+    HISTORICAL_POLICY.approvedReusableWorkflowContracts[key],
     undefined,
     "standards-sync gained a convergence-tag contract without answering the needs question",
   );
@@ -8702,7 +8756,8 @@ test("the sync reusable carries no contract at the convergence tag", () => {
 // predecessor is the assertion, so an input, secret, or caller permission
 // widened in the new key fails here rather than shipping.
 test("every reusable contract at the v0.25.0 tag copies its v0.24.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
+  const contracts = HISTORICAL_CONTRACTS;
   let asserted = 0;
   for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
@@ -8727,7 +8782,8 @@ test("every reusable contract at the v0.25.0 tag copies its v0.24.0 entry forwar
 // write. Each entry is therefore written by review, as a verbatim copy of
 // its v0.25.0 predecessor.
 test("every reusable contract at the v0.26.0 tag copies its v0.25.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
+  const contracts = HISTORICAL_CONTRACTS;
   let asserted = 0;
   for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
@@ -8748,7 +8804,8 @@ test("every reusable contract at the v0.26.0 tag copies its v0.25.0 entry forwar
 // markdown-extra-globs input that stays out of allowedInputs because no
 // caller passes it, and issue-triage-label only changes its label default.
 test("every reusable contract at the v0.27.0 tag copies its predecessor forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(Object.keys(LIVE_SUCCESSOR));
+  const contracts = HISTORICAL_CONTRACTS;
   const predecessors = {
     "claude-review": REPINE_LANE_SHA_V0_26_0,
     "claude-security-review": REPINE_LANE_SHA_V0_26_0,
@@ -8773,7 +8830,8 @@ test("every reusable contract at the v0.27.0 tag copies its predecessor forward 
 // v0.27.1 only moves ci-workflows' internal self-pins; every contract surface
 // is unchanged, so all seven entries copy v0.27.0 forward.
 test("every reusable contract at the v0.27.1 tag copies its v0.27.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(Object.keys(LIVE_SUCCESSOR));
+  const contracts = HISTORICAL_CONTRACTS;
   const reusables = [
     "claude-review",
     "claude-security-review",
@@ -8798,7 +8856,8 @@ test("every reusable contract at the v0.27.1 tag copies its v0.27.0 entry forwar
 // v0.28.1 changes only claude-review's behavior under a disabled review cap;
 // both lane contracts copy v0.28.0 forward.
 test("both claude lane contracts at the v0.28.1 tag copy their v0.28.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review"]);
+  const contracts = HISTORICAL_CONTRACTS;
   for (const reusable of ["claude-review", "claude-security-review"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
     const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_0}`];
@@ -8813,7 +8872,8 @@ test("both claude lane contracts at the v0.28.1 tag copy their v0.28.0 entry for
 
 // v0.29.0 slims both lanes to one caller-passed input; only allowedInputs narrows.
 test("both claude lane contracts at the v0.29.0 tag narrow their v0.28.1 entry to the runner input", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review"]);
+  const contracts = HISTORICAL_CONTRACTS;
   for (const reusable of ["claude-review", "claude-security-review"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
     const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`];
@@ -8829,7 +8889,8 @@ test("both claude lane contracts at the v0.29.0 tag narrow their v0.28.1 entry t
 // v0.29.1 moves no input, secret, permission or routing field: the lanes gain
 // a Skill grant and a stricter status job, standards-sync only comments.
 test("every reusable contract at the v0.29.1 tag copies its predecessor forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
+  const contracts = HISTORICAL_CONTRACTS;
   const predecessors = {
     "claude-review": REPINE_LANE_SHA_V0_29_0,
     "claude-security-review": REPINE_LANE_SHA_V0_29_0,
@@ -8928,7 +8989,8 @@ test("no target manages both the fleet and the hosted caller of one lane", async
 // v0.30.1 moves no input, secret, permission or routing field: the lanes only
 // bump claude-code-action, standards-sync is byte-identical.
 test("every reusable contract at the v0.30.1 tag copies its v0.29.1 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
+  const contracts = HISTORICAL_CONTRACTS;
   for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
     const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
     const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_1}`];

@@ -105,6 +105,21 @@ const CURRENT_REVIEW_SHA = "91d06c94d733e5daa507e0afaa06a140bb46d337";
 const FRESH_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const REVIEW_WORKFLOW = "melodic-software/ci-workflows/.github/workflows/claude-review.yml";
 
+// CURRENT_REVIEW_SHA is a revision the live policy no longer admits; its
+// reviewed contract lives in the runner-policy historical fixture.
+async function policyWithHistory() {
+  const read = async (rel) => JSON.parse(await readFile(new URL(rel, import.meta.url), "utf8"));
+  const live = await read("../runner-policy/policy.json");
+  const history = await read("../runner-policy/fixtures/historical-contracts.json");
+  return {
+    ...live,
+    approvedReusableWorkflowContracts: {
+      ...live.approvedReusableWorkflowContracts,
+      ...history.approvedReusableWorkflowContracts,
+    },
+  };
+}
+
 const NOTE_FORBIDDEN = [
   "selector allowlist",
   "approvedSelector",
@@ -165,9 +180,7 @@ test("the lockstep script no longer carries selector-allowlist machinery", async
 });
 
 test("copy-forward clones one real claude-review contract onto a new SHA", async () => {
-  const onDisk = JSON.parse(
-    await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
-  );
+  const onDisk = await policyWithHistory();
   const policy = structuredClone(onDisk);
   const oldKey = `${REVIEW_WORKFLOW}@${CURRENT_REVIEW_SHA}`;
   const newKey = `${REVIEW_WORKFLOW}@${FRESH_SHA}`;
@@ -226,9 +239,7 @@ test("pairCallerPins refuses a pin line that apply did not leave as a pin", () =
 });
 
 test("a renamed pin with an unchanged surface writes no contract and lands on the human checklist", async () => {
-  const policy = JSON.parse(
-    await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
-  );
+  const policy = await policyWithHistory();
   const before = structuredClone(policy);
   const pins = [
     {
@@ -306,7 +317,7 @@ async function policyRoot() {
   temporaryRoots.push(root);
   const rel = "components/runner-policy/policy.json";
   await mkdir(path.join(root, path.dirname(rel)), { recursive: true });
-  const bytes = await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8");
+  const bytes = `${JSON.stringify(await policyWithHistory(), null, 2)}\n`;
   await writeFile(path.join(root, rel), bytes);
   return { file: path.join(root, rel), root, bytes };
 }
@@ -344,9 +355,7 @@ test("settleLockstep writes the copy-forward when nothing was declined", async (
 });
 
 test("a selector copy-forward throws and adds no selector key", async () => {
-  const onDisk = JSON.parse(
-    await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8"),
-  );
+  const onDisk = await policyWithHistory();
   const policy = structuredClone(onDisk);
   const before = structuredClone(policy);
   assert.throws(
@@ -428,9 +437,7 @@ function samePathPin() {
 }
 
 async function planWithFetch(pins, fetchImpl) {
-  const policy = validatePolicy(
-    JSON.parse(await readFile(new URL("../runner-policy/policy.json", import.meta.url), "utf8")),
-  );
+  const policy = validatePolicy(await policyWithHistory());
   return planLockstep(pins, FRESH_SHA, (pin) =>
     lockstep.laneSecuritySurfacesMatch({
       oldSource: DOLLAR_REUSABLE_SOURCE,
