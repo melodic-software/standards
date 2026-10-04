@@ -171,6 +171,10 @@ components:
       - repository-text
     files:
       .editorconfig-checker.json: .editorconfig-checker.json
+  github-actions-conventions:
+    files:
+      components/github-actions-conventions/vocabulary.json: .github/standards/github-actions-conventions/vocabulary.json
+      components/github-actions-conventions/vocabulary.schema.json: .github/standards/github-actions-conventions/vocabulary.schema.json
   gitleaks:
     files:
       .gitleaks.toml: .gitleaks.toml
@@ -462,6 +466,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - editorconfig-checker
+      - github-actions-conventions
       - gitleaks
       - lychee
       - managed-files-guard-caller
