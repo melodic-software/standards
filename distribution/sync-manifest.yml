@@ -158,7 +158,7 @@ components:
       components/cloud-bootstrap/cloud-bootstrap.sh: .claude/cloud-bootstrap.sh
   comment-hygiene-action:
     files:
-      components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/comment-hygiene/comment-hygiene-patterns.sh
+      components/comment-hygiene/comment-hygiene-patterns.sh: .github/actions/check-comment-markers/comment-hygiene-patterns.sh
   comment-hygiene-tools:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
@@ -271,7 +271,7 @@ components:
       .node-version: .node-version
   path-detection-action:
     files:
-      components/path-detection/machine-path-patterns.sh: .github/actions/machine-specific-paths/machine-path-patterns.sh
+      components/path-detection/machine-path-patterns.sh: .github/actions/check-machine-paths/machine-path-patterns.sh
   path-detection-guardrails:
     files:
       components/path-detection/machine-path-patterns.sh: plugins/guardrails/lib/path-detection/machine-path-patterns.sh
