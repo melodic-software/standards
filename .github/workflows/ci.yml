@@ -348,6 +348,14 @@ jobs:
         run: npm run test:dependabot-policy
       - name: Enforce dependabot policy on standards
         run: npm run lint:dependabot-policy
+      # Reads the public ci-workflows reusable at an immutable pinned SHA, so
+      # the only non-hermetic input is the fetch itself; a separate job would
+      # add a needs edge for no isolation gain. Blocking from admission: see
+      # components/dependabot-policy/README.md "Merge lanes".
+      - name: Enforce the auto-merge allowlist lockstep with ci-workflows
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run lint:dependabot-automerge-lockstep
 
   pr-convention-policy:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}

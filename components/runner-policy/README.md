@@ -1052,6 +1052,23 @@ composites through `$/` at the release commit instead of v0.27.0 pins. Both
 upstream SHAs match their release tags. No input, secret, caller permission or
 `runs-on` routing moved. The old keys stay for consumers pinned at v0.33.0 or
 earlier.
+`pr-automerge-dependabot` is registered at the v0.35.0 tag
+`69e506b7c119517ef1dfc421479232b386b93a52`, its first revision, security-reviewed
+on ci-workflows#676. It arms squash auto-merge, passing the verified head SHA as
+`expectedHeadOid`, on a Dependabot `pull_request` that bumps only allowlisted
+GitHub Actions publishers by a patch or minor version, and disarms a PR that
+fails the gate; it never calls a merge mutation, so the required `ci-status`
+check still decides the merge. The caller owns the trigger; the job runs only
+on `pull_request` with PR author id 49699333. Its one job declares
+`contents: write` and `pull-requests: write`, which is the exact
+`allowedCallerPermissions` map. Its only input is `runner` and it takes no
+secrets. It pins `dependabot/fetch-metadata` v3.1.0
+(`25dd0e34f4fe68f24cc83900b1fe3fe149efef98`) and `actions/github-script` v9.0.0
+(`3a2844b7e9c422d3c10d287c895573f7108da1b3`), and checks out nothing. Its
+`PUBLISHER_ALLOWLIST` constant mirrors `dependabot-policy` `autoMerge`, which
+`npm run lint:dependabot-automerge-lockstep` enforces. Hosted `ubuntu-24.04`
+with write scopes needs no exception on a public repository; a private consumer
+needs a `privileged-control-plane` exception or the fleet.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
