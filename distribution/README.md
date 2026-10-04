@@ -400,8 +400,9 @@ grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
 Both call `.github/actions/check-managed-files` at the same pin. The two files
-differ only in `runs-on`, comments and the workflow `name:`, which equals each
-destination stem (`pr-check-managed-files-hosted` and
+differ only in `runs-on`, comments, their `on.pull_request.paths` entries (each
+lists the managed destinations of the targets that receive it) and the workflow
+`name:`, which equals each destination stem (`pr-check-managed-files-hosted` and
 `pr-check-managed-files`). They share the job id and job name
 `pr-check-managed-files`, so the check context is `pr-check-managed-files`
 on every target, hosted or fleet-routed. The hosted caller
