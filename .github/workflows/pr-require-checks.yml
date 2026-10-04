@@ -434,6 +434,7 @@ jobs:
               harness/shell/**
               ruff.toml
               .gitignore
+              .gitattributes
               components/ruff/**
               components/pyright/**
               **/*.py
@@ -572,6 +573,7 @@ jobs:
               harness/shell/**
               .node-version
               .editorconfig
+              .gitattributes
               .lefthook/dotnet-format.json
               components/dotnet-analysis/**
               components/lefthook-dotnet/**
@@ -580,6 +582,7 @@ jobs:
               global.json
               nuget.config
               NuGet.config
+              NuGet.Config
       - name: Check out
         if: ${{ fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -648,6 +651,7 @@ jobs:
               .github/workflows/pr-require-checks.yml
               harness/shell/**
               .golangci.yml
+              .gitattributes
               go.work
               go.work.sum
               components/go-analysis/**
