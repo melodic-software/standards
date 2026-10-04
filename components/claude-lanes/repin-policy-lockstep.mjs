@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import {
   ConfigurationError,
   parseUniqueJson,
-  reusableWorkflowSecuritySurfacesMatch,
+  reusableWorkflowSecuritySurfacesAndObjectsMatch,
   validatePolicy,
 } from "../runner-policy/runner-policy.mjs";
 import { parseLockstepArgs } from "./repin-lockstep-args.mjs";
@@ -106,18 +106,36 @@ function fetchUpstreamFile(repoPath, ref) {
   return Buffer.from(content, "base64").toString("utf8");
 }
 
-function laneSecuritySurfacesMatch(oldSource, newSource, lanePath, policy) {
+/**
+ * Compares a same-path pin's security surface and, through runner-policy's
+ * object comparison, every `$/` action tree and `./` nested workflow it
+ * reaches. Any fetch or shape failure declines.
+ */
+export async function laneSecuritySurfacesMatch({
+  oldSource,
+  newSource,
+  workflowPath,
+  oldSha,
+  newSha,
+  policy,
+  fetchImpl = fetch,
+  githubToken,
+}) {
   try {
-    const result = reusableWorkflowSecuritySurfacesMatch({
+    const result = await reusableWorkflowSecuritySurfacesAndObjectsMatch({
       oldSource,
       newSource,
-      workflowPath: lanePath,
+      workflowPath,
+      oldRevision: oldSha,
+      newRevision: newSha,
       policy,
+      fetchImpl,
+      githubToken,
     });
     if (!result.unchanged) {
       return {
         unchanged: false,
-        reason: `${lanePath} ${result.diffField} changed between revisions`,
+        reason: `${workflowPath} ${result.diffField} changed between revisions`,
       };
     }
     return { unchanged: true };
@@ -265,7 +283,7 @@ export function renamedPathReason(pin) {
  * reviewed by hand, never copied, however its surface compares. Every other
  * pin copies forward only when `surfaceOf(pin)` reports it unchanged.
  */
-export function planLockstep(pins, newSha, surfaceOf) {
+export async function planLockstep(pins, newSha, surfaceOf) {
   const reasons = [];
   const copyForwards = [];
   const unique = new Map(
@@ -278,7 +296,7 @@ export function planLockstep(pins, newSha, surfaceOf) {
       reasons.push(renamedPathReason(pin));
       continue;
     }
-    const surface = surfaceOf(pin);
+    const surface = await surfaceOf(pin);
     if (!surface.unchanged) {
       reasons.push(`${pin.newWorkflowPath} ${surface.reason} (from ${pin.oldSha.slice(0, 7)})`);
       continue;
@@ -364,7 +382,10 @@ async function main() {
       pins.push({ ...pin, kind: target.kind });
     }
   }
-  const { reasons, copyForwards } = planLockstep(pins, newSha, (pin) => {
+  // The workflow step exports GH_TOKEN for gh; runner-policy sends the token
+  // only on its api.github.com tree requests.
+  const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const { reasons, copyForwards } = await planLockstep(pins, newSha, (pin) => {
     const repoPath = repoPathOf(pin.newWorkflowPath);
     let newSource = newSourceByRepoPath.get(repoPath);
     if (newSource === undefined) {
@@ -372,7 +393,15 @@ async function main() {
       newSourceByRepoPath.set(repoPath, newSource);
     }
     const oldSource = fetchUpstreamFile(repoPathOf(pin.oldWorkflowPath), pin.oldSha);
-    return laneSecuritySurfacesMatch(oldSource, newSource, pin.newWorkflowPath, policy);
+    return laneSecuritySurfacesMatch({
+      oldSource,
+      newSource,
+      workflowPath: pin.newWorkflowPath,
+      oldSha: pin.oldSha,
+      newSha,
+      policy,
+      githubToken,
+    });
   });
 
   await appendOutput(outputFile, await settleLockstep({ reasons, copyForwards }, newSha, tag));
