@@ -169,7 +169,7 @@ test("annotations escape the characters the workflow command syntax reserves", (
 test("the OIDC negative-test name exception applies only in github-iac", async () => {
   const root = await repository({
     workflows: {
-      "release-deploy-oidc-negative-test.yml": workflow("release-deploy-x", ["test"]),
+      "release-deploy-oidc-negative-test.yml": workflow("release-deployx", ["test"]),
     },
   });
   assert.deepEqual(

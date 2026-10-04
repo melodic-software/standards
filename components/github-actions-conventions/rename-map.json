@@ -1080,11 +1080,11 @@
     "from": ".github/workflows/oidc-negative-canary.yml",
     "to": ".github/workflows/release-deploy-oidc-negative-test.yml",
     "from_name": "github-iac-production-deploy-v1x",
-    "to_name": "release-deploy-x",
+    "to_name": "release-deployx",
     "job_renames": [],
     "couplings": ["OIDC", "PULUMI-GUARD", "RP-repo", "GOV-TESTS"],
     "confidence": "high",
-    "note": "D1: proves Pulumi rejects a one-character near-match workflow NAME. Its `name:` is the deploy name plus one character (`release-deploy-x`), the single recorded exception to name = stem. It asserts `.workflow_ref == .../oidc-negative-canary.yml@refs/heads/main` (line 100): edit that assertion in the same PR. Ships in the same sequence as the deploy rename"
+    "note": "D1: proves Pulumi rejects a one-character near-match workflow NAME. Its `name:` is the deploy name plus one character (`release-deployx`), the single recorded exception to name = stem. It asserts `.workflow_ref == .../oidc-negative-canary.yml@refs/heads/main` (line 100): edit that assertion in the same PR. Ships in the same sequence as the deploy rename"
   },
   {
     "repo": "github-iac",
