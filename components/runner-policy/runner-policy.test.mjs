@@ -8862,17 +8862,27 @@ function withoutComments(body) {
     .join("\n");
 }
 
-test("each hosted claude lane caller equals its fleet sibling except for comments and runner", async () => {
+// The workflow `name:` equals each destination's stem, so the hosted file's
+// name is its fleet sibling's plus `-hosted`; the job ids, and so the check
+// contexts, stay the same.
+test("each hosted claude lane caller equals its fleet sibling except for comments, runner and the -hosted name", async () => {
   const hosted = await claudeLaneCallerComponents(HOSTED_LANE_DIR);
   assert.equal(hosted.length, 2, "expected a hosted code-review and security-review caller");
   for (const { source, body } of hosted) {
     const fleetSource = source.replace(HOSTED_LANE_DIR, "components/claude-lanes/");
     const fleet = await readFile(new URL(`../../${fleetSource}`, import.meta.url), "utf8");
     assert.match(body, /^ {6}runner: ubuntu-24\.04$/mu, `${source} must run on ubuntu-24.04`);
+    const fleetName = fleet.match(/^name: (\S+)$/mu)?.[1];
+    assert.ok(fleetName, `${fleetSource} has no workflow name`);
+    assert.match(body, new RegExp(`^name: ${fleetName}-hosted$`, "mu"), `${source} name`);
+    const normalize = (text) =>
+      withoutComments(text)
+        .replace(/^( {6}runner:) \S+$/mu, "$1")
+        .replace(/^name: \S+$/mu, "name:");
     assert.equal(
-      withoutComments(body).replace(/^( {6}runner:) \S+$/mu, "$1"),
-      withoutComments(fleet).replace(/^( {6}runner:) \S+$/mu, "$1"),
-      `${source} drifted from ${fleetSource} beyond comments and runner`,
+      normalize(body),
+      normalize(fleet),
+      `${source} drifted from ${fleetSource} beyond comments, runner and name`,
     );
   }
 });
