@@ -51,6 +51,8 @@ on:
       - .github/actionlint.yaml
       - .github/actions/check-comment-markers/comment-hygiene-patterns.sh
       - .github/actions/check-machine-paths/machine-path-patterns.sh
+      - .github/standards/github-actions-conventions/vocabulary.json
+      - .github/standards/github-actions-conventions/vocabulary.schema.json
       - .github/standards/pyright/pyrightconfig.json
       - .github/standards/runner-policy/package-lock.json
       - .github/standards/runner-policy/package.json
