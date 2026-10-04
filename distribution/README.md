@@ -399,8 +399,12 @@ the second recorded exception to the consumer-owned-caller rule, on the same
 grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
-The two files differ only in `runs-on` and comments, and share the job name,
-so the check context is `managed-files-guard` everywhere. The hosted caller
+Both call `.github/actions/check-managed-files` at the same pin. The two files
+differ only in `runs-on`, comments and the workflow `name:`, which equals each
+destination stem (`pr-check-managed-files-hosted` and
+`pr-check-managed-files`). They share the job id and job name
+`pr-check-managed-files`, so the check context is `pr-check-managed-files`
+on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The
 fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
 the fleet-enrolled private targets (`claude-code-proxy`, `dotfiles`,
