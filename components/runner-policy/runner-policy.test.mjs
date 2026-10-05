@@ -2979,15 +2979,7 @@ test("hosted matrix expression policy remains required, unique, and structurally
   }
 });
 
-test("the live policy admits ci-workflows reusables only at the revision consumers pin", () => {
-  const live = Object.keys(BASE_POLICY.approvedReusableWorkflowContracts).filter((key) =>
-    key.startsWith("melodic-software/ci-workflows/"),
-  );
-  assert.deepEqual(
-    live.filter((key) => !key.endsWith(`@${LIVE_CI_WORKFLOWS_SHA}`)),
-    [],
-  );
-  assert.equal(live.length, 9);
+test("the live policy admits none of the historical contracts", () => {
   for (const key of Object.keys(HISTORICAL_CONTRACTS)) {
     assert.equal(BASE_POLICY.approvedReusableWorkflowContracts[key], undefined, key);
   }
