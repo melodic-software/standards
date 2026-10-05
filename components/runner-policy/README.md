@@ -1082,9 +1082,29 @@ caller permission or `runs-on` routing moved.
 Once every consumer pinned v0.36.0, the ci-workflows entries at older SHAs were
 retired under step 4 of the lockstep below, including every `7446b51` and
 `69e506b` key. The older entries the tests still read now live verbatim in
-`fixtures/historical-contracts.json`, so `policy.json` admits ci-workflows only
+`fixtures/historical-contracts.json`, so `policy.json` admitted ci-workflows only
 at `fb56986`; the review notes in this section stay as the record the v0.36.0
 terms were copied from.
+All nine reusables are also registered at the v0.38.0 tag
+`95732fda50a95d3297320a6f2c791a1a91870a7f`, each a verbatim copy of its
+`fb56986` entry, which stays until every consumer repins. Three workflow blobs
+are byte-identical (`intake-label-needs-triage`, `pr-scan-dependencies`,
+`pr-automerge-dependabot`). `intake-triage`, `pr-review` and
+`pr-review-security` change step timeouts and outcome reporting and resolve a
+changed `$/report-lane-outcome` tree; `pr-run-checks` changes its outcome join
+and its `$/markdownlint` and `$/shellcheck` trees; `pr-audit-workflows` bumps
+zizmor from 1.29.0 to 1.30.0 with a matching `sha256` default, widens its
+`paths` default to `.github/actions`, and bumps `codeql-action/upload-sarif`
+from v4.38.1 to v4.38.2 (`2892aa5`). The four secret-capable entries
+(`intake-triage`, `pr-review`, `pr-review-security`,
+`maintenance-sync-standards`) were signed off by hand on 2026-10-05.
+`maintenance-sync-standards` changes with ci-workflows#688: a sync run that
+pushes a new head to its PR disarms and re-arms auto-merge at that head with
+`expectedHeadOid`, so a reviewer's manual disarm holds only until the next head
+change, and a run that disarms but cannot re-arm fails instead of warning; to
+stop a sync PR for good, set `automerge: false` in the manifest or
+add the `do-not-merge` label. No input, secret, caller permission or `runs-on`
+routing moved.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
