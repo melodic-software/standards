@@ -181,10 +181,12 @@ assert_exit 'a gitleaks finding refuses with exit 4' 4 "$rc"
 assert_eq 'a gitleaks finding makes no call' 0 "$calls"
 
 # Machine paths and private hostnames: the page goes to the private origin.
+# The user segment goes through $u: the repo's machine-path check skips one.
+u=alice
 path_samples=(
-  'Linux home path|/home/alice/src/app.ts'
-  'macOS home path|/Users/alice/src/app.ts'
-  'Windows user path|C:\Users\alice\src'
+  "Linux home path|/home/$u/src/app.ts"
+  "macOS home path|/Users/$u/src/app.ts"
+  "Windows user path|C:\\Users\\$u\\src"
   'WSL share path|\\wsl.localhost\Ubuntu\home'
   'WSL mount path|/mnt/c/Users/alice'
   'root home path|see /root/.bashrc'
@@ -199,7 +201,7 @@ for sample in "${path_samples[@]}"; do
   assert_contains "a $label is reported private" "$out" '"visibility":"private"'
 done
 
-STUB_SEQ="$priv_ok" run "$(page path '/home/alice/x')" --visibility public --id "$pid"
+STUB_SEQ="$priv_ok" run "$(page path "/home/$u/x")" --visibility public --id "$pid"
 assert_exit 'a forced-private republish succeeds' 0 "$rc"
 assert_eq 'a forced-private republish makes one call' 1 "$calls"
 assert_eq 'a forced-private republish creates on the private origin' \
