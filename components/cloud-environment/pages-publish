@@ -133,7 +133,9 @@ send() {
       fi
     done
     url="$1" method="$2" data="$3"
-    args=(-sS --proto =https --max-time 120 --config - -X "$method" -w "\n%{http_code}")
+    # -q must stay first: it stops curl reading a .curlrc from CURL_HOME,
+    # XDG_CONFIG_HOME or HOME, which could add a url line and leak the headers.
+    args=(-q -sS --proto =https --max-time 120 --config - -X "$method" -w "\n%{http_code}")
     [[ -z "$data" ]] || args+=(-H "Content-Type: text/html; charset=utf-8" --data-binary "@$data")
     {
       printf "header = \"Authorization: Bearer %s\"\n" "$PP_TOKEN"

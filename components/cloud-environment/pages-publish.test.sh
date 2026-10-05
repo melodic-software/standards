@@ -106,6 +106,7 @@ assert_contains 'Content-Type is text/html; charset=utf-8' "$argv_all" 'Content-
 assert_contains 'the body is the page file' "$argv_all" "--data-binary"$'\n'"@$clean"
 assert_contains 'curl is held to https' "$argv_all" $'--proto\n=https'
 assert_contains 'curl reads its config from stdin' "$argv_all" $'--config\n-'
+assert_eq 'curl skips every .curlrc (-q is its first argument)' '-q' "$(argv_of 1 | head -n 1)"
 assert_not_contains 'no secret is in curl argv' "$argv_all" 'SENTINEL'
 assert_contains 'the bearer token is a stdin config line' "$stdin_all" \
   'header = "Authorization: Bearer SENTINEL-pub-token"'
