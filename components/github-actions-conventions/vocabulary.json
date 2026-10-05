@@ -84,6 +84,7 @@
       { "name": "publish-binaries", "status": "in-use" },
       { "name": "publish-image", "status": "in-use" },
       { "name": "publish-packages", "status": "in-use" },
+      { "name": "publish-plugins", "status": "in-use" },
       { "name": "tag", "status": "in-use" }
     ],
     "maintenance": [
