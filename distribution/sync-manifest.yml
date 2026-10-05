@@ -274,11 +274,6 @@ components:
   node-runtime:
     files:
       .node-version: .node-version
-  # The rendered-page uploader (components/cloud-environment/README.md), for
-  # local machines; cloud sessions get it from setup.sh instead.
-  pages-publish:
-    files:
-      components/cloud-environment/pages-publish: dot_local/bin/executable_pages-publish
   path-detection-action:
     files:
       components/path-detection/machine-path-patterns.sh: .github/actions/check-machine-paths/machine-path-patterns.sh
@@ -615,7 +610,6 @@ targets:
       - markdownlint
       - markdownlint-home
       - node-runtime
-      - pages-publish
       - pr-body-contract-rule
       - psscriptanalyzer
       - pyright

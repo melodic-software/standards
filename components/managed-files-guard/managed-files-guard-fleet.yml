@@ -77,7 +77,6 @@ on:
       - _typos.toml
       - docs/adr/README.md
       - docs/adr/adr-template.md
-      - dot_local/bin/executable_pages-publish
       - dot_markdownlint-cli2.jsonc
       - eng/dotnet-analysis/Directory.Build.props
       - eng/dotnet-analysis/dotnet.globalconfig
