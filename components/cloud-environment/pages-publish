@@ -1,0 +1,255 @@
+#!/bin/bash
+# melodic-software/standards cloud-environment pages-publish
+#
+# Uploads one rendered page to the operator's page host, installed by setup.sh
+# to ~/.local/bin/pages-publish:
+#
+#   pages-publish <file> --visibility public|private [--id <id>]
+#   pages-publish --delete <id> --visibility public|private
+#
+# Operator values come only from <passwd home>/.config/pages-publish/config,
+# where <passwd home> is field 6 of `getent passwd "$(id -un)"`. HOME,
+# XDG_CONFIG_HOME and every other run-time variable are ignored, because a
+# repository's settings can set them. The file must be owned by the current
+# user with mode 0600 and hold these KEY=VALUE lines:
+#   PUBLIC_ENDPOINT, PRIVATE_ENDPOINT          https://<host> upload origins
+#   PUBLIC_TOKEN_SECRET, PRIVATE_TOKEN_SECRET  vault names of the bearer tokens
+#   PRIVATE_ACCESS_ID_SECRET, PRIVATE_ACCESS_KEY_SECRET
+#                                              vault names of the Access
+#                                              service-token pair (private only)
+#
+# The page must be a regular file under ${TMPDIR:-/tmp} carrying a builder
+# stamp <!-- rv-gen:<name> sha256:<64 hex> -->. Its bytes are scanned before
+# any network call: a credential shape refuses the upload, a machine path or
+# private hostname sends it to the private endpoint. When the visibility sent
+# differs from the one requested, --id is dropped and a new page is created;
+# the caller deletes the old id. A 409 private-required from the public host
+# is retried once as a private create.
+#
+# Secrets are resolved by vault-exec and reach curl only as config lines on
+# its stdin, never in argv. On success stdout is one JSON line
+# {"id":..., "visibility":..., "url":...}; --delete prints nothing.
+# Exit codes: 2 usage, 3 input not a stamped temp-dir page, 4 credential
+# content (here or at the host), 5 config missing or invalid, 6 upload failed.
+set -u
+export LC_ALL=C
+
+die() {
+  printf 'pages-publish: %s\n' "$2" >&2
+  exit "$1"
+}
+
+usage() {
+  printf 'usage: pages-publish <file> --visibility public|private [--id <id>]\n' >&2
+  printf '       pages-publish --delete <id> --visibility public|private\n' >&2
+  die 2 "$1"
+}
+
+id_re='^[A-Za-z0-9_-]{22}$'
+file='' visibility='' page_id='' delete_id=''
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --visibility | --id | --delete)
+      [[ $# -ge 2 ]] || usage "$1 needs a value"
+      [[ "$1" != --visibility ]] || visibility="$2"
+      [[ "$1" != --id ]] || page_id="$2"
+      [[ "$1" != --delete ]] || delete_id="$2"
+      shift 2
+      ;;
+    -*) usage "unknown option '$1'" ;;
+    *)
+      [[ -z "$file" ]] || usage "more than one file given"
+      file="$1"
+      shift
+      ;;
+  esac
+done
+[[ "$visibility" == public || "$visibility" == private ]] || usage '--visibility must be public or private'
+if [[ -n "$delete_id" ]]; then
+  [[ -z "$file" && -z "$page_id" ]] || usage '--delete takes no file and no --id'
+  [[ "$delete_id" =~ $id_re ]] || usage "invalid id '$delete_id'"
+else
+  [[ -n "$file" ]] || usage 'missing <file>'
+  [[ -z "$page_id" || "$page_id" =~ $id_re ]] || usage "invalid id '$page_id'"
+fi
+
+# ---------------------------------------------------------------- config
+
+home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
+[[ "$home" == /* ]] || die 5 'cannot resolve the home directory from the passwd database'
+config="$home/.config/pages-publish/config"
+[[ -f "$config" && ! -L "$config" ]] || die 5 "config $config is missing"
+owner_mode="$(stat -c '%u %a' "$config" 2>/dev/null || stat -f '%u %Lp' "$config" 2>/dev/null)"
+[[ "$owner_mode" == "$(id -u) 600" ]] ||
+  die 5 "config $config must be owned by uid $(id -u) with mode 0600 (found: ${owner_mode:-unknown})"
+
+declare -A cfg=()
+keys=(PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET
+  PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET)
+while IFS= read -r line || [[ -n "$line" ]]; do
+  line="${line%$'\r'}"
+  [[ -z "${line//[[:space:]]/}" || "$line" == '#'* ]] && continue
+  key="${line%%=*}"
+  [[ "$line" == *=* && " ${keys[*]} " == *" $key "* ]] || die 5 "config $config: unknown line '${key}'"
+  cfg[$key]="${line#*=}"
+done <"$config"
+for key in "${keys[@]}"; do
+  value="${cfg[$key]:-}"
+  [[ -n "$value" ]] || die 5 "config $config: $key is missing"
+  if [[ "$key" == *_ENDPOINT ]]; then
+    value="${value%/}"
+    [[ "$value" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || die 5 "config $config: $key must be an https://<host> origin"
+    cfg[$key]="$value"
+  else
+    [[ "$value" =~ ^[A-Za-z0-9-]{1,127}$ ]] || die 5 "config $config: $key is not a vault secret name"
+  fi
+done
+
+# ---------------------------------------------------------------- upload
+
+# send <visibility> <method> <path> [<file>]: one request to that visibility's
+# upload origin. Sets status and body. The bearer token, and for the private
+# origin the Access service-token pair, are resolved by vault-exec into the
+# environment of an inner shell whose builtin printf writes them as curl config
+# lines on curl's stdin.
+send() {
+  local vis="$1" method="$2" path="$3" data="${4:-}" prefix envs resp rc
+  prefix="${vis^^}"
+  # The inner shell must see only what vault-exec resolves here, never a caller's PP_*.
+  unset PP_TOKEN PP_ACCESS_ID PP_ACCESS_KEY
+  envs=(--env "PP_TOKEN=${cfg[${prefix}_TOKEN_SECRET]}")
+  if [[ "$vis" == private ]]; then
+    envs+=(--env "PP_ACCESS_ID=${cfg[PRIVATE_ACCESS_ID_SECRET]}"
+      --env "PP_ACCESS_KEY=${cfg[PRIVATE_ACCESS_KEY_SECRET]}")
+  fi
+  # shellcheck disable=SC2016 # expanded by the inner shell
+  resp="$(vault-exec "${envs[@]}" -- bash -c '
+    set -u
+    bad="[\"\\\\[:cntrl:]]"
+    for v in "$PP_TOKEN" "${PP_ACCESS_ID-}" "${PP_ACCESS_KEY-}"; do
+      if [[ "$v" =~ $bad ]]; then
+        echo "pages-publish: a resolved secret holds a character curl config cannot carry" >&2
+        exit 97
+      fi
+    done
+    url="$1" method="$2" data="$3"
+    # -q must stay first: it stops curl reading a .curlrc from CURL_HOME,
+    # XDG_CONFIG_HOME or HOME, which could add a url line and leak the headers.
+    args=(-q -sS --proto =https --max-time 120 --config - -X "$method" -w "\n%{http_code}")
+    [[ -z "$data" ]] || args+=(-H "Content-Type: text/html; charset=utf-8" --data-binary "@$data")
+    {
+      printf "header = \"Authorization: Bearer %s\"\n" "$PP_TOKEN"
+      if [[ -n "${PP_ACCESS_ID-}" ]]; then
+        printf "header = \"CF-Access-Client-Id: %s\"\n" "$PP_ACCESS_ID"
+        printf "header = \"CF-Access-Client-Secret: %s\"\n" "$PP_ACCESS_KEY"
+      fi
+    } | curl "${args[@]}" "$url"
+  ' pages-publish "${cfg[${prefix}_ENDPOINT]}$path" "$method" "$data")"
+  rc=$?
+  [[ $rc -eq 0 ]] || die 6 "$method ${cfg[${prefix}_ENDPOINT]}$path failed (exit $rc)"
+  status="${resp##*$'\n'}"
+  body="${resp%$'\n'*}"
+  [[ "$resp" == *$'\n'* ]] || body=''
+}
+
+if [[ -n "$delete_id" ]]; then
+  send "$visibility" DELETE "/_upload/$delete_id"
+  [[ "$status" == 204 ]] || die 6 "DELETE returned HTTP $status"
+  exit 0
+fi
+
+# ---------------------------------------------------------------- input
+
+tmp_root="$(realpath -e -- "${TMPDIR:-/tmp}" 2>/dev/null)" || die 3 "temp dir ${TMPDIR:-/tmp} does not exist"
+real="$(realpath -e -- "$file" 2>/dev/null)" || die 3 "$file does not exist"
+[[ -f "$real" && "$real" == "$tmp_root"/* ]] || die 3 "$file is not a regular file under $tmp_root"
+stamp_re='<!-- rv-gen:[A-Za-z0-9._-]+ sha256:[0-9a-f]{64} -->'
+grep -aqE -- "$stamp_re" "$real" || die 3 "$file carries no builder stamp <!-- rv-gen:<name> sha256:<64 hex> -->"
+
+# ---------------------------------------------------------------- scan
+
+# A copy of the shapes in claude-code-plugins lib/publish-gate.mjs and the
+# upload Worker's scan.js; change all three together. Only these shapes are
+# caught, and the Worker's scan is the binding one. The builder stamp is
+# removed before scanning so its hash never reads as a key.
+w='(^|[^A-Za-z0-9_])'
+hx='[0-9a-f]'
+nhx='[^0-9a-f]'
+secret_labels=(
+  'private key' 'AWS access key' 'GitHub token' 'Anthropic key' 'OpenAI key'
+  'Slack token' 'Stripe key' 'password or secret assignment' 'R2 key pair'
+  'R2 key label' 'Azure client secret' 'Cloudflare API token' 'page upload token'
+)
+secret_res=(
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+  "${w}(AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}([^A-Za-z0-9_]|$)"
+  "${w}(gh[pousr]_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{82})"
+  "${w}sk-ant-[A-Za-z0-9_-]{20,}"
+  "${w}sk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}"
+  "${w}xox[abposr]-[0-9A-Za-z-]{10,}"
+  "${w}[sr]k_(test|live|prod)_[0-9A-Za-z]{10,}"
+  "${w}([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Cc][Ll][Ii][Ee][Nn][Tt]_[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii]_?[Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn])[\"']?[[:space:]]*[:=][[:space:]]*[\"'][^\"'[:space:]\$<>{}]{8,}[\"']"
+  "(^|${nhx})(${hx}{32}${nhx}(.*${nhx})?${hx}{64}|${hx}{64}${nhx}(.*${nhx})?${hx}{32})(${nhx}|$)"
+  "(accessKeyId|secretAccessKey)[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9/+=]{16,}"
+  "(^|[^A-Za-z0-9_~.-])[A-Za-z0-9_~.]{3}[0-9]Q~[A-Za-z0-9_~.-]{31,34}([^A-Za-z0-9_~.-]|$)"
+  "${w}(cfut|cfat|cfk)_[A-Za-z0-9]{40}"
+  "${w}pgup_[A-Za-z0-9_-]{16,}"
+)
+private_labels=(
+  'Linux home path' 'macOS home path' 'Windows user path' 'WSL share path'
+  'WSL mount path' 'root home path' 'scratchpad slug' 'private hostname'
+)
+private_res=(
+  '/home/[A-Za-z0-9._-]+/'
+  '/Users/[A-Za-z0-9._-]+/'
+  '[A-Za-z]:\\+Users\\+'
+  '\\\\+wsl'
+  '/mnt/[a-z]/Users/'
+  '(^|[^A-Za-z0-9._-])/root/'
+  '-home-[A-Za-z0-9._]+-'
+  "(^|[^A-Za-z0-9.-])[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.(local|internal|lan)([^A-Za-z0-9_.-]|\.[^A-Za-z0-9_-]|\.?$)"
+)
+
+scan_copy="$(mktemp)" || die 6 'cannot create a scan copy'
+trap 'rm -f "$scan_copy"' EXIT
+sed -E "s/$stamp_re//g" "$real" >"$scan_copy" || die 6 'cannot create a scan copy'
+
+for i in "${!secret_res[@]}"; do
+  hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$scan_copy" | cut -d: -f1)"
+  [[ -z "$hit" ]] || die 4 "refused: line $hit looks like a ${secret_labels[$i]}"
+done
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks dir --no-banner --redact "$scan_copy" >/dev/null 2>&1
+  [[ $? -ne 1 ]] || die 4 'refused: gitleaks found a credential'
+fi
+
+sent="$visibility"
+for i in "${!private_res[@]}"; do
+  if grep -aqE -- "${private_res[$i]}" "$scan_copy"; then
+    [[ "$sent" == private ]] ||
+      printf 'pages-publish: sending private: the page holds a %s\n' "${private_labels[$i]}" >&2
+    sent=private
+    break
+  fi
+done
+[[ "$sent" == "$visibility" ]] || page_id=''
+
+# ---------------------------------------------------------------- publish
+
+send "$sent" PUT "/_upload${page_id:+/$page_id}" "$real"
+if [[ "$status" == 409 && "$sent" == public && "$body" == private-required ]]; then
+  printf 'pages-publish: the public host requires private; creating a private page\n' >&2
+  sent=private
+  page_id=''
+  send private PUT /_upload "$real"
+fi
+[[ "$status" != 422 ]] || die 4 "refused by the host: ${body:0:80}"
+[[ "$status" == 200 || "$status" == 201 ]] || die 6 "PUT returned HTTP $status"
+url="${body%%$'\n'*}"
+url="${url%$'\r'}"
+[[ "$url" =~ ^https://[^[:space:]\"\\]+$ ]] || die 6 'the host returned no page URL'
+returned_id="${url%/}"
+returned_id="${returned_id##*/}"
+[[ "$returned_id" =~ $id_re ]] || die 6 "no page id in the returned URL $url"
+[[ -z "$page_id" || "$returned_id" == "$page_id" ]] || die 6 "the host replaced $page_id but returned $returned_id"
+printf '{"id":"%s","visibility":"%s","url":"%s"}\n' "$returned_id" "$sent" "$url"
