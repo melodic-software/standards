@@ -591,7 +591,7 @@ jobs:
           persist-credentials: false
       # The fixture tests run first, while DOTNET_VERSION is the only SDK in
       # DOTNET_INSTALL_DIR. The build and format actions then install the SDK
-      # they pin, which is newer, so each step runs the SDK it ran alone.
+      # passed below, which is newer, so each step runs the SDK it ran alone.
       - name: Set up .NET
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -624,11 +624,13 @@ jobs:
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-build@95732fda50a95d3297320a6f2c791a1a91870a7f # v0.38.0
         with:
+          dotnet-version: 10.0.400
           project: components/dotnet-analysis/fixtures/good/good.csproj
       - name: Verify .NET whitespace
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-format@95732fda50a95d3297320a6f2c791a1a91870a7f # v0.38.0
         with:
+          dotnet-version: 10.0.400
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   check-go:
