@@ -427,4 +427,108 @@ assert_nonzero 'a fetched file without the marker is refused' "$rc"
 assert_file_absent 'a refused fetch installs nothing' "$ve_tmp/fresh/vault-exec"
 rm -rf "$ve_tmp"
 
+# Page uploader: installed like vault-exec, by its own marker, and a foreign
+# pages-publish is kept with a WARN that names it.
+pp_rel='components/cloud-environment/pages-publish'
+pp_src="$root/$pp_rel"
+assert_eq 'setup.sh fetches pages-publish from its published path' \
+  "https://raw.githubusercontent.com/melodic-software/standards/main/$pp_rel" \
+  "$(sed -n "s/^PAGES_PUBLISH_URL='\(.*\)'\$/\1/p" "$script")"
+pp_marker="$(sed -n "s/^PAGES_PUBLISH_MARKER='\(.*\)'\$/\1/p" "$script")"
+grep -qxF "$pp_marker" "$pp_src"
+rc=$?
+assert_exit 'pages-publish carries the marker setup.sh installs by' 0 "$rc"
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh installs pages-publish under the user home' \
+  "$(cat "$script")" 'pages_publish_dest="$HOME/.local/bin/pages-publish"'
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh names a foreign pages-publish in its WARN' \
+  "$(cat "$script")" 'WARN pages-publish: $pages_publish_dest is not ours; left untouched'
+
+pp_tmp="$(mktemp -d)"
+pp_dest="$pp_tmp/home/.local/bin/pages-publish"
+install_pages_publish "$pp_src" "$pp_dest"
+rc=$?
+assert_exit 'pages-publish installs into a missing ~/.local/bin' 0 "$rc"
+cmp -s "$pp_src" "$pp_dest"
+rc=$?
+assert_exit 'the installed pages-publish is the component file' 0 "$rc"
+printf '%s\n' '#!/bin/bash' 'echo someone else' >"$pp_dest"
+cp "$pp_dest" "$pp_tmp/foreign"
+install_pages_publish "$pp_src" "$pp_dest"
+rc=$?
+assert_exit 'a pages-publish without the marker is refused as not ours (2)' 2 "$rc"
+cmp -s "$pp_dest" "$pp_tmp/foreign"
+rc=$?
+assert_exit 'the foreign pages-publish is left byte-identical' 0 "$rc"
+install_pages_publish "$vault_exec_src" "$pp_tmp/fresh/pages-publish"
+rc=$?
+assert_exit 'a fetched file with the wrong marker is refused (1)' 1 "$rc"
+assert_file_absent 'a refused fetch installs no pages-publish' "$pp_tmp/fresh/pages-publish"
+
+# Operator files: written after the repo bootstrap, whatever its outcome.
+bootstrap_ln="$(grep -n -F 'bash .claude/cloud-bootstrap.sh' "$script" | head -n 1 | cut -d: -f1)"
+# shellcheck disable=SC2016 # the $ is a literal in the grep needles
+for call in 'write_rendered_views "${CLAUDE_CONFIG_DIR' 'write_pages_publish_config "$pages_publish_config"'; do
+  call_ln="$(grep -n -F "$call" "$script" | head -n 1 | cut -d: -f1)"
+  if [[ -n "$call_ln" && -n "$bootstrap_ln" && "$call_ln" -gt "$bootstrap_ln" ]]; then
+    pass "setup.sh calls ${call%% *} after the repo bootstrap"
+  else
+    fail "setup.sh calls ${call%% *} after the repo bootstrap" \
+      "bootstrap at line '${bootstrap_ln:-none}', call at line '${call_ln:-none}'"
+  fi
+done
+
+LOG="$pp_tmp/setup.log"
+printf 'medium: artifact\n' >"$pp_tmp/rendered-views.md"
+RENDERED_VIEWS_MD='medium: hosted' write_rendered_views "$pp_tmp/rendered-views.md"
+assert_eq 'RENDERED_VIEWS_MD replaces what a repo bootstrap wrote' 'medium: hosted' \
+  "$(cat "$pp_tmp/rendered-views.md")"
+(unset RENDERED_VIEWS_MD && write_rendered_views "$pp_tmp/unset/rendered-views.md")
+assert_file_absent 'an unset RENDERED_VIEWS_MD writes nothing' "$pp_tmp/unset/rendered-views.md"
+
+# The config path comes from the passwd database (a stub getent here), never HOME.
+mkdir -p "$pp_tmp/bin"
+cat >"$pp_tmp/bin/getent" <<'STUB'
+#!/usr/bin/env bash
+printf '%s:x:1000:1000::%s:/bin/bash\n' "$2" "$STUB_HOME"
+STUB
+chmod +x "$pp_tmp/bin/getent"
+pp_path="$(PATH="$pp_tmp/bin:$PATH" STUB_HOME="$pp_tmp/pwhome" HOME="$pp_tmp/decoy" pages_publish_config_path)"
+assert_eq 'the config path is under the passwd home, not HOME' \
+  "$pp_tmp/pwhome/.config/pages-publish/config" "$pp_path"
+
+pp_vars=(PAGES_PUBLISH_PUBLIC_ENDPOINT=https://public.example.test
+  PAGES_PUBLISH_PRIVATE_ENDPOINT=https://private.example.test
+  PAGES_PUBLISH_PUBLIC_TOKEN_SECRET=pub-token PAGES_PUBLISH_PRIVATE_TOKEN_SECRET=priv-token
+  PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET=priv-access-id
+  PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET=priv-access-key)
+(export "${pp_vars[@]}" && write_pages_publish_config "$pp_path")
+rc=$?
+assert_exit 'all six PAGES_PUBLISH_* variables write the config' 0 "$rc"
+assert_eq 'the config holds the six keys' \
+  'PRIVATE_ACCESS_ID_SECRET=priv-access-id
+PRIVATE_ACCESS_KEY_SECRET=priv-access-key
+PRIVATE_ENDPOINT=https://private.example.test
+PRIVATE_TOKEN_SECRET=priv-token
+PUBLIC_ENDPOINT=https://public.example.test
+PUBLIC_TOKEN_SECRET=pub-token' "$(sort "$pp_path")"
+assert_eq 'the config has mode 0600' 600 "$(stat -c '%a' "$pp_path")"
+
+rm -f "$pp_path"
+(export "${pp_vars[@]:0:4}" && write_pages_publish_config "$pp_path")
+rc=$?
+assert_nonzero 'a partial set is refused' "$rc"
+assert_file_absent 'a partial set writes no config' "$pp_path"
+assert_contains 'the WARN names the missing keys' "$(cat "$LOG")" \
+  'missing: PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET'
+(export "${pp_vars[@]}" && export PAGES_PUBLISH_PUBLIC_TOKEN_SECRET=$'x\nPUBLIC_ENDPOINT=https://evil.example.test' &&
+  write_pages_publish_config "$pp_path")
+assert_file_absent 'a value holding a line break writes no config' "$pp_path"
+(write_pages_publish_config "$pp_path")
+rc=$?
+assert_exit 'no PAGES_PUBLISH_* variables is a quiet no-op' 0 "$rc"
+assert_file_absent 'no PAGES_PUBLISH_* variables writes no config' "$pp_path"
+rm -rf "$pp_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1

@@ -169,6 +169,75 @@ secret with it.
 Every name resolves in `kv-melo-devtools-prod`, the one vault the cloud
 identity is granted. Set `VAULT_EXEC_VAULT` to read another vault.
 
+## Page uploader
+
+[`pages-publish`](pages-publish) uploads one rendered page to the operator's
+page host through its upload route (`PUT <origin>/_upload` creates,
+`PUT <origin>/_upload/<id>` replaces, `DELETE <origin>/_upload/<id>` removes):
+
+```text
+pages-publish <file> --visibility public|private [--id <id>]
+pages-publish --delete <id> --visibility public|private
+```
+
+On success it prints one JSON line, `{"id":..., "visibility":..., "url":...}`,
+built from the page URL the host returns; `--delete` prints nothing.
+
+| Exit | Meaning |
+|---|---|
+| 0 | uploaded (or deleted: the host answered 204) |
+| 2 | usage |
+| 3 | the file is not a regular file under `${TMPDIR:-/tmp}` (after `realpath`), or carries no builder stamp `<!-- rv-gen:<name> sha256:<64 hex> -->` |
+| 4 | credential-shaped content, found here before any network call or by the host (HTTP 422) |
+| 5 | config missing or invalid, or not owned by the current user with mode 0600 |
+| 6 | the token could not be resolved, or the upload or an HTTP answer failed |
+
+**Config.** Operator values come only from
+`<passwd home>/.config/pages-publish/config`, where `<passwd home>` is field 6
+of `getent passwd "$(id -un)"`. `HOME`, `XDG_CONFIG_HOME` and every other
+run-time variable are ignored, because a repository's settings can set
+environment variables. The file holds `KEY=VALUE` lines (blank lines and `#`
+comments allowed, any other key refused):
+
+| Key | Value |
+|---|---|
+| `PUBLIC_ENDPOINT`, `PRIVATE_ENDPOINT` | `https://<host>` upload origin of each host |
+| `PUBLIC_TOKEN_SECRET`, `PRIVATE_TOKEN_SECRET` | vault secret name of each host's bearer upload token |
+| `PRIVATE_ACCESS_ID_SECRET`, `PRIVATE_ACCESS_KEY_SECRET` | vault secret names of the Access service-token pair the private host's upload path requires |
+
+**Scan.** Before any network call the page bytes, builder stamp removed, are
+matched against a fixed list of credential shapes (and `gitleaks dir` when
+gitleaks is on `PATH`); a hit exits 4 and stderr names the shape and line,
+never the match. A machine path (`/home/<user>/`, `/Users/<user>/`,
+`C:\Users\`, `\\wsl`, `/mnt/<drive>/Users/`, `/root/`, a `-home-<user>-`
+slug) or a `.local`, `.internal` or `.lan` hostname sends the page to the
+private host. Only the listed shapes are caught; the host's own scan is the
+binding one. When the visibility sent differs from the one requested, `--id`
+is dropped and a new page is created, and when the public host answers 409
+`private-required` the upload is retried once as a private create. In both
+cases the caller deletes the old id.
+
+**Secrets.** `vault-exec --env` resolves the host's bearer token and, for the
+private host only, the Access pair. They reach `curl` only as
+`header = "..."` lines on its stdin (`--config -`), never in argv; the public
+host never receives the Access headers. Requests are `https` only and send
+`Content-Type: text/html; charset=utf-8`.
+
+**Setup.** After `vault-exec`, the script installs `pages-publish` to
+`~/.local/bin/pages-publish` the same way: a copy without the marker line is
+left alone with `WARN pages-publish: <dest> is not ours`. After the repo
+bootstrap, whatever its outcome, it writes two operator files from the
+environment's variables, so they win over anything the bootstrap wrote:
+
+- `RENDERED_VIEWS_MD`, when set, replaces
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md`.
+- `PAGES_PUBLISH_PUBLIC_ENDPOINT`, `PAGES_PUBLISH_PRIVATE_ENDPOINT`,
+  `PAGES_PUBLISH_PUBLIC_TOKEN_SECRET`, `PAGES_PUBLISH_PRIVATE_TOKEN_SECRET`,
+  `PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET` and
+  `PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET`, when all six are set, become the
+  config above, mode 0600, at the passwd-home path. A partial set logs a
+  `WARN` naming the missing variables and writes no config.
+
 ## Calling contract (frozen)
 
 The interface between this component and consuming repositories:
@@ -266,7 +335,7 @@ the snapshot.
   rebuilt, so reverting the commit and forcing a rebuild restores the prior
   state; in an emergency the bootstrap can pin a commit SHA in the raw URL
   instead of `main`. The pin covers this script only: the plugin catalog, the
-  permission floor and `vault-exec` are still fetched from `main`.
+  permission floor, `vault-exec` and `pages-publish` are still fetched from `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
 the shared environment baseline, which includes deriving the fleet plugin

@@ -57,6 +57,12 @@ the primary consumer merges the file into a shared template-data namespace) carr
   third-party linter. Force/destructive spellings stay covered by `deny`, which always
   wins, with one deliberate carve-out below.
 
+  **`pages-publish` is covered because it enforces its own rules.** The cloud-environment
+  uploader accepts only a builder-stamped page under the temp dir, refuses the credential
+  shapes it lists before any network call, and sends pages holding machine paths to the
+  private host; the upload host scans again and binds
+  (see `components/cloud-environment/README.md`).
+
   **Test-suite invocations are deliberately absent.** A test runner executes whatever test
   files are on disk, and an agent session that can write files plus a blanket `pytest`
   grant compose into a general code-execution grant wearing a narrow name. No rule

@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-04.1'
+SCRIPT_VERSION='2026-10-04.2'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -61,6 +61,12 @@ CLAUDE_PERMISSIONS_URL='https://raw.githubusercontent.com/melodic-software/stand
 # is never replaced.
 VAULT_EXEC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/vault-exec'
 VAULT_EXEC_MARKER='# melodic-software/standards cloud-environment vault-exec'
+# Page uploader: this component's pages-publish, installed beside vault-exec
+# the same way (see install_pages_publish). Its config is written from the six
+# PAGES_PUBLISH_* environment variables (see write_pages_publish_config).
+PAGES_PUBLISH_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/pages-publish'
+PAGES_PUBLISH_MARKER='# melodic-software/standards cloud-environment pages-publish'
+PAGES_PUBLISH_KEYS='PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
@@ -190,17 +196,17 @@ compose_permissions_floor() {
   return 1
 }
 
-# install_vault_exec <fetched script> <dest>: install the fetched resolver at
-# <dest> with mode 0755. Returns 1 and leaves <dest> untouched when the fetched
-# file does not parse or lacks VAULT_EXEC_MARKER, when <dest> exists without
-# the marker (not ours), or when any write fails. A copy of ours is replaced.
-install_vault_exec() {
-  local src="$1" dest="$2" tmp="$2.install.$$"
-  if ! bash -n "$src" 2>/dev/null || ! grep -qxF "$VAULT_EXEC_MARKER" "$src"; then
+# install_marked <marker> <fetched script> <dest>: install the fetched script
+# at <dest> with mode 0755. Returns 1 and leaves <dest> untouched when the
+# fetched file does not parse or lacks <marker>, or when any write fails, and 2
+# when <dest> exists without the marker (not ours). A copy of ours is replaced.
+install_marked() {
+  local marker="$1" src="$2" dest="$3" tmp="$3.install.$$"
+  if ! bash -n "$src" 2>/dev/null || ! grep -qxF "$marker" "$src"; then
     return 1
   fi
-  if [[ -e "$dest" ]] && ! grep -qxF "$VAULT_EXEC_MARKER" "$dest" 2>/dev/null; then
-    return 1
+  if [[ -e "$dest" ]] && ! grep -qxF "$marker" "$dest" 2>/dev/null; then
+    return 2
   fi
   mkdir -p "${dest%/*}" || return 1
   if cp "$src" "$tmp" && chmod 0755 "$tmp" && mv -f "$tmp" "$dest"; then
@@ -209,9 +215,66 @@ install_vault_exec() {
   rm -f "$tmp"
   return 1
 }
+install_vault_exec() { install_marked "$VAULT_EXEC_MARKER" "$@"; }
+install_pages_publish() { install_marked "$PAGES_PUBLISH_MARKER" "$@"; }
 
-# Sourced by setup.test.sh for the plugin-list, permission-floor and vault-exec
-# helpers only.
+# pages_publish_config_path: the one path pages-publish reads its config from,
+# under the passwd-database home of the current user (never HOME).
+pages_publish_config_path() {
+  local home
+  home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
+  [[ "$home" == /* ]] || return 1
+  printf '%s/.config/pages-publish/config\n' "$home"
+}
+
+# write_pages_publish_config <dest>: write the six PAGES_PUBLISH_* variables as
+# KEY=VALUE lines to <dest> with mode 0600. None set: nothing to do. Some set,
+# or a value holding a line break: a WARN naming them, and no config written.
+write_pages_publish_config() {
+  local dest="$1" tmp="$1.write.$$" key var missing=() bad=() lines=''
+  for key in $PAGES_PUBLISH_KEYS; do
+    var="PAGES_PUBLISH_$key"
+    if [[ -z "${!var:-}" ]]; then
+      missing+=("$var")
+    elif [[ "${!var}" == *[$'\n\r']* ]]; then
+      bad+=("$var")
+    else
+      lines+="$key=${!var}"$'\n'
+    fi
+  done
+  if [[ ${#missing[@]} -eq 6 ]]; then
+    log 'pages-publish: no PAGES_PUBLISH_* variables set; no config written'
+    return 0
+  fi
+  if [[ ${#missing[@]} -gt 0 || ${#bad[@]} -gt 0 ]]; then
+    log "WARN pages-publish: config not written; missing: ${missing[*]:-none}; line break in: ${bad[*]:-none}"
+    return 1
+  fi
+  if (umask 077 && mkdir -p "${dest%/*}" && printf '%s' "$lines" >"$tmp") &&
+    chmod 0600 "$tmp" && mv -f "$tmp" "$dest"; then
+    log "pages-publish: config written to $dest"
+    return 0
+  fi
+  rm -f "$tmp"
+  log "WARN pages-publish: config write to $dest failed"
+  return 1
+}
+
+# write_rendered_views <dest>: replace <dest> with RENDERED_VIEWS_MD when it is
+# set, whatever a repo bootstrap wrote there before.
+write_rendered_views() {
+  local dest="$1"
+  [[ -n "${RENDERED_VIEWS_MD:-}" ]] || return 0
+  if mkdir -p "${dest%/*}" && printf '%s\n' "$RENDERED_VIEWS_MD" >"$dest"; then
+    log "rendered-views: $dest written from RENDERED_VIEWS_MD"
+    return 0
+  fi
+  log "WARN rendered-views: write to $dest failed"
+  return 1
+}
+
+# Sourced by setup.test.sh for the plugin-list, permission-floor, installer and
+# operator-file helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -488,6 +551,20 @@ else
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
 
+# Operator files from the environment's variables, after the repo bootstrap
+# whatever its outcome, so the environment's values win over anything the
+# bootstrap wrote: the rendered-views preference and the pages-publish config.
+if [[ -n "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]]; then
+  write_rendered_views "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md"
+elif [[ -n "${RENDERED_VIEWS_MD:-}" ]]; then
+  log 'WARN rendered-views: neither CLAUDE_CONFIG_DIR nor HOME is set; not written'
+fi
+if pages_publish_config="$(pages_publish_config_path)"; then
+  write_pages_publish_config "$pages_publish_config"
+else
+  log 'WARN pages-publish: no passwd home for the current user; config not written'
+fi
+
 # Permission floor (standards#653): union the fleet's reviewed
 # claude-permissions allow/deny floor into the user settings file the plugin
 # install above wrote at user scope, so a session booted from this snapshot
@@ -535,6 +612,23 @@ else
     log "WARN vault-exec: install refused (fetched file invalid, $vault_exec_dest is not ours, or a failed write)"
   fi
   rm -f "$vault_exec_file" 2>/dev/null
+
+  # Page uploader, the same way. A pages-publish someone else put there is
+  # left alone with a WARN that names it.
+  pages_publish_dest="$HOME/.local/bin/pages-publish"
+  pages_publish_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-pages-publish.$$")"
+  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
+    "$PAGES_PUBLISH_URL" -o "$pages_publish_file" >>"$LOG" 2>&1; then
+    log 'WARN pages-publish: fetch failed; not installed this build'
+  else
+    install_pages_publish "$pages_publish_file" "$pages_publish_dest" >>"$LOG" 2>&1
+    case $? in
+      0) log "pages-publish installed to $pages_publish_dest" ;;
+      2) log "WARN pages-publish: $pages_publish_dest is not ours; left untouched" ;;
+      *) log 'WARN pages-publish: install refused (fetched file invalid or a failed write)' ;;
+    esac
+  fi
+  rm -f "$pages_publish_file" 2>/dev/null
 fi
 
 # Temp-file hygiene: without this the fetched installers — and this script
