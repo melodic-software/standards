@@ -1081,9 +1081,10 @@ renamed path never auto-copies, so it was hand-reviewed. No input, secret,
 caller permission or `runs-on` routing moved.
 Once every consumer pinned v0.36.0, the ci-workflows entries at older SHAs were
 retired under step 4 of the lockstep below, including every `7446b51` and
-`69e506b` key. The older entries that remain are the ones a
-`runner-policy.test.mjs` case still reads; the review notes in this section
-stay as the record the v0.36.0 terms were copied from.
+`69e506b` key. The older entries the tests still read now live verbatim in
+`fixtures/historical-contracts.json`, so `policy.json` admits ci-workflows only
+at `fb56986`; the review notes in this section stay as the record the v0.36.0
+terms were copied from.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
@@ -1265,7 +1266,8 @@ Two public repositories execute this gate today: `standards` and
 The gate scopes these review reusables by path: `claude-review.yml` and
 `claude-security-review.yml`, and their renamed paths `pr-review.yml` and
 `pr-review-security.yml`. No consumer pins an old path; the old paths stay
-listed because older entries for them remain in `policy.json`.
+listed because the historical fixture the tests read still holds entries for
+them.
 
 > **Invariant:** No `claude-review` or `claude-security-review` contract may list
 > `standards-ref` or the `STANDARDS_REVIEW_APP_*` secrets while **any**
