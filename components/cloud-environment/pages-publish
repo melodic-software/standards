@@ -115,6 +115,8 @@ done
 send() {
   local vis="$1" method="$2" path="$3" data="${4:-}" prefix envs resp rc
   prefix="${vis^^}"
+  # The inner shell must see only what vault-exec resolves here, never a caller's PP_*.
+  unset PP_TOKEN PP_ACCESS_ID PP_ACCESS_KEY
   envs=(--env "PP_TOKEN=${cfg[${prefix}_TOKEN_SECRET]}")
   if [[ "$vis" == private ]]; then
     envs+=(--env "PP_ACCESS_ID=${cfg[PRIVATE_ACCESS_ID_SECRET]}"
@@ -233,7 +235,7 @@ done
 # ---------------------------------------------------------------- publish
 
 send "$sent" PUT "/_upload${page_id:+/$page_id}" "$real"
-if [[ "$status" == 409 && "$sent" == public && "$body" == private-required* ]]; then
+if [[ "$status" == 409 && "$sent" == public && "$body" == private-required ]]; then
   printf 'pages-publish: the public host requires private; creating a private page\n' >&2
   sent=private
   page_id=''

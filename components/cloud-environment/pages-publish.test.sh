@@ -218,6 +218,17 @@ assert_not_contains 'the retry drops the public id' "$(argv_of 2)" "$pid"
 assert_contains 'the retry carries the Access headers' "$(cat "$tmp/calls/stdin.2")" 'CF-Access-Client-Id'
 assert_contains 'the retry is reported private' "$out" "{\"id\":\"$pid2\",\"visibility\":\"private\""
 
+STUB_SEQ="409:private-required-x;$priv_ok" run "$clean" --visibility public
+assert_exit 'a 409 whose body is not exactly private-required exits 6' 6 "$rc"
+assert_eq 'a 409 with another body is not retried' 1 "$calls"
+
+PP_ACCESS_ID=CALLER-SENTINEL-id PP_ACCESS_KEY=CALLER-SENTINEL-key PP_TOKEN=CALLER-SENTINEL-token \
+  STUB_SEQ="$pub_ok" run "$clean" --visibility public
+assert_exit 'a public upload with caller PP_* variables succeeds' 0 "$rc"
+assert_not_contains 'caller PP_* values never reach curl argv' "$argv_all" 'CALLER-SENTINEL'
+assert_not_contains 'caller PP_* values never reach curl stdin' "$stdin_all" 'CALLER-SENTINEL'
+assert_not_contains 'caller PP_ACCESS_* adds no Access header to a public upload' "$stdin_all" 'CF-Access'
+
 STUB_SEQ='422:credential:aws' run "$clean" --visibility public
 assert_exit 'a host 422 exits 4' 4 "$rc"
 STUB_SEQ='500:boom' run "$clean" --visibility public
