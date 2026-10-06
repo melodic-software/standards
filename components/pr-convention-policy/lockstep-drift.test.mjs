@@ -1172,6 +1172,41 @@ test("a run.sh that stops feeding the PR body through analyze_body is drift", ()
   }
 });
 
+test("a run.sh whose report consumers stop reading the report or raising errors is drift", () => {
+  const cases = [
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    negated_quoted+="\\"${text}\\" (trigger \\"${trigger}\\")"\n  done <"$analysis"',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    negated_quoted+="\\"${text}\\" (trigger \\"${trigger}\\")"\n  done </dev/null',
+      /a `negated` report is a linkage error/,
+    ],
+    [
+      '    *) ;;\n    esac\n  done <"$analysis"',
+      "    *) ;;\n    esac\n  done </dev/null",
+      /a missing or empty section report/,
+    ],
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '      linkage_errors+=("The \\"## ${name}\\" section is empty.")\n',
+      "      :\n",
+      /a missing or empty section report/,
+    ],
+    [
+      "    ! grep -qx 'no-issue' \"$analysis\"; then\n    linkage_errors+=(",
+      "    ! grep -qx 'no-issue' \"$analysis\"; then\n    : linkage_errors+=(",
+      /a `non-closing` report satisfies linkage/,
+    ],
+    ["    linkage_result=fail\n", "    linkage_result=pass\n", /a linkage error fails the check/],
+  ];
+  for (const [from, to, expected] of cases) {
+    const errors = mutate("gateRun", from, to);
+    assert.equal(errors.length, 1, errors.join("; "));
+    assert.match(errors[0], /^gate composite \(verdict\): /);
+    assert.match(errors[0], expected);
+  }
+});
+
 test("a run.sh that stops acting on the analyzer's report is drift", () => {
   const ignored = mutate("gateRun", '    [[ "$kind" == negated ]] || continue', "    continue");
   assert.equal(ignored.length, 1, ignored.join("; "));
