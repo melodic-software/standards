@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Checks that a repository's root AGENTS.md carries the `## Code Review Rules`
 # section the convention in this directory's README.md defines: the heading,
-# the inherited intro line verbatim, and the org-wide REVIEW.md pointer whose
-# target matches whether the repository has a root REVIEW.md.
+# the inherited intro line verbatim, and exactly one org-wide REVIEW.md pointer
+# whose target matches whether the repository has a root REVIEW.md.
 #
 # Usage:
 #   code-review-rules.sh file  [--root DIR]
@@ -27,6 +27,7 @@ fixtures=''
 
 heading='## Code Review Rules'
 intro='Each line names a rule CI does not enforce; the linked file states it in full.'
+pointer_label='- Org-wide criteria:'
 # shellcheck disable=SC2016 # literal Markdown backticks, not an expansion
 pointer_prefix='- Org-wide criteria: [`REVIEW.md`]('
 canonical_url='https://github.com/melodic-software/standards/blob/main/REVIEW.md'
@@ -99,14 +100,27 @@ problems() {
     inside && /^##? / { exit }
     inside { print }')"
   printf '%s\n' "$section" | grep -qxF -- "$intro" || echo "the inherited intro line is missing"
-  pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_prefix" 'index($0, p) == 1')"
+  # Every line naming the org-wide criteria counts, linked or not and at any
+  # indentation (an indented bullet is still a list item), so a stale second
+  # pointer beside the correct one cannot pass.
+  pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_label" '{ s = $0; sub(/^[[:space:]]+/, "", s) } index(s, p) == 1')"
   if [[ -z "$pointers" ]]; then
     echo "the inherited REVIEW.md pointer line is missing"
     return
   fi
+  count="$(printf '%s\n' "$pointers" | wc -l | tr -d ' ')"
+  if [[ "$count" -ne 1 ]]; then
+    echo "${count} org-wide criteria pointer lines, expected one"
+    return
+  fi
+  # The inherited block is copied verbatim, so the one pointer is unindented.
+  if [[ "$pointers" == [[:space:]]* ]]; then
+    echo "the org-wide criteria pointer line must not be indented"
+    return
+  fi
   if [[ "$has_review" == true ]]; then expected='REVIEW.md'; else expected="$canonical_url"; fi
-  printf '%s\n' "$pointers" | grep -qF -- "${pointer_prefix}${expected})" \
-    || echo "the REVIEW.md pointer must link ${expected} (root REVIEW.md present: ${has_review})"
+  [[ "$pointers" == "${pointer_prefix}${expected})"* ]] ||
+    echo "the REVIEW.md pointer must link ${expected} (root REVIEW.md present: ${has_review})"
 }
 
 if [[ "$command" == file ]]; then
