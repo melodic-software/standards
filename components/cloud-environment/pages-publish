@@ -328,14 +328,18 @@ for copy in "$scan_copy" "$host_copy"; do
     [[ -z "$hit" ]] || die 4 "refused: $where $hit looks like a ${secret_labels[$i]}"
   done
 done
+have_gitleaks=0
 if command -v gitleaks >/dev/null 2>&1; then
+  have_gitleaks=1
   gitleaks dir --no-banner --redact "$scan_copy" >/dev/null 2>&1
   [[ $? -ne 1 ]] || die 4 'refused: gitleaks found a credential'
 fi
 
 # A credential only the wide copy shows is one the host would accept, so the
-# page goes private instead of being refused. A machine path or hostname in
-# any copy, or a path-detection body in the wide copy, sends it private too.
+# page goes private instead of being refused. A gitleaks finding only a decoded
+# copy shows does the same: its rules are not the host's. A machine path or
+# hostname in any copy, or a path-detection body in the wide copy, sends it
+# private too.
 reason=''
 for i in "${!secret_res[@]}"; do
   hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$wide_copy" | cut -d: -f1)"
@@ -343,6 +347,11 @@ for i in "${!secret_res[@]}"; do
     reason="${secret_labels[$i]} on decoded line $hit"
     break
   }
+done
+for copy in "$host_copy" "$wide_copy"; do
+  [[ -z "$reason" && $have_gitleaks == 1 ]] || break
+  gitleaks dir --no-banner --redact "$copy" >/dev/null 2>&1
+  [[ $? -ne 1 ]] || reason='gitleaks finding in a decoded copy'
 done
 for i in "${!private_res[@]}"; do
   [[ -z "$reason" ]] || break

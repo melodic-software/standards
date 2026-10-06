@@ -43,8 +43,14 @@ IFS=';' read -ra seq <<<"$STUB_SEQ"
 entry="${seq[n - 1]}"
 printf '%s\n%s' "${entry#*:}" "${entry%%:*}"
 STUB
+# gitleaks stub: exits STUB_GITLEAKS_RC, or with STUB_GITLEAKS_FIND set, 1 when
+# the scanned path (its last argument) holds that text and 0 otherwise.
 cat >"$tmp/bin/gitleaks" <<'STUB'
 #!/usr/bin/env bash
+if [[ -n "${STUB_GITLEAKS_FIND:-}" ]]; then
+  ! grep -qF -- "$STUB_GITLEAKS_FIND" "${*: -1}"
+  exit $?
+fi
 exit "${STUB_GITLEAKS_RC:-0}"
 STUB
 chmod +x "$tmp/bin/"*
@@ -179,6 +185,17 @@ assert_contains 'a page whose only 64-hex is the stamp stays public' "$out" '"vi
 STUB_GITLEAKS_RC=1 run "$clean" --visibility public
 assert_exit 'a gitleaks finding refuses with exit 4' 4 "$rc"
 assert_eq 'a gitleaks finding makes no call' 0 "$calls"
+STUB_GITLEAKS_FIND=leakmarker run "$(page leak 'raw leakmarker')" --visibility public
+assert_exit 'a gitleaks finding in the raw page refuses with exit 4' 4 "$rc"
+# A gitleaks rule is not the host's, so a finding only decoding reveals sends
+# the page private instead of refusing it.
+for form in 'leak<span>marker</span>' 'leak&#109;arker'; do
+  STUB_GITLEAKS_FIND=leakmarker STUB_SEQ="$priv_ok" run "$(page leak "$form")" --visibility public
+  assert_exit "a gitleaks finding only in a decoded copy ($form) uploads" 0 "$rc"
+  assert_contains "a gitleaks finding only in a decoded copy ($form) is sent private" "$argv_all" \
+    'https://private.example.test/_upload'
+  assert_contains "a gitleaks finding only in a decoded copy ($form) is named" "$err" 'gitleaks finding'
+done
 
 # Machine paths and private hostnames: the page goes to the private origin.
 # The user segment goes through $u: the repo's machine-path check skips one.

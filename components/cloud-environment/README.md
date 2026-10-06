@@ -219,7 +219,9 @@ there exits 4 naming the decoded line, the refusal the host would give. The
 wide copy also decodes the other common named entities (`&sol;`, `&colon;`,
 `&period;` and the like), numeric entities without their `;`, and JSON/JS
 escapes (`\/`, `\"`, `\uXXXX`, `\xHH`); a credential found only there sends
-the page private, since the host would accept it. A decoded NUL or invalid
+the page private, since the host would accept it. `gitleaks dir` refuses only
+on the raw bytes; a gitleaks finding in either decoded copy alone sends the
+page private, since its rules are not the host's. A decoded NUL or invalid
 code point becomes U+FFFD, so the text on either side never joins into a
 shape. The wide copy is also
 matched against the [path-detection](../path-detection/README.md) bodies,
@@ -247,8 +249,8 @@ baseline period is needed. Evidence: the Worker's `scan()` at
 provisioning `0809074`, run over this test's samples, reports a GitHub token
 for the HTML-entity, hex-entity and tag-split forms (refused here), and
 nothing for the JSON-escape, `\"`, `&lowbar;` and `&#95`-without-`;` forms
-(sent private here, not refused). The wide copy and the path-detection
-bodies never refuse; they only send a page private, the existing outcome for
+(sent private here, not refused). The wide copy, gitleaks on either decoded
+copy and the path-detection bodies never refuse; they only send a page private, the existing outcome for
 a machine path. No report-only path remains, so no completion issue is open.
 The exception is owned by this component's maintainers and holds while the
 host copy matches the Worker's `normalize()`: the Worker's `scan.js` and this
