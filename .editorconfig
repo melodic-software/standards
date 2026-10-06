@@ -47,6 +47,13 @@ indent_size = unset
 indent_size = 2
 switch_case_indent = true
 
+# Extensionless shebang scripts (e.g. vault-exec): `[[shell]]` is a shfmt
+# extension, outside the EditorConfig spec, that matches any file shfmt detects
+# as shell (bash included). Editors that do not know it match nothing here.
+[[shell]]
+indent_size = 2
+switch_case_indent = true
+
 # Windows batch: cmd.exe requires CRLF.
 [*.{cmd,bat}]
 end_of_line = crlf
