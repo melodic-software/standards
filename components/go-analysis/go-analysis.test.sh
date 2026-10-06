@@ -36,7 +36,23 @@ assert_eq 'golangci-lint config is the exact reviewed allowlist' \
 version_out="$(golangci-lint version 2>&1)"
 rc=$?
 assert_exit 'golangci-lint reports its version' 0 "$rc"
-assert_contains 'golangci-lint uses the approved release' "$version_out" '2.12.2'
+# The pin matches GOLANGCI_LINT_VERSION in .github/workflows/pr-require-checks.yml.
+# A mismatch here is a local environment problem (for example a tool manager
+# that floated to a newer release), not a contract defect: name it as such.
+pinned_golangci='2.12.2'
+installed_golangci=''
+if [[ "$version_out" =~ version\ v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+  installed_golangci="${BASH_REMATCH[1]}"
+fi
+if [[ "$installed_golangci" == "$pinned_golangci" ]]; then
+  pass 'golangci-lint uses the approved release'
+elif [[ -z "$installed_golangci" ]]; then
+  fail 'golangci-lint uses the approved release' \
+    "could not parse a version from: $version_out"
+else
+  fail 'golangci-lint uses the approved release' \
+    "local golangci-lint $installed_golangci does not match the pinned $pinned_golangci; install the pinned version (CI installs $pinned_golangci)"
+fi
 
 out="$(golangci-lint config verify --config "$config" 2>&1)"
 rc=$?
