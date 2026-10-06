@@ -1033,6 +1033,25 @@ test("every sample body fills the policy's own required sections", () => {
   }
 });
 
+test("the window samples follow any schema-valid wordWindow", () => {
+  const policy = structuredClone(POLICY);
+  policy.body.negatedClosers.wordWindow = 40;
+  const [trigger] = policy.body.negatedClosers.triggerWords;
+  const [closer] = policy.body.closingKeywords;
+  const edge = linkageMatrix(policy).filter(({ line }) =>
+    new RegExp(`^${trigger} [a-z ]+ ${closer} #12$`).test(line),
+  );
+  const widths = edge.map(({ line }) => line.split(" ").length - 3).sort((a, b) => a - b);
+  assert.deepEqual(widths, [39, 40]);
+  for (const { line } of edge) {
+    const words = line.split(" ").slice(1, -2);
+    assert.equal(new Set(words).size, words.length, line);
+    for (const word of words) {
+      assert.match(word, /^[a-z]+$/);
+    }
+  }
+});
+
 test("a trigger list change is named statically and confirmed behaviorally", () => {
   const hook = mutate("hookValidator", " | intentionally", "");
   assert.equal(hook.length, 2, hook.join("; "));

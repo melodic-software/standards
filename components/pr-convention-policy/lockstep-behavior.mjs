@@ -58,6 +58,24 @@ export const MASKINGS = [
 ];
 const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
 
+// `count` distinct words of letters only, so any schema-valid wordWindow can be
+// probed: the named fillers first, then "filler" plus a base-26 letter suffix.
+function fillers(count) {
+  return Array.from({ length: count }, (_, index) => {
+    if (index < FILLERS.length) {
+      return FILLERS[index];
+    }
+    let suffix = "";
+    for (let rest = index - FILLERS.length; ; rest = Math.floor(rest / 26) - 1) {
+      suffix = String.fromCharCode(97 + (rest % 26)) + suffix;
+      if (rest < 26) {
+        break;
+      }
+    }
+    return `filler${suffix}`;
+  });
+}
+
 const capitalize = (word) => `${word[0].toUpperCase()}${word.slice(1)}`;
 const capitalizeWords = (phrase) => phrase.split(" ").map(capitalize).join(" ");
 
@@ -126,9 +144,6 @@ export function linkageMatrix(policy) {
   }
 
   const { wordWindow, affirmativePhrases } = negatedClosers;
-  if (wordWindow > FILLERS.length) {
-    throw new BehaviorToolError(`wordWindow ${wordWindow} exceeds the sample filler supply`);
-  }
   const triggers = [
     ...negatedClosers.triggerWords,
     ...negatedClosers.triggerSuffixes.map((suffix) => `does${suffix}`),
@@ -149,8 +164,8 @@ export function linkageMatrix(policy) {
   ];
   // Every negation shape is probed with every closing keyword, so a copy that
   // wires negation to one keyword only cannot pass.
-  const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
-  const outside = FILLERS.slice(0, wordWindow).join(" ");
+  const inside = fillers(wordWindow - 1).join(" ");
+  const outside = fillers(wordWindow).join(" ");
   for (const closer of closingKeywords) {
     const lower = closer.toLowerCase();
     for (const trigger of triggers) {
@@ -173,7 +188,7 @@ export function linkageMatrix(policy) {
     add(`This ${firstTrigger}e ${lower} #12`, { closing: true });
     add(`This can${firstTrigger} ${lower} #12`, { closing: true });
     add(`${firstTrigger} ${outside.replace(" ", "-")} ${closer} #12`, { closing: true });
-    const references = FILLERS.slice(0, wordWindow).map((_, index) => `#${index + 1}`);
+    const references = fillers(wordWindow).map((_, index) => `#${index + 1}`);
     add(`${firstTrigger} ${references.join(" ")} ${closer} #12`, { negated: firstTrigger });
     add(`${firstTrigger}\n${closer} #12`, { closing: true });
     for (const delimiter of CLAUSE_DELIMITERS) {
