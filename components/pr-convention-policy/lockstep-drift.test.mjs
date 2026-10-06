@@ -858,6 +858,62 @@ test("a copy that stops at the first closing reference on a line is behavioral d
   assert.match(hook[0], /"This does not closes #12; Closes #11" should be linked \+ negated/);
 });
 
+// An opt-out does not excuse a negated closer: GitHub closes the issue anyway.
+test("a copy that skips negation once a body opts out is behavioral drift", () => {
+  const texts = goodTexts();
+  texts.gateRun = texts.gateRun
+    .replace(
+      '  body = ""\n',
+      '  for (i = 1; i <= line_count; i++) if (tolower(masked[i]) ~ /no (linked|related) issue/) opted_out = 1\n  body = ""\n',
+    )
+    .replace(
+      "    trigger = negation_trigger(line, start)\n",
+      '    trigger = opted_out ? "" : negation_trigger(line, start)\n',
+    );
+  assert.equal((texts.gateRun.match(/opted_out/g) ?? []).length, 2, "mutation did not apply");
+  assertOnlyBehavior(
+    checkCopies(POLICY, texts),
+    "gateRun",
+    /"No linked issue: housekeeping\\nThis does not closes #12" should be no-issue \+ negated by "not", got closing \+ no-issue/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    '  LINKAGE_NEGATED=()\n  linkage::split_lines "$1"\n',
+    // The hook's own no-issue test, as scan_linkage runs it after the loop;
+    // `$$` is a literal `$` in a String.replace replacement.
+    `  LINKAGE_NEGATED=()\n  [[ $$'\\n'"\${1,,}"$$'\\n' =~ $NO_ISSUE_ERE ]] && return 0\n  linkage::split_lines "$1"\n`,
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"No linked issue: housekeeping\\nThis does not closes #12" should be linked \+ negated by "not", got linked/,
+  );
+});
+
+test("the sample matrix crosses a negated closer with every kind of linkage", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers } = POLICY.body;
+  const others = [
+    ...nonClosingMarkers.map((marker) => `${marker}: #13`),
+    ...noIssueMarkers.map((marker) => `${marker}: housekeeping`),
+  ];
+  for (const keyword of closingKeywords) {
+    const negated = `This does not ${keyword.toLowerCase()} #12`;
+    for (const text of [`${keyword} #11`, ...others]) {
+      assert.ok(lines.includes(`${text}\n${negated}`), `${text} then ${negated}`);
+      assert.ok(lines.includes(`${negated}\n${text}`), `${negated} then ${text}`);
+    }
+  }
+  for (const first of [`${closingKeywords[0]} #11`, ...others]) {
+    for (const second of [`${closingKeywords[0]} #11`, ...others]) {
+      if (first !== second) {
+        assert.ok(lines.includes(`${first}\n${second}`), `${first} then ${second}`);
+      }
+    }
+  }
+});
+
 test("the sample matrix varies case, apostrophes and the window's word rules", () => {
   const lines = linkageMatrix(POLICY).map(({ line }) => line);
   const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = POLICY.body;
@@ -946,7 +1002,9 @@ test("undoing any normalization step in either copy is behavioral drift", () => 
     [
       "hookValidator",
       `  lower=$'\\n'"\${1,,}"$'\\n'`,
-      `  lower=$'\\n'"$1"$'\\n'`,
+      // `$$` is a literal `$` in a String.replace replacement; a bare `$'`
+      // would splice in the rest of the file.
+      `  lower=$$'\\n'"$1"$$'\\n'`,
       /"No linked issue: housekeeping" should be linked, got unlinked/,
     ],
   ];

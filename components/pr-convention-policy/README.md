@@ -115,9 +115,12 @@ beyond it, in upper and capitalized case, and with a typographic apostrophe.
 The matrix also covers each clause delimiter, punctuation that is not one (`:`,
 `-`, brackets, quotes and the like, which must leave the window open), each
 affirmative phrase in any case, words that only contain a trigger, the
-window's word count across hyphens, bare references and line breaks, a negated
-closer beside valid linkage, and a negated and a valid closer on one line and
-on two, in both orders. It also hides a
+window's word count across hyphens, bare references and line breaks, and a
+negated and a valid closer on one line, in both orders. For every closing
+keyword, a negated closer sits on the line before and after a valid closer,
+each non-closing marker and each no-issue marker, and a no-issue marker shares
+its line in both orders, because no opt-out or other linkage excuses it. Every
+two kinds of valid linkage also appear together in both orders. It also hides a
 closing keyword, each non-closing marker, a negated closer for each closing
 keyword and a no-issue marker inside each shape both copies mask before they
 scan: an HTML comment (one line and several), a backtick fence, a tilde fence,

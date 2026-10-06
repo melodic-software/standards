@@ -135,6 +135,18 @@ export function linkageMatrix(policy) {
   ];
   const [firstTrigger] = negatedClosers.triggerWords;
   const negatedCloser = (closer) => `This does ${firstTrigger} ${closer.toLowerCase()} #12`;
+  // One line of each kind of valid linkage, with the verdict it alone earns.
+  const linkageLines = (closer) => [
+    { text: `${closer} #11`, expect: { closing: true } },
+    ...nonClosingMarkers.map((marker) => ({
+      text: `${marker}: #13`,
+      expect: { nonClosing: true },
+    })),
+    ...noIssueMarkers.map((marker) => ({
+      text: `${marker}: housekeeping`,
+      expect: { noIssue: true },
+    })),
+  ];
   // Every negation shape is probed with every closing keyword, so a copy that
   // wires negation to one keyword only cannot pass.
   const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
@@ -175,19 +187,37 @@ export function linkageMatrix(policy) {
         add(`This ${cased} ${lower} #12`, { closing: true });
       }
     }
-    // A negated closer is reported even when valid linkage sits elsewhere.
-    add(`${negatedCloser(closer)}\n${nonClosingMarkers[0]}: #13`, {
-      nonClosing: true,
-      negated: firstTrigger,
-    });
+    // A negated closer is reported whatever valid linkage sits elsewhere, on
+    // the line before or after it: a copy that settles the verdict on the
+    // first linkage it finds, or skips negation once a body opts out, misses
+    // it. GitHub still closes the issue either way.
+    for (const { text, expect } of linkageLines(closer)) {
+      add(`${text}\n${negatedCloser(closer)}`, { ...expect, negated: firstTrigger });
+      add(`${negatedCloser(closer)}\n${text}`, { ...expect, negated: firstTrigger });
+    }
     // Every closing reference on a line is judged, in order: a copy that
     // stops at the first match misses a negated closer after a valid one, or a
-    // valid one after a negated closer. Lines are scanned the same way.
+    // valid one after a negated closer.
     const bothWays = { closing: true, negated: firstTrigger };
     add(`${closer} #11 but does ${firstTrigger} ${lower} #12`, bothWays);
     add(`${negatedCloser(closer)}; ${closer} #11`, bothWays);
-    add(`${closer} #11\n${negatedCloser(closer)}`, bothWays);
-    add(`${negatedCloser(closer)}\n${closer} #11`, bothWays);
+  }
+  // A no-issue marker counts anywhere, so it can share the negated closer's
+  // line; a non-closing marker must stand alone and cannot.
+  for (const marker of noIssueMarkers) {
+    const closer = closingKeywords[0];
+    const negatedOnly = { noIssue: true, negated: firstTrigger };
+    add(`${marker}; ${negatedCloser(closer).toLowerCase()}`, negatedOnly);
+    add(`${negatedCloser(closer)}; ${marker.toLowerCase()}`, negatedOnly);
+  }
+  // Every two kinds of valid linkage together, in both orders, read as both.
+  const linkage = linkageLines(closingKeywords[0]);
+  for (const first of linkage) {
+    for (const second of linkage) {
+      if (first !== second) {
+        add(`${first.text}\n${second.text}`, { ...first.expect, ...second.expect });
+      }
+    }
   }
 
   // Linkage the rendered body does not show is not linkage: both copies mask
