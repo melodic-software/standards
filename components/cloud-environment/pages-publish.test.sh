@@ -202,21 +202,43 @@ for sample in "${path_samples[@]}"; do
 done
 
 # Escaped forms: a rendered page writes a shape as HTML entities, splits it
-# across highlighter tags, or escapes it inside inline JSON. Each is caught on
-# the decoded copy and routed as its plain form is. None matches the raw bytes.
+# across highlighter tags, or escapes it inside inline JSON. None matches the
+# raw bytes. A credential the host's own normalization reveals refuses, as the
+# host would; one only the wider decoding reveals sends the page private.
 a18="$(printf 'a%.0s' {1..18})"
-escaped_creds=(
+bs="\\"
+host_creds=(
   "HTML entity|ghp&#95;$a18$a18"
+  "hex HTML entity|ghp&#X5F;$a18$a18"
   "tag split|ghp_$a18<span class=\"n\">$a18</span>"
-  'JSON escape|ghp\u005f'"$a18$a18"
-  'JSON quote escape|{\"password\":\"hunter2hunter2\"}'
 )
-for sample in "${escaped_creds[@]}"; do
+for sample in "${host_creds[@]}"; do
   form="${sample%%|*}"
   run "$(page cred "${sample#*|}")" --visibility private
   assert_exit "a credential as a $form refuses with exit 4" 4 "$rc"
   assert_eq "a credential as a $form makes no call" 0 "$calls"
   assert_contains "a credential as a $form names the decoded line" "$err" 'decoded line 3 looks like a'
+done
+wide_creds=(
+  "JSON unicode escape|ghp${bs}u005f$a18$a18"
+  "JSON quote escape|{$bs\"password$bs\":$bs\"hunter2hunter2$bs\"}"
+  "named entity the host leaves|ghp&lowbar;$a18$a18"
+  "numeric entity without its semicolon|ghp&#95$a18$a18"
+)
+for sample in "${wide_creds[@]}"; do
+  form="${sample%%|*}"
+  STUB_SEQ="$priv_ok" run "$(page cred "${sample#*|}")" --visibility public
+  assert_exit "a credential as a $form uploads" 0 "$rc"
+  assert_contains "a credential as a $form is sent to the private origin" "$argv_all" 'https://private.example.test/_upload'
+  assert_contains "a credential as a $form names the decoded line" "$err" 'on decoded line 3'
+done
+
+# A character that decodes to nothing valid (NUL, past U+10FFFF) still
+# separates the text around it, so two token halves never join into a shape.
+for sep in '&#0;' '&#x0;' '&#99999999;' '\u{110000}' '\u0000' '\x00'; do
+  STUB_SEQ="$pub_ok" run "$(page cred "ghp_$a18$sep$a18")" --visibility public
+  assert_exit "token halves around $sep upload" 0 "$rc"
+  assert_contains "token halves around $sep stay public" "$out" '"visibility":"public"'
 done
 escaped_paths=(
   "Linux home path as an HTML entity|&#x2F;home&#x2F;$u&#47;src"
