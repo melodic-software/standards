@@ -10,6 +10,7 @@ import {
   checkHookBehavior,
   linkageMatrix,
   MASKINGS,
+  NON_DELIMITERS,
 } from "./lockstep-behavior.mjs";
 import {
   CONSUMER_REPOSITORIES,
@@ -565,16 +566,16 @@ test("the sample matrix covers every policy value, inside and just outside the w
       delimiter,
     );
   }
-  // Each trigger appears once at the window's edge (negated) and once a word
-  // further out (closing).
+  // Each trigger appears, for each closing keyword, once at the window's edge
+  // (negated) and once a word further out (closing).
   const firstTrigger = body.negatedClosers.triggerWords[0];
   const atEdge = matrix.filter(({ line }) => line.startsWith(`${firstTrigger} `));
   assert.deepEqual(
     atEdge.map(({ expect }) => [expect.negated, expect.closing]),
-    [
+    body.closingKeywords.flatMap(() => [
       [firstTrigger, false],
       [null, true],
-    ],
+    ]),
   );
 });
 
@@ -753,6 +754,101 @@ test("a copy that scans unmasked text is behavioral drift", () => {
     "gateRun",
     /"<!-- Closes #12 -->" should be no linkage, got closing/,
   );
+});
+
+test("every closing keyword is probed in every negation shape", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, negatedClosers } = POLICY.body;
+  const [firstTrigger] = negatedClosers.triggerWords;
+  for (const keyword of closingKeywords) {
+    const lower = keyword.toLowerCase();
+    const shapes = [
+      `${firstTrigger} alpha bravo charlie delta ${keyword} #12`,
+      `${firstTrigger} alpha bravo charlie delta echo ${keyword} #12`,
+      ...CLAUSE_DELIMITERS.map((delimiter) => `It is ${firstTrigger}${delimiter} ${keyword} #12`),
+      ...NON_DELIMITERS.map((mark) => `It is ${firstTrigger}${mark} ${keyword} #12`),
+      ...negatedClosers.affirmativePhrases.map((phrase) => `This ${phrase} ${lower} #12`),
+      `This does ${firstTrigger} ${lower} #12\n${nonClosingMarkers[0]}: #13`,
+      ...MASKINGS.map(([, mask]) => mask(`This does ${firstTrigger} ${lower} #12`)),
+    ];
+    for (const shape of shapes) {
+      assert.ok(lines.includes(shape), shape);
+    }
+  }
+});
+
+// Each mutation below reads the policy correctly for the first closing
+// keyword, the only one the matrix once probed for negation.
+test("a copy that detects negation for one closing keyword only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    "    trigger = negation_trigger(line, start)\n",
+    '    trigger = (substr(lower, start, 5) == "close") ? negation_trigger(line, start) : ""\n',
+  );
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"not alpha bravo charlie delta Fixes #12" should be negated/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      negation_trigger_to _plv_trigger "${line:0:start}"\n',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      _plv_trigger=""\n      [[ "$m" == close* ]] && negation_trigger_to _plv_trigger "${line:0:start}"\n',
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"not alpha bravo charlie delta Fixes #12" should be unlinked \+ negated by "not", got linked/,
+  );
+});
+
+test("punctuation outside the clause delimiters keeps the negation window open", () => {
+  for (const mark of NON_DELIMITERS) {
+    assert.ok(!CLAUSE_DELIMITERS.includes(mark), mark);
+  }
+  const { closingKeywords, negatedClosers } = POLICY.body;
+  const [firstTrigger] = negatedClosers.triggerWords;
+  const matrix = linkageMatrix(POLICY);
+  for (const mark of NON_DELIMITERS) {
+    const sample = matrix.find(
+      ({ line }) => line === `It is ${firstTrigger}${mark} ${closingKeywords[0]} #12`,
+    );
+    assert.ok(sample, mark);
+    assert.equal(sample.expect.negated, firstTrigger, mark);
+    assert.equal(sample.expect.closing, false, mark);
+  }
+});
+
+test("a copy that treats a colon as a clause delimiter is behavioral drift", () => {
+  const gate = mutate("gateRun", 'ch == ";" || ch == ","', 'ch == ";" || ch == "," || ch == ":"');
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"It is not: Closes #12" should be negated by "not", got closing/,
+  );
+
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
+  const hook = mutate("hookValidator", 'tail="${2##*[.!?;,]}"', 'tail="${2##*[.!?;,:]}"');
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"It is not: Closes #12" should be unlinked \+ negated by "not", got linked/,
+  );
+});
+
+test("every sample body fills the policy's own required sections", () => {
+  const tail = "\n\n## Summary\ns\n\n## Fix\nf\n\n## Verification\nv\n\n## Related\nr\n";
+  for (const { line, body } of linkageMatrix(POLICY)) {
+    assert.equal(body, `${line}${tail}`);
+  }
+  const policy = structuredClone(POLICY);
+  policy.body.requiredSections = ["Motivation", "Test plan"];
+  for (const { line, body } of linkageMatrix(policy)) {
+    assert.equal(body, `${line}\n\n## Motivation\nm\n\n## Test plan\nt\n`);
+  }
 });
 
 test("a trigger list change is named statically and confirmed behaviorally", () => {

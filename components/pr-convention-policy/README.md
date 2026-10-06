@@ -102,12 +102,15 @@ copy acts on it, and each review round of #647 found one more way to break the
 chain from declaration to verdict while every source regex still matched. So
 the linkage rules are also checked by running each copy.
 [`lockstep-behavior.mjs`](lockstep-behavior.mjs) generates a matrix of sample
-bodies from `policy.json`: each closing keyword, each non-closing marker on its
-own line, indented, mid-sentence and with trailing text, each no-issue marker,
-each trigger word and suffix at the window's edge and one word beyond it, each
-clause delimiter, each affirmative phrase, and a negated closer beside valid
-linkage. It also hides a closing keyword, each non-closing marker, a negated
-closer and a no-issue marker inside each shape both copies mask before they
+bodies from `policy.json`, each followed by every `requiredSections` heading
+with content: each closing keyword, each non-closing marker on its own line,
+indented, mid-sentence and with trailing text, each no-issue marker, and, for
+every closing keyword, each trigger word and suffix at the window's edge and
+one word beyond it, each clause delimiter, punctuation that is not one (`:`,
+`-`, brackets, quotes and the like, which must leave the window open), each
+affirmative phrase, and a negated closer beside valid linkage. It also hides a
+closing keyword, each non-closing marker, a negated closer for each closing
+keyword and a no-issue marker inside each shape both copies mask before they
 scan: an HTML comment (one line and several), a backtick fence, a tilde fence,
 a space- and a tab-indented code block, and inline code. Each of those bodies
 must read as missing linkage, and a masked negated closer beside a real

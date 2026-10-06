@@ -34,11 +34,15 @@ export class BehaviorToolError extends Error {
 
 const SANDBOX_ENV = { PATH: "/usr/bin:/bin" };
 const TIMEOUT_MS = 10_000;
-const SECTIONS_TAIL = "\n\n## Summary\ns\n\n## Fix\nf\n\n## Verification\nv\n\n## Related\nr\n";
 // The clause punctuation that resets the negation window. policy.json has no
 // field for it; the README's `negatedClosers` paragraph and the schema's
 // description name the same five characters.
 export const CLAUSE_DELIMITERS = [".", "!", "?", ";", ","];
+// Punctuation outside that set, which must leave the window open: a disclaimer
+// before it still negates the keyword after it. An apostrophe is left out (it
+// is part of a word, as in "doesn't"), and so are a backtick and `<`, which
+// open masked Markdown.
+export const NON_DELIMITERS = [":", "-", "(", ")", '"', "/", "[", "]", "*", "&"];
 // The Markdown each copy masks before it scans, as wrappers around one line of
 // linkage. Only shapes the two copies agree on: they part ways where a comment
 // opener sits inside code (see the README's Behavioral lockstep section).
@@ -54,12 +58,20 @@ export const MASKINGS = [
 ];
 const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
 
-// Every case is a few lines of linkage plus four non-empty sections, so a
-// verdict can only differ on linkage. `expect.negated` names the disclaimer
-// word the policy says triggers, or null.
+// One line of content under each required section, in policy order.
+export function sectionsTail(requiredSections) {
+  const sections = requiredSections.map(
+    (section) => `\n\n## ${section}\n${section[0].toLowerCase()}`,
+  );
+  return `${sections.join("")}\n`;
+}
+
+// Every case is a few lines of linkage plus every required section, non-empty,
+// so a verdict can only differ on linkage. `expect.negated` names the
+// disclaimer word the policy says triggers, or null.
 export function linkageMatrix(policy) {
-  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = policy.body;
-  const closer = closingKeywords[0];
+  const { requiredSections, closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } =
+    policy.body;
   const none = { closing: false, nonClosing: false, noIssue: false, negated: null };
   const cases = [];
   const add = (line, expect) => cases.push({ line, expect: { ...none, ...expect } });
@@ -86,25 +98,32 @@ export function linkageMatrix(policy) {
     ...negatedClosers.triggerWords,
     ...negatedClosers.triggerSuffixes.map((suffix) => `does${suffix}`),
   ];
-  for (const trigger of triggers) {
-    const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
-    const outside = FILLERS.slice(0, wordWindow).join(" ");
-    add(`${trigger} ${inside} ${closer} #12`.replace("  ", " "), { negated: trigger });
-    add(`${trigger} ${outside} ${closer} #12`, { closing: true });
-  }
   const [firstTrigger] = negatedClosers.triggerWords;
-  for (const delimiter of CLAUSE_DELIMITERS) {
-    add(`It is ${firstTrigger}${delimiter} ${closer} #12`, { closing: true });
+  const negatedCloser = (closer) => `This does ${firstTrigger} ${closer.toLowerCase()} #12`;
+  // Every negation shape is probed with every closing keyword, so a copy that
+  // wires negation to one keyword only cannot pass.
+  for (const closer of closingKeywords) {
+    for (const trigger of triggers) {
+      const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
+      const outside = FILLERS.slice(0, wordWindow).join(" ");
+      add(`${trigger} ${inside} ${closer} #12`.replace("  ", " "), { negated: trigger });
+      add(`${trigger} ${outside} ${closer} #12`, { closing: true });
+    }
+    for (const delimiter of CLAUSE_DELIMITERS) {
+      add(`It is ${firstTrigger}${delimiter} ${closer} #12`, { closing: true });
+    }
+    for (const mark of NON_DELIMITERS) {
+      add(`It is ${firstTrigger}${mark} ${closer} #12`, { negated: firstTrigger });
+    }
+    for (const phrase of affirmativePhrases) {
+      add(`This ${phrase} ${closer.toLowerCase()} #12`, { closing: true });
+    }
+    // A negated closer is reported even when valid linkage sits elsewhere.
+    add(`${negatedCloser(closer)}\n${nonClosingMarkers[0]}: #13`, {
+      nonClosing: true,
+      negated: firstTrigger,
+    });
   }
-  for (const phrase of affirmativePhrases) {
-    add(`This ${phrase} ${closer.toLowerCase()} #12`, { closing: true });
-  }
-  // A negated closer is reported even when valid linkage sits elsewhere.
-  const negatedCloser = `This does ${firstTrigger} ${closer.toLowerCase()} #12`;
-  add(`${negatedCloser}\n${nonClosingMarkers[0]}: #13`, {
-    nonClosing: true,
-    negated: firstTrigger,
-  });
 
   // Linkage the rendered body does not show is not linkage: both copies mask
   // HTML comments and code before they scan, so a body whose only linkage is
@@ -112,18 +131,21 @@ export function linkageMatrix(policy) {
   // these samples every body reads the same raw and masked, and a copy that
   // scanned the raw body would still pass.
   const maskedLines = [
-    `${closer} #12`,
+    `${closingKeywords[0]} #12`,
     ...nonClosingMarkers.map((marker) => `${marker}: #12`),
-    negatedCloser,
+    ...closingKeywords.map(negatedCloser),
     `${noIssueMarkers[0]}: housekeeping`,
   ];
   for (const [, mask] of MASKINGS) {
     for (const text of maskedLines) {
       add(mask(text), {});
     }
-    add(`${mask(negatedCloser)}\n\n${nonClosingMarkers[0]}: #13`, { nonClosing: true });
+    for (const closer of closingKeywords) {
+      add(`${mask(negatedCloser(closer))}\n\n${nonClosingMarkers[0]}: #13`, { nonClosing: true });
+    }
   }
-  return cases.map((sample) => ({ ...sample, body: `${sample.line}${SECTIONS_TAIL}` }));
+  const tail = sectionsTail(requiredSections);
+  return cases.map((sample) => ({ ...sample, body: `${sample.line}${tail}` }));
 }
 
 function describe(verdict) {
