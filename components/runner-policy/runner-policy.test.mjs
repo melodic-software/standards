@@ -5538,7 +5538,6 @@ function scanSetupTree(treeSha, { actionSource = SCAN_SETUP_ACTION_BLOB_SHA, ext
 function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = false }) {
   return async (url) => {
     const treeMatch = COMMIT_RELATIVE_TREE_URL.exec(url);
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
     if (treeMatch) {
       const tree = trees[treeMatch[1]];
       if (!tree) {
@@ -5547,7 +5546,6 @@ function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = fal
       return { ok: true, json: async () => ({ sha: treeMatch[1], truncated, tree }) };
     }
     const rawMatch = COMMIT_RELATIVE_RAW_URL.exec(url);
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
     if (rawMatch) {
       const [, revision, filePath] = rawMatch;
       const body =

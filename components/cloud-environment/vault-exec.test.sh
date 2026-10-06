@@ -11,7 +11,9 @@ script="$root/components/cloud-environment/vault-exec"
 value='s3cr3t-VALUE-9f2'
 
 tmp="$(mktemp -d)"
-mkdir -p "$tmp/bin"
+mkdir -p "$tmp/bin" "$tmp/realbin" "$tmp/home"
+real_curl="$(command -v curl)"
+ln -s "$real_curl" "$tmp/realbin/curl"
 # The stub logs its argv, one line per call, drains its own stdin (so a
 # resolver that passed the caller's stdin to curl would lose it), prints a body
 # plus the -w status line, and exits 22 for a status of 400 or more, as
@@ -61,6 +63,24 @@ assert_contains 'curl reads the default vault' "$(cat "$STUB_CURL_LOG")" \
 assert_not_contains 'curl sends no auth header (the proxy adds it)' "$(cat "$STUB_CURL_LOG")" 'Authorization'
 assert_not_contains "curl's argv never holds the value" "$(cat "$STUB_CURL_LOG")" "$value"
 assert_not_contains 'stderr never holds the value' "$err" "$value"
+assert_eq 'curl skips every .curlrc (-q is its first argument)' '-q' \
+  "$(head -n 1 "$STUB_CURL_LOG" | cut -d ' ' -f 1)"
+
+# A planted .curlrc, run against the real curl: if curl read it, its
+# trace-ascii line would write the request (and any header the proxy path
+# sees) to a file of the planter's choosing. The proxy is a closed local port,
+# so the read fails fast and nothing leaves the machine.
+cat >"$tmp/home/.curlrc" <<EOF
+trace-ascii = "$tmp/home/planted-trace"
+EOF
+env -u NO_PROXY -u no_proxy -u CURL_CA_BUNDLE \
+  HTTPS_PROXY=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 \
+  CURL_HOME="$tmp/home" HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/home" \
+  PATH="$tmp/realbin:$PATH" VAULT_EXEC_BUDGET_SEC=5 VAULT_EXEC_RETRY_DELAY_SEC=0 \
+  "$script" --optional --env TOKEN=my-secret -- true </dev/null >/dev/null 2>"$tmp/err"
+rc=$?
+assert_exit 'a hostile .curlrc does not stop an --optional run' 0 "$rc"
+assert_file_absent 'the real curl never reads a planted .curlrc' "$tmp/home/planted-trace"
 
 run 200 "$ok_body" '' --env TOKEN=my-secret -- true
 assert_eq 'stdout carries nothing of its own' '' "$out"

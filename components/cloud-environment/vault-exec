@@ -67,10 +67,13 @@ deadline=$((SECONDS + budget))
 # fetch <url>: one attempt, capped by the time left. Sets resp (the body, then
 # the status on its last line) and curl_rc. curl reads /dev/null, never this
 # script's stdin, which belongs to the command; the body stays in memory.
+# -q must stay first: it stops curl reading a .curlrc from CURL_HOME,
+# XDG_CONFIG_HOME or HOME, which could add a url, proxy or trace line and send
+# the response, or the token the proxy adds, somewhere else.
 fetch() {
   local max=$((deadline - SECONDS))
   [[ $max -le 10 ]] || max=10
-  resp="$(curl -sS --fail-with-body --proto '=https' --connect-timeout 5 \
+  resp="$(curl -q -sS --fail-with-body --proto '=https' --connect-timeout 5 \
     --max-time "$max" -w '\n%{http_code}' "$1" </dev/null 2>/dev/null)"
   curl_rc=$?
 }
