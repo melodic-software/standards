@@ -718,6 +718,18 @@
   {
     "repo": "claude-code-plugins",
     "kind": "workflow",
+    "from": ".github/workflows/release-plugins.yml",
+    "to": ".github/workflows/release-publish-plugins.yml",
+    "from_name": "release-plugins",
+    "to_name": "release-publish-plugins",
+    "job_renames": [],
+    "couplings": [],
+    "confidence": "high",
+    "note": "ADR 0048 bot-maintained release PR (schedule, push of .changes/** to main, workflow_dispatch); added after the map was drawn. `plugins` is not a release function word; `publish-plugins` is. Jobs `build` and `merge` are verb-first and keep their ids. No workflow_run keys on its name; pr-require-checks.yml lists the file in its check-jsonschema `files:` and must change in the same PR; the `release-plugins` concurrency group may keep its value"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
     "from": ".github/workflows/selection-audit.yml",
     "to": ".github/workflows/maintenance-audit-test-selection.yml",
     "from_name": "selection-audit",
