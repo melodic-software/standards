@@ -1,6 +1,6 @@
 # PR body contract
 
-`ci-status` (its `pr-contract` step) fails a pull request only on a
+The `pr-contract` step inside `ci-status` fails a pull request only on a
 non-Conventional-Commits title or a `do-not-merge` label. The body contract is
 advisory, reported by comment and the `needs-issue-linkage` label, but
 expected: open with `Closes #<issue>` (or `Fixes`/`Resolves`) or
