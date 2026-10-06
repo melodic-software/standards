@@ -33,6 +33,18 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
       validatePolicy({ schemaVersion: 1, title: { allowedTypes: ["feat"], requireScope: false } }),
     ConfigurationError,
   );
+  // A version-1 policy, with no non-closing or negated-closer record, no
+  // longer validates.
+  const { nonClosingMarkers, negatedClosers, ...versionOneBody } = POLICY.body;
+  assert.ok(nonClosingMarkers.length > 0 && negatedClosers.wordWindow > 0);
+  assert.throws(
+    () => validatePolicy({ ...POLICY, schemaVersion: 1, body: versionOneBody }),
+    ConfigurationError,
+  );
+  assert.throws(
+    () => validatePolicy({ ...POLICY, body: versionOneBody }),
+    /body must have required property 'nonClosingMarkers'/,
+  );
 });
 
 test("canonical requiredSections mirror the enforced pr-issue-linkage contract", () => {
@@ -152,12 +164,14 @@ test("duplicate JSON object members fail closed", () => {
 
 test("closing keyword validation follows policy-authored keywords", () => {
   const customPolicy = validatePolicy({
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: { allowedTypes: ["docs"], requireScope: false },
     body: {
       requiredSections: ["Related"],
       closingKeywords: ["Completes"],
       noIssueMarkers: ["No linked issue"],
+      nonClosingMarkers: POLICY.body.nonClosingMarkers,
+      negatedClosers: POLICY.body.negatedClosers,
     },
   });
   const accepted = `Completes #42
@@ -175,12 +189,14 @@ test("closing keyword validation follows policy-authored keywords", () => {
 
 test("title validation follows policy-authored allowed types", () => {
   const customPolicy = validatePolicy({
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: { allowedTypes: ["docs"], requireScope: false },
     body: {
       requiredSections: ["Related"],
       closingKeywords: ["Closes"],
       noIssueMarkers: ["No linked issue"],
+      nonClosingMarkers: POLICY.body.nonClosingMarkers,
+      negatedClosers: POLICY.body.negatedClosers,
     },
   });
   assert.deepEqual(rules(validateTitle("docs: update readme", customPolicy)), []);

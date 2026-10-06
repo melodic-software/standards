@@ -46,29 +46,52 @@ check below reads the composite's default so it cannot reopen.
 Every pull request carries:
 
 - a native closing keyword (`Closes`, `Fixes`, or `Resolves` followed by an
-  issue number), or the literal `No linked issue` / `No related issue` when
-  nothing closes; and
+  issue number), a non-closing reference (`Refs: #N` or `Relates to: #N`, alone
+  on its own line, from `nonClosingMarkers`) when the PR links an issue it must
+  not close, or the literal `No linked issue` / `No related issue` when nothing
+  is linked; and
 - a non-empty section for each entry in `requiredSections`: `## Summary` (what
   changes and why), `## Fix` (the concrete change), `## Verification`
   (evidence the change works), and `## Related` (PRs, ADRs, or decision-log
   entries the PR does not close).
+
+A negated closing reference (`does not close #N`) is an error even when valid
+linkage appears elsewhere: GitHub's own parser ignores the disclaimer and
+closes the issue on merge. `negatedClosers` records the rule: a closing
+reference is negated when one of `triggerWords`, or a word ending in one of
+`triggerSuffixes`, appears among the last `wordWindow` words between the
+previous `.`, `!`, `?`, `;` or `,` and the keyword, unless it opens one of the
+`affirmativePhrases` (`not only ... but` is affirmative).
+
+`nonClosingMarkers` and `negatedClosers` are descriptive records of the rules
+the composite and the hook validator implement. The local validator
+(`pr-convention-policy.mjs`) is a self-test, not the evaluator of record, and
+does not apply them: it still asks a body for a closing keyword or a no-issue
+marker.
 
 The `## Related` section is fleet-wide house style (reconciled in #247); this
 component encodes the rule the gate enforces. The authoritative gate is the
 `ci-workflows` `pr-contract` composite, which hardcodes its own copy of the
 contract: the section list as the `section_report("<name>")` calls in
 [`run.sh`](https://github.com/melodic-software/ci-workflows/blob/main/.github/actions/pr-contract/run.sh),
-the closing keywords and no-issue markers as the awk patterns beside them, and
-the allowed title types and the scope requirement as the `types` and
-`require-scope` input defaults in `action.yml`. Those
-copies must change in lockstep with `policy.json`; letting them drift is
+the closing keywords and no-issue markers as the awk patterns beside them, the
+non-closing markers as the `rest ~ /^(refs|relates[ \t]+to):.../` test in
+`scan_line`, the negation rule as `negation_trigger`, and the allowed title
+types and the scope requirement as the `types` and `require-scope` input
+defaults in `action.yml`. The hook validator transcribes the same linkage
+rules as `CLOSING_ERE`, `NON_CLOSING_ERE`, `NO_ISSUE_ERE` and
+`negation_trigger_to`; it is neither stricter nor looser than the composite on
+either rule. Those copies must change in lockstep with `policy.json`; letting them drift is
 exactly the failure #393 recorded. That lockstep is enforced by
 [`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008), which the
 `pr-convention-lockstep` CI lane runs against the live gate source, the
 source-control plugin's hook validator, the org PR template, the distributed
 `.claude/rules/pr-body-contract.md` rule, and the contract of the artifact each
 consumer pins (the composite, or the reusable until that repository takes its
-Phase 3 pull request) at that pinned SHA.
+Phase 3 pull request) at that pinned SHA. The non-closing and negated-closer
+rules are checked in the live composite, at every composite pin, and in the
+hook; a reusable pin is checked for sections, keywords and markers only, since
+that transition-only artifact gained the two rules late (ci-workflows#544).
 
 Only the title and the `do-not-merge` label fail the composite's step. A body
 missing a closing keyword or a section is advisory: a warning, one upserted
