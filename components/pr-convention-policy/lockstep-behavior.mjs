@@ -59,6 +59,13 @@ export const MASKINGS = [
   ["inline code", (text) => `See \`${text}\` here`],
   ["inline code of two backticks", (text) => `\`\`${text}\`\``],
 ];
+// Block openers left unclosed: each copy masks from the opener to the end of
+// the body, so linkage after it never counts.
+export const UNTERMINATED_MASKINGS = [
+  ["an unclosed HTML comment", (text) => `<!--\n${text}`],
+  ["an unclosed backtick fence", (text) => `\`\`\`\n${text}`],
+  ["an unclosed tilde fence", (text) => `~~~\n${text}`],
+];
 // GitHub's closing keywords, every inflection both copies accept. policy.json
 // spells three of them and lists no inflections; GitHub's list is the one in
 // "Linking a pull request to an issue" (docs.github.com, Using keywords in
@@ -298,6 +305,14 @@ export function linkageMatrix(policy) {
     }
     for (const closer of closingKeywords) {
       add(`${mask(negatedCloser(closer))}\n\n${nonClosingMarkers[0]}: #13`, { nonClosing: true });
+    }
+  }
+  // No sample pairs these with valid linkage: the unclosed opener also hides
+  // the sections tail every body ends with, and the hook folds the missing
+  // sections into its verdict.
+  for (const [, mask] of UNTERMINATED_MASKINGS) {
+    for (const text of maskedLines) {
+      add(mask(text), {});
     }
   }
   const tail = sectionsTail(requiredSections);

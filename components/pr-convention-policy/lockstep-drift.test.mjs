@@ -12,6 +12,7 @@ import {
   linkageMatrix,
   MASKINGS,
   NON_DELIMITERS,
+  UNTERMINATED_MASKINGS,
 } from "./lockstep-behavior.mjs";
 import {
   CONSUMER_REPOSITORIES,
@@ -719,6 +720,13 @@ test("the sample matrix hides every kind of linkage in every masked shape", () =
     const beside = matrix.find(({ line }) => line.startsWith(`${mask(negatedCloser)}\n\n`));
     assert.ok(beside, `${name}: masked negated closer beside a marker`);
     assert.deepEqual(beside.expect, { ...unlinked, nonClosing: true }, name);
+  }
+  for (const [name, mask] of UNTERMINATED_MASKINGS) {
+    for (const text of hidden) {
+      const sample = matrix.find(({ line }) => line === mask(text));
+      assert.ok(sample, `${name}: ${text}`);
+      assert.deepEqual(sample.expect, unlinked, `${name}: ${text}`);
+    }
   }
 });
 

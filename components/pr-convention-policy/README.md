@@ -127,7 +127,8 @@ two kinds of valid linkage also appear together in both orders. It also hides a
 closing keyword, each non-closing marker, a negated closer for each closing
 keyword and a no-issue marker inside each shape both copies mask before they
 scan: an HTML comment (one line and several), a backtick fence, a tilde fence,
-a space- and a tab-indented code block, and inline code. Each of those bodies
+a space- and a tab-indented code block, and inline code, plus an HTML comment,
+a backtick fence and a tilde fence left unclosed to the end of the body. Each of those bodies
 must read as missing linkage, and a masked negated closer beside a real
 `Refs:` line must not be reported, so a copy that scanned the raw body would
 fail. It runs the composite's `analyze_body` awk program (live and at every
