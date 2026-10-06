@@ -72,3 +72,18 @@ on `gh pr create`, so plugin-less sessions would lose the signal), and retiring
 it in favor of templates and plugin guidance (`--body` skips the template, and
 the body contract is still the expected standard, so the advisory comment and
 label would return as noise). Decisions 2 and 3 are unchanged.
+
+## Revisited 2026-10-06 (#647): rules the reusable pins predate
+
+`policy.json` now also records the non-closing `Refs:`/`Relates to:` markers
+(`nonClosingMarkers`) and the negated-closer rule (`negatedClosers`). The
+lockstep check holds the live composite, every composite pin, and the hook to
+both, so the Consequences entry above (the lane stays red until every copy and
+every caller pin catches up) still holds for them. It has one exception: a pin
+of the `pr-issue-linkage.yml` reusable is checked for sections, closing
+keywords, and no-issue markers only. That reusable gained the two rules late
+(ci-workflows#544) in JavaScript the check has no extractor for. The reusable
+was deleted from ci-workflows `main`, so it serves only repositories that have
+not yet moved to the composite, and the composite has carried both rules at
+every pin since v0.20.0. A repository's move to the composite brings it under
+the full check.

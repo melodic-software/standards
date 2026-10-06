@@ -344,6 +344,63 @@ export function parseValidatorPatterns(shellText, location) {
 // against the policy the same way.
 // ---------------------------------------------------------------------------
 
+// A declared pattern or helper proves nothing on its own: the copy must call
+// it and act on the result, or the rule is dead code and a parse of its body
+// is a false green. Each entry is one link of that chain, from the call site
+// to the verdict, quoted from the live source.
+const WIRING = {
+  compositeNonClosing: [
+    ["scan_line runs on every masked line", /scan_line\(masked\[i\]\)/],
+    ["a marker match sets has_non_closing", /rest ~ \/.+\/\) \{\s*has_non_closing = 1/],
+    ["has_non_closing is reported", /if \(has_non_closing\) print "non-closing"/],
+    [
+      "a non-closing report satisfies linkage",
+      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then/,
+    ],
+  ],
+  compositeNegation: [
+    ["scan_line runs on every masked line", /scan_line\(masked\[i\]\)/],
+    [
+      "negation_trigger is called on each closing reference and branched on",
+      /trigger = negation_trigger\(line, start\)\s*\n\s*if \(trigger != ""\) \{/,
+    ],
+    [
+      "a negated reference is recorded and never counted as closing",
+      /if \(trigger != ""\) \{[\s\S]*?negated_count\+\+[\s\S]*?\}\s*\} else \{\s*has_closing = 1\s*\}/,
+    ],
+    ["negated references are reported", /print "negated\\t" negated_order\[i\]/],
+    [
+      "a negated report is a linkage error",
+      /\[\[ "\$kind" == negated \]\][\s\S]*?linkage_errors\+=\("Negated closing reference/,
+    ],
+  ],
+  validatorNonClosing: [
+    ["a marker match counts as linkage", /\[\[ "\$lower" =~ \$NON_CLOSING_ERE \]\] && found=0/],
+    ["scan_linkage returns success on linkage", /\(\(found == 0\)\) && return 0/],
+    ["scan_linkage decides linkage", /scan_linkage "\$_plv_body" \|\| _plv_linked=1/],
+  ],
+  validatorNegation: [
+    [
+      "negation_trigger_to is called on each closing reference and only an empty result counts",
+      /negation_trigger_to _plv_trigger "\$\{line:0:start\}"\s*\n\s*if \[\[ -z "\$_plv_trigger" \]\]; then\s*found=0\s*continue\s*fi/,
+    ],
+    ["a negated reference is recorded", /LINKAGE_NEGATED\+=\(/],
+    [
+      "a recorded negated reference is a linkage problem",
+      /\(\(\$\{#LINKAGE_NEGATED\[@\]\} == 0\)\) \|\| \{[\s\S]*?LINKAGE_PROBLEMS\+=\("Negated closing reference/,
+    ],
+  ],
+};
+
+function assertWired(text, chain, location) {
+  const missing = WIRING[chain].filter(([, pattern]) => !pattern.test(text));
+  if (missing.length > 0) {
+    throw new DriftError(
+      `${location}: the rule is not wired in: ${missing.map(([link]) => link).join("; ")}`,
+    );
+  }
+}
+
 // The marker alternation is the first group of the pattern, after the `^`
 // anchor and the hook's `{0,3}` indent allowance (the composite strips that
 // indent before matching). A multi-word marker spells its gap as a blank-class
@@ -366,6 +423,7 @@ export function parseValidatorNonClosing(shellText, location) {
     throw new DriftError(`${location}: NON_CLOSING_ERE declaration not found`);
   }
   assertValidatorOperand(shellText, "NON_CLOSING_ERE", location);
+  assertWired(shellText, "validatorNonClosing", location);
   return {
     markers: nonClosingAlternation(declaration[1], location),
     pattern: ereToJs(declaration[1]),
@@ -389,6 +447,7 @@ export function parseCompositeNonClosing(runShText, location) {
       `${location}: the non-closing marker test no longer reads the lowercased, indent-stripped line (\`rest = tolower(substr(line, indent + 1))\` under \`indent <= 3\`)`,
     );
   }
+  assertWired(runShText, "compositeNonClosing", location);
   return {
     markers: nonClosingAlternation(declaration[1], location),
     pattern: new RegExp(declaration[1]),
@@ -415,6 +474,7 @@ export function parseValidatorNegation(shellText, location) {
       `${location}: negation_trigger_to's window is inconsistent (n > ${window[1]}, first = n - ${window[2]})`,
     );
   }
+  assertWired(shellText, "validatorNegation", location);
   const words = [];
   const suffixes = [];
   for (const alternative of cases[1].split("|").map((item) => item.trim())) {
@@ -465,6 +525,7 @@ export function parseCompositeNegation(runShText, location) {
       `${location}: negation_trigger's suffix test reads ${Number(suffix[1]) + 1} characters for the ${suffix[2].length}-character "${suffix[2]}"`,
     );
   }
+  assertWired(runShText, "compositeNegation", location);
   return {
     triggerWords: [...triggers[1].matchAll(/lower == "(\w+)"/g)].map((m) => m[1]),
     triggerSuffixes: [suffix[2]],

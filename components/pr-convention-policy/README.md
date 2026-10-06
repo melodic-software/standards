@@ -91,7 +91,9 @@ consumer pins (the composite, or the reusable until that repository takes its
 Phase 3 pull request) at that pinned SHA. The non-closing and negated-closer
 rules are checked in the live composite, at every composite pin, and in the
 hook; a reusable pin is checked for sections, keywords and markers only, since
-that transition-only artifact gained the two rules late (ci-workflows#544).
+that transition-only artifact gained the two rules late (ci-workflows#544);
+ADR-0008's [2026-10-06 (#647) amendment](../../docs/adr/0008-distribute-pr-body-contract-rule.md#revisited-2026-10-06-647-rules-the-reusable-pins-predate)
+records that exception to its every-pin consequence.
 
 Only the title and the `do-not-merge` label fail the composite's step. A body
 missing a closing keyword or a section is advisory: a warning, one upserted

@@ -71,6 +71,17 @@ const GOOD_COMPOSITE_RUN = [
   "    chunk = substr(lower, offset + 1)",
   "    if (!match(chunk, /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[ \\t]*:?[ \\t]*([a-z0-9_.-]+\\/[a-z0-9_.-]+)?#[0-9]+/)) break",
   "    offset = offset + RSTART + RLENGTH - 1",
+  "    text = substr(line, start, len)",
+  "    trigger = negation_trigger(line, start)",
+  '    if (trigger != "") {',
+  "      if (!(text in negated_trigger)) {",
+  "        negated_count++",
+  "        negated_order[negated_count] = text",
+  "        negated_trigger[text] = trigger",
+  "      }",
+  "    } else {",
+  "      has_closing = 1",
+  "    }",
   "  }",
   "}",
   "END {",
@@ -78,10 +89,31 @@ const GOOD_COMPOSITE_RUN = [
   '  section_report("Fix")',
   '  section_report("Verification")',
   '  section_report("Related")',
+  "  for (i = 1; i <= line_count; i++) {",
+  "    scan_line(masked[i])",
+  "  }",
+  "  for (i = 1; i <= negated_count; i++) {",
+  '    print "negated\\t" negated_order[i] "\\t" negated_trigger[negated_order[i]]',
+  "  }",
+  '  if (has_closing) print "closing"',
+  '  if (has_non_closing) print "non-closing"',
   '  if (tolower(body) ~ /(^|[^a-z0-9_])no (linked|related) issue([^a-z0-9_]|$)/) print "no-issue"',
   "}",
   "'",
   "}",
+  // The live verdict lines that act on the analyzer's report, verbatim.
+  "  while IFS=$'\\t' read -r kind text trigger; do",
+  '    [[ "$kind" == negated ]] || continue',
+  '    negated_quoted+="$text"',
+  '  done <"$analysis"',
+  '  if [[ -n "$negated_quoted" ]]; then',
+  '    linkage_errors+=("Negated closing reference ($negated_quoted).")',
+  "  fi",
+  "  if ! grep -qx 'closing' \"$analysis\" &&",
+  "    ! grep -qx 'non-closing' \"$analysis\" &&",
+  "    ! grep -qx 'no-issue' \"$analysis\"; then",
+  "    linkage_errors+=('Missing a native closing keyword.')",
+  "  fi",
   "",
 ].join("\n");
 
@@ -121,7 +153,6 @@ const GOOD_VALIDATOR = [
   "CLOSING_ERE='(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:blank:]]*:?[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
   "NON_CLOSING_ERE='^ {0,3}(refs|relates[[:blank:]]+to):[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[[:blank:]]*$'",
   "NO_ISSUE_ERE='[^a-z0-9_]no (linked|related) issue[^a-z0-9_]'",
-  // The live `scan_linkage` operand lines, verbatim.
   // The live `negation_trigger_to` window, exception and trigger lines, verbatim.
   "  ((n > 5)) && first=$((n - 5))",
   "  for ((i = first; i < n; i++)); do",
@@ -135,13 +166,28 @@ const GOOD_VALIDATOR = [
   "      ;;",
   "    esac",
   "  done",
+  // The live `scan_linkage` operand, call-site and verdict lines, verbatim.
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
   '    lower="${line,,}"',
   '    [[ "$lower" =~ $NON_CLOSING_ERE ]] && found=0',
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
   '    while chunk="${lower:off}" && [[ "$chunk" =~ $CLOSING_ERE ]]; do',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '      negation_trigger_to _plv_trigger "${line:0:start}"',
+  '      if [[ -z "$_plv_trigger" ]]; then',
+  "        found=0",
+  "        continue",
+  "      fi",
+  '      LINKAGE_NEGATED+=("$text")',
+  "    done",
+  "  ((found == 0)) && return 0",
   `  lower=$'\\n'"\${1,,}"$'\\n'`,
   '  [[ "$lower" =~ $NO_ISSUE_ERE ]]',
+  '  scan_linkage "$_plv_body" || _plv_linked=1',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash array length, not a JS placeholder
+  "  ((${#LINKAGE_NEGATED[@]} == 0)) || {",
+  '    LINKAGE_PROBLEMS+=("Negated closing reference ($_plv_negated).")',
+  "  }",
   "REQUIRED_SECTIONS=(Summary Fix Verification Related)",
   "",
 ].join("\n");
@@ -645,6 +691,101 @@ test("composite negated-closer drift is reported, and an off-by-one window is ca
   noException.gateRun = noException.gateRun.replace(/^.*== "only"\) continue\n/m, "");
   const [exceptionError] = checkCopies(POLICY, noException);
   assert.match(exceptionError, /"not only" exception/);
+});
+
+// A helper or pattern whose body matches policy is dead code unless the copy
+// calls it and acts on what it returns; each mutation below leaves every
+// declaration intact and breaks one link between the call site and the verdict.
+test("a negation helper that is never called, or whose result is ignored, is drift", () => {
+  const cases = [
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      "    trigger = negation_trigger(line, start)\n",
+      '    trigger = ""\n',
+      /negation_trigger is called/,
+    ],
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      '    if (trigger != "") {',
+      "    if (0) {",
+      /negation_trigger is called/,
+    ],
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      '    [[ "$kind" == negated ]] || continue',
+      "    continue",
+      /a negated report is a linkage error/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '      negation_trigger_to _plv_trigger "${line:0:start}"\n',
+      "",
+      /negation_trigger_to is called/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      '      if [[ -z "$_plv_trigger" ]]; then',
+      "      if true; then",
+      /only an empty result counts/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      '    LINKAGE_PROBLEMS+=("Negated closing reference',
+      '    : ("Negated closing reference',
+      /a recorded negated reference is a linkage problem/,
+    ],
+  ];
+  for (const [copy, location, from, to, message] of cases) {
+    const texts = goodTexts();
+    texts[copy] = texts[copy].replace(from, to);
+    assert.notEqual(texts[copy], goodTexts()[copy], from);
+    const errors = checkCopies(POLICY, texts);
+    assert.equal(errors.length, 1, `${from}: ${errors.join("; ")}`);
+    assert.ok(errors[0].startsWith(`${location}: the rule is not wired in`), errors[0]);
+    assert.match(errors[0], message, from);
+  }
+});
+
+test("a non-closing match that never reaches the linkage verdict is drift", () => {
+  const cases = [
+    [
+      "gateRun",
+      "gate composite (non-closing markers)",
+      '  if (has_non_closing) print "non-closing"\n',
+      "",
+      /has_non_closing is reported/,
+    ],
+    [
+      "gateRun",
+      "gate composite (non-closing markers)",
+      "    ! grep -qx 'non-closing' \"$analysis\" &&\n",
+      "",
+      /a non-closing report satisfies linkage/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (non-closing markers)",
+      '[[ "$lower" =~ $NON_CLOSING_ERE ]] && found=0',
+      '[[ "$lower" =~ $NON_CLOSING_ERE ]] && :',
+      /a marker match counts as linkage/,
+    ],
+  ];
+  for (const [copy, location, from, to, message] of cases) {
+    const texts = goodTexts();
+    texts[copy] = texts[copy].replace(from, to);
+    assert.notEqual(texts[copy], goodTexts()[copy], from);
+    const errors = checkCopies(POLICY, texts).filter((e) => e.startsWith(location));
+    assert.equal(errors.length, 1, `${from}: ${errors.join("; ")}`);
+    assert.match(errors[0], /the rule is not wired in/);
+    assert.match(errors[0], message, from);
+  }
 });
 
 test("a composite pin without the non-closing or negation rules is drift at that pin", () => {
