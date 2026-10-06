@@ -569,7 +569,7 @@ test("the sample matrix covers every policy value, inside and just outside the w
   // Each trigger appears, for each closing keyword, once at the window's edge
   // (negated) and once a word further out (closing).
   const firstTrigger = body.negatedClosers.triggerWords[0];
-  const atEdge = matrix.filter(({ line }) => line.startsWith(`${firstTrigger} `));
+  const atEdge = matrix.filter(({ line }) => line.startsWith(`${firstTrigger} alpha `));
   assert.deepEqual(
     atEdge.map(({ expect }) => [expect.negated, expect.closing]),
     body.closingKeywords.flatMap(() => [
@@ -837,6 +837,130 @@ test("a copy that treats a colon as a clause delimiter is behavioral drift", () 
     "hookValidator",
     /"It is not: Closes #12" should be unlinked \+ negated by "not", got linked/,
   );
+});
+
+test("a copy that stops at the first closing reference on a line is behavioral drift", () => {
+  const gate = mutate("gateRun", "    offset = start + len - 1\n", "    offset = length(lower)\n");
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"Closes #11 but does not closes #12" should be closing \+ negated by "not", got closing/,
+  );
+  assert.match(gate[0], /"This does not closes #12; Closes #11" should be closing \+ negated/);
+
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  const hook = mutate("hookValidator", "      off=$((start + len))\n", "      off=${#lower}\n");
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"Closes #11 but does not closes #12" should be linked \+ negated by "not", got linked/,
+  );
+  assert.match(hook[0], /"This does not closes #12; Closes #11" should be linked \+ negated/);
+});
+
+test("the sample matrix varies case, apostrophes and the window's word rules", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = POLICY.body;
+  for (const keyword of closingKeywords) {
+    const lower = keyword.toLowerCase();
+    for (const shape of [
+      `${keyword.toUpperCase()} #12`,
+      `${keyword}: #12`,
+      `${keyword} #11\nThis does not ${lower} #12`,
+      `This does not ${lower} #12\n${keyword} #11`,
+      `not\n${keyword} #12`,
+      ...negatedClosers.triggerWords.map((word) => `This ${word.toUpperCase()} ${lower} #12`),
+      `This DOESN\u2019T ${lower} #12`,
+      `This NOT ONLY ${lower} #12`,
+      `This Not Only ${lower} #12`,
+    ]) {
+      assert.ok(lines.includes(shape), JSON.stringify(shape));
+    }
+  }
+  for (const marker of [...nonClosingMarkers, ...noIssueMarkers]) {
+    assert.ok(
+      lines.some((line) => line.startsWith(marker.toUpperCase())),
+      marker,
+    );
+  }
+});
+
+// Each copy folds case in several places and normalizes the typographic
+// apostrophe; undoing any one of them must change a verdict on the matrix.
+test("undoing any normalization step in either copy is behavioral drift", () => {
+  const cases = [
+    ["gateRun", "    lower = tolower(word)\n", "    lower = word\n", /"This NOT closes #12"/],
+    [
+      "gateRun",
+      'tolower(words[i + 1]) == "only"',
+      'words[i + 1] == "only"',
+      /"This NOT ONLY closes #12" should be closing, got negated by "NOT"/,
+    ],
+    [
+      "gateRun",
+      `if (tolower(substr(word, length(word) - 2)) == "n'"'"'t")`,
+      `if (substr(word, length(word) - 2) == "n'"'"'t")`,
+      /"This DOESN'T closes #12" should be negated by "DOESN'T", got closing/,
+    ],
+    [
+      "gateRun",
+      `  gsub("\\342\\200\\231", "'"'"'", tail)\n`,
+      "",
+      /"This doesn\u2019t closes #12" should be negated by "doesn't", got closing/,
+    ],
+    [
+      "gateRun",
+      "    rest = tolower(substr(line, indent + 1))\n",
+      "    rest = substr(line, indent + 1)\n",
+      /"REFS: #12" should be non-closing, got no linkage/,
+    ],
+    [
+      "gateRun",
+      "  if (tolower(body) ~ /(^|",
+      "  if (body ~ /(^|",
+      /"No linked issue: housekeeping" should be no-issue, got no linkage/,
+    ],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ["hookValidator", 'lower="${words[i],,}"', 'lower="${words[i]}"', /"This NOT closes #12"/],
+    [
+      "hookValidator",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '[[ "${words[i + 1],,}" == only ]]',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '[[ "${words[i + 1]}" == only ]]',
+      /"This NOT ONLY closes #12" should be linked, got unlinked \+ negated by "NOT"/,
+    ],
+    [
+      "hookValidator",
+      `  tail="\${tail//$'\\xe2\\x80\\x99'/\\'}"\n`,
+      "",
+      /"This doesn\u2019t closes #12" should be unlinked \+ negated by "doesn't", got linked/,
+    ],
+    [
+      "hookValidator",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    lower="${line,,}"\n',
+      '    lower="$line"\n',
+      /"CLOSES #12" should be linked/,
+    ],
+    [
+      "hookValidator",
+      `  lower=$'\\n'"\${1,,}"$'\\n'`,
+      `  lower=$'\\n'"$1"$'\\n'`,
+      /"No linked issue: housekeeping" should be linked, got unlinked/,
+    ],
+  ];
+  // A static extractor may name the same edit too; the behavioral finding
+  // must be there either way, and nothing outside the mutated copy may fire.
+  for (const [copy, from, to, expected] of cases) {
+    const errors = mutate(copy, from, to);
+    const behavior = errors.filter((error) => error.startsWith(`${LOCATION[copy]} (behavior): `));
+    assert.equal(behavior.length, 1, errors.join("; "));
+    assert.match(behavior[0], expected);
+    for (const error of errors) {
+      assert.ok(error.startsWith(LOCATION[copy]), error);
+    }
+  }
 });
 
 test("every sample body fills the policy's own required sections", () => {

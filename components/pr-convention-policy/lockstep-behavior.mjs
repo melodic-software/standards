@@ -58,6 +58,9 @@ export const MASKINGS = [
 ];
 const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
 
+const capitalize = (word) => `${word[0].toUpperCase()}${word.slice(1)}`;
+const capitalizeWords = (phrase) => phrase.split(" ").map(capitalize).join(" ");
+
 // One line of content under each required section, in policy order.
 export function sectionsTail(requiredSections) {
   const sections = requiredSections.map(
@@ -76,18 +79,50 @@ export function linkageMatrix(policy) {
   const cases = [];
   const add = (line, expect) => cases.push({ line, expect: { ...none, ...expect } });
 
+  // Every term is matched without regard to case, a closing keyword anywhere
+  // on a line (a list item or a quote included) with an optional colon and any
+  // blanks before the reference, and only as a whole word before a whole
+  // reference. A bare issue URL is not a reference to either copy.
   for (const keyword of closingKeywords) {
+    const lower = keyword.toLowerCase();
     add(`${keyword} #12`, { closing: true });
     add(`${keyword} owner/repo#12`, { closing: true });
+    add(`${keyword.toUpperCase()} #12`, { closing: true });
+    add(`${keyword}: #12`, { closing: true });
+    add(`${keyword}#12`, { closing: true });
+    add(`${keyword}\t#12`, { closing: true });
+    add(`${keyword} #12\r`, { closing: true });
+    add(`- ${keyword} #12`, { closing: true });
+    add(`> ${keyword} #12`, { closing: true });
+    add(`x${lower} #12`, {});
+    add(`${keyword} #12x`, {});
+    add(`${keyword} https://github.com/owner/repo/issues/12`, {});
   }
+  // A non-closing marker counts only as a whole line: colon required, any
+  // blanks inside the marker and around the reference, any case, at most three
+  // spaces of indent, and no list bullet or quote in front.
   for (const marker of nonClosingMarkers) {
     add(`${marker}: #12`, { nonClosing: true });
     add(`   ${marker}: owner/repo#12`, { nonClosing: true });
     add(`See ${marker}: #12 for context`, {});
     add(`${marker}: #12 and more`, {});
+    add(`${marker.toUpperCase()}: #12`, { nonClosing: true });
+    add(`${marker}:#12`, { nonClosing: true });
+    add(`${marker}: #12 \t`, { nonClosing: true });
+    add(`${marker}: #12\r`, { nonClosing: true });
+    add(`${marker} #12`, {});
+    add(`- ${marker}: #12`, {});
+    add(`> ${marker}: #12`, {});
+    if (marker.includes(" ")) {
+      add(`${marker.replaceAll(" ", " \t")}: #12`, { nonClosing: true });
+    }
   }
+  // A no-issue marker counts anywhere in the body, in any case, as whole words.
   for (const marker of noIssueMarkers) {
     add(`${marker}: housekeeping`, { noIssue: true });
+    add(`${marker.toUpperCase()}: housekeeping`, { noIssue: true });
+    add(`There is ${marker.toLowerCase()} here`, { noIssue: true });
+    add(`${marker}s here`, {});
   }
 
   const { wordWindow, affirmativePhrases } = negatedClosers;
@@ -102,13 +137,33 @@ export function linkageMatrix(policy) {
   const negatedCloser = (closer) => `This does ${firstTrigger} ${closer.toLowerCase()} #12`;
   // Every negation shape is probed with every closing keyword, so a copy that
   // wires negation to one keyword only cannot pass.
+  const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
+  const outside = FILLERS.slice(0, wordWindow).join(" ");
   for (const closer of closingKeywords) {
+    const lower = closer.toLowerCase();
     for (const trigger of triggers) {
-      const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
-      const outside = FILLERS.slice(0, wordWindow).join(" ");
       add(`${trigger} ${inside} ${closer} #12`.replace("  ", " "), { negated: trigger });
       add(`${trigger} ${outside} ${closer} #12`, { closing: true });
+      // A trigger is matched without regard to case and reported as written.
+      for (const cased of [trigger.toUpperCase(), capitalize(trigger)]) {
+        add(`This ${cased} ${lower} #12`, { negated: cased });
+      }
+      // A typographic apostrophe (U+2019) reads as a straight one, and the
+      // trigger is reported with the straight one.
+      if (trigger.includes("'")) {
+        for (const written of [trigger, trigger.toUpperCase()]) {
+          add(`This ${written.replaceAll("'", "’")} ${lower} #12`, { negated: written });
+        }
+      }
     }
+    // Only whole words trigger, the window counts words of letters (a hyphen
+    // splits one, a bare reference is none), and it never crosses a line.
+    add(`This ${firstTrigger}e ${lower} #12`, { closing: true });
+    add(`This can${firstTrigger} ${lower} #12`, { closing: true });
+    add(`${firstTrigger} ${outside.replace(" ", "-")} ${closer} #12`, { closing: true });
+    const references = FILLERS.slice(0, wordWindow).map((_, index) => `#${index + 1}`);
+    add(`${firstTrigger} ${references.join(" ")} ${closer} #12`, { negated: firstTrigger });
+    add(`${firstTrigger}\n${closer} #12`, { closing: true });
     for (const delimiter of CLAUSE_DELIMITERS) {
       add(`It is ${firstTrigger}${delimiter} ${closer} #12`, { closing: true });
     }
@@ -116,13 +171,23 @@ export function linkageMatrix(policy) {
       add(`It is ${firstTrigger}${mark} ${closer} #12`, { negated: firstTrigger });
     }
     for (const phrase of affirmativePhrases) {
-      add(`This ${phrase} ${closer.toLowerCase()} #12`, { closing: true });
+      for (const cased of [phrase, phrase.toUpperCase(), capitalizeWords(phrase)]) {
+        add(`This ${cased} ${lower} #12`, { closing: true });
+      }
     }
     // A negated closer is reported even when valid linkage sits elsewhere.
     add(`${negatedCloser(closer)}\n${nonClosingMarkers[0]}: #13`, {
       nonClosing: true,
       negated: firstTrigger,
     });
+    // Every closing reference on a line is judged, in order: a copy that
+    // stops at the first match misses a negated closer after a valid one, or a
+    // valid one after a negated closer. Lines are scanned the same way.
+    const bothWays = { closing: true, negated: firstTrigger };
+    add(`${closer} #11 but does ${firstTrigger} ${lower} #12`, bothWays);
+    add(`${negatedCloser(closer)}; ${closer} #11`, bothWays);
+    add(`${closer} #11\n${negatedCloser(closer)}`, bothWays);
+    add(`${negatedCloser(closer)}\n${closer} #11`, bothWays);
   }
 
   // Linkage the rendered body does not show is not linkage: both copies mask

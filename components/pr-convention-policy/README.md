@@ -103,12 +103,21 @@ chain from declaration to verdict while every source regex still matched. So
 the linkage rules are also checked by running each copy.
 [`lockstep-behavior.mjs`](lockstep-behavior.mjs) generates a matrix of sample
 bodies from `policy.json`, each followed by every `requiredSections` heading
-with content: each closing keyword, each non-closing marker on its own line,
-indented, mid-sentence and with trailing text, each no-issue marker, and, for
-every closing keyword, each trigger word and suffix at the window's edge and
-one word beyond it, each clause delimiter, punctuation that is not one (`:`,
+with content. Each closing keyword appears in upper case, with a colon, with
+no or a tab blank, after a list bullet or a quote, with a CRLF ending, and in
+shapes that must not count (inside a longer word, before a longer reference, or
+before an issue URL). Each non-closing marker appears on its own line,
+indented, in upper case, with no blank or trailing blanks, mid-sentence, with
+trailing text, without its colon, and after a bullet or a quote. Each no-issue
+marker appears in upper case, mid-sentence and pluralized. For every closing
+keyword, each trigger word and suffix appears at the window's edge and one word
+beyond it, in upper and capitalized case, and with a typographic apostrophe.
+The matrix also covers each clause delimiter, punctuation that is not one (`:`,
 `-`, brackets, quotes and the like, which must leave the window open), each
-affirmative phrase, and a negated closer beside valid linkage. It also hides a
+affirmative phrase in any case, words that only contain a trigger, the
+window's word count across hyphens, bare references and line breaks, a negated
+closer beside valid linkage, and a negated and a valid closer on one line and
+on two, in both orders. It also hides a
 closing keyword, each non-closing marker, a negated closer for each closing
 keyword and a no-issue marker inside each shape both copies mask before they
 scan: an HTML comment (one line and several), a backtick fence, a tilde fence,
@@ -135,6 +144,17 @@ it, the hook masks it as an indented code block. The hook is usually the
 stricter copy there, but not always: a negated closer in that indented tail is
 reported by the gate and passed by the hook. Aligning the hook is a `claude-code-plugins` change; the matrix gains these
 shapes when the copies agree.
+
+It leaves out Unicode spaces for the same reason. The hook turns a no-break
+space and the other Unicode spaces into a plain space before it scans, so
+`Closes<U+00A0>#12` closes and `No<U+00A0>linked issue` opts out. The composite
+matches only a space or a tab, so neither counts as linkage.
+
+It also probes only the closing keywords `policy.json` spells. Both copies
+accept GitHub's nine forms (close, closes, closed, fix, fixes, fixed, resolve,
+resolves, resolved), but the policy does not list inflections. The reference
+validator in `pr-convention-policy.mjs` derives its own: it accepts `Fixe #12`,
+which neither copy does, and rejects `Fix #12`, which both accept.
 
 Executing fetched code is bounded as follows:
 
