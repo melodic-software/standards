@@ -934,18 +934,24 @@ jobs:
       - name: Test naming conventions
         if: ${{ !cancelled() }}
         run: npm run test:github-actions-conventions
-      # Findings go to the step summary, not annotations: GitHub shows only
-      # ten annotations per step. The last line is the finding count.
-      - name: Report naming findings on standards (advisory)
+      # Findings go to the step summary and the log, not annotations: GitHub
+      # shows only ten annotations per step. The last line is the finding
+      # count. Enforcing mode fails the step on any blocking finding.
+      - name: Check naming conventions on standards
         if: ${{ !cancelled() }}
         run: |
+          set -uo pipefail
+          report="$RUNNER_TEMP/naming-lint.txt"
+          status=0
+          npm run --silent lint:github-actions-conventions -- --format text > "$report" || status=$?
           {
-            echo '### naming-lint (advisory)'
+            echo '### naming-lint (enforcing)'
             echo '```text'
-            npm run --silent lint:github-actions-conventions -- --format text
+            cat "$report"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          tail -n 2 "$GITHUB_STEP_SUMMARY" | head -n 1
+          cat "$report"
+          exit "$status"
 
   pr-audit-workflows:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}

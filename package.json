@@ -21,7 +21,7 @@
     "lint:concurrency-policy": "node components/concurrency-policy/concurrency-policy.mjs --root .",
     "lint:dependabot-automerge-lockstep": "node components/dependabot-policy/automerge-lockstep.mjs",
     "lint:dependabot-policy": "node components/dependabot-policy/dependabot-policy.mjs --root .",
-    "lint:github-actions-conventions": "node components/github-actions-conventions/naming-lint.mjs --root . --mode advisory",
+    "lint:github-actions-conventions": "node components/github-actions-conventions/naming-lint.mjs --root . --mode enforcing",
     "lint:pr-convention-lockstep": "node components/pr-convention-policy/lockstep-drift.mjs",
     "lint:pr-convention-policy": "node components/pr-convention-policy/pr-convention-policy.mjs --title \"feat(distribution): add pr-convention-policy component\" --body \"$(cat components/pr-convention-policy/fixtures/good/pr-body.md)\"",
     "lint:runner-policy": "node components/runner-policy/runner-policy.mjs --root .",

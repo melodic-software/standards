@@ -211,11 +211,51 @@ gitleaks is on `PATH`); a hit exits 4 and stderr names the shape and line,
 never the match. A machine path (`/home/<user>/`, `/Users/<user>/`,
 `C:\Users\`, `\\wsl`, `/mnt/<drive>/Users/`, `/root/`, a `-home-<user>-`
 slug) or a `.local`, `.internal` or `.lan` hostname sends the page to the
-private host. Only the listed shapes are caught; the host's own scan is the
-binding one. When the visibility sent differs from the one requested, `--id`
-is dropped and a new page is created, and when the public host answers 409
+private host. Each list also runs on two decoded copies, with tags stripped
+so a token split across highlighter `<span>`s rejoins. The host copy repeats
+the host scan's own normalization (`&#NN;`, `&#xHH;`, `&amp;`, `&lt;`,
+`&gt;`, `&quot;`, `&apos;`, `&nbsp;`, and `\\` to `\`); a credential found
+there exits 4 naming the decoded line, the refusal the host would give. The
+wide copy also decodes the other common named entities (`&sol;`, `&colon;`,
+`&period;` and the like), numeric entities without their `;`, and JSON/JS
+escapes (`\/`, `\"`, `\uXXXX`, `\xHH`); a credential found only there sends
+the page private, since the host would accept it. `gitleaks dir` refuses only
+on the raw bytes; a gitleaks finding in either decoded copy alone sends the
+page private, since its rules are not the host's. A decoded NUL or invalid
+code point becomes U+FFFD, so the text on either side never joins into a
+shape. The wide copy is also
+matched against the [path-detection](../path-detection/README.md) bodies,
+which add a home path with no trailing slash, the forward-slash and 8.3
+Windows forms, and Windows checkout roots. They are copied into the script
+because setup installs it as one file, and its test fails when the copy and
+the library differ. They skip the raw bytes, where a home path with an
+escaped `&lt;user&gt;` placeholder would read as a real user. Only the listed
+shapes are caught; the host's own scan is the binding one. When the
+visibility sent differs from the one requested, `--id` is dropped and a new
+page is created, and when the public host answers 409
 `private-required` the upload is retried once as a private create. In both
 cases the caller deletes the old id.
+
+**Rollout of the decoded scan.** The host-copy refusal blocks from its first
+release under the
+[enforcement rollout](../../docs/component-lifecycle.md#enforcement-rollout)
+exception for a deterministic check backed by equivalent evidence from the
+live consumer. That consumer is the upload Worker, which since
+melodic-software/provisioning#705 answers 422 to any upload whose normalized
+text matches a credential shape; this script already exits 4 on that 422. The
+host copy is the same normalization, so a page it refuses already exits 4 at
+upload. The client's only change is refusing before the network call, so no
+baseline period is needed. Evidence: the Worker's `scan()` at
+provisioning `0809074`, run over this test's samples, reports a GitHub token
+for the HTML-entity, hex-entity and tag-split forms (refused here), and
+nothing for the JSON-escape, `\"`, `&lowbar;` and `&#95`-without-`;` forms
+(sent private here, not refused). The wide copy, gitleaks on either decoded
+copy and the path-detection bodies never refuse; they only send a page private, the existing outcome for
+a machine path. No report-only path remains, so no completion issue is open.
+The exception is owned by this component's maintainers and holds while the
+host copy matches the Worker's `normalize()`: the Worker's `scan.js` and this
+script are changed together, and `pages-publish.test.sh` pins which forms
+refuse and which go private.
 
 **Secrets.** `vault-exec --env` resolves the host's bearer token and, for the
 private host only, the Access pair. They reach `curl` only as

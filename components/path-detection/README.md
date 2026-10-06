@@ -29,7 +29,10 @@ consumer record).
 Before this component existed, each of those drivers carried its own
 hand-synced copy of the bodies; the 8.3 short-name widening (`ALICE~1`) had to
 be propagated by hand to every copy. The bodies now land here once and reach
-every driver through the sync pipeline.
+every driver through the sync pipeline. One in-repo driver holds a copy:
+`cloud-environment/pages-publish` is installed as a single file, so it carries
+the five definitions verbatim, and its test fails when they differ from this
+file. A body change here updates that copy in the same change.
 
 `machine-path-patterns.test.sh` pins the contract: each body matches the path
 shapes it exists to catch (plain, forward-slash, JSON-escaped, 8.3 short-name,

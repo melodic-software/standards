@@ -3,9 +3,10 @@
 Codex reviews pull requests on every Melodic Software repository and takes its
 review guidance from a `## Code Review Rules` section in the root `AGENTS.md`
 ([Codex GitHub docs](https://learn.chatgpt.com/docs/third-party/github),
-fetched 2026-09-30). Every non-archived repository carries that section in the
-shape below, so the Codex reviewer gets the same rules the Claude review lanes
-read. Decided in `melodic-software/standards#656`; the pilot is
+fetched 2026-09-30). Every non-archived repository except a `sandbox`-topic
+test bed carries that section in the shape below, so the Codex reviewer gets
+the same rules the Claude review lanes read. Decided in
+`melodic-software/standards#656`; the pilot is
 `melodic-software/claude-code-plugins#5966`.
 
 ## Shape
@@ -91,9 +92,10 @@ when one of the two is correct, so a stale pointer cannot sit beside the right
 one; the one pointer itself is unindented, as the inherited block is copied
 verbatim.
 
-- `code-review-rules.sh file` checks one checkout. The `check-repo-hygiene` job
-  in `pr-require-checks.yml` runs it on this repository on every pull request, beside the
-  contract test [`code-review-rules.test.sh`](code-review-rules.test.sh).
+- `code-review-rules.sh file` checks one checkout. The `check-repo-hygiene`
+  job in `pr-require-checks.yml` runs it on this repository on every pull
+  request, beside the contract test
+  [`code-review-rules.test.sh`](code-review-rules.test.sh).
 - `code-review-rules.sh fleet` checks repositories through the GitHub contents
   API. The scheduled
   [`maintenance-audit-code-review-rules`](../../.github/workflows/maintenance-audit-code-review-rules.yml)
@@ -102,14 +104,20 @@ verbatim.
   read-only App token, so a new repository is flagged once it is public or a
   sync target. A private repository outside the installation is not visible to
   either token.
+- Both listings skip a repository with the `sandbox` topic, such as
+  `pr-pipeline-sandbox`: a disposable test bed is no convergence target, for
+  the reason `distribution/sync-manifest.yml` records for
+  `claude-lane-sandbox`. `code-review-rules.sh names` holds that one filter;
+  the public listing applies it in the script and the workflow pipes the
+  private listing through it.
 
 Drift fails the fleet run with one error annotation per nonconforming
-repository, as `maintenance-audit-link-check-excludes` does, and opens no issue. It blocks
-from admission without a report-only period: the run gates no pull request,
-and the observation run on 2026-10-03 (all 17 non-archived repositories) found
-exactly the expected baseline, the pilot passing and every other repository
-missing the section, so its failures stay red only until the `standards#656`
-rollout lands each repository's section.
+repository, as `maintenance-audit-link-check-excludes` does, and opens no
+issue. It blocks from admission without a report-only period: the run gates
+no pull request, and the observation run on 2026-10-03 (all 17 non-archived
+repositories) found exactly the expected baseline, the pilot passing and every
+other repository missing the section, so its failures stay red only until the
+`standards#656` rollout lands each repository's section.
 
 ## Ownership
 
@@ -119,5 +127,6 @@ rollout lands each repository's section.
   distribution model has no partial-merge layer
   ([distribution contract](../../distribution/README.md)), so the section is
   copied once by a rollout pull request and held in place by the check.
-- **Rollback**: delete the workflow and the code-review-rules steps in `check-repo-hygiene`; the
-  sections already landed stay valid `AGENTS.md` content.
+- **Rollback**: delete the workflow and the code-review-rules steps in
+  `check-repo-hygiene`; the sections already landed stay valid `AGENTS.md`
+  content.

@@ -171,7 +171,7 @@ file.
 
 ```sh
 npm ci --prefix components/github-actions-conventions
-node components/github-actions-conventions/naming-lint.mjs --root . --mode advisory
+node components/github-actions-conventions/naming-lint.mjs --root . --mode enforcing
 ```
 
 | Option | Default | Meaning |
@@ -205,13 +205,15 @@ activity and slot names outside workflow files.
 
 ### Rollout
 
-The analyzer starts in advisory mode, following the
+The analyzer follows the
 [enforcement rollout](../../docs/component-lifecycle.md#enforcement-rollout).
-The standards CI runs it advisory over this repository and writes the findings
-to the step summary. ci-workflows wraps it, in advisory mode until the renames
-in `rename-map.json` land there, then enforcing. The switch to enforcing is
-tracked in [#672](https://github.com/melodic-software/standards/issues/672),
-due 2026-11-30. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
+The standards CI runs it enforcing over this repository: a blocking finding
+fails `check-github-actions`, and so `ci-status`. The findings also go to the
+step summary. ci-workflows does not wrap the analyzer yet; its wrapper runs
+advisory until the renames in `rename-map.json` land across the consumers
+(plan phase 5), then enforcing. That switch is tracked in
+[#672](https://github.com/melodic-software/standards/issues/672), due
+2026-11-30. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
 31 of them blocking in enforcing mode.
 
 ### Ownership and operation

@@ -19,9 +19,11 @@
 #                                              service-token pair (private only)
 #
 # The page must be a regular file under ${TMPDIR:-/tmp} carrying a builder
-# stamp <!-- rv-gen:<name> sha256:<64 hex> -->. Its bytes are scanned before
-# any network call: a credential shape refuses the upload, a machine path or
-# private hostname sends it to the private endpoint. When the visibility sent
+# stamp <!-- rv-gen:<name> sha256:<64 hex> -->. Its bytes, and decoded copies
+# with tags stripped and HTML entities and JSON escapes undone, are scanned
+# before any network call: a credential shape the host would also refuse
+# refuses the upload; any other credential shape, a machine path or a private
+# hostname sends it to the private endpoint. When the visibility sent
 # differs from the one requested, --id is dropped and a new page is created;
 # the caller deletes the old id. A 409 private-required from the public host
 # is retried once as a private create.
@@ -210,28 +212,162 @@ private_res=(
   "(^|[^A-Za-z0-9.-])[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.(local|internal|lan)([^A-Za-z0-9_.-]|\.[^A-Za-z0-9_-]|\.?$)"
 )
 
-scan_copy="$(mktemp)" || die 6 'cannot create a scan copy'
-trap 'rm -f "$scan_copy"' EXIT
-sed -E "s/$stamp_re//g" "$real" >"$scan_copy" || die 6 'cannot create a scan copy'
+# The machine-path bodies of components/path-detection/machine-path-patterns.sh,
+# copied verbatim because setup.sh installs this file alone; the test fails
+# when the two drift. They add what the shapes above miss: a home path with no
+# trailing slash, forward-slash and 8.3 Windows forms, and Windows checkout
+# roots. They run on the wide decoded copy only: in the raw bytes an escaped
+# placeholder (/home/&lt;user&gt;) reads as a user segment, while decoded it is
+# the <user> form the bodies leave clean.
+HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*(~[0-9]+)?'
+HPP_MACOS_USER_BODY='/Users/[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*'
+HPP_LINUX_USER_BODY='/home/[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*'
+HPP_WIN_REPO_BODY='[A-Za-z]:(/|\\\\?)(repos|Repos|projects|Projects|dev|Dev)(/|\\\\?)[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*(~[0-9]+)?'
+HPP_ESCAPED_WIN_REPO_BODY='[A-Za-z]:\\\\(repos|Repos|projects|Projects|dev|Dev)\\\\[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*(~[0-9]+)?'
+slash='(^|[^A-Za-z0-9._-])'
+decoded_labels=(
+  'Windows user path' 'macOS home path' 'Linux home path' 'Windows checkout path'
+  'Windows checkout path'
+)
+decoded_res=(
+  "$HPP_WIN_USER_BODY" "$slash$HPP_MACOS_USER_BODY" "$slash$HPP_LINUX_USER_BODY"
+  "$HPP_WIN_REPO_BODY" "$HPP_ESCAPED_WIN_REPO_BODY"
+)
 
-for i in "${!secret_res[@]}"; do
-  hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$scan_copy" | cut -d: -f1)"
-  [[ -z "$hit" ]] || die 4 "refused: line $hit looks like a ${secret_labels[$i]}"
+# Two decoded copies, so a shape a rendered page splits across highlighter
+# tags, writes as entities or escapes inside inline JSON is still seen. Each is
+# built by passes that split the text on one character, so even a 10 MiB
+# single-line page is read once: tags out (<...> with no < inside, across
+# lines), HTML entities in, then escapes in.
+#   host copy  the Worker's normalize() in scan.js: &#NN; &#xHH; and &amp;
+#              &lt; &gt; &quot; &apos; &nbsp; (the ; required), and \\ to \.
+#              A credential here is one the host already refuses.
+#   wide copy  also &sol; &colon; &period; and the other named ones below,
+#              numeric entities without their ;, and the JS escapes \/ \" \'
+#              \uXXXX \u{X...} \xHH, which the host does not decode.
+# A code point above 0x7F is written as UTF-8. NUL, a value past U+10FFFF or
+# one too long to read becomes U+FFFD, never nothing, so a decoded character
+# neither turns into a shape's ASCII nor joins the text on either side of it.
+# shellcheck disable=SC2016 # an awk program, not shell
+decode_awk='
+function hexval(s, i, v) {
+  if (length(s) > 8) return 1114112
+  s = tolower(s)
+  for (i = 1; i <= length(s); i++) v = v * 16 + index("0123456789abcdef", substr(s, i, 1)) - 1
+  return v
+}
+function utf8(n) {
+  if (n < 1 || n > 1114111) n = 65533
+  if (n < 128) return sprintf("%c", n)
+  if (n < 2048) return sprintf("%c%c", 192 + int(n / 64), 128 + n % 64)
+  if (n < 65536) return sprintf("%c%c%c", 224 + int(n / 4096), 128 + int(n / 64) % 64, 128 + n % 64)
+  return sprintf("%c%c%c%c", 240 + int(n / 262144), 128 + int(n / 4096) % 64, 128 + int(n / 64) % 64, 128 + n % 64)
+}
+BEGIN {
+  RS = mode == "tags" ? "<" : mode == "entities" ? "&" : "\\"
+  names = "amp & lt < gt > quot \" apos \047"
+  if (wide) names = names " sol / bsol \\ colon : period . lowbar _ equals = num # commat @"
+  k = split(names, e, " ")
+  for (i = 1; i < k; i += 2) named[e[i]] = e[i + 1]
+  named["nbsp"] = " "
+  pending = 1
+}
+NR == 1 { printf "%s", $0; next }
+mode == "tags" { i = index($0, ">"); printf "%s", (i ? substr($0, i + 1) : "<" $0); next }
+mode == "entities" {
+  r = $0
+  if (match(r, /^#[xX][0-9A-Fa-f]+/)) n = hexval(substr(r, 3, RLENGTH - 2))
+  else if (match(r, /^#[0-9]+/)) n = RLENGTH > 9 ? 1114112 : substr(r, 2, RLENGTH - 1) + 0
+  else {
+    if (match(r, /^[A-Za-z]+;/) && (tolower(substr(r, 1, RLENGTH - 1)) in named))
+      printf "%s%s", named[tolower(substr(r, 1, RLENGTH - 1))], substr(r, RLENGTH + 1)
+    else printf "&%s", r
+    next
+  }
+  if (substr(r, RLENGTH + 1, 1) == ";") RLENGTH++
+  else if (!wide) { printf "&%s", r; next }
+  printf "%s%s", utf8(n), substr(r, RLENGTH + 1)
+  next
+}
+{
+  r = $0
+  if (!pending) { printf "%s", r; pending = 1; next }
+  if (r == "") { printf "%s", "\\"; pending = 0; next }
+  c = substr(r, 1, 1)
+  if (!wide) r = "\\" r
+  else if (c == "u" && match(r, /^u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/)) r = utf8(hexval(substr(r, 2, 4))) substr(r, 6)
+  else if (c == "u" && match(r, /^u[{][0-9A-Fa-f]+[}]/)) r = utf8(hexval(substr(r, 3, RLENGTH - 3))) substr(r, RLENGTH + 1)
+  else if (c == "x" && match(r, /^x[0-9A-Fa-f][0-9A-Fa-f]/)) r = utf8(hexval(substr(r, 2, 2))) substr(r, 4)
+  else if (c != "/" && c != "\"" && c != "\047") r = "\\" r
+  printf "%s", r
+}'
+
+scan_dir="$(mktemp -d)" || die 6 'cannot create a scan copy'
+trap 'rm -rf "$scan_dir"' EXIT
+scan_copy="$scan_dir/page" host_copy="$scan_dir/host" wide_copy="$scan_dir/wide"
+sed -E "s/$stamp_re//g" "$real" >"$scan_copy" || die 6 'cannot create a scan copy'
+# The added newline keeps a final <, & or \ from reading as a separator.
+{ cat "$scan_copy" && printf '\n'; } | awk -v mode=tags "$decode_awk" >"$scan_dir/untagged" ||
+  die 6 'cannot create a decoded scan copy'
+for wide in 0 1; do
+  copy="$host_copy"
+  [[ $wide == 0 ]] || copy="$wide_copy"
+  awk -v mode=entities -v wide="$wide" "$decode_awk" "$scan_dir/untagged" |
+    awk -v mode=escapes -v wide="$wide" "$decode_awk" >"$copy" ||
+    die 6 'cannot create a decoded scan copy'
 done
+
+# A credential in the raw page or the host copy refuses. The host refuses the
+# same page with a 422, which also exits 4, so this only refuses it before the
+# upload. The raw page goes first, so a plain-text shape reports its own line.
+for copy in "$scan_copy" "$host_copy"; do
+  where=line
+  [[ "$copy" == "$scan_copy" ]] || where='decoded line'
+  for i in "${!secret_res[@]}"; do
+    hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$copy" | cut -d: -f1)"
+    [[ -z "$hit" ]] || die 4 "refused: $where $hit looks like a ${secret_labels[$i]}"
+  done
+done
+have_gitleaks=0
 if command -v gitleaks >/dev/null 2>&1; then
+  have_gitleaks=1
   gitleaks dir --no-banner --redact "$scan_copy" >/dev/null 2>&1
   [[ $? -ne 1 ]] || die 4 'refused: gitleaks found a credential'
 fi
 
-sent="$visibility"
-for i in "${!private_res[@]}"; do
-  if grep -aqE -- "${private_res[$i]}" "$scan_copy"; then
-    [[ "$sent" == private ]] ||
-      printf 'pages-publish: sending private: the page holds a %s\n' "${private_labels[$i]}" >&2
-    sent=private
+# A credential only the wide copy shows is one the host would accept, so the
+# page goes private instead of being refused. A gitleaks finding only a decoded
+# copy shows does the same: its rules are not the host's. A machine path or
+# hostname in any copy, or a path-detection body in the wide copy, sends it
+# private too.
+reason=''
+for i in "${!secret_res[@]}"; do
+  hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$wide_copy" | cut -d: -f1)"
+  [[ -z "$hit" ]] || {
+    reason="${secret_labels[$i]} on decoded line $hit"
     break
-  fi
+  }
 done
+for copy in "$host_copy" "$wide_copy"; do
+  [[ -z "$reason" && $have_gitleaks == 1 ]] || break
+  gitleaks dir --no-banner --redact "$copy" >/dev/null 2>&1
+  [[ $? -ne 1 ]] || reason='gitleaks finding in a decoded copy'
+done
+for i in "${!private_res[@]}"; do
+  [[ -z "$reason" ]] || break
+  ! grep -aqE -- "${private_res[$i]}" "$scan_copy" "$host_copy" "$wide_copy" ||
+    reason="${private_labels[$i]}"
+done
+for i in "${!decoded_res[@]}"; do
+  [[ -z "$reason" ]] || break
+  ! grep -aqE -- "${decoded_res[$i]}" "$wide_copy" || reason="${decoded_labels[$i]}"
+done
+sent="$visibility"
+if [[ -n "$reason" ]]; then
+  [[ "$sent" == private ]] ||
+    printf 'pages-publish: sending private: the page holds a %s\n' "$reason" >&2
+  sent=private
+fi
 [[ "$sent" == "$visibility" ]] || page_id=''
 
 # ---------------------------------------------------------------- publish
