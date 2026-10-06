@@ -385,7 +385,21 @@ export function parseCompositeNonClosing(runShText, location) {
 // verdict are therefore checked as source. They are the only links of the
 // chain left static.
 export function assertCompositeVerdictReads(runShText, location) {
+  // The behavioral check runs analyze_body on its own, so the wiring from the
+  // PR body through analyze_body into the report run.sh reads is checked here:
+  // the body file holds the PR body, the report is analyze_body's output, and
+  // nothing else writes the report.
+  const reportWrites = runShText.match(/>>?\s*"\$analysis"/g) ?? [];
   const links = [
+    [
+      "the PR body is written to the analyzer's input",
+      /jq -r '\.body \/\/ ""' <"\$pr_json" >"\$scratch\/body\.txt"/,
+    ],
+    [
+      "analyze_body writes the report run.sh reads",
+      /analysis="\$scratch\/analysis\.txt"\s*\n\s*analyze_body <"\$scratch\/body\.txt" >"\$analysis"\n/,
+    ],
+    ["nothing else writes the report", { test: () => reportWrites.length === 1 }],
     [
       "a `non-closing` report satisfies linkage",
       /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then/,

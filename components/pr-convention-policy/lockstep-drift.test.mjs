@@ -1148,6 +1148,30 @@ test("a trigger list change is named statically and confirmed behaviorally", () 
   assert.ok(gate.some((error) => error.startsWith("gate composite (behavior): ")));
 });
 
+test("a run.sh that stops feeding the PR body through analyze_body is drift", () => {
+  const invocation = '  analyze_body <"$scratch/body.txt" >"$analysis"\n';
+  const cases = [
+    [invocation, "  printf 'closing\\n' >\"$analysis\"\n", /analyze_body writes the report/],
+    [invocation, '  analyze_body </dev/null >"$analysis"\n', /analyze_body writes the report/],
+    [
+      invocation,
+      `${invocation}  printf 'closing\\n' >>"$analysis"\n`,
+      /nothing else writes the report/,
+    ],
+    [
+      `jq -r '.body // ""' <"$pr_json" >"$scratch/body.txt"`,
+      `printf '' >"$scratch/body.txt"`,
+      /the PR body is written to the analyzer's input/,
+    ],
+  ];
+  for (const [from, to, expected] of cases) {
+    const errors = mutate("gateRun", from, to);
+    assert.equal(errors.length, 1, errors.join("; "));
+    assert.match(errors[0], /^gate composite \(verdict\): /);
+    assert.match(errors[0], expected);
+  }
+});
+
 test("a run.sh that stops acting on the analyzer's report is drift", () => {
   const ignored = mutate("gateRun", '    [[ "$kind" == negated ]] || continue', "    continue");
   assert.equal(ignored.length, 1, ignored.join("; "));
