@@ -87,3 +87,8 @@ was deleted from ci-workflows `main`, so it serves only repositories that have
 not yet moved to the composite, and the composite has carried both rules at
 every pin since v0.20.0. A repository's move to the composite brings it under
 the full check.
+
+The same change runs the composite's analyzer and the hook on sample bodies and
+blocks on any verdict the policy does not predict. Its rollout evidence, and why
+it needs no report-only period, is recorded in the component README's
+[Rollout](../../components/pr-convention-policy/README.md#rollout) section.

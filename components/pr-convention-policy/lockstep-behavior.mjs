@@ -39,9 +39,22 @@ const SECTIONS_TAIL = "\n\n## Summary\ns\n\n## Fix\nf\n\n## Verification\nv\n\n#
 // field for it; the README's `negatedClosers` paragraph and the schema's
 // description name the same five characters.
 export const CLAUSE_DELIMITERS = [".", "!", "?", ";", ","];
+// The Markdown each copy masks before it scans, as wrappers around one line of
+// linkage. Only shapes the two copies agree on: they part ways where a comment
+// opener sits inside code (see the README's Behavioral lockstep section).
+export const MASKINGS = [
+  ["an HTML comment", (text) => `<!-- ${text} -->`],
+  ["a multi-line HTML comment", (text) => `<!--\n${text}\n-->`],
+  ["a backtick fence", (text) => `\`\`\`\n${text}\n\`\`\``],
+  ["a tilde fence with an info string", (text) => `~~~text\n${text}\n~~~`],
+  ["an indented code block", (text) => `    ${text}`],
+  ["a tab-indented code block", (text) => `\t${text}`],
+  ["inline code", (text) => `See \`${text}\` here`],
+  ["inline code of two backticks", (text) => `\`\`${text}\`\``],
+];
 const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
 
-// Every case is one linkage line (or two) plus four non-empty sections, so a
+// Every case is a few lines of linkage plus four non-empty sections, so a
 // verdict can only differ on linkage. `expect.negated` names the disclaimer
 // word the policy says triggers, or null.
 export function linkageMatrix(policy) {
@@ -87,10 +100,29 @@ export function linkageMatrix(policy) {
     add(`This ${phrase} ${closer.toLowerCase()} #12`, { closing: true });
   }
   // A negated closer is reported even when valid linkage sits elsewhere.
-  add(`This does ${firstTrigger} ${closer.toLowerCase()} #12\n${nonClosingMarkers[0]}: #13`, {
+  const negatedCloser = `This does ${firstTrigger} ${closer.toLowerCase()} #12`;
+  add(`${negatedCloser}\n${nonClosingMarkers[0]}: #13`, {
     nonClosing: true,
     negated: firstTrigger,
   });
+
+  // Linkage the rendered body does not show is not linkage: both copies mask
+  // HTML comments and code before they scan, so a body whose only linkage is
+  // masked has none, and a masked negated closer is never reported. Without
+  // these samples every body reads the same raw and masked, and a copy that
+  // scanned the raw body would still pass.
+  const maskedLines = [
+    `${closer} #12`,
+    ...nonClosingMarkers.map((marker) => `${marker}: #12`),
+    negatedCloser,
+    `${noIssueMarkers[0]}: housekeeping`,
+  ];
+  for (const [, mask] of MASKINGS) {
+    for (const text of maskedLines) {
+      add(mask(text), {});
+    }
+    add(`${mask(negatedCloser)}\n\n${nonClosingMarkers[0]}: #13`, { nonClosing: true });
+  }
   return cases.map((sample) => ({ ...sample, body: `${sample.line}${SECTIONS_TAIL}` }));
 }
 

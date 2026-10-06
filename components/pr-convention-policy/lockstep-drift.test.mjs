@@ -9,6 +9,7 @@ import {
   checkCompositeBehavior,
   checkHookBehavior,
   linkageMatrix,
+  MASKINGS,
 } from "./lockstep-behavior.mjs";
 import {
   CONSUMER_REPOSITORIES,
@@ -694,6 +695,64 @@ test("breaking how either copy reaches its verdict is behavioral drift", () => {
   for (const [copy, from, to, expected] of cases) {
     assertOnlyBehavior(mutate(copy, from, to), copy, expected);
   }
+});
+
+test("the sample matrix hides every kind of linkage in every masked shape", () => {
+  const matrix = linkageMatrix(POLICY);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = POLICY.body;
+  const negatedCloser = `This does ${negatedClosers.triggerWords[0]} ${closingKeywords[0].toLowerCase()} #12`;
+  const hidden = [
+    `${closingKeywords[0]} #12`,
+    ...nonClosingMarkers.map((marker) => `${marker}: #12`),
+    negatedCloser,
+    `${noIssueMarkers[0]}: housekeeping`,
+  ];
+  const unlinked = { closing: false, nonClosing: false, noIssue: false, negated: null };
+  for (const [name, mask] of MASKINGS) {
+    for (const text of hidden) {
+      const sample = matrix.find(({ line }) => line === mask(text));
+      assert.ok(sample, `${name}: ${text}`);
+      assert.deepEqual(sample.expect, unlinked, `${name}: ${text}`);
+    }
+    const beside = matrix.find(({ line }) => line.startsWith(`${mask(negatedCloser)}\n\n`));
+    assert.ok(beside, `${name}: masked negated closer beside a marker`);
+    assert.deepEqual(beside.expect, { ...unlinked, nonClosing: true }, name);
+  }
+});
+
+// The masked samples exist for these mutations: a copy that scans the raw
+// body, or masks comments but not code, agrees with policy on every plain
+// sample and differs only where linkage is hidden.
+test("a copy that scans unmasked text is behavioral drift", () => {
+  const raw = mutate(
+    "hookValidator",
+    'scan_linkage "$_plv_body" || _plv_linked=1',
+    'scan_linkage "$1" || _plv_linked=1',
+  );
+  assertOnlyBehavior(raw, "hookValidator", /"<!-- Closes #12 -->" should be unlinked, got linked/);
+
+  const commentsOnly = mutate(
+    "hookValidator",
+    'scan_linkage "$_plv_body" || _plv_linked=1',
+    'scan_linkage "$_plv_stripped" || _plv_linked=1',
+  );
+  assertOnlyBehavior(
+    commentsOnly,
+    "hookValidator",
+    /"```\\nCloses #12\\n```" should be unlinked, got linked/,
+  );
+  assert.doesNotMatch(commentsOnly[0], /<!--/);
+
+  const texts = goodTexts();
+  texts.gateRun = texts.gateRun
+    .replace("  line = $0\n", "  line = $0\n  raw[NR] = line\n")
+    .replace("    scan_line(masked[i])", "    scan_line(raw[i])");
+  assert.equal((texts.gateRun.match(/raw\[/g) ?? []).length, 2, "mutation did not apply");
+  assertOnlyBehavior(
+    checkCopies(POLICY, texts),
+    "gateRun",
+    /"<!-- Closes #12 -->" should be no linkage, got closing/,
+  );
 });
 
 test("a trigger list change is named statically and confirmed behaviorally", () => {

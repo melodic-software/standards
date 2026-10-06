@@ -106,7 +106,13 @@ bodies from `policy.json`: each closing keyword, each non-closing marker on its
 own line, indented, mid-sentence and with trailing text, each no-issue marker,
 each trigger word and suffix at the window's edge and one word beyond it, each
 clause delimiter, each affirmative phrase, and a negated closer beside valid
-linkage. It runs the composite's `analyze_body` awk program (live and at every
+linkage. It also hides a closing keyword, each non-closing marker, a negated
+closer and a no-issue marker inside each shape both copies mask before they
+scan: an HTML comment (one line and several), a backtick fence, a tilde fence,
+a space- and a tab-indented code block, and inline code. Each of those bodies
+must read as missing linkage, and a masked negated closer beside a real
+`Refs:` line must not be reported, so a copy that scanned the raw body would
+fail. It runs the composite's `analyze_body` awk program (live and at every
 composite pin) and the hook's `linkage::problems` on every body and fails on any
 verdict the policy does not predict, naming the body. The static extractors
 stay as the precise diff of declared lists. The bash in `run.sh` that reads the
@@ -114,6 +120,18 @@ analyzer's report calls the GitHub API and cannot run here, so its two
 report-reading lines are the only part of the chain still checked as source.
 The hermetic tests run the same path against verbatim copies of both sources in
 [`fixtures/lockstep/`](fixtures/lockstep/).
+
+The matrix leaves out one masking shape on purpose, because the two copies
+disagree on it: a `<!--` inside code. The composite masks comments and code in
+one pass, so a `<!--` inside a fence or an inline code span is code text and
+opens no comment, as CommonMark renders it. The hook strips comments first and
+masks code afterwards, so the same `<!--` opens a comment that swallows the rest
+of the body, sections included. Text after a `-->` that closes a comment on a
+line indented four or more spaces splits them the same way: the composite scans
+it, the hook masks it as an indented code block. The hook is usually the
+stricter copy there, but not always: a negated closer in that indented tail is
+reported by the gate and passed by the hook. Aligning the hook is a `claude-code-plugins` change; the matrix gains these
+shapes when the copies agree.
 
 Executing fetched code is bounded as follows:
 
@@ -133,6 +151,36 @@ Executing fetched code is bounded as follows:
   stronger sandbox first.
 - Neither process receives the GitHub token: Node passes an explicit
   environment instead of inheriting its own.
+
+#### Rollout
+
+The behavioral comparisons block in the existing `pr-convention-lockstep` lane
+from their admission (#647), without a report-only period. They take the
+[component lifecycle](../../docs/component-lifecycle.md#enforcement-rollout)'s
+exception for a deterministic check, on this evidence from the live consumers:
+
+- Before admission, the live sources ran clean: `checkCopies` against
+  ci-workflows `main`, the `claude-code-plugins` hook validator and the org PR
+  template, and `checkPinnedComposite` at composite pins `2531d56`, `cf316d1`
+  and `fb56986`.
+- On the PR head `145870d`, the lane's `verify-pr-convention-lockstep` job
+  (Actions run 37465415796) passed: the hermetic tests, then the live run with
+  the org App token, which fetched every source and pin and reported that all
+  copies and consumer pins match `policy.json`.
+- The Markdown-masking samples were added after that run. They were run
+  locally against the same live sources (the composite's `run.sh` on `main`
+  and at the three pins, the hook on `main`), and every body matched the
+  policy's verdict.
+
+No baseline period is needed because there is no baseline to learn. The check
+is deterministic: the matrix is generated from `policy.json` and each copy's
+verdict on a body is a pure function of its source, so a clean run over every
+live source and pin is the complete baseline, with zero findings to classify.
+It is not a new gate on any consumer: it re-verifies the same linkage rules the
+lane already blocked on through the static parse, and it fails only when a copy
+the lane already holds to those rules stops acting on them. A failure names the
+copy, the sample body, and the expected and actual verdicts, so it is
+actionable as it stands. No report-only path exists to remove.
 
 Only the title and the `do-not-merge` label fail the composite's step. A body
 missing a closing keyword or a section is advisory: a warning, one upserted
