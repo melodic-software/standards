@@ -55,3 +55,20 @@ in a gate repo loads regardless of installed plugins.
   repository's re-drift surfaces immediately as that repository's own next
   first-PR failure and is cheap to fix, while caller pins — where divergence
   hid for months — are checked on every run.
+
+## Revisited 2026-10-06 (#641)
+
+The driver above changed: the `pr-contract` step inside `ci-status` now fails
+only on the title and the `do-not-merge` label, and a body missing its closing
+keyword or a section draws an advisory comment and the `needs-issue-linkage`
+label instead of a failed check. Decision 1 stands with a narrower rule: the
+file stays always-loaded and distributed, trimmed to the gating facts, the
+body contract in one compact line, and a pointer to the PR template. A
+plugin-less session drafting with a bare `gh pr create --body` still sees no
+template, and the lockstep check still needs the contract named in the rule.
+
+Rejected: loading the rule only at PR time (nothing in the rules layer fires
+on `gh pr create`, so plugin-less sessions would lose the signal), and retiring
+it in favor of templates and plugin guidance (`--body` skips the template, and
+the body contract is still the expected standard, so the advisory comment and
+label would return as noise). Decisions 2 and 3 are unchanged.
