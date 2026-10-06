@@ -7,14 +7,20 @@
 # Usage:
 #   code-review-rules.sh file  [--root DIR]
 #   code-review-rules.sh fleet [--org OWNER] [--repos FILE] [--fixtures DIR]
+#   code-review-rules.sh names <REPOSITORIES.json
 #
 # `file` checks DIR/AGENTS.md against DIR/REVIEW.md (default DIR: `.`).
 # `fleet` checks the default branch of every repository named in FILE (one
 # name per line), reading each repository's AGENTS.md and REVIEW.md through
 # the GitHub contents API with the GH_TOKEN in the environment. Without
-# --repos it checks the org's public, non-archived repositories, which any
-# token can read. --fixtures DIR reads DIR/<repo>/AGENTS.md and
-# DIR/<repo>/REVIEW.md instead of the API (tests only).
+# --repos it checks the org's public, non-archived repositories without the
+# `sandbox` topic, which any token can read. --fixtures DIR reads
+# DIR/<repo>/AGENTS.md and DIR/<repo>/REVIEW.md instead of the API (tests
+# only).
+# `names` reads GitHub repository objects on stdin (a JSON array or a stream
+# of objects) and prints the name of each one the fleet audits: not archived
+# and without the `sandbox` topic. The scheduled workflow pipes its private
+# installation listing through it, so both listings apply one filter.
 #
 # Exits 0 when every repository checked conforms, 1 when any does not (one
 # `MISSING:` line per repository), 2 on a usage or query error.
@@ -31,6 +37,9 @@ pointer_label='- Org-wide criteria:'
 # shellcheck disable=SC2016 # literal Markdown backticks, not an expansion
 pointer_prefix='- Org-wide criteria: [`REVIEW.md`]('
 canonical_url='https://github.com/melodic-software/standards/blob/main/REVIEW.md'
+# The repository objects the fleet audits: not archived, and not a disposable
+# test bed carrying the `sandbox` topic (pr-pipeline-sandbox).
+audited='select((.archived | not) and (any(.topics[]?; . == "sandbox") | not)) | .name'
 
 usage() {
   sed -n '2,/^set -euo pipefail/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
@@ -44,6 +53,10 @@ die() {
 command="${1:-}"
 case "$command" in
   file | fleet) shift ;;
+  names)
+    jq -r "if type == \"array\" then .[] else . end | ${audited}"
+    exit
+    ;;
   -h | --help | help | '')
     usage
     exit 0
@@ -174,7 +187,7 @@ if [[ -n "$repos_file" ]]; then
   repos="$(sed '/^[[:space:]]*$/d' "$repos_file" | LC_ALL=C sort -u)"
 else
   repos="$(gh api --paginate "orgs/${org}/repos?type=public&per_page=100" \
-    --jq '.[] | select(.archived | not) | .name' | LC_ALL=C sort -u)" \
+    --jq ".[] | ${audited}" | LC_ALL=C sort -u)" \
     || die "could not list public repositories of ${org}"
 fi
 [[ -n "$repos" ]] || die 'no repositories to check'
