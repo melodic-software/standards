@@ -81,7 +81,7 @@ jobs:
     concurrency:
       group: pr-review-security-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@2531d56a21e79b7b5222643fadbee95c23a4525b # v0.38.1
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@cf316d12b4a14fbdb96a339b7ad00ce935a8cad4 # v0.38.2
     with:
       runner: ubuntu-24.04
     # Pass only the one named secret (least privilege) rather than
