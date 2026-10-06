@@ -205,26 +205,37 @@ activity and slot names outside workflow files.
 
 ### Rollout
 
-The analyzer follows the
-[enforcement rollout](../../docs/component-lifecycle.md#enforcement-rollout).
-The standards CI runs it enforcing over this repository: a blocking finding
-fails `check-github-actions`, and so `ci-status`. The findings also go to the
-step summary. ci-workflows does not wrap the analyzer yet; its wrapper runs
-advisory until the renames in `rename-map.json` land across the consumers
-(plan phase 5), then enforcing. That switch is tracked in
-[#672](https://github.com/melodic-software/standards/issues/672), due
-2026-11-30. Baseline on ci-workflows at `7f03272` (2026-10-03): 49 findings,
-31 of them blocking in enforcing mode.
+The analyzer went through the
+[enforcement rollout](../../docs/component-lifecycle.md#enforcement-rollout)
+and is enforcing; [#672](https://github.com/melodic-software/standards/issues/672)
+closed the advisory period.
+
+- **standards:** CI runs it enforcing over this repository. A blocking finding
+  fails `check-github-actions`, and so `ci-status`. The findings also go to
+  the step summary.
+- **ci-workflows:** the `check-workflow-naming` composite action wraps the
+  analyzer. Its `mode` input defaults to `enforcing`, and ci-workflows runs it
+  over its own workflows and actions as the `check-workflow-naming` lane of
+  `ci-status`.
+- **Other consumers:** adopt it by adding a job that runs
+  `melodic-software/ci-workflows/.github/actions/check-workflow-naming` and
+  aggregating that job into `ci-status`. Rename every blocking finding first,
+  with its entry in [`rename-map.json`](rename-map.json); the last one among
+  the public repositories, claude-code-plugins' `release-plugins.yml`, was
+  renamed to `release-publish-plugins.yml` before the switch.
+- **Rollback:** set the composite's `mode: advisory`, which reports every
+  finding as a warning and passes, or remove the lane.
 
 ### Ownership and operation
 
 - **Owner:** the standards maintainers own the conventions, vocabulary and
-  analyzer; each consumer owns its wrapper and its renames.
+  analyzer; ci-workflows owns the `check-workflow-naming` composite; each
+  consumer owns its lane and its renames.
 - **Outcome:** every workflow, job and action in a consumer passes
   `--mode enforcing`, so check names read `<slot> / <unit>` and `ci-status`
   stays the only required check.
-- **Rollback:** switch the consumer's wrapper back to `--mode advisory`, or
-  remove the wrapper job. Nothing else reads the analyzer's output.
+- **Rollback:** set the consumer's composite to `mode: advisory`, or remove
+  the lane. Nothing else reads the analyzer's output.
 - **Failure behavior:** read-only over `.github/`, no network or credentials,
   `contents: read` only. An unparsable workflow is a `workflow-unparsable`
   finding; bad arguments or a bad vocabulary exit 2.
