@@ -83,9 +83,11 @@ linked file holds the rest.
 ## Check
 
 [`code-review-rules.sh`](code-review-rules.sh) checks the section: the heading
-appears once, its section holds the intro line verbatim, and its `REVIEW.md`
-pointer links `REVIEW.md` when the repository has a root `REVIEW.md` and the
-canonical URL when it does not.
+appears once, its section holds the intro line verbatim, and it holds exactly
+one `- Org-wide criteria:` line, a `REVIEW.md` pointer that links `REVIEW.md`
+when the repository has a root `REVIEW.md` and the canonical URL when it does
+not. A second `Org-wide criteria` line fails the check even when one of the two
+is correct, so a stale pointer cannot sit beside the right one.
 
 - `code-review-rules.sh file` checks one checkout. The `check-repo-hygiene` job
   in `pr-require-checks.yml` runs it on this repository on every pull request, beside the
