@@ -91,6 +91,9 @@
             },
             "affirmativePhrases": {
               "type": "array",
+              "description": "Both linkage copies implement exactly one affirmative exception, which the lockstep extractors read; widening this needs both copies and the extractors to change together.",
+              "minItems": 1,
+              "maxItems": 1,
               "uniqueItems": true,
               "items": { "type": "string", "pattern": "^[a-z]+ [a-z]+$" }
             },

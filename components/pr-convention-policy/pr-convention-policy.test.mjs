@@ -45,6 +45,11 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
     () => validatePolicy({ ...POLICY, body: versionOneBody }),
     /body must have required property 'nonClosingMarkers'/,
   );
+  // Both linkage copies implement exactly one affirmative exception.
+  for (const affirmativePhrases of [[], ["not only", "not just"]]) {
+    const body = { ...POLICY.body, negatedClosers: { ...negatedClosers, affirmativePhrases } };
+    assert.throws(() => validatePolicy({ ...POLICY, body }), /affirmativePhrases must NOT have/);
+  }
 });
 
 test("canonical requiredSections mirror the enforced pr-issue-linkage contract", () => {
