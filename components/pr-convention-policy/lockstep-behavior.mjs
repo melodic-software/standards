@@ -252,9 +252,9 @@ export function linkageMatrix(policy) {
   }
 
   // Every inflection closes and is negated like the policy's spellings: a copy
-  // that wires negation to those three alone would pass `does not close #12`,
-  // which GitHub still closes. The policy's own spellings already appear plain
-  // and upper-cased above.
+  // that wires negation to those three alone would accept "does not close" in
+  // front of a reference, which GitHub still closes. The policy's own
+  // spellings already appear plain and upper-cased above.
   const spelled = closingKeywords.map((keyword) => keyword.toLowerCase());
   for (const form of GITHUB_CLOSING_KEYWORDS) {
     if (!spelled.includes(form)) {
