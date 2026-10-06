@@ -8,9 +8,9 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.5.15",
     "jsonc-parser": "3.3.1",
-    "lefthook": "2.1.14",
+    "lefthook": "2.1.16",
     "markdownlint-cli2": "0.23.3",
     "semver": "7.8.5",
     "yaml": "2.9.1"
