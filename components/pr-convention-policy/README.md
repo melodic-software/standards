@@ -153,10 +153,12 @@ space and the other Unicode spaces into a plain space before it scans, so
 `Closes<U+00A0>#12` closes and `No<U+00A0>linked issue` opts out. The composite
 matches only a space or a tab, so neither counts as linkage.
 
-It also probes only the closing keywords `policy.json` spells. Both copies
-accept GitHub's nine forms (close, closes, closed, fix, fixes, fixed, resolve,
-resolves, resolved), but the policy does not list inflections. The reference
-validator in `pr-convention-policy.mjs` derives its own by trimming the listed
+`policy.json` spells three closing keywords and lists no inflections, but both
+copies accept GitHub's nine forms (close, closes, closed, fix, fixes, fixed,
+resolve, resolves, resolved), so the matrix probes every form as a plain closer
+and as a negated one, from a GitHub-documented constant in
+`lockstep-behavior.mjs`. The only divergence left is outside the matrix: the
+reference validator in `pr-convention-policy.mjs` derives its own forms by trimming the listed
 keyword, so for `Fixes` it accepts the non-word stem that drops only the final
 `s`, which neither copy does, and rejects `Fix #12`, which both accept.
 

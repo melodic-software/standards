@@ -8,6 +8,7 @@ import {
   CLAUSE_DELIMITERS,
   checkCompositeBehavior,
   checkHookBehavior,
+  GITHUB_CLOSING_KEYWORDS,
   linkageMatrix,
   MASKINGS,
   NON_DELIMITERS,
@@ -856,6 +857,42 @@ test("a copy that stops at the first closing reference on a line is behavioral d
     /"Closes #11 but does not closes #12" should be linked \+ negated by "not", got linked/,
   );
   assert.match(hook[0], /"This does not closes #12; Closes #11" should be linked \+ negated/);
+});
+
+// The policy spells three keywords, but GitHub closes on all nine forms.
+test("a copy that negates only the policy's keyword spellings is behavioral drift", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  for (const form of GITHUB_CLOSING_KEYWORDS) {
+    assert.ok(
+      lines.some((line) => line.toLowerCase() === `${form} #12`),
+      form,
+    );
+    assert.ok(lines.includes(`This does not ${form} #12`), form);
+  }
+
+  const gate = mutate(
+    "gateRun",
+    "    trigger = negation_trigger(line, start)\n",
+    '    trigger = (substr(lower, start, len) ~ /^(closes|fixes|resolves)/) ? negation_trigger(line, start) : ""\n',
+  );
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"This does not close #12" should be negated by "not", got closing/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      negation_trigger_to _plv_trigger "${line:0:start}"\n',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      _plv_trigger=""\n      [[ "$m" =~ ^(closes|fixes|resolves) ]] && negation_trigger_to _plv_trigger "${line:0:start}"\n',
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"This does not close #12" should be unlinked \+ negated by "not", got linked/,
+  );
 });
 
 // An opt-out does not excuse a negated closer: GitHub closes the issue anyway.

@@ -56,6 +56,22 @@ export const MASKINGS = [
   ["inline code", (text) => `See \`${text}\` here`],
   ["inline code of two backticks", (text) => `\`\`${text}\`\``],
 ];
+// GitHub's closing keywords, every inflection both copies accept. policy.json
+// spells three of them and lists no inflections; GitHub's list is the one in
+// "Linking a pull request to an issue" (docs.github.com, Using keywords in
+// issues and pull requests), checked 2026-10; recheck when either copy's
+// keyword pattern changes.
+export const GITHUB_CLOSING_KEYWORDS = [
+  "close",
+  "closes",
+  "closed",
+  "fix",
+  "fixes",
+  "fixed",
+  "resolve",
+  "resolves",
+  "resolved",
+];
 const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
 
 // `count` distinct words of letters only, so any schema-valid wordWindow can be
@@ -233,6 +249,19 @@ export function linkageMatrix(policy) {
         add(`${first.text}\n${second.text}`, { ...first.expect, ...second.expect });
       }
     }
+  }
+
+  // Every inflection closes and is negated like the policy's spellings: a copy
+  // that wires negation to those three alone would pass `does not close #12`,
+  // which GitHub still closes. The policy's own spellings already appear plain
+  // and upper-cased above.
+  const spelled = closingKeywords.map((keyword) => keyword.toLowerCase());
+  for (const form of GITHUB_CLOSING_KEYWORDS) {
+    if (!spelled.includes(form)) {
+      add(`${capitalize(form)} #12`, { closing: true });
+      add(`${form.toUpperCase()} #12`, { closing: true });
+    }
+    add(`This does ${firstTrigger} ${form} #12`, { negated: firstTrigger });
   }
 
   // Linkage the rendered body does not show is not linkage: both copies mask
