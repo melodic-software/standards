@@ -46,6 +46,8 @@ stale='- Org-wide criteria: [`REVIEW.md`](docs/REVIEW.md), synced from `melodic-
 repo duplicate-stale "$(section "$intro" "$(printf '%s\n%s' "$synced" "$stale")")" review
 repo duplicate-same "$(section "$intro" "$(printf '%s\n%s' "$synced" "$synced")")" review
 repo duplicate-unlinked "$(section "$intro" "$(printf '%s\n%s' "$synced" '- Org-wide criteria: see the standards repository.')")" review
+repo duplicate-indented "$(section "$intro" "$(printf '%s\n   %s' "$synced" "$stale")")" review
+repo pointer-indented "$(section "$intro" "  $synced")" review
 repo pointer-outside "$(printf '# Repo\n\n## Code Review Rules\n\n%s\n\n## Next\n\n%s\n' "$intro" "$synced")" review
 # shellcheck disable=SC2016 # a literal Markdown fence, not an expansion
 fence='```'
@@ -94,6 +96,14 @@ assert_contains 'a repeated pointer is counted' "$out" '2 org-wide criteria poin
 out="$(bash "$script" file --root "$work/fleet/duplicate-unlinked" 2>&1)"
 assert_exit 'file fails when a second org-wide criteria line links nothing' 1 $?
 assert_contains 'an unlinked second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/duplicate-indented" 2>&1)"
+assert_exit 'file fails when an indented stale pointer sits beside the correct one' 1 $?
+assert_contains 'an indented second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/pointer-indented" 2>&1)"
+assert_exit 'file fails when the only pointer is indented' 1 $?
+assert_contains 'the indented pointer is named' "$out" 'pointer line must not be indented'
 
 out="$(bash "$script" file --root "$work/fleet/pointer-outside" 2>&1)"
 assert_exit 'file fails when the pointer sits under a later heading' 1 $?

@@ -100,9 +100,10 @@ problems() {
     inside && /^##? / { exit }
     inside { print }')"
   printf '%s\n' "$section" | grep -qxF -- "$intro" || echo "the inherited intro line is missing"
-  # Every line naming the org-wide criteria counts, linked or not, so a stale
-  # second pointer beside the correct one cannot pass.
-  pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_label" 'index($0, p) == 1')"
+  # Every line naming the org-wide criteria counts, linked or not and at any
+  # indentation (an indented bullet is still a list item), so a stale second
+  # pointer beside the correct one cannot pass.
+  pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_label" '{ s = $0; sub(/^[[:space:]]+/, "", s) } index(s, p) == 1')"
   if [[ -z "$pointers" ]]; then
     echo "the inherited REVIEW.md pointer line is missing"
     return
@@ -112,9 +113,14 @@ problems() {
     echo "${count} org-wide criteria pointer lines, expected one"
     return
   fi
+  # The inherited block is copied verbatim, so the one pointer is unindented.
+  if [[ "$pointers" == [[:space:]]* ]]; then
+    echo "the org-wide criteria pointer line must not be indented"
+    return
+  fi
   if [[ "$has_review" == true ]]; then expected='REVIEW.md'; else expected="$canonical_url"; fi
-  [[ "$pointers" == "${pointer_prefix}${expected})"* ]] \
-    || echo "the REVIEW.md pointer must link ${expected} (root REVIEW.md present: ${has_review})"
+  [[ "$pointers" == "${pointer_prefix}${expected})"* ]] ||
+    echo "the REVIEW.md pointer must link ${expected} (root REVIEW.md present: ${has_review})"
 }
 
 if [[ "$command" == file ]]; then
