@@ -415,7 +415,6 @@ function upstreamFetch(treesBySha, requests = []) {
   return async (url) => {
     requests.push(url);
     const treeMatch = TREE_URL.exec(url);
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
     const tree = treeMatch && treesBySha[treeMatch[1]];
     if (tree) {
       return { ok: true, json: async () => ({ truncated: false, tree }) };

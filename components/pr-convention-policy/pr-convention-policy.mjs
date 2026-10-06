@@ -140,7 +140,6 @@ export function stripRenderedHtmlComments(text) {
       if (fence !== null) {
         output.push("");
         if (
-          // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
           marker !== null &&
           marker[1][0] === fence.char &&
           marker[1].length >= fence.length &&
@@ -150,7 +149,6 @@ export function stripRenderedHtmlComments(text) {
         }
         continue;
       }
-      // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
       if (marker !== null && !(marker[1][0] === "`" && marker[2].includes("`"))) {
         fence = { char: marker[1][0], length: marker[1].length };
         output.push("");
@@ -214,7 +212,6 @@ function extractSection(text, heading) {
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => {
     const match = /^(#{1,6})\s+\S/u.exec(line.trim());
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome 2.5.14 false positive, RegExp.exec can return null
     return match !== null && match[1].length <= level;
   });
   return (end === -1 ? rest : rest.slice(0, end)).join("\n").trim();
