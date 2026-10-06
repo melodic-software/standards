@@ -113,7 +113,9 @@ trailing text, without its colon, and after a bullet or a quote. Each no-issue
 marker appears in upper case, mid-sentence and pluralized. For every closing
 keyword, each trigger word and suffix appears at the window's edge and one word
 beyond it, in upper and capitalized case, and with a typographic apostrophe.
-The matrix also covers each clause delimiter, punctuation that is not one (`:`,
+Each suffix is also attached to several host words besides `does` (`won't`,
+`can't`, `isn't`, `shouldn't`, from `SUFFIX_HOSTS`), each in the same case and
+apostrophe variants. The matrix also covers each clause delimiter, punctuation that is not one (`:`,
 `-`, brackets, quotes and the like, which must leave the window open), each
 affirmative phrase in any case, words that only contain a trigger, the
 window's word count across hyphens, bare references and line breaks, and a
