@@ -30,8 +30,9 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # Temporary until the GitHub Actions naming-convention migration close-out
-    # sweep: ci-workflows pins move by hand until then.
+    # Every fleet consumer ignores ci-workflows pins (see the header of
+    # maintenance-repin-ci-workflows.yml, which re-pins the caller components
+    # on each release); this repository's own pins move by hand.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
   # Keep the npm dev-dependencies current — the root devDependency pins
