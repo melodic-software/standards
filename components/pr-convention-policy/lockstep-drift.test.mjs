@@ -806,6 +806,22 @@ test("a copy that detects negation for one closing keyword only is behavioral dr
   );
 });
 
+test("a copy that recognizes the suffix on one word only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    `    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+    `    if (lower != "doesn'"'"'t") continue\n    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+  );
+  assertOnlyBehavior(gate, "gateRun", /"This won't closes #12" should be negated/);
+
+  const hook = mutate(
+    "hookValidator",
+    `    case "$lower" in\n`,
+    `    [[ "$lower" == *"n't" && "$lower" != "doesn't" ]] && continue\n    case "$lower" in\n`,
+  );
+  assertOnlyBehavior(hook, "hookValidator", /"This won't closes #12" should be unlinked/);
+});
+
 test("punctuation outside the clause delimiters keeps the negation window open", () => {
   for (const mark of NON_DELIMITERS) {
     assert.ok(!CLAUSE_DELIMITERS.includes(mark), mark);

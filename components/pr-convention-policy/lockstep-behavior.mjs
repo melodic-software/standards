@@ -43,6 +43,9 @@ export const CLAUSE_DELIMITERS = [".", "!", "?", ";", ","];
 // is part of a word, as in "doesn't"), and so are a backtick and `<`, which
 // open masked Markdown.
 export const NON_DELIMITERS = [":", "-", "(", ")", '"', "/", "[", "]", "*", "&"];
+// Word stems a trigger suffix is attached to besides "does" (won't, can't,
+// isn't, shouldn't).
+export const SUFFIX_HOSTS = ["wo", "ca", "is", "should"];
 // The Markdown each copy masks before it scans, as wrappers around one line of
 // linkage. Only shapes the two copies agree on: they part ways where a comment
 // opener sits inside code (see the README's Behavioral lockstep section).
@@ -197,6 +200,13 @@ export function linkageMatrix(policy) {
         for (const written of [trigger, trigger.toUpperCase()]) {
           add(`This ${written.replaceAll("'", "’")} ${lower} #12`, { negated: written });
         }
+      }
+    }
+    // A suffix trigger ends any word, not only the "does" the samples above
+    // build on, so a copy that recognizes one host word alone cannot pass.
+    for (const suffix of negatedClosers.triggerSuffixes) {
+      for (const host of SUFFIX_HOSTS) {
+        add(`This ${host}${suffix} ${lower} #12`, { negated: `${host}${suffix}` });
       }
     }
     // Only whole words trigger, the window counts words of letters (a hyphen

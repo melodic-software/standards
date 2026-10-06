@@ -80,8 +80,9 @@ non-closing markers as the `rest ~ /^(refs|relates[ \t]+to):.../` test in
 types and the scope requirement as the `types` and `require-scope` input
 defaults in `action.yml`. The hook validator transcribes the same linkage
 rules as `CLOSING_ERE`, `NON_CLOSING_ERE`, `NO_ISSUE_ERE` and
-`negation_trigger_to`; it is neither stricter nor looser than the composite on
-either rule. Those copies must change in lockstep with `policy.json`; letting them drift is
+`negation_trigger_to`. It agrees with the composite on every sample in the
+behavioral matrix; the inputs where the two still disagree are recorded under
+[Behavioral lockstep](#behavioral-lockstep). Those copies must change in lockstep with `policy.json`; letting them drift is
 exactly the failure #393 recorded. That lockstep is enforced by
 [`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008), which the
 `pr-convention-lockstep` CI lane runs against the live gate source, the
