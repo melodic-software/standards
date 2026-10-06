@@ -359,6 +359,28 @@ const WIRING = {
     ],
   ],
   compositeNegation: [
+    // negation_trigger's input: the text before the keyword, cut at the
+    // previous clause punctuation, apostrophes normalized, split into words.
+    [
+      "negation_trigger slices the line before the keyword",
+      /preceding = substr\(line, 1, keyword_index - 1\)/,
+    ],
+    [
+      "negation_trigger cuts the slice at the previous .!?;,",
+      /cut = 0\s*for \(i = length\(preceding\); i >= 1; i--\) \{\s*ch = substr\(preceding, i, 1\)\s*if \(ch == "\." \|\| ch == "!" \|\| ch == "\?" \|\| ch == ";" \|\| ch == ","\) \{\s*cut = i\s*break\s*\}[\s\S]*?tail = substr\(preceding, cut \+ 1\)/,
+    ],
+    [
+      "negation_trigger normalizes a typographic apostrophe",
+      /gsub\("\\342\\200\\231", "'"'"'", tail\)/,
+    ],
+    [
+      "negation_trigger splits the clause into words[1..count]",
+      /count = 0\s*\n\s*while \(match\(tail, \/\[A-Za-z\]\[A-Za-z'"'"'\]\*\/\)\) \{\s*count\+\+\s*words\[count\] = substr\(tail, RSTART, RLENGTH\)\s*tail = substr\(tail, RSTART \+ RLENGTH\)\s*\}/,
+    ],
+    [
+      "negation_trigger tests each windowed word",
+      /for \(i = first; i <= count; i\+\+\) \{\s*word = words\[i\]\s*lower = tolower\(word\)/,
+    ],
     ["scan_line runs on every masked line", /scan_line\(masked\[i\]\)/],
     [
       "negation_trigger is called on each closing reference and branched on",
@@ -380,6 +402,21 @@ const WIRING = {
     ["scan_linkage decides linkage", /scan_linkage "\$_plv_body" \|\| _plv_linked=1/],
   ],
   validatorNegation: [
+    // The same preprocessing, transcribed: `$2` is `${line:0:start}`.
+    ["negation_trigger_to cuts its input at the previous .!?;,", /tail="\$\{2##\*\[\.!\?;,\]\}"/],
+    [
+      "negation_trigger_to normalizes a typographic apostrophe",
+      /tail="\$\{tail\/\/\$'\\xe2\\x80\\x99'\/\\'\}"/,
+    ],
+    ["the word pattern is a letter run", /^_PLV_WORD_ERE="\[A-Za-z\]\[A-Za-z'\]\*"$/m],
+    [
+      "negation_trigger_to splits the clause into words and counts them",
+      /while \[\[ "\$tail" =~ \$_PLV_WORD_ERE \]\]; do\s*words\+=\("\$\{BASH_REMATCH\[0\]\}"\)\s*tail="\$\{tail#\*"\$\{BASH_REMATCH\[0\]\}"\}"\s*done\s*n=\$\{#words\[@\]\}/,
+    ],
+    [
+      "negation_trigger_to tests each windowed word",
+      /for \(\(i = first; i < n; i\+\+\)\); do\s*lower="\$\{words\[i\],,\}"/,
+    ],
     [
       "negation_trigger_to is called on each closing reference and only an empty result counts",
       /negation_trigger_to _plv_trigger "\$\{line:0:start\}"\s*\n\s*if \[\[ -z "\$_plv_trigger" \]\]; then\s*found=0\s*continue\s*fi/,
@@ -917,6 +954,18 @@ export function checkCopies(policy, texts) {
   // masking.
   run(() =>
     assertMentionsAny(texts.rulesFile, policy.body.noIssueMarkers, "rules file (no-issue markers)"),
+  );
+  // The same holds for linking without closing: the rules file must steer an
+  // author to one non-closing marker, in the `<marker>:` form the gate reads,
+  // so a session that must not close an issue is not pushed toward a false
+  // no-issue marker or a negated closer. The org template is not held to this
+  // yet: it lives in another repository and names no marker in that form.
+  run(() =>
+    assertMentionsAny(
+      texts.rulesFile,
+      policy.body.nonClosingMarkers.map((marker) => `${marker}:`),
+      "rules file (non-closing markers)",
+    ),
   );
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>

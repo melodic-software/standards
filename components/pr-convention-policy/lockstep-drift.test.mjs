@@ -43,7 +43,25 @@ const POLICY = parseUniqueJson(
 const GOOD_COMPOSITE_RUN = [
   "analyze_body() {",
   "  awk '",
-  "function negation_trigger(line, keyword_index,   tail, count, words, first, word, lower) {",
+  // The live `negation_trigger`, verbatim but for its comments.
+  "function negation_trigger(line, keyword_index,   preceding, cut, i, ch, tail, count, words, first, word, lower) {",
+  "  preceding = substr(line, 1, keyword_index - 1)",
+  "  cut = 0",
+  "  for (i = length(preceding); i >= 1; i--) {",
+  "    ch = substr(preceding, i, 1)",
+  '    if (ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == ",") {',
+  "      cut = i",
+  "      break",
+  "    }",
+  "  }",
+  "  tail = substr(preceding, cut + 1)",
+  `  gsub("\\342\\200\\231", "'"'"'", tail)`,
+  "  count = 0",
+  `  while (match(tail, /[A-Za-z][A-Za-z'"'"']*/)) {`,
+  "    count++",
+  "    words[count] = substr(tail, RSTART, RLENGTH)",
+  "    tail = substr(tail, RSTART + RLENGTH)",
+  "  }",
   "  first = (count > 5) ? count - 4 : 1",
   "  for (i = first; i <= count; i++) {",
   "    word = words[i]",
@@ -153,7 +171,24 @@ const GOOD_VALIDATOR = [
   "CLOSING_ERE='(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:blank:]]*:?[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
   "NON_CLOSING_ERE='^ {0,3}(refs|relates[[:blank:]]+to):[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[[:blank:]]*$'",
   "NO_ISSUE_ERE='[^a-z0-9_]no (linked|related) issue[^a-z0-9_]'",
-  // The live `negation_trigger_to` window, exception and trigger lines, verbatim.
+  // The live `negation_trigger_to`, verbatim.
+  `_PLV_WORD_ERE="[A-Za-z][A-Za-z']*"`,
+  "negation_trigger_to() {",
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '  local __plv_dest="$1" tail="${2##*[.!?;,]}" lower n first i',
+  "  local -a words=()",
+  `  printf -v "$__plv_dest" '%s' ""`,
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  "  tail=\"${tail//$'\\xe2\\x80\\x99'/\\'}\"",
+  '  while [[ "$tail" =~ $_PLV_WORD_ERE ]]; do',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '    words+=("${BASH_REMATCH[0]}")',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  '    tail="${tail#*"${BASH_REMATCH[0]}"}"',
+  "  done",
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  "  n=${#words[@]}",
+  "  first=0",
   "  ((n > 5)) && first=$((n - 5))",
   "  for ((i = first; i < n; i++)); do",
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
@@ -162,10 +197,13 @@ const GOOD_VALIDATOR = [
   '    [[ "$lower" == not ]] && ((i + 1 < n)) && [[ "${words[i + 1],,}" == only ]] && continue',
   '    case "$lower" in',
   `    not | never | no | without | deliberately | intentionally | *"n't")`,
+  `      printf -v "$__plv_dest" '%s' "\${words[i]}"`,
   "      return 0",
   "      ;;",
+  "    *) ;;",
   "    esac",
   "  done",
+  "}",
   // The live `scan_linkage` operand, call-site and verdict lines, verbatim.
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
   '    lower="${line,,}"',
@@ -224,7 +262,7 @@ const BACKTICKED_TEMPLATE = GOOD_TEMPLATE.replace(
 );
 const GOOD_RULES = [
   "# PR body contract",
-  "`Closes #<issue>` (`Fixes`/`Resolves`), or `No related issue: <reason>`.",
+  "`Closes #<issue>` (`Fixes`/`Resolves`), a `Refs: #<issue>` line, or `No related issue: <reason>`.",
   "Sections: `## Summary`, `## Fix`, `## Verification`, `## Related`.",
 ].join("\n\n");
 
@@ -439,6 +477,21 @@ test("rules file missing a section or keyword is reported", () => {
   texts.rulesFile = texts.rulesFile.replace("## Related", "## See also").replace("Resolves", "");
   const errors = checkCopies(POLICY, texts);
   assert.equal(errors.filter((e) => e.startsWith("rules file")).length, 2, errors.join("; "));
+});
+
+test("a rules file that names no non-closing marker is reported", () => {
+  const texts = goodTexts();
+  texts.rulesFile = texts.rulesFile.replace("a `Refs: #<issue>` line, ", "");
+  const errors = checkCopies(POLICY, texts);
+  assert.equal(errors.length, 1, errors.join("; "));
+  assert.match(
+    errors[0],
+    /^rules file \(non-closing markers\): mentions none of: Refs:, Relates to:/,
+  );
+  // The marker without the colon is not the form the gate reads.
+  const colonless = goodTexts();
+  colonless.rulesFile = colonless.rulesFile.replace("`Refs: #<issue>`", "`Refs #<issue>`");
+  assert.equal(checkCopies(POLICY, colonless).length, 1);
 });
 
 test("composite keyword/marker regressions are caught functionally, not by mention", () => {
@@ -740,6 +793,74 @@ test("a negation helper that is never called, or whose result is ignored, is dri
       '    LINKAGE_PROBLEMS+=("Negated closing reference',
       '    : ("Negated closing reference',
       /a recorded negated reference is a linkage problem/,
+    ],
+  ];
+  for (const [copy, location, from, to, message] of cases) {
+    const texts = goodTexts();
+    texts[copy] = texts[copy].replace(from, to);
+    assert.notEqual(texts[copy], goodTexts()[copy], from);
+    const errors = checkCopies(POLICY, texts);
+    assert.equal(errors.length, 1, `${from}: ${errors.join("; ")}`);
+    assert.ok(errors[0].startsWith(`${location}: the rule is not wired in`), errors[0]);
+    assert.match(errors[0], message, from);
+  }
+});
+
+// The helpers' trigger lists can match policy while their input is gone: a
+// negation_trigger that never fills words/count returns "" for every closer.
+test("a negation helper that stops building its word list is drift", () => {
+  const cases = [
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      "    words[count] = substr(tail, RSTART, RLENGTH)\n",
+      "",
+      /splits the clause into words/,
+    ],
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      "  preceding = substr(line, 1, keyword_index - 1)",
+      '  preceding = ""',
+      /slices the line before the keyword/,
+    ],
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      "  tail = substr(preceding, cut + 1)",
+      "  tail = preceding",
+      /cuts the slice at the previous/,
+    ],
+    [
+      "gateRun",
+      "gate composite (negated closers)",
+      "    word = words[i]",
+      '    word = ""',
+      /tests each windowed word/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      'tail="${2##*[.!?;,]}"',
+      'tail="$2"',
+      /cuts its input at the previous/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    words+=("${BASH_REMATCH[0]}")\n',
+      "",
+      /splits the clause into words/,
+    ],
+    [
+      "hookValidator",
+      "hook validator (negated closers)",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      "  n=${#words[@]}",
+      "  n=0",
+      /splits the clause into words and counts them/,
     ],
   ];
   for (const [copy, location, from, to, message] of cases) {
