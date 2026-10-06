@@ -201,6 +201,81 @@ for sample in "${path_samples[@]}"; do
   assert_contains "a $label is reported private" "$out" '"visibility":"private"'
 done
 
+# Escaped forms: a rendered page writes a shape as HTML entities, splits it
+# across highlighter tags, or escapes it inside inline JSON. Each is caught on
+# the decoded copy and routed as its plain form is. None matches the raw bytes.
+a18="$(printf 'a%.0s' {1..18})"
+escaped_creds=(
+  "HTML entity|ghp&#95;$a18$a18"
+  "tag split|ghp_$a18<span class=\"n\">$a18</span>"
+  'JSON escape|ghp\u005f'"$a18$a18"
+  'JSON quote escape|{\"password\":\"hunter2hunter2\"}'
+)
+for sample in "${escaped_creds[@]}"; do
+  form="${sample%%|*}"
+  run "$(page cred "${sample#*|}")" --visibility private
+  assert_exit "a credential as a $form refuses with exit 4" 4 "$rc"
+  assert_eq "a credential as a $form makes no call" 0 "$calls"
+  assert_contains "a credential as a $form names the decoded line" "$err" 'decoded line 3 looks like a'
+done
+escaped_paths=(
+  "Linux home path as an HTML entity|&#x2F;home&#x2F;$u&#47;src"
+  "Linux home path as a named entity|&sol;home&sol;$u&sol;src"
+  "Linux home path split by tags|/home/<b>$u</b>/src"
+  "Linux home path as a JSON escape|\\/home\\/$u\\/src"
+  "Linux home path as a JSON unicode escape|\\u002Fhome\\u002f$u\\x2Fsrc"
+  'private hostname as an HTML entity|ssh build01&period;internal'
+  'private hostname split by tags|ssh build01.<span>internal</span>'
+  'private hostname as a JSON escape|"host":"build01\u002einternal"'
+)
+for sample in "${escaped_paths[@]}"; do
+  label="${sample%%|*}"
+  STUB_SEQ="$priv_ok" run "$(page path "${sample#*|}")" --visibility public
+  assert_exit "a $label uploads" 0 "$rc"
+  assert_contains "a $label is sent to the private origin" "$argv_all" 'https://private.example.test/_upload'
+done
+
+# The path-detection bodies, run on the decoded copy, add the shapes the
+# Worker list misses; an escaped placeholder decodes to the <user> form they
+# leave clean.
+hpp_paths=(
+  "Linux home path|home is /home/$u"
+  "Windows user path|C:/Users/$u"
+  "Windows checkout path|D:\\repos\\$u"
+)
+for sample in "${hpp_paths[@]}"; do
+  label="${sample%%|*}"
+  STUB_SEQ="$priv_ok" run "$(page path "${sample#*|}")" --visibility public
+  assert_contains "a $label without the Worker shape is sent private" "$err" "the page holds a $label"
+  assert_contains "a $label without the Worker shape is reported private" "$out" '"visibility":"private"'
+done
+lt='&lt;'
+STUB_SEQ="$pub_ok" run "$(page path "see /home/${lt}user&gt;/src and /Users/${lt}user&gt;")" --visibility public
+assert_exit 'an escaped <user> placeholder uploads' 0 "$rc"
+assert_contains 'an escaped <user> placeholder stays public' "$out" '"visibility":"public"'
+STUB_SEQ="$pub_ok" run "$(page path "a &amp;&lt;b&gt; &#0; &#99999999; &bogus; \\q \\\\ trailing \\")" --visibility public
+assert_exit 'stray entities and escapes upload' 0 "$rc"
+assert_contains 'stray entities and escapes stay public' "$out" '"visibility":"public"'
+
+# The embedded copy of the path-detection bodies matches the library.
+lib_bodies="$(grep -E '^HPP_[A-Z_]+=' "$root/components/path-detection/machine-path-patterns.sh")"
+own_bodies="$(grep -E '^HPP_[A-Z_]+=' "$script")"
+assert_eq 'pages-publish carries every path-detection body' 5 "$(grep -c . <<<"$lib_bodies")"
+assert_eq 'the path-detection bodies in pages-publish match the library' "$lib_bodies" "$own_bodies"
+
+# Decoding stays linear on a 2 MiB single line of each separator.
+for unit in '<a' '&#' '\u' '&#x2F;'; do
+  big="$pages/big.html"
+  {
+    printf '%s\n' "$stamp"
+    yes "$unit" | tr -d '\n' | head -c 2097152
+    printf '\n'
+  } >"$big"
+  start=$SECONDS
+  STUB_SEQ="$pub_ok" run "$big" --visibility public
+  assert_eq "a 2 MiB line of '$unit' scans in under 20 s" 1 "$((SECONDS - start < 20))"
+done
+
 STUB_SEQ="$priv_ok" run "$(page path "/home/$u/x")" --visibility public --id "$pid"
 assert_exit 'a forced-private republish succeeds' 0 "$rc"
 assert_eq 'a forced-private republish makes one call' 1 "$calls"

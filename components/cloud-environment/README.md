@@ -211,9 +211,20 @@ gitleaks is on `PATH`); a hit exits 4 and stderr names the shape and line,
 never the match. A machine path (`/home/<user>/`, `/Users/<user>/`,
 `C:\Users\`, `\\wsl`, `/mnt/<drive>/Users/`, `/root/`, a `-home-<user>-`
 slug) or a `.local`, `.internal` or `.lan` hostname sends the page to the
-private host. Only the listed shapes are caught; the host's own scan is the
-binding one. When the visibility sent differs from the one requested, `--id`
-is dropped and a new page is created, and when the public host answers 409
+private host. Each list also runs on a decoded copy, as the host's scan does:
+tags stripped (so a token split across highlighter `<span>`s rejoins), HTML
+entities decoded (`&#47;`, `&#x2F;`, `&sol;`, `&amp;` and the like), then
+JSON/JS escapes undone (`\/`, `\\`, `\"`, `\uXXXX`, `\xHH`); a credential
+found only there exits 4 naming the decoded line. The decoded copy is also
+matched against the [path-detection](../path-detection/README.md) bodies,
+which add a home path with no trailing slash, the forward-slash and 8.3
+Windows forms, and Windows checkout roots. They are copied into the script
+because setup installs it as one file, and its test fails when the copy and
+the library differ. They skip the raw bytes, where a home path with an
+escaped `&lt;user&gt;` placeholder would read as a real user. Only the listed
+shapes are caught; the host's own scan is the binding one. When the
+visibility sent differs from the one requested, `--id` is dropped and a new
+page is created, and when the public host answers 409
 `private-required` the upload is retried once as a private create. In both
 cases the caller deletes the old id.
 
