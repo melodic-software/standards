@@ -95,6 +95,45 @@ that transition-only artifact gained the two rules late (ci-workflows#544);
 ADR-0008's [2026-10-06 (#647) amendment](../../docs/adr/0008-distribute-pr-body-contract-rule.md#revisited-2026-10-06-647-rules-the-reusable-pins-predate)
 records that exception to its every-pin consequence.
 
+### Behavioral lockstep
+
+Static parsing proves a copy declares the policy's data; it cannot prove the
+copy acts on it, and each review round of #647 found one more way to break the
+chain from declaration to verdict while every source regex still matched. So
+the linkage rules are also checked by running each copy.
+[`lockstep-behavior.mjs`](lockstep-behavior.mjs) generates a matrix of sample
+bodies from `policy.json`: each closing keyword, each non-closing marker on its
+own line, indented, mid-sentence and with trailing text, each no-issue marker,
+each trigger word and suffix at the window's edge and one word beyond it, each
+clause delimiter, each affirmative phrase, and a negated closer beside valid
+linkage. It runs the composite's `analyze_body` awk program (live and at every
+composite pin) and the hook's `linkage::problems` on every body and fails on any
+verdict the policy does not predict, naming the body. The static extractors
+stay as the precise diff of declared lists. The bash in `run.sh` that reads the
+analyzer's report calls the GitHub API and cannot run here, so its two
+report-reading lines are the only part of the chain still checked as source.
+The hermetic tests run the same path against verbatim copies of both sources in
+[`fixtures/lockstep/`](fixtures/lockstep/).
+
+Executing fetched code is bounded as follows:
+
+- Both sources come from org-owned repositories (`ci-workflows`,
+  `claude-code-plugins`), fetched with the lane's read-only contents token, or
+  from this repository's fixtures.
+- The analyzer runs under `gawk --sandbox`, which refuses `system()`, command
+  pipes, output redirection and extra input files, so it can only read the
+  sample body on stdin and print. The lane installs `gawk` when the runner
+  image lacks it; a missing `gawk` fails the check, never skips it.
+- The hook runs as a sourced library in `bash --noprofile --norc` from a
+  scratch copy, with an environment of `PATH=/usr/bin:/bin` and `LC_ALL` only
+  (no token, no `HOME`) and a 10-second timeout. A hang is reported as drift.
+  Unlike the analyzer, bash is not confined to stdin and stdout: this step
+  trusts the hook as org-owned code and limits only what it can reach, so a
+  change to the hook's trust (another owner, a third-party source) needs a
+  stronger sandbox first.
+- Neither process receives the GitHub token: Node passes an explicit
+  environment instead of inheriting its own.
+
 Only the title and the `do-not-merge` label fail the composite's step. A body
 missing a closing keyword or a section is advisory: a warning, one upserted
 comment, and the `needs-issue-linkage` label, with the step still exiting 0

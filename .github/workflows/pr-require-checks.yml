@@ -802,6 +802,18 @@ jobs:
           cache-dependency-path: components/pr-convention-policy/package-lock.json
       - name: Install pr-convention-policy dependencies
         run: npm ci --prefix components/pr-convention-policy
+      # The lockstep check runs the composite's awk analyzer under
+      # `gawk --sandbox` (system(), pipes and redirection disabled), and the
+      # runner image's awk is not guaranteed to be gawk. Missing gawk fails the
+      # check rather than skipping it, so install it before either step.
+      - name: Ensure gawk for the sandboxed analyzer run
+        run: |
+          set -euo pipefail
+          if ! command -v gawk >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends gawk
+          fi
+          gawk --version | head -n 1
       - name: Test lockstep parsers and mutation probes (hermetic)
         run: npm run test:pr-convention-lockstep
       # Four gate callers are private repositories, so the live check reads

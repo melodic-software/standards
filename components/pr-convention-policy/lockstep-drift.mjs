@@ -32,6 +32,7 @@ import { pathToFileURL } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
+import { checkCompositeBehavior, checkHookBehavior } from "./lockstep-behavior.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
 const MODULE_DIRECTORY = import.meta.dirname;
@@ -298,14 +299,10 @@ export function parseMarkdownHeadings(markdownText) {
 // operand, as the composite's `tolower` is asserted: CLOSING_ERE only on
 // `$chunk` (a slice of `lower="${line,,}"`), NO_ISSUE_ERE only on `$lower`
 // (`${1,,}` wrapped in newlines). A match on the raw line is drift.
-// NON_CLOSING_ERE is matched one line at a time against `$lower`, the same
-// lowercased line CLOSING_ERE's `$chunk` is sliced from.
 const VALIDATOR_OPERANDS = {
   // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
   CLOSING_ERE: { operand: "chunk", sources: ['lower="${line,,}"', 'chunk="${lower:off}"'] },
   NO_ISSUE_ERE: { operand: "lower", sources: [`lower=$'\\n'"\${1,,}"$'\\n'`] },
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-  NON_CLOSING_ERE: { operand: "lower", sources: ['lower="${line,,}"'] },
 };
 
 function assertValidatorOperand(shellText, name, location) {
@@ -339,104 +336,14 @@ export function parseValidatorPatterns(shellText, location) {
 
 // ---------------------------------------------------------------------------
 // Non-closing references and negated closers (`body.nonClosingMarkers` and
-// `body.negatedClosers`). The composite and the hook both implement them; the
-// hook's are a transcription of the composite's, so both copies are checked
-// against the policy the same way.
+// `body.negatedClosers`). Two layers: the static extractors below diff the
+// DATA each copy declares (marker alternation, trigger words, suffix,
+// affirmative phrase, window) against policy, so a drifted list is named
+// precisely; `lockstep-behavior.mjs` then RUNS each copy on sample bodies
+// generated from policy, which proves the rule is wired from declaration to
+// verdict whatever shape the code takes. The behavioral layer replaced a chain
+// of source-shape regexes that every review round found one more gap in.
 // ---------------------------------------------------------------------------
-
-// A declared pattern or helper proves nothing on its own: the copy must call
-// it and act on the result, or the rule is dead code and a parse of its body
-// is a false green. Each entry is one link of that chain, from the call site
-// to the verdict, quoted from the live source.
-const WIRING = {
-  compositeNonClosing: [
-    ["scan_line runs on every masked line", /scan_line\(masked\[i\]\)/],
-    ["a marker match sets has_non_closing", /rest ~ \/.+\/\) \{\s*has_non_closing = 1/],
-    ["has_non_closing is reported", /if \(has_non_closing\) print "non-closing"/],
-    [
-      "a non-closing report satisfies linkage",
-      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then/,
-    ],
-  ],
-  compositeNegation: [
-    // negation_trigger's input: the text before the keyword, cut at the
-    // previous clause punctuation, apostrophes normalized, split into words.
-    [
-      "negation_trigger slices the line before the keyword",
-      /preceding = substr\(line, 1, keyword_index - 1\)/,
-    ],
-    [
-      "negation_trigger cuts the slice at the previous .!?;,",
-      /cut = 0\s*for \(i = length\(preceding\); i >= 1; i--\) \{\s*ch = substr\(preceding, i, 1\)\s*if \(ch == "\." \|\| ch == "!" \|\| ch == "\?" \|\| ch == ";" \|\| ch == ","\) \{\s*cut = i\s*break\s*\}[\s\S]*?tail = substr\(preceding, cut \+ 1\)/,
-    ],
-    [
-      "negation_trigger normalizes a typographic apostrophe",
-      /gsub\("\\342\\200\\231", "'"'"'", tail\)/,
-    ],
-    [
-      "negation_trigger splits the clause into words[1..count]",
-      /count = 0\s*\n\s*while \(match\(tail, \/\[A-Za-z\]\[A-Za-z'"'"'\]\*\/\)\) \{\s*count\+\+\s*words\[count\] = substr\(tail, RSTART, RLENGTH\)\s*tail = substr\(tail, RSTART \+ RLENGTH\)\s*\}/,
-    ],
-    [
-      "negation_trigger tests each windowed word",
-      /for \(i = first; i <= count; i\+\+\) \{\s*word = words\[i\]\s*lower = tolower\(word\)/,
-    ],
-    ["scan_line runs on every masked line", /scan_line\(masked\[i\]\)/],
-    [
-      "negation_trigger is called on each closing reference and branched on",
-      /trigger = negation_trigger\(line, start\)\s*\n\s*if \(trigger != ""\) \{/,
-    ],
-    [
-      "a negated reference is recorded and never counted as closing",
-      /if \(trigger != ""\) \{[\s\S]*?negated_count\+\+[\s\S]*?\}\s*\} else \{\s*has_closing = 1\s*\}/,
-    ],
-    ["negated references are reported", /print "negated\\t" negated_order\[i\]/],
-    [
-      "a negated report is a linkage error",
-      /\[\[ "\$kind" == negated \]\][\s\S]*?linkage_errors\+=\("Negated closing reference/,
-    ],
-  ],
-  validatorNonClosing: [
-    ["a marker match counts as linkage", /\[\[ "\$lower" =~ \$NON_CLOSING_ERE \]\] && found=0/],
-    ["scan_linkage returns success on linkage", /\(\(found == 0\)\) && return 0/],
-    ["scan_linkage decides linkage", /scan_linkage "\$_plv_body" \|\| _plv_linked=1/],
-  ],
-  validatorNegation: [
-    // The same preprocessing, transcribed: `$2` is `${line:0:start}`.
-    ["negation_trigger_to cuts its input at the previous .!?;,", /tail="\$\{2##\*\[\.!\?;,\]\}"/],
-    [
-      "negation_trigger_to normalizes a typographic apostrophe",
-      /tail="\$\{tail\/\/\$'\\xe2\\x80\\x99'\/\\'\}"/,
-    ],
-    ["the word pattern is a letter run", /^_PLV_WORD_ERE="\[A-Za-z\]\[A-Za-z'\]\*"$/m],
-    [
-      "negation_trigger_to splits the clause into words and counts them",
-      /while \[\[ "\$tail" =~ \$_PLV_WORD_ERE \]\]; do\s*words\+=\("\$\{BASH_REMATCH\[0\]\}"\)\s*tail="\$\{tail#\*"\$\{BASH_REMATCH\[0\]\}"\}"\s*done\s*n=\$\{#words\[@\]\}/,
-    ],
-    [
-      "negation_trigger_to tests each windowed word",
-      /for \(\(i = first; i < n; i\+\+\)\); do\s*lower="\$\{words\[i\],,\}"/,
-    ],
-    [
-      "negation_trigger_to is called on each closing reference and only an empty result counts",
-      /negation_trigger_to _plv_trigger "\$\{line:0:start\}"\s*\n\s*if \[\[ -z "\$_plv_trigger" \]\]; then\s*found=0\s*continue\s*fi/,
-    ],
-    ["a negated reference is recorded", /LINKAGE_NEGATED\+=\(/],
-    [
-      "a recorded negated reference is a linkage problem",
-      /\(\(\$\{#LINKAGE_NEGATED\[@\]\} == 0\)\) \|\| \{[\s\S]*?LINKAGE_PROBLEMS\+=\("Negated closing reference/,
-    ],
-  ],
-};
-
-function assertWired(text, chain, location) {
-  const missing = WIRING[chain].filter(([, pattern]) => !pattern.test(text));
-  if (missing.length > 0) {
-    throw new DriftError(
-      `${location}: the rule is not wired in: ${missing.map(([link]) => link).join("; ")}`,
-    );
-  }
-}
 
 // The marker alternation is the first group of the pattern, after the `^`
 // anchor and the hook's `{0,3}` indent allowance (the composite strips that
@@ -459,12 +366,7 @@ export function parseValidatorNonClosing(shellText, location) {
   if (!declaration) {
     throw new DriftError(`${location}: NON_CLOSING_ERE declaration not found`);
   }
-  assertValidatorOperand(shellText, "NON_CLOSING_ERE", location);
-  assertWired(shellText, "validatorNonClosing", location);
-  return {
-    markers: nonClosingAlternation(declaration[1], location),
-    pattern: ereToJs(declaration[1]),
-  };
+  return { markers: nonClosingAlternation(declaration[1], location) };
 }
 
 export function parseCompositeNonClosing(runShText, location) {
@@ -474,21 +376,31 @@ export function parseCompositeNonClosing(runShText, location) {
       `${location}: the \`rest ~ /.../\` non-closing marker test (has_non_closing = 1) was not found in run.sh`,
     );
   }
-  // `rest` is the lowercased line with up to three leading spaces removed;
-  // without either step the extracted pattern is not the rule the gate applies.
-  if (
-    !runShText.includes("if (indent <= 3)") ||
-    !runShText.includes("rest = tolower(substr(line, indent + 1))")
-  ) {
+  return { markers: nonClosingAlternation(declaration[1], location) };
+}
+
+// The behavioral layer runs the composite's analyzer, not the bash around it:
+// the rest of run.sh calls the GitHub API and cannot run here. The two lines
+// that turn the analyzer's `non-closing` and `negated` reports into the
+// verdict are therefore checked as source. They are the only links of the
+// chain left static.
+export function assertCompositeVerdictReads(runShText, location) {
+  const links = [
+    [
+      "a `non-closing` report satisfies linkage",
+      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then/,
+    ],
+    [
+      "a `negated` report is a linkage error",
+      /\[\[ "\$kind" == negated \]\][\s\S]*?linkage_errors\+=\("Negated closing reference/,
+    ],
+  ];
+  const missing = links.filter(([, pattern]) => !pattern.test(runShText));
+  if (missing.length > 0) {
     throw new DriftError(
-      `${location}: the non-closing marker test no longer reads the lowercased, indent-stripped line (\`rest = tolower(substr(line, indent + 1))\` under \`indent <= 3\`)`,
+      `${location}: run.sh no longer acts on the analyzer's report: ${missing.map(([link]) => link).join("; ")}`,
     );
   }
-  assertWired(runShText, "compositeNonClosing", location);
-  return {
-    markers: nonClosingAlternation(declaration[1], location),
-    pattern: new RegExp(declaration[1]),
-  };
 }
 
 // The awk program is single-quoted bash, so an apostrophe inside it is spelled
@@ -506,12 +418,6 @@ export function parseValidatorNegation(shellText, location) {
       `${location}: negation_trigger_to's window, "not only" exception, or trigger \`case\` not found`,
     );
   }
-  if (window[1] !== window[2]) {
-    throw new DriftError(
-      `${location}: negation_trigger_to's window is inconsistent (n > ${window[1]}, first = n - ${window[2]})`,
-    );
-  }
-  assertWired(shellText, "validatorNegation", location);
   const words = [];
   const suffixes = [];
   for (const alternative of cases[1].split("|").map((item) => item.trim())) {
@@ -550,19 +456,6 @@ export function parseCompositeNegation(runShText, location) {
       `${location}: negation_trigger's window, "not only" exception, trigger words, or suffix test not found in run.sh`,
     );
   }
-  // awk is 1-indexed: `count - (W - 1)` through `count` is the last W words,
-  // and `length(word) - (L - 1)` is the start of an L-character suffix.
-  if (Number(window[2]) !== Number(window[1]) - 1) {
-    throw new DriftError(
-      `${location}: negation_trigger's window is inconsistent (count > ${window[1]}, first = count - ${window[2]})`,
-    );
-  }
-  if (Number(suffix[1]) !== suffix[2].length - 1) {
-    throw new DriftError(
-      `${location}: negation_trigger's suffix test reads ${Number(suffix[1]) + 1} characters for the ${suffix[2].length}-character "${suffix[2]}"`,
-    );
-  }
-  assertWired(runShText, "compositeNegation", location);
   return {
     triggerWords: [...triggers[1].matchAll(/lower == "(\w+)"/g)].map((m) => m[1]),
     triggerSuffixes: [suffix[2]],
@@ -663,28 +556,14 @@ function setDifference(actual, expected) {
   return parts.join("; ");
 }
 
-// The declared marker alternation must be exactly the policy's set, and the
-// pattern must behave as the policy describes: each marker links on a line of
-// its own (bare or cross-repository reference, either case), and the same
-// text mid-sentence or followed by prose does not.
-function assertNonClosing({ markers, pattern }, policy, location) {
+// The declared marker alternation must be exactly the policy's set. How the
+// pattern behaves (own line, indent, case, trailing text) is the behavioral
+// layer's job.
+function assertNonClosing({ markers }, policy, location) {
   const expected = policy.body.nonClosingMarkers.map((marker) => marker.toLowerCase());
   const difference = setDifference(markers, expected);
-  const problems = difference === "" ? [] : [`markers ${difference}`];
-  for (const marker of policy.body.nonClosingMarkers) {
-    for (const accepted of [`${marker}: #12`, `${marker}: owner/repo#12`, `${marker}:#12  `]) {
-      if (!pattern.test(accepted.toLowerCase())) {
-        problems.push(`rejects "${accepted}"`);
-      }
-    }
-    for (const rejected of [`see ${marker}: #12`, `${marker}: #12 and more`, `${marker} #12`]) {
-      if (pattern.test(rejected.toLowerCase())) {
-        problems.push(`accepts "${rejected}", which is not a marker on its own line`);
-      }
-    }
-  }
-  if (problems.length > 0) {
-    throw new DriftError(`${location}: non-closing pattern ${problems.join(", ")}`);
+  if (difference !== "") {
+    throw new DriftError(`${location}: non-closing markers ${difference}`);
   }
 }
 
@@ -1011,6 +890,9 @@ export function checkCopies(policy, texts) {
       "hook validator (negated closers)",
     ),
   );
+  run(() => checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)"));
+  run(() => assertCompositeVerdictReads(texts.gateRun, "gate composite (verdict)"));
+  run(() => checkHookBehavior(texts.hookValidator, policy, "hook validator (behavior)"));
   return errors;
 }
 
@@ -1079,6 +961,8 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
   );
   run(() => assertNonClosing(parseCompositeNonClosing(runShText, location), policy, location));
   run(() => assertNegation(parseCompositeNegation(runShText, location), policy, location));
+  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`));
+  run(() => assertCompositeVerdictReads(runShText, `${location} (verdict)`));
   return errors;
 }
 

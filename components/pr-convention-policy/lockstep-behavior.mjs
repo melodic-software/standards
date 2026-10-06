@@ -1,0 +1,278 @@
+// Behavioral lockstep (#647): run each linkage implementation on a matrix of
+// sample bodies generated from `policy.json` and compare its verdicts with the
+// ones the policy predicts. A static parse of a copy's source proves the
+// declared data matches; only running the copy proves the rule is wired from
+// the declaration to the verdict, whatever shape the code takes.
+//
+// Trust boundary. The code executed here is fetched from org-owned
+// repositories (ci-workflows, claude-code-plugins) over a read-only contents
+// token, or read from this repository's fixtures. It still runs confined:
+//   - the composite's analyzer is pure awk, run under `gawk --sandbox`, which
+//     disables `system()`, command pipes, file redirection and extra input
+//     files, so it can read only the sample body on stdin and print a verdict;
+//   - the hook validator is a sourced bash library, run in `bash --noprofile
+//     --norc` with an environment of PATH and LC_ALL only (no token, no HOME),
+//     a timeout, and a scratch copy of the fetched file it cannot affect;
+//   - neither process receives the lane's GitHub token.
+// A missing `gawk` or `bash` is an error, never a skip.
+
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+// A cycle, deliberately: lockstep-drift.mjs imports this module, and nothing
+// here touches DriftError until a check runs, after both have evaluated.
+import { DriftError } from "./lockstep-drift.mjs";
+
+export class BehaviorToolError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BehaviorToolError";
+  }
+}
+
+const SANDBOX_ENV = { PATH: "/usr/bin:/bin" };
+const TIMEOUT_MS = 10_000;
+const SECTIONS_TAIL = "\n\n## Summary\ns\n\n## Fix\nf\n\n## Verification\nv\n\n## Related\nr\n";
+// The clause punctuation that resets the negation window. policy.json has no
+// field for it; the README's `negatedClosers` paragraph and the schema's
+// description name the same five characters.
+export const CLAUSE_DELIMITERS = [".", "!", "?", ";", ","];
+const FILLERS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
+
+// Every case is one linkage line (or two) plus four non-empty sections, so a
+// verdict can only differ on linkage. `expect.negated` names the disclaimer
+// word the policy says triggers, or null.
+export function linkageMatrix(policy) {
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = policy.body;
+  const closer = closingKeywords[0];
+  const none = { closing: false, nonClosing: false, noIssue: false, negated: null };
+  const cases = [];
+  const add = (line, expect) => cases.push({ line, expect: { ...none, ...expect } });
+
+  for (const keyword of closingKeywords) {
+    add(`${keyword} #12`, { closing: true });
+    add(`${keyword} owner/repo#12`, { closing: true });
+  }
+  for (const marker of nonClosingMarkers) {
+    add(`${marker}: #12`, { nonClosing: true });
+    add(`   ${marker}: owner/repo#12`, { nonClosing: true });
+    add(`See ${marker}: #12 for context`, {});
+    add(`${marker}: #12 and more`, {});
+  }
+  for (const marker of noIssueMarkers) {
+    add(`${marker}: housekeeping`, { noIssue: true });
+  }
+
+  const { wordWindow, affirmativePhrases } = negatedClosers;
+  if (wordWindow > FILLERS.length) {
+    throw new BehaviorToolError(`wordWindow ${wordWindow} exceeds the sample filler supply`);
+  }
+  const triggers = [
+    ...negatedClosers.triggerWords,
+    ...negatedClosers.triggerSuffixes.map((suffix) => `does${suffix}`),
+  ];
+  for (const trigger of triggers) {
+    const inside = FILLERS.slice(0, wordWindow - 1).join(" ");
+    const outside = FILLERS.slice(0, wordWindow).join(" ");
+    add(`${trigger} ${inside} ${closer} #12`.replace("  ", " "), { negated: trigger });
+    add(`${trigger} ${outside} ${closer} #12`, { closing: true });
+  }
+  const [firstTrigger] = negatedClosers.triggerWords;
+  for (const delimiter of CLAUSE_DELIMITERS) {
+    add(`It is ${firstTrigger}${delimiter} ${closer} #12`, { closing: true });
+  }
+  for (const phrase of affirmativePhrases) {
+    add(`This ${phrase} ${closer.toLowerCase()} #12`, { closing: true });
+  }
+  // A negated closer is reported even when valid linkage sits elsewhere.
+  add(`This does ${firstTrigger} ${closer.toLowerCase()} #12\n${nonClosingMarkers[0]}: #13`, {
+    nonClosing: true,
+    negated: firstTrigger,
+  });
+  return cases.map((sample) => ({ ...sample, body: `${sample.line}${SECTIONS_TAIL}` }));
+}
+
+function describe(verdict) {
+  const parts = [];
+  if (verdict.closing) parts.push("closing");
+  if (verdict.nonClosing) parts.push("non-closing");
+  if (verdict.noIssue) parts.push("no-issue");
+  if (verdict.negated) parts.push(`negated by "${verdict.negated}"`);
+  return parts.length === 0 ? "no linkage" : parts.join(" + ");
+}
+
+function reportMismatches(mismatches, location) {
+  if (mismatches.length === 0) {
+    return;
+  }
+  const shown = mismatches
+    .slice(0, 6)
+    .map(
+      ({ line, expected, actual }) =>
+        `${JSON.stringify(line)} should be ${expected}, got ${actual}`,
+    );
+  const more =
+    mismatches.length > shown.length ? `; and ${mismatches.length - shown.length} more` : "";
+  throw new DriftError(
+    `${location}: linkage behavior differs from policy on ${mismatches.length} sample bod${mismatches.length === 1 ? "y" : "ies"}: ${shown.join("; ")}${more}`,
+  );
+}
+
+function run(command, args, options, location, what) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    env: SANDBOX_ENV,
+    timeout: TIMEOUT_MS,
+    maxBuffer: 16 * 1024 * 1024,
+    ...options,
+  });
+  if (result.error) {
+    // Code that hangs on a sample body is drift in that code, not a tool fault.
+    if (result.error.code === "ETIMEDOUT") {
+      throw new DriftError(
+        `${location}: the ${what} did not finish within ${TIMEOUT_MS / 1000}s on the sample bodies`,
+      );
+    }
+    if (result.error.code === "ENOENT") {
+      throw new BehaviorToolError(
+        `${location}: behavioral lockstep needs \`${command}\` on PATH to run the ${what}; install it (the CI lane does)`,
+      );
+    }
+    throw new BehaviorToolError(`${location}: the ${what}: ${result.error.message}`);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// The composite: its analyzer is the awk program inside `analyze_body`.
+// ---------------------------------------------------------------------------
+
+export function extractCompositeAnalyzer(runShText, location) {
+  const match = runShText.match(/^analyze_body\(\) \{\n {2}awk '\n([\s\S]*?)\n'\n\}$/m);
+  if (!match) {
+    throw new DriftError(
+      `${location}: run.sh has no \`analyze_body() { awk '...' }\` analyzer to execute`,
+    );
+  }
+  // Single-quoted bash spells an apostrophe `'"'"'`; awk sees the apostrophe.
+  return match[1].replaceAll(`'"'"'`, "'");
+}
+
+export function runCompositeAnalyzer(program, body, location) {
+  const result = run(
+    "gawk",
+    ["--sandbox", "--", program],
+    { input: body, env: { ...SANDBOX_ENV, LC_ALL: "C.UTF-8" } },
+    location,
+    "analyzer",
+  );
+  if (result.status !== 0) {
+    throw new DriftError(
+      `${location}: the analyzer exited ${result.status ?? result.signal} on a sample body: ${result.stderr.trim()}`,
+    );
+  }
+  const lines = result.stdout.split("\n");
+  const negated = lines.filter((line) => line.startsWith("negated\t"));
+  return {
+    closing: lines.includes("closing"),
+    nonClosing: lines.includes("non-closing"),
+    noIssue: lines.includes("no-issue"),
+    negated: negated.length > 0 ? negated[0].split("\t")[2] : null,
+  };
+}
+
+// Most consumers pin the same few composite versions, so one run per distinct
+// analyzer and policy serves them all.
+const compositeMismatchCache = new Map();
+
+export function checkCompositeBehavior(runShText, policy, location) {
+  const program = extractCompositeAnalyzer(runShText, location);
+  const key = `${JSON.stringify(policy.body)}\0${program}`;
+  if (!compositeMismatchCache.has(key)) {
+    const mismatches = [];
+    for (const { line, body, expect } of linkageMatrix(policy)) {
+      const actual = runCompositeAnalyzer(program, body, location);
+      if (describe(actual) !== describe(expect)) {
+        mismatches.push({ line, expected: describe(expect), actual: describe(actual) });
+      }
+    }
+    compositeMismatchCache.set(key, mismatches);
+  }
+  reportMismatches(compositeMismatchCache.get(key), location);
+}
+
+// ---------------------------------------------------------------------------
+// The hook: a sourced bash library whose aggregate verdict is
+// `linkage::problems`, which fills LINKAGE_PROBLEMS. The harness feeds it the
+// matrix NUL-separated and prints each body's problems, NUL-terminated.
+// ---------------------------------------------------------------------------
+
+const HOOK_HARNESS = [
+  "export LC_ALL=C",
+  'source "$1" >/dev/null 2>&1 || exit 90',
+  "declare -F linkage::problems >/dev/null || exit 91",
+  "while IFS= read -r -d '' body; do",
+  '  linkage::problems "$body" || true',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: bash, not a JS template
+  "  ((${#LINKAGE_PROBLEMS[@]} == 0)) || printf '%s\\n' \"${LINKAGE_PROBLEMS[@]}\"",
+  "  printf '\\0'",
+  "done",
+].join("\n");
+
+// A negated reference is reported as `... (trigger "<word>") ...`; any other
+// problem on a body whose sections are all filled is missing linkage.
+function hookVerdict(record) {
+  const problems = record.split("\n").filter(Boolean);
+  const trigger = record.match(/\(trigger "([^"]+)"\)/);
+  return {
+    linked: problems.every((problem) => problem.includes('(trigger "')),
+    negated: trigger ? trigger[1] : null,
+  };
+}
+
+export function checkHookBehavior(shellText, policy, location) {
+  const matrix = linkageMatrix(policy);
+  const directory = mkdtempSync(path.join(tmpdir(), "pr-lockstep-hook-"));
+  let result;
+  try {
+    const hookPath = path.join(directory, "pr-linkage-validator.sh");
+    writeFileSync(hookPath, shellText);
+    result = run(
+      "bash",
+      ["--noprofile", "--norc", "-c", HOOK_HARNESS, "lockstep-harness", hookPath],
+      { input: `${matrix.map(({ body }) => body).join("\0")}\0`, cwd: directory },
+      location,
+      "validator",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+  if (result.status === 90) {
+    throw new DriftError(`${location}: the validator does not source cleanly in bash`);
+  }
+  if (result.status === 91) {
+    throw new DriftError(`${location}: the validator no longer defines linkage::problems`);
+  }
+  const records = result.stdout.split("\0");
+  if (result.status !== 0 || records.length !== matrix.length + 1) {
+    throw new DriftError(
+      `${location}: the validator harness exited ${result.status ?? result.signal} after ${records.length - 1} of ${matrix.length} sample bodies: ${result.stderr.trim()}`,
+    );
+  }
+  const mismatches = [];
+  matrix.forEach(({ line, expect }, index) => {
+    const actual = hookVerdict(records[index]);
+    const expected = {
+      linked: expect.closing || expect.nonClosing || expect.noIssue,
+      negated: expect.negated,
+    };
+    const show = (v) =>
+      `${v.linked ? "linked" : "unlinked"}${v.negated ? ` + negated by "${v.negated}"` : ""}`;
+    if (show(actual) !== show(expected)) {
+      mismatches.push({ line, expected: show(expected), actual: show(actual) });
+    }
+  });
+  reportMismatches(mismatches, location);
+}
