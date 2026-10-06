@@ -41,6 +41,13 @@ repo no-heading '# Repo'
 repo no-intro "$(section 'Some other intro.' "$synced")" review
 repo no-pointer "$(section "$intro" '- Local rule: [rule](docs/rule.md).')" review
 repo wrong-target "$(section "$intro" "$remote")" review
+# shellcheck disable=SC2016 # literal Markdown backticks, not an expansion
+stale='- Org-wide criteria: [`REVIEW.md`](docs/REVIEW.md), synced from `melodic-software/standards`.'
+repo duplicate-stale "$(section "$intro" "$(printf '%s\n%s' "$synced" "$stale")")" review
+repo duplicate-same "$(section "$intro" "$(printf '%s\n%s' "$synced" "$synced")")" review
+repo duplicate-unlinked "$(section "$intro" "$(printf '%s\n%s' "$synced" '- Org-wide criteria: see the standards repository.')")" review
+repo duplicate-indented "$(section "$intro" "$(printf '%s\n   %s' "$synced" "$stale")")" review
+repo pointer-indented "$(section "$intro" "  $synced")" review
 repo pointer-outside "$(printf '# Repo\n\n## Code Review Rules\n\n%s\n\n## Next\n\n%s\n' "$intro" "$synced")" review
 # shellcheck disable=SC2016 # a literal Markdown fence, not an expansion
 fence='```'
@@ -78,6 +85,26 @@ out="$(bash "$script" file --root "$work/fleet/wrong-target" 2>&1)"
 assert_exit 'file fails when a repo with REVIEW.md links the remote copy' 1 $?
 assert_contains 'the expected target is named' "$out" 'must link REVIEW.md'
 
+out="$(bash "$script" file --root "$work/fleet/duplicate-stale" 2>&1)"
+assert_exit 'file fails when a stale pointer sits beside the correct one' 1 $?
+assert_contains 'the duplicate pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/duplicate-same" 2>&1)"
+assert_exit 'file fails when the correct pointer appears twice' 1 $?
+assert_contains 'a repeated pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/duplicate-unlinked" 2>&1)"
+assert_exit 'file fails when a second org-wide criteria line links nothing' 1 $?
+assert_contains 'an unlinked second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/duplicate-indented" 2>&1)"
+assert_exit 'file fails when an indented stale pointer sits beside the correct one' 1 $?
+assert_contains 'an indented second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
+
+out="$(bash "$script" file --root "$work/fleet/pointer-indented" 2>&1)"
+assert_exit 'file fails when the only pointer is indented' 1 $?
+assert_contains 'the indented pointer is named' "$out" 'pointer line must not be indented'
+
 out="$(bash "$script" file --root "$work/fleet/pointer-outside" 2>&1)"
 assert_exit 'file fails when the pointer sits under a later heading' 1 $?
 assert_contains 'a pointer outside the section does not count' "$out" 'REVIEW.md pointer line is missing'
@@ -107,11 +134,12 @@ out="$(bash "$script" fleet --repos "$work/ok.txt" --fixtures "$work/fleet" 2>&1
 assert_exit 'fleet passes when every repo conforms' 0 $?
 assert_contains 'fleet lists the conforming repos' "$out" 'OK: remote synced'
 
-printf '%s\n' synced no-agents wrong-target '' >"$work/mixed.txt"
+printf '%s\n' synced no-agents wrong-target duplicate-stale '' >"$work/mixed.txt"
 out="$(bash "$script" fleet --repos "$work/mixed.txt" --fixtures "$work/fleet" 2>&1)"
 assert_exit 'fleet fails when any repo does not conform' 1 $?
 assert_contains 'fleet names a repo without AGENTS.md' "$out" 'MISSING: no-agents: no root AGENTS.md'
 assert_contains 'fleet names a repo with the wrong pointer' "$out" 'MISSING: wrong-target: the REVIEW.md pointer'
+assert_contains 'fleet names a repo with a duplicate pointer' "$out" 'MISSING: duplicate-stale: 2 org-wide criteria pointer lines'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: synced'
 
 # --- usage -----------------------------------------------------------------
