@@ -5,6 +5,16 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  CLAUSE_DELIMITERS,
+  checkCompositeBehavior,
+  checkHookBehavior,
+  GITHUB_CLOSING_KEYWORDS,
+  linkageMatrix,
+  MASKINGS,
+  NON_DELIMITERS,
+  UNTERMINATED_MASKINGS,
+} from "./lockstep-behavior.mjs";
+import {
   CONSUMER_REPOSITORIES,
   checkCopies,
   checkFleet,
@@ -14,12 +24,16 @@ import {
   detectArtifactPin,
   maskCode,
   parseCallerPin,
+  parseCompositeNegation,
+  parseCompositeNonClosing,
   parseCompositeRequireScope,
   parseCompositeSections,
   parseCompositeTypes,
   parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
+  parseValidatorNegation,
+  parseValidatorNonClosing,
   parseValidatorPatterns,
   parseValidatorSections,
   readGateComposite,
@@ -33,32 +47,16 @@ const POLICY = parseUniqueJson(
   "policy.json",
 );
 
-// Hermetic fixtures mirroring the narrowest parsed surface of each live copy.
-// Written as arrays of plain strings so a backslash in an awk regex stays a
-// backslash without template-literal escaping games.
-const GOOD_COMPOSITE_RUN = [
-  "analyze_body() {",
-  "  awk '",
-  "function scan_line(line,   lower, offset, chunk) {",
-  "  lower = tolower(line)",
-  "  offset = 0",
-  "  while (1) {",
-  "    chunk = substr(lower, offset + 1)",
-  "    if (!match(chunk, /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[ \\t]*:?[ \\t]*([a-z0-9_.-]+\\/[a-z0-9_.-]+)?#[0-9]+/)) break",
-  "    offset = offset + RSTART + RLENGTH - 1",
-  "  }",
-  "}",
-  "END {",
-  '  section_report("Summary")',
-  '  section_report("Fix")',
-  '  section_report("Verification")',
-  '  section_report("Related")',
-  '  if (tolower(body) ~ /(^|[^a-z0-9_])no (linked|related) issue([^a-z0-9_]|$)/) print "no-issue"',
-  "}",
-  "'",
-  "}",
-  "",
-].join("\n");
+// The two executable copies are vendored verbatim, because the behavioral
+// layer runs them: the composite's run.sh from ci-workflows
+// a932d486c5a4d0a959c42e60ff015f50cf2103f3 and the hook validator from
+// claude-code-plugins 53d5c6a09dfb5890b9767b447a28ca10ba922173. The `.txt`
+// suffix keeps the shell lint lanes off code this repository does not own.
+// Refresh them when either upstream changes shape the tests depend on.
+const readFixture = (name) =>
+  readFile(path.join(MODULE_DIRECTORY, "fixtures", "lockstep", name), "utf8");
+const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
+const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
 
 const GOOD_COMPOSITE_ACTION = [
   "name: pr-contract",
@@ -92,20 +90,6 @@ const GOOD_GATE = `
               /\\b(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s*(?:[\\w.-]+\\/[\\w.-]+)?#\\d+\\b/i;
             const NO_ISSUE_MARKER = /\\bno (?:linked|related) issue\\b/i;
 `;
-const GOOD_VALIDATOR = [
-  "CLOSING_ERE='(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:blank:]]*:?[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
-  "NON_CLOSING_ERE='^ {0,3}(refs|relates[[:blank:]]+to):[[:blank:]]*([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+[[:blank:]]*$'",
-  "NO_ISSUE_ERE='[^a-z0-9_]no (linked|related) issue[^a-z0-9_]'",
-  // The live `scan_linkage` operand lines, verbatim.
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-  '    lower="${line,,}"',
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-  '    while chunk="${lower:off}" && [[ "$chunk" =~ $CLOSING_ERE ]]; do',
-  `  lower=$'\\n'"\${1,,}"$'\\n'`,
-  '  [[ "$lower" =~ $NO_ISSUE_ERE ]]',
-  "REQUIRED_SECTIONS=(Summary Fix Verification Related)",
-  "",
-].join("\n");
 // The live org template's shape since .github#135: one escape, plain text, on
 // its own line inside the guidance comment an author reads and deletes. The
 // comment placement is load-bearing — masking it the way the composite masks a
@@ -139,7 +123,7 @@ const BACKTICKED_TEMPLATE = GOOD_TEMPLATE.replace(
 );
 const GOOD_RULES = [
   "# PR body contract",
-  "`Closes #<issue>` (`Fixes`/`Resolves`), or `No related issue: <reason>`.",
+  "`Closes #<issue>` (`Fixes`/`Resolves`), a `Refs: #<issue>` line, or `No related issue: <reason>`.",
   "Sections: `## Summary`, `## Fix`, `## Verification`, `## Related`.",
 ].join("\n\n");
 
@@ -356,6 +340,21 @@ test("rules file missing a section or keyword is reported", () => {
   assert.equal(errors.filter((e) => e.startsWith("rules file")).length, 2, errors.join("; "));
 });
 
+test("a rules file that names no non-closing marker is reported", () => {
+  const texts = goodTexts();
+  texts.rulesFile = texts.rulesFile.replace("a `Refs: #<issue>` line, ", "");
+  const errors = checkCopies(POLICY, texts);
+  assert.equal(errors.length, 1, errors.join("; "));
+  assert.match(
+    errors[0],
+    /^rules file \(non-closing markers\): mentions none of: Refs:, Relates to:/,
+  );
+  // The marker without the colon is not the form the gate reads.
+  const colonless = goodTexts();
+  colonless.rulesFile = colonless.rulesFile.replace("`Refs: #<issue>`", "`Refs #<issue>`");
+  assert.equal(checkCopies(POLICY, colonless).length, 1);
+});
+
 test("composite keyword/marker regressions are caught functionally, not by mention", () => {
   // Keyword stem removed from the DECLARED pattern while the word survives in
   // prose: a mention check would pass; the functional probe must not.
@@ -385,8 +384,10 @@ test("a composite that stops lowercasing the line is drift, not a pass", () => {
   const texts = goodTexts();
   texts.gateRun = texts.gateRun.replace("lower = tolower(line)", "lower = line");
   const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate composite"));
-  assert.equal(errors.length, 1);
+  assert.equal(errors.length, 2, errors.join("; "));
   assert.match(errors[0], /no longer lowercases the line/);
+  // Running it agrees: a capitalized keyword no longer closes.
+  assert.match(errors[1], /^gate composite \(behavior\): .*"Closes #12" should be closing/);
 });
 
 test("a composite at a consumer pin passes when it matches policy", () => {
@@ -447,32 +448,49 @@ test("validator keyword/marker regressions are caught functionally", () => {
 });
 
 test("validator CLOSING_ERE is read from its own declaration, not NON_CLOSING_ERE", () => {
-  const [closing, nonClosing, ...rest] = GOOD_VALIDATOR.split("\n");
-  const swapped = [nonClosing, closing, ...rest].join("\n");
+  const closing = GOOD_VALIDATOR.match(/^CLOSING_ERE=.*$/m)[0];
+  const nonClosing = GOOD_VALIDATOR.match(/^NON_CLOSING_ERE=.*$/m)[0];
+  const swapped = GOOD_VALIDATOR.replace(closing, "\0")
+    .replace(nonClosing, closing)
+    .replace("\0", nonClosing);
+  assert.notEqual(swapped, GOOD_VALIDATOR);
   assert.match(parseValidatorPatterns(swapped, "validator").keyword.source, /^\(close/);
-  assert.throws(() => parseValidatorPatterns([nonClosing, ...rest].join("\n"), "v"), DriftError);
+  assert.throws(
+    () => parseValidatorPatterns(GOOD_VALIDATOR.replace(`${closing}\n`, ""), "v"),
+    DriftError,
+  );
 });
 
 test("validator that matches its EREs against un-lowercased text is drift", () => {
+  // Each mutation is caught statically by name; running the hook confirms it
+  // where a capitalized sample actually changes verdict.
   const mutations = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-    ['lower="${line,,}"', 'lower="$line"', "CLOSING_ERE"],
-    ['"$chunk" =~ $CLOSING_ERE', '"$line" =~ $CLOSING_ERE', "CLOSING_ERE"],
-    ['"$lower" =~ $NO_ISSUE_ERE', '"$1" =~ $NO_ISSUE_ERE', "NO_ISSUE_ERE"],
+    ['    lower="${line,,}"', '    lower="$line"', "CLOSING_ERE", true],
+    ['"$chunk" =~ $CLOSING_ERE', '"$line" =~ $CLOSING_ERE', "CLOSING_ERE", true],
+    ['"$lower" =~ $NO_ISSUE_ERE', '"$1" =~ $NO_ISSUE_ERE', "NO_ISSUE_ERE", true],
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
-    ["${1,,}", "$1", "NO_ISSUE_ERE"],
+    ["${1,,}", "$1", "NO_ISSUE_ERE", true],
   ];
-  for (const [from, to, name] of mutations) {
+  for (const [from, to, name, behaves] of mutations) {
     const texts = goodTexts();
     texts.hookValidator = texts.hookValidator.replace(from, to);
     assert.notEqual(texts.hookValidator, GOOD_VALIDATOR, from);
     const errors = checkCopies(POLICY, texts);
-    assert.equal(errors.length, 1, from);
-    assert.match(errors[0], new RegExp(`^hook validator: .*no longer matches ${name}`), from);
+    assert.ok(
+      errors.every((error) => error.startsWith("hook validator")),
+      errors.join("; "),
+    );
+    assert.match(errors[0], new RegExp(`^hook validator: .*no longer matches ${name} `), from);
+    assert.equal(
+      errors.some((error) => error.startsWith("hook validator (behavior): ")),
+      behaves,
+      `${from}: ${errors.join("; ")}`,
+    );
   }
   // An extra raw-line match alongside the lowercased one is drift too.
   const texts = goodTexts();
-  texts.hookValidator += '[[ "$line" =~ $CLOSING_ERE ]]\n';
+  texts.hookValidator += '[[ "$line" =~ $CLOSING_ERE ]] || true\n';
   assert.equal(checkCopies(POLICY, texts).length, 1);
 });
 
@@ -483,12 +501,805 @@ test("stale reusable pin with current sections but stale keyword enforcement is 
   assert.match(errors[0], /rejects closing keyword "Resolves"/);
 });
 
+// ---------------------------------------------------------------------------
+// Non-closing references and negated closers (#647). Static extractors diff
+// the declared data; the behavioral layer runs the vendored copies on a
+// policy-generated matrix, so every mutation below that breaks behavior must
+// surface as a `(behavior)` finding whatever source shape it takes.
+// ---------------------------------------------------------------------------
+
+const NEGATION_DATA_FIELDS = [
+  "triggerWords",
+  "triggerSuffixes",
+  "affirmativePhrases",
+  "wordWindow",
+];
+const negationData = (negatedClosers) =>
+  Object.fromEntries(NEGATION_DATA_FIELDS.map((field) => [field, negatedClosers[field]]));
+
+// Mutate one copy and return its findings, asserting the text really changed.
+function mutate(copy, from, to) {
+  const texts = goodTexts();
+  texts[copy] = texts[copy].replace(from, to);
+  assert.notEqual(texts[copy], goodTexts()[copy], `mutation did not apply: ${from}`);
+  return checkCopies(POLICY, texts);
+}
+
+const LOCATION = { gateRun: "gate composite", hookValidator: "hook validator" };
+
+function assertOnlyBehavior(errors, copy, expected) {
+  assert.equal(errors.length, 1, errors.join("; "));
+  assert.ok(errors[0].startsWith(`${LOCATION[copy]} (behavior): `), errors[0]);
+  assert.match(errors[0], expected);
+}
+
+test("non-closing and negation parsers read the policy's values from both copies", () => {
+  const expectedMarkers = POLICY.body.nonClosingMarkers.map((marker) => marker.toLowerCase());
+  assert.deepEqual(parseValidatorNonClosing(GOOD_VALIDATOR, "hook").markers, expectedMarkers);
+  assert.deepEqual(parseCompositeNonClosing(GOOD_COMPOSITE_RUN, "gate").markers, expectedMarkers);
+  const expectedNegation = negationData(POLICY.body.negatedClosers);
+  assert.deepEqual(parseValidatorNegation(GOOD_VALIDATOR, "hook"), expectedNegation);
+  assert.deepEqual(parseCompositeNegation(GOOD_COMPOSITE_RUN, "gate"), expectedNegation);
+});
+
+test("the sample matrix covers every policy value, inside and just outside the window", () => {
+  const matrix = linkageMatrix(POLICY);
+  const lines = matrix.map(({ line }) => line);
+  const { body } = POLICY;
+  for (const term of [...body.closingKeywords, ...body.nonClosingMarkers, ...body.noIssueMarkers]) {
+    assert.ok(
+      lines.some((line) => line.includes(term)),
+      term,
+    );
+  }
+  const negated = matrix.filter(({ expect }) => expect.negated).map(({ expect }) => expect.negated);
+  for (const word of body.negatedClosers.triggerWords) {
+    assert.ok(negated.includes(word), word);
+  }
+  for (const suffix of body.negatedClosers.triggerSuffixes) {
+    assert.ok(
+      negated.some((word) => word.endsWith(suffix)),
+      suffix,
+    );
+  }
+  for (const delimiter of CLAUSE_DELIMITERS) {
+    assert.ok(
+      lines.some((line) => line.includes(`${delimiter} `)),
+      delimiter,
+    );
+  }
+  // Each trigger appears, for each closing keyword, once at the window's edge
+  // (negated) and once a word further out (closing).
+  const firstTrigger = body.negatedClosers.triggerWords[0];
+  const atEdge = matrix.filter(({ line }) => line.startsWith(`${firstTrigger} alpha `));
+  assert.deepEqual(
+    atEdge.map(({ expect }) => [expect.negated, expect.closing]),
+    body.closingKeywords.flatMap(() => [
+      [firstTrigger, false],
+      [null, true],
+    ]),
+  );
+});
+
+test("a composite with the negation call removed is behavioral drift", () => {
+  const errors = mutate(
+    "gateRun",
+    "    trigger = negation_trigger(line, start)\n",
+    '    trigger = ""\n',
+  );
+  assertOnlyBehavior(errors, "gateRun", /should be negated by "not", got closing/);
+});
+
+test("a hook whose negation helper never writes its result is behavioral drift", () => {
+  // The trigger branch's write into the caller-named variable: without it the
+  // helper still returns 0, the destination stays empty, and every negated
+  // closer counts as a valid one.
+  const errors = mutate("hookValidator", `      printf -v "$__plv_dest" '%s' "\${words[i]}"\n`, "");
+  assertOnlyBehavior(errors, "hookValidator", /should be unlinked \+ negated by "not", got linked/);
+});
+
+test("a dropped non-closing marker is drift statically and behaviorally, in either copy", () => {
+  const hook = mutate("hookValidator", "(refs|relates[[:blank:]]+to):", "(refs):");
+  assert.equal(hook.length, 2, hook.join("; "));
+  assert.match(
+    hook[0],
+    /^hook validator \(non-closing markers\): non-closing markers missing relates to/,
+  );
+  assert.match(
+    hook[1],
+    /^hook validator \(behavior\): .*"Relates to: #12" should be linked, got unlinked/,
+  );
+
+  const gate = mutate("gateRun", "(refs|relates[ \\t]+to):", "(refs):");
+  assert.equal(gate.length, 2, gate.join("; "));
+  assert.match(
+    gate[0],
+    /^gate composite \(non-closing markers\): non-closing markers missing relates to/,
+  );
+  assert.match(
+    gate[1],
+    /^gate composite \(behavior\): .*"Relates to: #12" should be non-closing, got no linkage/,
+  );
+});
+
+test("a declared marker policy does not name is static drift", () => {
+  const errors = mutate("hookValidator", "(refs|relates", "(refs|see|relates");
+  assert.equal(errors.length, 1, errors.join("; "));
+  assert.match(errors[0], /^hook validator \(non-closing markers\): .*unexpected see/);
+});
+
+test("a non-closing pattern that stops requiring its own line is behavioral drift", () => {
+  const errors = mutate("hookValidator", "#[0-9]+[[:blank:]]*$'", "#[0-9]+'");
+  assertOnlyBehavior(
+    errors,
+    "hookValidator",
+    /"Refs: #12 and more" should be unlinked, got linked/,
+  );
+});
+
+test("a policy marker no copy implements is drift in both copies, both ways", () => {
+  const policy = structuredClone(POLICY);
+  policy.body.nonClosingMarkers.push("Part of");
+  const errors = checkCopies(policy, goodTexts());
+  assert.equal(errors.length, 4, errors.join("; "));
+  assert.match(errors[0], /^gate composite \(non-closing markers\): .*missing part of/);
+  assert.match(errors[1], /^hook validator \(non-closing markers\): .*missing part of/);
+  assert.match(errors[2], /^gate composite \(behavior\): .*"Part of: #12"/);
+  assert.match(errors[3], /^hook validator \(behavior\): .*"Part of: #12"/);
+});
+
+// Each of these broke one link earlier review rounds had to find by reading
+// source: the helper's input, a verdict, the exception, the window.
+test("breaking how either copy reaches its verdict is behavioral drift", () => {
+  const cases = [
+    ["gateRun", "    words[count] = substr(tail, RSTART, RLENGTH)\n", "", /negated by/],
+    [
+      "gateRun",
+      "  tail = substr(preceding, cut + 1)",
+      "  tail = preceding",
+      /"It is not\. Closes #12"/,
+    ],
+    [
+      "gateRun",
+      '  if (has_non_closing) print "non-closing"\n',
+      "",
+      /"Refs: #12" should be non-closing/,
+    ],
+    [
+      "gateRun",
+      "count - 4 : 1",
+      "count - 5 : 1",
+      /echo Closes #12" should be closing, got negated/,
+    ],
+    // An early return ahead of the intact "not only" exception line.
+    [
+      "gateRun",
+      "    lower = tolower(word)\n",
+      "    lower = tolower(word)\n    if (lower ~ /^not$/) return word\n",
+      /"This not only closes #12" should be closing/,
+    ],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ["hookValidator", 'tail="${2##*[.!?;,]}"', 'tail="$2"', /"It is not, Closes #12"/],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ["hookValidator", "  n=${#words[@]}", "  n=0", /negated by/],
+    [
+      "hookValidator",
+      '[[ "$lower" =~ $NON_CLOSING_ERE ]] && found=0',
+      '[[ "$lower" =~ $NON_CLOSING_ERE ]] && :',
+      /"Refs: #12" should be linked, got unlinked/,
+    ],
+    [
+      "hookValidator",
+      '      if [[ -z "$_plv_trigger" ]]; then',
+      "      if true; then",
+      /should be unlinked \+ negated by "not", got linked/,
+    ],
+  ];
+  for (const [copy, from, to, expected] of cases) {
+    assertOnlyBehavior(mutate(copy, from, to), copy, expected);
+  }
+});
+
+test("the sample matrix hides every kind of linkage in every masked shape", () => {
+  const matrix = linkageMatrix(POLICY);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = POLICY.body;
+  const negatedCloser = `This does ${negatedClosers.triggerWords[0]} ${closingKeywords[0].toLowerCase()} #12`;
+  const hidden = [
+    `${closingKeywords[0]} #12`,
+    ...nonClosingMarkers.map((marker) => `${marker}: #12`),
+    negatedCloser,
+    `${noIssueMarkers[0]}: housekeeping`,
+  ];
+  const unlinked = { closing: false, nonClosing: false, noIssue: false, negated: null };
+  for (const [name, mask] of MASKINGS) {
+    for (const text of hidden) {
+      const sample = matrix.find(({ line }) => line === mask(text));
+      assert.ok(sample, `${name}: ${text}`);
+      assert.deepEqual(sample.expect, unlinked, `${name}: ${text}`);
+    }
+    const beside = matrix.find(({ line }) => line.startsWith(`${mask(negatedCloser)}\n\n`));
+    assert.ok(beside, `${name}: masked negated closer beside a marker`);
+    assert.deepEqual(beside.expect, { ...unlinked, nonClosing: true }, name);
+  }
+  for (const [name, mask] of UNTERMINATED_MASKINGS) {
+    for (const text of hidden) {
+      const sample = matrix.find(({ line }) => line === mask(text));
+      assert.ok(sample, `${name}: ${text}`);
+      assert.deepEqual(sample.expect, unlinked, `${name}: ${text}`);
+    }
+  }
+});
+
+// The masked samples exist for these mutations: a copy that scans the raw
+// body, or masks comments but not code, agrees with policy on every plain
+// sample and differs only where linkage is hidden.
+test("a copy that scans unmasked text is behavioral drift", () => {
+  const raw = mutate(
+    "hookValidator",
+    'scan_linkage "$_plv_body" || _plv_linked=1',
+    'scan_linkage "$1" || _plv_linked=1',
+  );
+  assertOnlyBehavior(raw, "hookValidator", /"<!-- Closes #12 -->" should be unlinked, got linked/);
+
+  const commentsOnly = mutate(
+    "hookValidator",
+    'scan_linkage "$_plv_body" || _plv_linked=1',
+    'scan_linkage "$_plv_stripped" || _plv_linked=1',
+  );
+  assertOnlyBehavior(
+    commentsOnly,
+    "hookValidator",
+    /"```\\nCloses #12\\n```" should be unlinked, got linked/,
+  );
+  assert.doesNotMatch(commentsOnly[0], /<!--/);
+
+  const texts = goodTexts();
+  texts.gateRun = texts.gateRun
+    .replace("  line = $0\n", "  line = $0\n  raw[NR] = line\n")
+    .replace("    scan_line(masked[i])", "    scan_line(raw[i])");
+  assert.equal((texts.gateRun.match(/raw\[/g) ?? []).length, 2, "mutation did not apply");
+  assertOnlyBehavior(
+    checkCopies(POLICY, texts),
+    "gateRun",
+    /"<!-- Closes #12 -->" should be no linkage, got closing/,
+  );
+});
+
+test("every closing keyword is probed in every negation shape", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, negatedClosers } = POLICY.body;
+  const [firstTrigger] = negatedClosers.triggerWords;
+  for (const keyword of closingKeywords) {
+    const lower = keyword.toLowerCase();
+    const shapes = [
+      `${firstTrigger} alpha bravo charlie delta ${keyword} #12`,
+      `${firstTrigger} alpha bravo charlie delta echo ${keyword} #12`,
+      ...CLAUSE_DELIMITERS.map((delimiter) => `It is ${firstTrigger}${delimiter} ${keyword} #12`),
+      ...NON_DELIMITERS.map((mark) => `It is ${firstTrigger}${mark} ${keyword} #12`),
+      ...negatedClosers.affirmativePhrases.map((phrase) => `This ${phrase} ${lower} #12`),
+      `This does ${firstTrigger} ${lower} #12\n${nonClosingMarkers[0]}: #13`,
+      ...MASKINGS.map(([, mask]) => mask(`This does ${firstTrigger} ${lower} #12`)),
+    ];
+    for (const shape of shapes) {
+      assert.ok(lines.includes(shape), shape);
+    }
+  }
+});
+
+// Each mutation below reads the policy correctly for the first closing
+// keyword, the only one the matrix once probed for negation.
+test("a copy that detects negation for one closing keyword only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    "    trigger = negation_trigger(line, start)\n",
+    '    trigger = (substr(lower, start, 5) == "close") ? negation_trigger(line, start) : ""\n',
+  );
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"not alpha bravo charlie delta Fixes #12" should be negated/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      negation_trigger_to _plv_trigger "${line:0:start}"\n',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      _plv_trigger=""\n      [[ "$m" == close* ]] && negation_trigger_to _plv_trigger "${line:0:start}"\n',
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"not alpha bravo charlie delta Fixes #12" should be unlinked \+ negated by "not", got linked/,
+  );
+});
+
+test("a copy that recognizes the suffix on one word only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    `    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+    `    if (lower != "doesn'"'"'t") continue\n    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+  );
+  assertOnlyBehavior(gate, "gateRun", /"This won't closes #12" should be negated/);
+
+  const hook = mutate(
+    "hookValidator",
+    `    case "$lower" in\n`,
+    `    [[ "$lower" == *"n't" && "$lower" != "doesn't" ]] && continue\n    case "$lower" in\n`,
+  );
+  assertOnlyBehavior(hook, "hookValidator", /"This won't closes #12" should be unlinked/);
+});
+
+test("a copy that folds case on the suffix for one word only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    `    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+    `    if (word != lower && lower ~ /n'"'"'t$/ && lower != "doesn'"'"'t") continue\n    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+  );
+  assertOnlyBehavior(gate, "gateRun", /"This WON'T closes #12" should be negated/);
+
+  const hook = mutate(
+    "hookValidator",
+    `    case "$lower" in\n`,
+    `    [[ "\${words[i]}" != "$lower" && "$lower" == *"n't" && "$lower" != "doesn't" ]] && continue\n    case "$lower" in\n`,
+  );
+  assertOnlyBehavior(hook, "hookValidator", /"This WON'T closes #12" should be unlinked/);
+});
+
+test("punctuation outside the clause delimiters keeps the negation window open", () => {
+  for (const mark of NON_DELIMITERS) {
+    assert.ok(!CLAUSE_DELIMITERS.includes(mark), mark);
+  }
+  const { closingKeywords, negatedClosers } = POLICY.body;
+  const [firstTrigger] = negatedClosers.triggerWords;
+  const matrix = linkageMatrix(POLICY);
+  for (const mark of NON_DELIMITERS) {
+    const sample = matrix.find(
+      ({ line }) => line === `It is ${firstTrigger}${mark} ${closingKeywords[0]} #12`,
+    );
+    assert.ok(sample, mark);
+    assert.equal(sample.expect.negated, firstTrigger, mark);
+    assert.equal(sample.expect.closing, false, mark);
+  }
+});
+
+test("a copy that treats a colon as a clause delimiter is behavioral drift", () => {
+  const gate = mutate("gateRun", 'ch == ";" || ch == ","', 'ch == ";" || ch == "," || ch == ":"');
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"It is not: Closes #12" should be negated by "not", got closing/,
+  );
+
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
+  const hook = mutate("hookValidator", 'tail="${2##*[.!?;,]}"', 'tail="${2##*[.!?;,:]}"');
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"It is not: Closes #12" should be unlinked \+ negated by "not", got linked/,
+  );
+});
+
+test("a copy that stops at the first closing reference on a line is behavioral drift", () => {
+  const gate = mutate("gateRun", "    offset = start + len - 1\n", "    offset = length(lower)\n");
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"Closes #11 but does not closes #12" should be closing \+ negated by "not", got closing/,
+  );
+  assert.match(gate[0], /"This does not closes #12; Closes #11" should be closing \+ negated/);
+
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+  const hook = mutate("hookValidator", "      off=$((start + len))\n", "      off=${#lower}\n");
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"Closes #11 but does not closes #12" should be linked \+ negated by "not", got linked/,
+  );
+  assert.match(hook[0], /"This does not closes #12; Closes #11" should be linked \+ negated/);
+});
+
+// The policy spells three keywords, but GitHub closes on all nine forms.
+test("a copy that negates only the policy's keyword spellings is behavioral drift", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  for (const form of GITHUB_CLOSING_KEYWORDS) {
+    assert.ok(
+      lines.some((line) => line.toLowerCase() === `${form} #12`),
+      form,
+    );
+    assert.ok(lines.includes(`This does not ${form} #12`), form);
+  }
+
+  const gate = mutate(
+    "gateRun",
+    "    trigger = negation_trigger(line, start)\n",
+    '    trigger = (substr(lower, start, len) ~ /^(closes|fixes|resolves)/) ? negation_trigger(line, start) : ""\n',
+  );
+  assertOnlyBehavior(
+    gate,
+    "gateRun",
+    /"This does not close #12" should be negated by "not", got closing/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      negation_trigger_to _plv_trigger "${line:0:start}"\n',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    '      _plv_trigger=""\n      [[ "$m" =~ ^(closes|fixes|resolves) ]] && negation_trigger_to _plv_trigger "${line:0:start}"\n',
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"This does not close #12" should be unlinked \+ negated by "not", got linked/,
+  );
+});
+
+// An opt-out does not excuse a negated closer: GitHub closes the issue anyway.
+test("a copy that skips negation once a body opts out is behavioral drift", () => {
+  const texts = goodTexts();
+  texts.gateRun = texts.gateRun
+    .replace(
+      '  body = ""\n',
+      '  for (i = 1; i <= line_count; i++) if (tolower(masked[i]) ~ /no (linked|related) issue/) opted_out = 1\n  body = ""\n',
+    )
+    .replace(
+      "    trigger = negation_trigger(line, start)\n",
+      '    trigger = opted_out ? "" : negation_trigger(line, start)\n',
+    );
+  assert.equal((texts.gateRun.match(/opted_out/g) ?? []).length, 2, "mutation did not apply");
+  assertOnlyBehavior(
+    checkCopies(POLICY, texts),
+    "gateRun",
+    /"No linked issue: housekeeping\\nThis does not closes #12" should be no-issue \+ negated by "not", got closing \+ no-issue/,
+  );
+
+  const hook = mutate(
+    "hookValidator",
+    '  LINKAGE_NEGATED=()\n  linkage::split_lines "$1"\n',
+    // The hook's own no-issue test, as scan_linkage runs it after the loop;
+    // `$$` is a literal `$` in a String.replace replacement.
+    `  LINKAGE_NEGATED=()\n  [[ $$'\\n'"\${1,,}"$$'\\n' =~ $NO_ISSUE_ERE ]] && return 0\n  linkage::split_lines "$1"\n`,
+  );
+  assertOnlyBehavior(
+    hook,
+    "hookValidator",
+    /"No linked issue: housekeeping\\nThis does not closes #12" should be linked \+ negated by "not", got linked/,
+  );
+});
+
+test("the sample matrix crosses a negated closer with every kind of linkage", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers } = POLICY.body;
+  const others = [
+    ...nonClosingMarkers.map((marker) => `${marker}: #13`),
+    ...noIssueMarkers.map((marker) => `${marker}: housekeeping`),
+  ];
+  for (const keyword of closingKeywords) {
+    const negated = `This does not ${keyword.toLowerCase()} #12`;
+    for (const text of [`${keyword} #11`, ...others]) {
+      assert.ok(lines.includes(`${text}\n${negated}`), `${text} then ${negated}`);
+      assert.ok(lines.includes(`${negated}\n${text}`), `${negated} then ${text}`);
+    }
+  }
+  for (const first of [`${closingKeywords[0]} #11`, ...others]) {
+    for (const second of [`${closingKeywords[0]} #11`, ...others]) {
+      if (first !== second) {
+        assert.ok(lines.includes(`${first}\n${second}`), `${first} then ${second}`);
+      }
+    }
+  }
+});
+
+test("the sample matrix varies case, apostrophes and the window's word rules", () => {
+  const lines = linkageMatrix(POLICY).map(({ line }) => line);
+  const { closingKeywords, nonClosingMarkers, noIssueMarkers, negatedClosers } = POLICY.body;
+  for (const keyword of closingKeywords) {
+    const lower = keyword.toLowerCase();
+    for (const shape of [
+      `${keyword.toUpperCase()} #12`,
+      `${keyword}: #12`,
+      `${keyword} #11\nThis does not ${lower} #12`,
+      `This does not ${lower} #12\n${keyword} #11`,
+      `not\n${keyword} #12`,
+      ...negatedClosers.triggerWords.map((word) => `This ${word.toUpperCase()} ${lower} #12`),
+      `This DOESN\u2019T ${lower} #12`,
+      `This NOT ONLY ${lower} #12`,
+      `This Not Only ${lower} #12`,
+    ]) {
+      assert.ok(lines.includes(shape), JSON.stringify(shape));
+    }
+  }
+  for (const marker of [...nonClosingMarkers, ...noIssueMarkers]) {
+    assert.ok(
+      lines.some((line) => line.startsWith(marker.toUpperCase())),
+      marker,
+    );
+  }
+});
+
+// Each copy folds case in several places and normalizes the typographic
+// apostrophe; undoing any one of them must change a verdict on the matrix.
+test("undoing any normalization step in either copy is behavioral drift", () => {
+  const cases = [
+    ["gateRun", "    lower = tolower(word)\n", "    lower = word\n", /"This NOT closes #12"/],
+    [
+      "gateRun",
+      'tolower(words[i + 1]) == "only"',
+      'words[i + 1] == "only"',
+      /"This NOT ONLY closes #12" should be closing, got negated by "NOT"/,
+    ],
+    [
+      "gateRun",
+      `if (tolower(substr(word, length(word) - 2)) == "n'"'"'t")`,
+      `if (substr(word, length(word) - 2) == "n'"'"'t")`,
+      /"This DOESN'T closes #12" should be negated by "DOESN'T", got closing/,
+    ],
+    [
+      "gateRun",
+      `  gsub("\\342\\200\\231", "'"'"'", tail)\n`,
+      "",
+      /"This doesn\u2019t closes #12" should be negated by "doesn't", got closing/,
+    ],
+    [
+      "gateRun",
+      "    rest = tolower(substr(line, indent + 1))\n",
+      "    rest = substr(line, indent + 1)\n",
+      /"REFS: #12" should be non-closing, got no linkage/,
+    ],
+    [
+      "gateRun",
+      "  if (tolower(body) ~ /(^|",
+      "  if (body ~ /(^|",
+      /"No linked issue: housekeeping" should be no-issue, got no linkage/,
+    ],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+    ["hookValidator", 'lower="${words[i],,}"', 'lower="${words[i]}"', /"This NOT closes #12"/],
+    [
+      "hookValidator",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '[[ "${words[i + 1],,}" == only ]]',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '[[ "${words[i + 1]}" == only ]]',
+      /"This NOT ONLY closes #12" should be linked, got unlinked \+ negated by "NOT"/,
+    ],
+    [
+      "hookValidator",
+      `  tail="\${tail//$'\\xe2\\x80\\x99'/\\'}"\n`,
+      "",
+      /"This doesn\u2019t closes #12" should be unlinked \+ negated by "doesn't", got linked/,
+    ],
+    [
+      "hookValidator",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    lower="${line,,}"\n',
+      '    lower="$line"\n',
+      /"CLOSES #12" should be linked/,
+    ],
+    [
+      "hookValidator",
+      `  lower=$'\\n'"\${1,,}"$'\\n'`,
+      // `$$` is a literal `$` in a String.replace replacement; a bare `$'`
+      // would splice in the rest of the file.
+      `  lower=$$'\\n'"$1"$$'\\n'`,
+      /"No linked issue: housekeeping" should be linked, got unlinked/,
+    ],
+  ];
+  // A static extractor may name the same edit too; the behavioral finding
+  // must be there either way, and nothing outside the mutated copy may fire.
+  for (const [copy, from, to, expected] of cases) {
+    const errors = mutate(copy, from, to);
+    const behavior = errors.filter((error) => error.startsWith(`${LOCATION[copy]} (behavior): `));
+    assert.equal(behavior.length, 1, errors.join("; "));
+    assert.match(behavior[0], expected);
+    for (const error of errors) {
+      assert.ok(error.startsWith(LOCATION[copy]), error);
+    }
+  }
+});
+
+test("every sample body fills the policy's own required sections", () => {
+  const tail = "\n\n## Summary\ns\n\n## Fix\nf\n\n## Verification\nv\n\n## Related\nr\n";
+  for (const { line, body } of linkageMatrix(POLICY)) {
+    assert.equal(body, `${line}${tail}`);
+  }
+  const policy = structuredClone(POLICY);
+  policy.body.requiredSections = ["Motivation", "Test plan"];
+  for (const { line, body } of linkageMatrix(policy)) {
+    assert.equal(body, `${line}\n\n## Motivation\nm\n\n## Test plan\nt\n`);
+  }
+});
+
+test("the window samples follow any schema-valid wordWindow", () => {
+  const policy = structuredClone(POLICY);
+  policy.body.negatedClosers.wordWindow = 40;
+  const [trigger] = policy.body.negatedClosers.triggerWords;
+  const [closer] = policy.body.closingKeywords;
+  const edge = linkageMatrix(policy).filter(({ line }) =>
+    new RegExp(`^${trigger} [a-z ]+ ${closer} #12$`).test(line),
+  );
+  const widths = edge.map(({ line }) => line.split(" ").length - 3).sort((a, b) => a - b);
+  assert.deepEqual(widths, [39, 40]);
+  for (const { line } of edge) {
+    const words = line.split(" ").slice(1, -2);
+    assert.equal(new Set(words).size, words.length, line);
+    for (const word of words) {
+      assert.match(word, /^[a-z]+$/);
+    }
+  }
+});
+
+test("a trigger list change is named statically and confirmed behaviorally", () => {
+  const hook = mutate("hookValidator", " | intentionally", "");
+  assert.equal(hook.length, 2, hook.join("; "));
+  assert.match(
+    hook[0],
+    /^hook validator \(negated closers\): .*triggerWords missing intentionally/,
+  );
+  assert.match(hook[1], /^hook validator \(behavior\): .*negated by "intentionally"/);
+
+  const gate = mutate(
+    "gateRun",
+    'lower == "without" ||',
+    'lower == "without" || lower == "alpha" ||',
+  );
+  assert.ok(gate[0].startsWith("gate composite (negated closers): "), gate[0]);
+  assert.match(gate[0], /unexpected alpha/);
+  assert.ok(gate.some((error) => error.startsWith("gate composite (behavior): ")));
+});
+
+test("a run.sh that stops feeding the PR body through analyze_body is drift", () => {
+  const invocation = '  analyze_body <"$scratch/body.txt" >"$analysis"\n';
+  const cases = [
+    [invocation, "  printf 'closing\\n' >\"$analysis\"\n", /analyze_body writes the report/],
+    [invocation, '  analyze_body </dev/null >"$analysis"\n', /analyze_body writes the report/],
+    [
+      invocation,
+      `${invocation}  printf 'closing\\n' >>"$analysis"\n`,
+      /nothing else writes the report/,
+    ],
+    [
+      `jq -r '.body // ""' <"$pr_json" >"$scratch/body.txt"`,
+      `printf '' >"$scratch/body.txt"`,
+      /the PR body is written to the analyzer's input/,
+    ],
+  ];
+  for (const [from, to, expected] of cases) {
+    const errors = mutate("gateRun", from, to);
+    assert.equal(errors.length, 1, errors.join("; "));
+    assert.match(errors[0], /^gate composite \(verdict\): /);
+    assert.match(errors[0], expected);
+  }
+});
+
+test("a run.sh whose report consumers stop reading the report or raising errors is drift", () => {
+  const cases = [
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    negated_quoted+="\\"${text}\\" (trigger \\"${trigger}\\")"\n  done <"$analysis"',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '    negated_quoted+="\\"${text}\\" (trigger \\"${trigger}\\")"\n  done </dev/null',
+      /a `negated` report is a linkage error/,
+    ],
+    [
+      '    *) ;;\n    esac\n  done <"$analysis"',
+      "    *) ;;\n    esac\n  done </dev/null",
+      /a missing or empty section report/,
+    ],
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '      linkage_errors+=("The \\"## ${name}\\" section is empty.")\n',
+      "      :\n",
+      /a missing or empty section report/,
+    ],
+    [
+      "    ! grep -qx 'no-issue' \"$analysis\"; then\n    linkage_errors+=(",
+      "    ! grep -qx 'no-issue' \"$analysis\"; then\n    : linkage_errors+=(",
+      /a `non-closing` report satisfies linkage/,
+    ],
+    ["    linkage_result=fail\n", "    linkage_result=pass\n", /a linkage error fails the check/],
+  ];
+  for (const [from, to, expected] of cases) {
+    const errors = mutate("gateRun", from, to);
+    assert.equal(errors.length, 1, errors.join("; "));
+    assert.match(errors[0], /^gate composite \(verdict\): /);
+    assert.match(errors[0], expected);
+  }
+});
+
+test("a run.sh that stops acting on the analyzer's report is drift", () => {
+  const ignored = mutate("gateRun", '    [[ "$kind" == negated ]] || continue', "    continue");
+  assert.equal(ignored.length, 1, ignored.join("; "));
+  assert.match(ignored[0], /^gate composite \(verdict\): .*a `negated` report is a linkage error/);
+
+  const unread = mutate("gateRun", "    ! grep -qx 'non-closing' \"$analysis\" &&\n", "");
+  assert.equal(unread.length, 1, unread.join("; "));
+  assert.match(
+    unread[0],
+    /^gate composite \(verdict\): .*a `non-closing` report satisfies linkage/,
+  );
+});
+
+test("a composite pin without the non-closing or negation rules is drift at that pin", () => {
+  const stale = GOOD_COMPOSITE_RUN.replace("(refs|relates[ \\t]+to):", "(refs):").replace(
+    'lower == "deliberately" || ',
+    "",
+  );
+  const errors = checkPinnedComposite(
+    POLICY,
+    "medley",
+    "f".repeat(40),
+    stale,
+    GOOD_COMPOSITE_ACTION,
+  );
+  assert.equal(errors.length, 3, errors.join("; "));
+  assert.match(errors[0], /^caller medley pin fffffff: non-closing markers missing relates to/);
+  assert.match(errors[1], /^caller medley pin fffffff: negated-closer rule .*missing deliberately/);
+  assert.match(errors[2], /^caller medley pin fffffff \(behavior\): /);
+});
+
+test("code the behavioral layer cannot run is drift, never a pass", () => {
+  assert.throws(
+    () => checkCompositeBehavior("#!/usr/bin/env bash\n", POLICY, "composite"),
+    /no `analyze_body\(\) \{ awk '\.\.\.' \}` analyzer/,
+  );
+  assert.throws(() => checkHookBehavior("return 1\n", POLICY, "hook"), /does not source cleanly/);
+  assert.throws(
+    () => checkHookBehavior("true\n", POLICY, "hook"),
+    /no longer defines linkage::problems/,
+  );
+  assert.throws(
+    () => checkHookBehavior("linkage::problems() { exit 7; }\n", POLICY, "hook"),
+    (error) => error instanceof DriftError && /harness exited 7/.test(error.message),
+  );
+});
+
+test("the composite's analyzer runs sandboxed: system() is refused", () => {
+  const escaping = GOOD_COMPOSITE_RUN.replace("END {\n", 'END {\n  system("echo escaped")\n');
+  assert.notEqual(escaping, GOOD_COMPOSITE_RUN);
+  assert.throws(
+    () => checkCompositeBehavior(escaping, POLICY, "composite"),
+    (error) => error instanceof DriftError && /analyzer exited 2/.test(error.message),
+  );
+});
+
+test("the hook runs with no inherited environment", () => {
+  // A probe library that reports what it can see: the lane token must not
+  // reach code fetched from another repository.
+  // The probe passes every body when it sees a clean environment and fails
+  // every body when it sees the token or HOME, so a leak shows up as the very
+  // first sample, a plain closing keyword, reported unlinked.
+  process.env.LOCKSTEP_GITHUB_TOKEN = "must-not-leak";
+  try {
+    const probe = [
+      "LINKAGE_PROBLEMS=()",
+      "linkage::problems() {",
+      "  LINKAGE_PROBLEMS=()",
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '  [[ -z "${LOCKSTEP_GITHUB_TOKEN:-}${GITHUB_TOKEN:-}${HOME:-}" ]] || LINKAGE_PROBLEMS=(leak)',
+      "}",
+    ].join("\n");
+    assert.throws(
+      () => checkHookBehavior(probe, POLICY, "hook"),
+      (error) =>
+        error instanceof DriftError &&
+        /should be unlinked, got linked/.test(error.message) &&
+        !error.message.includes('"Closes #12" should be linked'),
+    );
+  } finally {
+    delete process.env.LOCKSTEP_GITHUB_TOKEN;
+  }
+});
+
 test("unparsable sources throw DriftError, never pass silently", () => {
   assert.throws(() => parseCompositeSections("#!/usr/bin/env bash\n", "composite"), DriftError);
   assert.throws(() => parseCompositeTypes("name: pr-contract\n", "composite"), DriftError);
   assert.throws(() => parseGateSections("jobs: {}", "gate"), DriftError);
   assert.throws(() => parseValidatorSections("echo hi", "validator"), DriftError);
   assert.throws(() => parseCallerPin("uses: something-else", "caller"), DriftError);
+  assert.throws(() => parseCompositeNonClosing("#!/usr/bin/env bash\n", "composite"), DriftError);
+  assert.throws(() => parseCompositeNegation("#!/usr/bin/env bash\n", "composite"), DriftError);
+  assert.throws(() => parseValidatorNegation("echo hi", "validator"), DriftError);
 });
 
 // ---------------------------------------------------------------------------

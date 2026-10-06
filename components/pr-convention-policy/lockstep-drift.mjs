@@ -32,6 +32,7 @@ import { pathToFileURL } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
+import { checkCompositeBehavior, checkHookBehavior } from "./lockstep-behavior.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
 const MODULE_DIRECTORY = import.meta.dirname;
@@ -304,6 +305,23 @@ const VALIDATOR_OPERANDS = {
   NO_ISSUE_ERE: { operand: "lower", sources: [`lower=$'\\n'"\${1,,}"$'\\n'`] },
 };
 
+function assertValidatorOperand(shellText, name, location) {
+  const { operand, sources } = VALIDATOR_OPERANDS[name];
+  const uses = [...shellText.matchAll(new RegExp(`"\\$(\\w+)" =~ \\$${name}\\b`, "g"))];
+  const lowercased =
+    uses.length > 0 &&
+    uses.every((use) => use[1] === operand) &&
+    sources.every((source) => shellText.includes(source));
+  if (!lowercased) {
+    throw new DriftError(
+      `${location}: scan_linkage no longer matches ${name} only against the lowercased \`$${operand}\` (${sources.join(", ")}), so the extracted pattern is not the one the hook applies`,
+    );
+  }
+}
+
+const ereToJs = (ere) =>
+  new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
+
 export function parseValidatorPatterns(shellText, location) {
   // Line-anchored, so the sibling NON_CLOSING_ERE declaration never matches.
   const keyword = shellText.match(/^CLOSING_ERE='([^']+)'/m);
@@ -311,21 +329,163 @@ export function parseValidatorPatterns(shellText, location) {
   if (!keyword || !marker) {
     throw new DriftError(`${location}: CLOSING_ERE / NO_ISSUE_ERE declarations not found`);
   }
-  for (const [name, { operand, sources }] of Object.entries(VALIDATOR_OPERANDS)) {
-    const uses = [...shellText.matchAll(new RegExp(`"\\$(\\w+)" =~ \\$${name}\\b`, "g"))];
-    const lowercased =
-      uses.length > 0 &&
-      uses.every((use) => use[1] === operand) &&
-      sources.every((source) => shellText.includes(source));
-    if (!lowercased) {
+  assertValidatorOperand(shellText, "CLOSING_ERE", location);
+  assertValidatorOperand(shellText, "NO_ISSUE_ERE", location);
+  return { keyword: ereToJs(keyword[1]), marker: ereToJs(marker[1]) };
+}
+
+// ---------------------------------------------------------------------------
+// Non-closing references and negated closers (`body.nonClosingMarkers` and
+// `body.negatedClosers`). Two layers: the static extractors below diff the
+// DATA each copy declares (marker alternation, trigger words, suffix,
+// affirmative phrase, window) against policy, so a drifted list is named
+// precisely; `lockstep-behavior.mjs` then RUNS each copy on sample bodies
+// generated from policy, which proves the rule is wired from declaration to
+// verdict whatever shape the code takes. The behavioral layer replaced a chain
+// of source-shape regexes that every review round found one more gap in.
+// ---------------------------------------------------------------------------
+
+// The marker alternation is the first group of the pattern, after the `^`
+// anchor and the hook's `{0,3}` indent allowance (the composite strips that
+// indent before matching). A multi-word marker spells its gap as a blank-class
+// run; it is read back as one space so it compares to the policy's spelling.
+function nonClosingAlternation(pattern, location) {
+  const group = pattern.match(/^\^(?: \{0,3\})?\(([^()]+)\):/);
+  if (!group) {
+    throw new DriftError(
+      `${location}: the non-closing pattern does not open with an anchored \`^(<marker>|...):\` group: ${pattern}`,
+    );
+  }
+  return group[1]
+    .split("|")
+    .map((marker) => marker.replaceAll(/\[\[:blank:\]\]\+|\[ \\t\]\+/g, " "));
+}
+
+export function parseValidatorNonClosing(shellText, location) {
+  const declaration = shellText.match(/^NON_CLOSING_ERE='([^']+)'/m);
+  if (!declaration) {
+    throw new DriftError(`${location}: NON_CLOSING_ERE declaration not found`);
+  }
+  return { markers: nonClosingAlternation(declaration[1], location) };
+}
+
+export function parseCompositeNonClosing(runShText, location) {
+  const declaration = runShText.match(/rest ~ \/(.+)\/\) \{\s*has_non_closing = 1/);
+  if (!declaration) {
+    throw new DriftError(
+      `${location}: the \`rest ~ /.../\` non-closing marker test (has_non_closing = 1) was not found in run.sh`,
+    );
+  }
+  return { markers: nonClosingAlternation(declaration[1], location) };
+}
+
+// The behavioral layer runs the composite's analyzer, not the bash around it:
+// the rest of run.sh calls the GitHub API and cannot run here. The two lines
+// that turn the analyzer's `non-closing` and `negated` reports into the
+// verdict are therefore checked as source. They are the only links of the
+// chain left static.
+export function assertCompositeVerdictReads(runShText, location) {
+  // The behavioral check runs analyze_body on its own, so the wiring from the
+  // PR body through analyze_body into the report run.sh reads is checked here:
+  // the body file holds the PR body, the report is analyze_body's output, and
+  // nothing else writes the report.
+  const reportWrites = runShText.match(/>>?\s*"\$analysis"/g) ?? [];
+  const links = [
+    [
+      "the PR body is written to the analyzer's input",
+      /jq -r '\.body \/\/ ""' <"\$pr_json" >"\$scratch\/body\.txt"/,
+    ],
+    [
+      "analyze_body writes the report run.sh reads",
+      /analysis="\$scratch\/analysis\.txt"\s*\n\s*analyze_body <"\$scratch\/body\.txt" >"\$analysis"\n/,
+    ],
+    ["nothing else writes the report", { test: () => reportWrites.length === 1 }],
+    // Each consumer below is bound to its input (the report) and to the error
+    // it raises, so redirecting a loop or dropping its error is caught.
+    [
+      "a missing or empty section report is a linkage error",
+      /while IFS=\$'\\t' read -r kind name _rest; do\s*\n\s*case "\$kind" in\s*\n\s*section-missing\)\s*\n\s*linkage_errors\+=\("Missing a \\"## \$\{name\}\\" section\.[^\n]*\n\s*;;\s*\n\s*section-empty\)\s*\n\s*linkage_errors\+=\("The \\"## \$\{name\}\\" section is empty\."\)\s*\n\s*;;\s*\n\s*\*\) ;;\s*\n\s*esac\s*\n\s*done <"\$analysis"\n/,
+    ],
+    [
+      "a `non-closing` report satisfies linkage",
+      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then\s*\n\s*linkage_errors\+=\('Missing a native closing keyword/,
+    ],
+    [
+      "a `negated` report is a linkage error",
+      /negated_quoted=""\s*\n\s*while IFS=\$'\\t' read -r kind text trigger; do\s*\n\s*\[\[ "\$kind" == negated \]\] \|\| continue\n(?:(?!\bdone\b)[\s\S])*?done <"\$analysis"\n\s*\n\s*if \[\[ -n "\$negated_quoted" \]\]; then\s*\n\s*linkage_errors\+=\("Negated closing reference/,
+    ],
+    [
+      "a linkage error fails the check",
+      /if \[\[ \$\{#linkage_errors\[@\]\} -gt 0 \]\]; then\s*\n\s*linkage_result=fail\n/,
+    ],
+  ];
+  const missing = links.filter(([, pattern]) => !pattern.test(runShText));
+  if (missing.length > 0) {
+    throw new DriftError(
+      `${location}: run.sh no longer acts on the analyzer's report: ${missing.map(([link]) => link).join("; ")}`,
+    );
+  }
+}
+
+// The awk program is single-quoted bash, so an apostrophe inside it is spelled
+// `'"'"'`; read it back as the apostrophe awk sees.
+const unquoteAwk = (text) => text.replaceAll(`'"'"'`, "'");
+
+export function parseValidatorNegation(shellText, location) {
+  const window = shellText.match(/\(\(n > (\d+)\)\) && first=\$\(\(n - (\d+)\)\)/);
+  const affirmative = shellText.match(
+    /\[\[ "\$lower" == (\w+) \]\] && \(\(i \+ 1 < n\)\) && \[\[ "\$\{words\[i \+ 1\],,\}" == (\w+) \]\] && continue/,
+  );
+  const cases = shellText.match(/case "\$lower" in\s*\n\s*([^\n)]+)\)/);
+  if (!window || !affirmative || !cases) {
+    throw new DriftError(
+      `${location}: negation_trigger_to's window, "not only" exception, or trigger \`case\` not found`,
+    );
+  }
+  const words = [];
+  const suffixes = [];
+  for (const alternative of cases[1].split("|").map((item) => item.trim())) {
+    const suffix = alternative.match(/^\*"([^"]+)"$/);
+    if (suffix) {
+      suffixes.push(suffix[1]);
+    } else if (/^[a-z]+$/.test(alternative)) {
+      words.push(alternative);
+    } else {
       throw new DriftError(
-        `${location}: scan_linkage no longer matches ${name} only against the lowercased \`$${operand}\` (${sources.join(", ")}), so the extracted pattern is not the one the hook applies`,
+        `${location}: negation_trigger_to has a trigger alternative this check cannot read: ${alternative}`,
       );
     }
   }
-  const toJs = (ere) =>
-    new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
-  return { keyword: toJs(keyword[1]), marker: toJs(marker[1]) };
+  return {
+    triggerWords: words,
+    triggerSuffixes: suffixes,
+    affirmativePhrases: [`${affirmative[1]} ${affirmative[2]}`],
+    wordWindow: Number(window[1]),
+  };
+}
+
+export function parseCompositeNegation(runShText, location) {
+  const window = runShText.match(/first = \(count > (\d+)\) \? count - (\d+) : 1/);
+  const affirmative = runShText.match(
+    /if \(lower == "(\w+)" && i < count && tolower\(words\[i \+ 1\]\) == "(\w+)"\) continue/,
+  );
+  const triggers = runShText.match(
+    /if \((lower == "\w+"(?:\s*\|\|\s*lower == "\w+")*)\) return word/,
+  );
+  const suffix = unquoteAwk(runShText).match(
+    /if \(tolower\(substr\(word, length\(word\) - (\d+)\)\) == "([^"]+)"\) return word/,
+  );
+  if (!window || !affirmative || !triggers || !suffix) {
+    throw new DriftError(
+      `${location}: negation_trigger's window, "not only" exception, trigger words, or suffix test not found in run.sh`,
+    );
+  }
+  return {
+    triggerWords: [...triggers[1].matchAll(/lower == "(\w+)"/g)].map((m) => m[1]),
+    triggerSuffixes: [suffix[2]],
+    affirmativePhrases: [`${affirmative[1]} ${affirmative[2]}`],
+    wordWindow: Number(window[1]),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +567,47 @@ function assertPatternsEnforce(patterns, policy, location, { lowercaseProbe = fa
   }
 }
 
+function setDifference(actual, expected) {
+  const parts = [];
+  const missing = expected.filter((item) => !actual.includes(item));
+  const unexpected = actual.filter((item) => !expected.includes(item));
+  if (missing.length > 0) {
+    parts.push(`missing ${missing.join(", ")}`);
+  }
+  if (unexpected.length > 0) {
+    parts.push(`unexpected ${unexpected.join(", ")}`);
+  }
+  return parts.join("; ");
+}
+
+// The declared marker alternation must be exactly the policy's set. How the
+// pattern behaves (own line, indent, case, trailing text) is the behavioral
+// layer's job.
+function assertNonClosing({ markers }, policy, location) {
+  const expected = policy.body.nonClosingMarkers.map((marker) => marker.toLowerCase());
+  const difference = setDifference(markers, expected);
+  if (difference !== "") {
+    throw new DriftError(`${location}: non-closing markers ${difference}`);
+  }
+}
+
+function assertNegation(actual, policy, location) {
+  const expected = policy.body.negatedClosers;
+  const problems = [];
+  for (const field of ["triggerWords", "triggerSuffixes", "affirmativePhrases"]) {
+    const difference = setDifference(actual[field], expected[field]);
+    if (difference !== "") {
+      problems.push(`${field} ${difference}`);
+    }
+  }
+  if (actual.wordWindow !== expected.wordWindow) {
+    problems.push(`wordWindow is ${actual.wordWindow}, policy says ${expected.wordWindow}`);
+  }
+  if (problems.length > 0) {
+    throw new DriftError(`${location}: negated-closer rule ${problems.join(", ")}`);
+  }
+}
+
 function assertExactSections(actual, expected, location) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new DriftError(
@@ -419,20 +620,12 @@ function assertExactSections(actual, expected, location) {
 // the list — so the comparison is set-wise and the message names the exact
 // divergence rather than printing two lists to diff by eye.
 function assertAllowedTypes(actual, expected, location) {
-  const missing = expected.filter((type) => !actual.includes(type));
-  const unexpected = actual.filter((type) => !expected.includes(type));
-  if (missing.length === 0 && unexpected.length === 0) {
+  const difference = setDifference(actual, expected);
+  if (difference === "") {
     return;
   }
-  const parts = [];
-  if (missing.length > 0) {
-    parts.push(`missing ${missing.join(", ")}`);
-  }
-  if (unexpected.length > 0) {
-    parts.push(`unexpected ${unexpected.join(", ")}`);
-  }
   throw new DriftError(
-    `${location}: allowed title types ${parts.join("; ")} (declared: ${actual.join(", ")})`,
+    `${location}: allowed title types ${difference} (declared: ${actual.join(", ")})`,
   );
 }
 
@@ -665,6 +858,18 @@ export function checkCopies(policy, texts) {
   run(() =>
     assertMentionsAny(texts.rulesFile, policy.body.noIssueMarkers, "rules file (no-issue markers)"),
   );
+  // The same holds for linking without closing: the rules file must steer an
+  // author to one non-closing marker, in the `<marker>:` form the gate reads,
+  // so a session that must not close an issue is not pushed toward a false
+  // no-issue marker or a negated closer. The org template is not held to this
+  // yet: it lives in another repository and names no marker in that form.
+  run(() =>
+    assertMentionsAny(
+      texts.rulesFile,
+      policy.body.nonClosingMarkers.map((marker) => `${marker}:`),
+      "rules file (non-closing markers)",
+    ),
+  );
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
     assertMentionsAnyRendered(
@@ -681,6 +886,37 @@ export function checkCopies(policy, texts) {
       { lowercaseProbe: true },
     ),
   );
+  run(() =>
+    assertNonClosing(
+      parseCompositeNonClosing(texts.gateRun, "gate composite (non-closing markers)"),
+      policy,
+      "gate composite (non-closing markers)",
+    ),
+  );
+  run(() =>
+    assertNegation(
+      parseCompositeNegation(texts.gateRun, "gate composite (negated closers)"),
+      policy,
+      "gate composite (negated closers)",
+    ),
+  );
+  run(() =>
+    assertNonClosing(
+      parseValidatorNonClosing(texts.hookValidator, "hook validator (non-closing markers)"),
+      policy,
+      "hook validator (non-closing markers)",
+    ),
+  );
+  run(() =>
+    assertNegation(
+      parseValidatorNegation(texts.hookValidator, "hook validator (negated closers)"),
+      policy,
+      "hook validator (negated closers)",
+    ),
+  );
+  run(() => checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)"));
+  run(() => assertCompositeVerdictReads(texts.gateRun, "gate composite (verdict)"));
+  run(() => checkHookBehavior(texts.hookValidator, policy, "hook validator (behavior)"));
   return errors;
 }
 
@@ -691,7 +927,10 @@ function pinLabel(sha) {
 // Validates the full contract at the pin — sections AND the executable
 // keyword/marker patterns — so a pinned reusable whose section list matches
 // current policy but whose keyword or marker enforcement is stale still
-// reports drift.
+// reports drift. The non-closing and negated-closer rules are not checked
+// here: the reusable is the transition-only predecessor, it gained them only
+// late (ci-workflows#544) and states them in JavaScript this module has no
+// extractor for, and the composite carries them at every pin since v0.20.0.
 export function checkPinnedReusable(policy, repo, sha, reusableText) {
   const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
@@ -707,8 +946,9 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
   return errors;
 }
 
-// The composite's equivalent: sections and enforcement patterns from `run.sh`,
-// allowed title types and `require-scope` from `action.yml`. Both title axes
+// The composite's equivalent: sections, enforcement patterns, the non-closing
+// marker test and the negation rule from `run.sh`, allowed title types and
+// `require-scope` from `action.yml`. Both title axes
 // are checked at the pin because a consumer pinned to a pre-`security`
 // composite would reject a `security:` title that policy allows, and one
 // pinned to a `require-scope: true` composite would reject every unscoped
@@ -743,6 +983,10 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
       location,
     ),
   );
+  run(() => assertNonClosing(parseCompositeNonClosing(runShText, location), policy, location));
+  run(() => assertNegation(parseCompositeNegation(runShText, location), policy, location));
+  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`));
+  run(() => assertCompositeVerdictReads(runShText, `${location} (verdict)`));
   return errors;
 }
 
