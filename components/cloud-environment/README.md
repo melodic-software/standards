@@ -221,7 +221,14 @@ cases the caller deletes the old id.
 private host only, the Access pair. They reach `curl` only as
 `header = "..."` lines on its stdin (`--config -`), never in argv; the public
 host never receives the Access headers. Requests are `https` only and send
-`Content-Type: text/html; charset=utf-8`.
+`Content-Type: text/html; charset=utf-8`. `curl` runs with `-q` first, so no
+`.curlrc` can add a second destination for those headers; `vault-exec` does the
+same for its Key Vault reads.
+
+**Trusted inputs.** A caller-set `HTTPS_PROXY` or `CURL_CA_BUNDLE` is honored by
+design: cloud sessions route through the agent proxy with its CA bundle. The
+config file is trusted once it passes the owner and mode 0600 check, since
+forging it needs write access to the home directory.
 
 **Setup.** After `vault-exec`, the script installs `pages-publish` to
 `~/.local/bin/pages-publish` the same way: a copy without the marker line is

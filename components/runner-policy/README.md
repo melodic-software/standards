@@ -1113,6 +1113,11 @@ step, using the target-scoped App token it already minted, that waits up to 30
 minutes for a previous sync PR in the target's merge queue to leave it, and
 raises the `sync` job timeout from 15 to 45 minutes. No input, secret, caller
 permission or `runs-on` routing moved.
+All nine reusables are also registered at the v0.38.2 tag
+`cf316d12b4a14fbdb96a339b7ad00ce935a8cad4`, each a verbatim copy of its
+`2531d56` entry. The release adds ci-workflows#696 and #697, which touch only
+`pr-require-checks` and its `aggregate-results` action, so all nine workflow
+blobs are byte-identical to v0.38.1.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
