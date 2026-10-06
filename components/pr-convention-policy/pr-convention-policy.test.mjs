@@ -45,10 +45,19 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
     () => validatePolicy({ ...POLICY, body: versionOneBody }),
     /body must have required property 'nonClosingMarkers'/,
   );
-  // Both linkage copies implement exactly one affirmative exception.
-  for (const affirmativePhrases of [[], ["not only", "not just"]]) {
-    const body = { ...POLICY.body, negatedClosers: { ...negatedClosers, affirmativePhrases } };
-    assert.throws(() => validatePolicy({ ...POLICY, body }), /affirmativePhrases must NOT have/);
+  // The linkage copies implement exactly one affirmative exception and one
+  // trigger suffix, which is all the lockstep extractors can read.
+  for (const [field, values] of [
+    ["affirmativePhrases", [[], ["not only", "not just"]]],
+    ["triggerSuffixes", [[], ["n't", "nt"]]],
+  ]) {
+    for (const value of values) {
+      const body = { ...POLICY.body, negatedClosers: { ...negatedClosers, [field]: value } };
+      assert.throws(
+        () => validatePolicy({ ...POLICY, body }),
+        new RegExp(`${field} must NOT have`),
+      );
+    }
   }
 });
 

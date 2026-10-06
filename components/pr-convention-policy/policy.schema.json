@@ -86,6 +86,9 @@
             },
             "triggerSuffixes": {
               "type": "array",
+              "description": "The composite implements exactly one suffix test, which the lockstep extractor reads; widening this needs both copies and the extractors to change together.",
+              "minItems": 1,
+              "maxItems": 1,
               "uniqueItems": true,
               "items": { "type": "string", "pattern": "^[a-z']+$" }
             },
