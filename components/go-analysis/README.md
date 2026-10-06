@@ -68,6 +68,12 @@ vetting, ordinary tests, and race tests when the host supports them. A missing
 Go toolchain or analyzer produces an explicit suite skip locally; CI installs
 both exact versions and therefore cannot satisfy the contract by skipping.
 
+Running the test locally requires golangci-lint v2.12.2 exactly, the version
+CI installs. A different local release, such as one a tool manager floated
+forward, fails the approved-release case with a message naming both versions.
+That failure is a local environment issue: install the pinned version rather
+than editing the pin.
+
 [1]: https://pkg.go.dev/cmd/gofmt
 [2]: https://go.dev/ref/mod#go-mod-tidy
 [3]: https://go.dev/ref/mod#go-mod-verify

@@ -63,7 +63,14 @@ exec "$REAL_JQ" "$@"
 SH
 chmod +x "$tmp/jq-bin/jq"
 echo 0 >"$tmp/jq-count/jq"
-real_jq="$(command -p -v jq)"
+# Resolve the real jq on the caller's PATH before the shim dir is prepended:
+# `command -p` searches only the default system PATH and misses a jq a tool
+# manager (mise, Homebrew, ...) installed elsewhere.
+real_jq="$(command -v jq)"
+if [[ -z "$real_jq" ]]; then
+  fail 'real jq resolves for the spawn-census shim' 'jq not found on PATH'
+  exit 1
+fi
 COUNT_DIR="$tmp/jq-count" REAL_JQ="$real_jq" PATH="$tmp/jq-bin:$PATH" \
   bash "$script" --file "$tmp/good.json" >/dev/null
 assert_eq '--file batches candidate parse and policy into one jq pass plus the base check' '2' \
