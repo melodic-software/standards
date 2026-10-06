@@ -7,6 +7,7 @@ name: maintenance-audit-code-review-rules
 # repositories, and a read-only standards-sync App token reads the private
 # repositories in that App's installation (every private sync target). A
 # private repository outside the installation is visible to neither token.
+# Both listings skip a `sandbox`-topic test bed (code-review-rules.sh names).
 # Drift fails the run; it opens no issue.
 on:
   workflow_dispatch:
@@ -81,7 +82,8 @@ jobs:
         run: |
           set -uo pipefail
           gh api --paginate 'installation/repositories?per_page=100' \
-            --jq '.repositories[] | select(.private and (.archived | not)) | .name' >"$RUNNER_TEMP/private.txt"
+            --jq '.repositories[] | select(.private)' |
+            bash components/code-review-rules/code-review-rules.sh names >"$RUNNER_TEMP/private.txt"
           printf 'Private installation repositories: %s\n' "$(wc -l <"$RUNNER_TEMP/private.txt")"
           rc=0
           bash components/code-review-rules/code-review-rules.sh fleet --repos "$RUNNER_TEMP/private.txt" >"$RUNNER_TEMP/private.out" || rc=$?

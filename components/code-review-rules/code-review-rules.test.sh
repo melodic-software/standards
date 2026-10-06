@@ -142,6 +142,25 @@ assert_contains 'fleet names a repo with the wrong pointer' "$out" 'MISSING: wro
 assert_contains 'fleet names a repo with a duplicate pointer' "$out" 'MISSING: duplicate-stale: 2 org-wide criteria pointer lines'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: synced'
 
+# --- names -----------------------------------------------------------------
+# The listing filter both fleet listings apply, over repository objects shaped
+# like the GitHub API's: sandbox anywhere in the topics, archived, and absent
+# or null topics.
+listing='[
+  {"name": "kept", "archived": false, "topics": ["testing"]},
+  {"name": "sandbox-first", "archived": false, "topics": ["sandbox", "testing"]},
+  {"name": "sandbox-last", "archived": false, "topics": ["testing", "sandbox"]},
+  {"name": "archived", "archived": true, "topics": []},
+  {"name": "no-topics", "archived": false},
+  {"name": "null-topics", "archived": false, "topics": null},
+  {"name": "sandboxed-word", "archived": false, "topics": ["sandboxes"]}
+]'
+out="$(printf '%s\n' "$listing" | bash "$script" names 2>&1)"
+assert_exit 'names reads a JSON array' 0 $?
+assert_eq 'names keeps only audited repositories' "$(printf '%s\n' kept no-topics null-topics sandboxed-word)" "$out"
+out="$(printf '%s\n' "$listing" | jq -c '.[]' | bash "$script" names 2>&1)"
+assert_eq 'names reads a stream of objects, as gh --jq emits' "$(printf '%s\n' kept no-topics null-topics sandboxed-word)" "$out"
+
 # --- usage -----------------------------------------------------------------
 bash "$script" bogus >/dev/null 2>&1
 assert_exit 'an unknown command is a usage error' 2 $?
