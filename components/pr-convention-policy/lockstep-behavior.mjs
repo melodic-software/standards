@@ -203,10 +203,17 @@ export function linkageMatrix(policy) {
       }
     }
     // A suffix trigger ends any word, not only the "does" the samples above
-    // build on, so a copy that recognizes one host word alone cannot pass.
+    // build on, so a copy that recognizes one host word alone cannot pass. Each
+    // host word also gets the case and typographic-apostrophe variants.
     for (const suffix of negatedClosers.triggerSuffixes) {
       for (const host of SUFFIX_HOSTS) {
-        add(`This ${host}${suffix} ${lower} #12`, { negated: `${host}${suffix}` });
+        const word = `${host}${suffix}`;
+        for (const cased of [word, word.toUpperCase(), capitalize(word)]) {
+          add(`This ${cased} ${lower} #12`, { negated: cased });
+          if (cased.includes("'")) {
+            add(`This ${cased.replaceAll("'", "’")} ${lower} #12`, { negated: cased });
+          }
+        }
       }
     }
     // Only whole words trigger, the window counts words of letters (a hyphen

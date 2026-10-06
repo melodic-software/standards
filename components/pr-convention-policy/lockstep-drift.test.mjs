@@ -822,6 +822,22 @@ test("a copy that recognizes the suffix on one word only is behavioral drift", (
   assertOnlyBehavior(hook, "hookValidator", /"This won't closes #12" should be unlinked/);
 });
 
+test("a copy that folds case on the suffix for one word only is behavioral drift", () => {
+  const gate = mutate(
+    "gateRun",
+    `    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+    `    if (word != lower && lower ~ /n'"'"'t$/ && lower != "doesn'"'"'t") continue\n    if (tolower(substr(word, length(word) - 2)) == "n'"'"'t") return word`,
+  );
+  assertOnlyBehavior(gate, "gateRun", /"This WON'T closes #12" should be negated/);
+
+  const hook = mutate(
+    "hookValidator",
+    `    case "$lower" in\n`,
+    `    [[ "\${words[i]}" != "$lower" && "$lower" == *"n't" && "$lower" != "doesn't" ]] && continue\n    case "$lower" in\n`,
+  );
+  assertOnlyBehavior(hook, "hookValidator", /"This WON'T closes #12" should be unlinked/);
+});
+
 test("punctuation outside the clause delimiters keeps the negation window open", () => {
   for (const mark of NON_DELIMITERS) {
     assert.ok(!CLAUSE_DELIMITERS.includes(mark), mark);
