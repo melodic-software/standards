@@ -40,5 +40,5 @@ jobs:
       dry-run: ${{ inputs.dry-run || false }}
       targets: ${{ inputs.targets || '' }}
     secrets:
-      app-client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
-      app-private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+      STANDARDS_SYNC_APP_CLIENT_ID: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      STANDARDS_SYNC_APP_PRIVATE_KEY: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
