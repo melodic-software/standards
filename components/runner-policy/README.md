@@ -1123,6 +1123,22 @@ key was retired under step 4 of the lockstep below, so `policy.json` admits
 ci-workflows only at `cf316d1`; the older entries the tests read live verbatim
 in `fixtures/historical-contracts.json`, and the review notes in this section
 stay as the record the v0.38.2 terms were copied from.
+All nine reusables are also registered at the v0.39.0 tag
+`6ba73b97b058602c4dd2bb6e2cce234d11011787`. Five workflow blobs are
+byte-identical to v0.38.2 (`intake-label-needs-triage`, `pr-scan-dependencies`,
+`pr-audit-workflows`, `pr-automerge-dependabot`, `pr-run-checks`), and each
+copies its `cf316d1` entry verbatim. `intake-triage`, `pr-review` and
+`pr-review-security` bump `anthropics/claude-code-action` from v1.0.240 to
+v1.0.241 (`cab360f`), and their `$/report-lane-outcome` tree changes only in
+its tests; each copies its `cf316d1` entry verbatim, and because each is
+secret-capable the copy is a hand review, never an auto-copy. `maintenance-sync-standards` is the one entry
+that widens: it adds the `environment` input (default `standards-sync`), whose
+`attest` and `sync` jobs read the App secrets from that caller-repository
+environment with `deployment: false`, and renames its `workflow_call` secrets
+from `app-client-id` and `app-private-key` to `STANDARDS_SYNC_APP_CLIENT_ID` and
+`STANDARDS_SYNC_APP_PRIVATE_KEY`, so a caller repinning to v0.39.0 must
+rename the keys it passes under `secrets:`. The caller-side values, caller
+permissions and `runs-on` routing are unchanged.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
