@@ -41,7 +41,7 @@ jobs:
     concurrency:
       group: pr-review-security-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@6ba73b97b058602c4dd2bb6e2cce234d11011787 # v0.39.0
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@c586acc8ea288d728cc7d92f641161eec462fa05 # v0.39.1
     with:
       # DEVIATION from the component, which names the managed fleet label:
       # this repository is PUBLIC, and runner-policy admits a managed label
