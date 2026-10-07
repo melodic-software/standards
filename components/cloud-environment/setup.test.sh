@@ -82,7 +82,7 @@ assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 # it marks the test bodies below unreachable (SC2317).
 # shellcheck disable=SC1090,SC1091
 MELODIC_SETUP_LIBONLY=1 source "$script"
-cat_tmp="$(mktemp -d -p "$TEST_TMPDIR")"
+cat_tmp="$(mktemp -d "$TEST_TMPDIR/cat_tmp.XXXXXX")"
 cat >"$cat_tmp/catalog.json" <<'JSON'
 {
   "name": "melodic-software",
@@ -214,7 +214,7 @@ fi
 # marketplace list and one plugin list, the memoization cloud-bootstrap.sh
 # relies on when it reads the fleet list and then the repo overlay.
 # Membership is in-process (no grep -qxF per entry).
-plug_tmp="$(mktemp -d -p "$TEST_TMPDIR")"
+plug_tmp="$(mktemp -d "$TEST_TMPDIR/plug_tmp.XXXXXX")"
 mkdir -p "$plug_tmp/bin" "$plug_tmp/counts"
 cat >"$plug_tmp/bin/claude" <<STUB
 #!/usr/bin/env bash
@@ -287,7 +287,7 @@ assert_eq 'setup.sh fetches the permission floor from its published path' \
 assert_contains 'setup.sh composes the fetched floor into the user settings file' \
   "$(cat "$script")" 'compose_permissions_floor "$floor_file" "$user_settings"'
 
-perm_tmp="$(mktemp -d -p "$TEST_TMPDIR")"
+perm_tmp="$(mktemp -d "$TEST_TMPDIR/perm_tmp.XXXXXX")"
 fresh="$perm_tmp/fresh/.claude/settings.json"
 compose_permissions_floor "$floor_src" "$fresh"
 rc=$?
@@ -397,7 +397,7 @@ assert_contains 'setup.sh installs vault-exec under the user home' \
 assert_contains 'README documents the vault-exec install path' \
   "$(cat "$readme")" '~/.local/bin/vault-exec'
 
-ve_tmp="$(mktemp -d -p "$TEST_TMPDIR")"
+ve_tmp="$(mktemp -d "$TEST_TMPDIR/ve_tmp.XXXXXX")"
 ve_dest="$ve_tmp/home/.local/bin/vault-exec"
 install_vault_exec "$vault_exec_src" "$ve_dest"
 rc=$?
@@ -450,7 +450,7 @@ assert_contains 'setup.sh installs pages-publish under the user home' \
 assert_contains 'setup.sh names a foreign pages-publish in its WARN' \
   "$(cat "$script")" 'WARN pages-publish: $pages_publish_dest is not ours; left untouched'
 
-pp_tmp="$(mktemp -d -p "$TEST_TMPDIR")"
+pp_tmp="$(mktemp -d "$TEST_TMPDIR/pp_tmp.XXXXXX")"
 pp_dest="$pp_tmp/home/.local/bin/pages-publish"
 install_pages_publish "$pp_src" "$pp_dest"
 rc=$?

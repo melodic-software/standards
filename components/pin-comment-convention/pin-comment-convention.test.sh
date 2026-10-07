@@ -245,7 +245,7 @@ assert_exit 'uses:-shaped text inside a YAML comment is not scanned' 0 "$?"
 # path. PATH-prefix the shim after resolving the version-checked yq — command
 # -p would pick kislyuk yq on this image, which is not Mike Farah v4.
 driver="$root/components/pin-comment-convention/scan-workflow-files.sh"
-spawn_dir="$(mktemp -d -p "$TEST_TMPDIR")"
+spawn_dir="$(mktemp -d "$TEST_TMPDIR/spawn_dir.XXXXXX")"
 mkdir -p "$spawn_dir/bin" "$spawn_dir/files"
 echo 0 >"$spawn_dir/yq"
 cat >"$spawn_dir/bin/yq" <<'SH'
@@ -269,7 +269,7 @@ assert_eq 'driver does not spawn yq per workflow file' '1' "$(cat "$spawn_dir/yq
 
 # Parse isolation: multi-file yq eval stops at the first bad file. The driver
 # must still flag a later file's policy miss after a parse error.
-iso="$(mktemp -d -p "$TEST_TMPDIR")"
+iso="$(mktemp -d "$TEST_TMPDIR/iso.XXXXXX")"
 cp "$good_fix" "$iso/a.yml"
 printf ':\n  not yaml\n' >"$iso/b.yml"
 cat >"$iso/c.yml" <<'YAML'
@@ -277,7 +277,7 @@ jobs:
   a:
     uses: melodic-software/ci-workflows/.github/workflows/x.yml@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46
 YAML
-iso_err="$(mktemp -p "$TEST_TMPDIR")"
+iso_err="$(mktemp "$TEST_TMPDIR/iso_err.XXXXXX")"
 echo 0 >"$spawn_dir/yq"
 COUNT_DIR="$spawn_dir" REAL_YQ="$real_yq" PATH="$spawn_dir/bin:$PATH" \
   bash "$driver" "$iso/a.yml" "$iso/b.yml" "$iso/c.yml" >/dev/null 2>"$iso_err"

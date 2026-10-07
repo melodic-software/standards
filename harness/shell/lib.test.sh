@@ -84,7 +84,7 @@ assert_contains "require_min_version errors on a non-numeric version token" "$ou
 assert_nonzero "require_min_version exits non-zero on a non-numeric version" "$rc"
 
 # --- assert_file_exists / assert_file_absent ---
-tmp="$(mktemp -p "$TEST_TMPDIR")"
+tmp="$(mktemp "$TEST_TMPDIR/tmp.XXXXXX")"
 assert_file_exists "temp file exists" "$tmp"
 out="$(assert_file_absent "fa" "$tmp" 2>&1)"
 assert_contains "assert_file_absent fails on an existing file" "$out" "FAIL:"
@@ -94,7 +94,7 @@ out="$(assert_file_exists "fe" "$tmp" 2>&1)"
 assert_contains "assert_file_exists fails on a missing file" "$out" "FAIL:"
 
 # --- assert_line_count ---
-tmp="$(mktemp -p "$TEST_TMPDIR")"
+tmp="$(mktemp "$TEST_TMPDIR/tmp.XXXXXX")"
 printf 'a\nb\nc\n' >"$tmp"
 out="$(assert_line_count "lc" "$tmp" 3)"
 assert_contains "assert_line_count counts newlines" "$out" "PASS:"
@@ -113,7 +113,7 @@ out="$(assert_row_count "rc" $'x1\ny2' 2 '^x' 2>&1)"
 assert_contains "assert_row_count fails on a wrong count" "$out" "FAIL:"
 
 # --- make_repo ---
-tmpd="$(mktemp -d -p "$TEST_TMPDIR")"
+tmpd="$(mktemp -d "$TEST_TMPDIR/tmpd.XXXXXX")"
 make_repo "$tmpd/r"
 assert_file_exists "make_repo initializes a git repo" "$tmpd/r/.git/HEAD"
 rm -rf "$tmpd"

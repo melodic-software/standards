@@ -92,7 +92,7 @@ assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
 
 # Spawn census: the local-lane driver feeds one git-grep hit line per call.
 # N single-line scans must not spawn N awk; multi-line content still uses one.
-awk_dir="$(mktemp -d -p "$TEST_TMPDIR")"
+awk_dir="$(mktemp -d "$TEST_TMPDIR/awk_dir.XXXXXX")"
 mkdir -p "$awk_dir/bin"
 echo 0 >"$awk_dir/awk"
 real_awk="$(command -p -v awk)"
