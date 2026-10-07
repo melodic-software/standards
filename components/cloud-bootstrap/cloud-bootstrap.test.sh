@@ -11,6 +11,11 @@ set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
 source "$root/harness/shell/lib.sh"
+TEST_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$TEST_TMPDIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 script="$root/components/cloud-bootstrap/cloud-bootstrap.sh"
 materialized="$root/.claude/cloud-bootstrap.sh"
@@ -20,9 +25,8 @@ env_setup="$root/components/cloud-environment/setup.sh"
 # The cloud-mode runs below execute the real script, which may write
 # `git config --global`; point it at a scratch file so the suite never touches
 # the host's real global config.
-GIT_CONFIG_GLOBAL="$(mktemp)"
+GIT_CONFIG_GLOBAL="$(mktemp "$TEST_TMPDIR/gitconfig.XXXXXX")"
 export GIT_CONFIG_GLOBAL
-trap 'rm -f "$GIT_CONFIG_GLOBAL"' EXIT
 
 bash -n "$script" 2>/dev/null
 rc=$?
@@ -114,7 +118,7 @@ assert_contains 'bootstrap keeps the repo enabledPlugins block as the deltas ove
 # CLOUD_BOOTSTRAP_FLEET_LIST seam (so no case ever reads, or needs to write,
 # a real snapshot path on the host), and a scratch repo with no
 # .claude/settings.json.
-inv_tmp="$(mktemp -d)"
+inv_tmp="$(mktemp -d "$TEST_TMPDIR/inv_tmp.XXXXXX")"
 mkdir -p "$inv_tmp/bin" "$inv_tmp/mp/.claude-plugin" "$inv_tmp/repo"
 cat >"$inv_tmp/mp/.claude-plugin/marketplace.json" <<'JSON'
 { "plugins": [ { "name": "alpha" }, { "name": "beta" }, { "name": "newcomer" } ] }
@@ -236,7 +240,7 @@ rm -rf "$inv_tmp"
 # touched. Only author.* may be set: committer.* and user.* stay unset so the
 # committer's SSH signature keeps verifying. The fleet list points at a
 # missing file so the plugin stage ends before any `claude` call.
-author_tmp="$(mktemp -d)"
+author_tmp="$(mktemp -d "$TEST_TMPDIR/author_tmp.XXXXXX")"
 mkdir -p "$author_tmp/bin" "$author_tmp/repo"
 cat >"$author_tmp/bin/gh" <<'STUB'
 #!/usr/bin/env bash

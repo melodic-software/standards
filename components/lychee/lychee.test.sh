@@ -17,12 +17,12 @@ command -v python3 >/dev/null 2>&1 || skip_suite 'python3 not installed (serves 
 # The include_fragments = "full" config key requires a recent lychee.
 require_min_version lychee "$(lychee --version | awk '{ print $2 }')" 0.24.2
 
-path_fixture_root="$(mktemp -d "$root/.lychee-path-fixture.XXXXXX")"
-http_fixture_root="$(mktemp -d "$root/.lychee-http-fixture.XXXXXX")"
+path_fixture_root="$(mktemp -d)"
+http_fixture_root="$(mktemp -d)"
 # Without errexit a failed mktemp leaves the variable empty, and every scratch
 # path built from it would then resolve against the filesystem root.
 if [[ -z "$path_fixture_root" || -z "$http_fixture_root" ]]; then
-  printf 'ERROR: could not create scratch fixture directories under %s\n' "$root" >&2
+  printf 'ERROR: could not create scratch fixture directories\n' >&2
   exit 1
 fi
 # Armed before the fixture server launches, so an abort in between still reaps

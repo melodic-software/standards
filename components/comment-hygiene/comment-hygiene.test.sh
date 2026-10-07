@@ -5,6 +5,11 @@ set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
 source "$root/harness/shell/lib.sh"
+TEST_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$TEST_TMPDIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 cd "$root" || exit 1
 
@@ -87,7 +92,7 @@ assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
 
 # Spawn census: the local-lane driver feeds one git-grep hit line per call.
 # N single-line scans must not spawn N awk; multi-line content still uses one.
-awk_dir="$(mktemp -d)"
+awk_dir="$(mktemp -d "$TEST_TMPDIR/awk_dir.XXXXXX")"
 mkdir -p "$awk_dir/bin"
 echo 0 >"$awk_dir/awk"
 real_awk="$(command -p -v awk)"
