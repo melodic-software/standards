@@ -7,7 +7,7 @@ root="$(git rev-parse --show-toplevel)"
 source "$root/harness/shell/lib.sh"
 
 script="$root/components/code-review-rules/code-review-rules.sh"
-work="$(mktemp -d "$root/.code-review-rules-fixture.XXXXXX")"
+work="$(mktemp -d)"
 if [[ -z "$work" ]]; then
   printf 'ERROR: could not create a scratch directory under %s\n' "$root" >&2
   exit 1
