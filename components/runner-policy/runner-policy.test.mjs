@@ -82,7 +82,7 @@ const HISTORICAL_POLICY = {
   },
 };
 // Each historical reusable's file name at the revision the live policy admits.
-const LIVE_CI_WORKFLOWS_SHA = "fb56986808750d6856c27de78df15e150027b8dc";
+const LIVE_CI_WORKFLOWS_SHA = "cf316d12b4a14fbdb96a339b7ad00ce935a8cad4";
 const LIVE_SUCCESSOR = {
   checks: "pr-run-checks",
   "claude-review": "pr-review",
