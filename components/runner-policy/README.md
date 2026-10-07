@@ -1087,7 +1087,7 @@ at `fb56986`; the review notes in this section stay as the record the v0.36.0
 terms were copied from.
 All nine reusables are also registered at the v0.38.0 tag
 `95732fda50a95d3297320a6f2c791a1a91870a7f`, each a verbatim copy of its
-`fb56986` entry, which stays until every consumer repins. Three workflow blobs
+`fb56986` entry. Three workflow blobs
 are byte-identical (`intake-label-needs-triage`, `pr-scan-dependencies`,
 `pr-automerge-dependabot`). `intake-triage`, `pr-review` and
 `pr-review-security` change step timeouts and outcome reporting and resolve a
@@ -1118,6 +1118,11 @@ All nine reusables are also registered at the v0.38.2 tag
 `2531d56` entry. The release adds ci-workflows#696 and #697, which touch only
 `pr-require-checks` and its `aggregate-results` action, so all nine workflow
 blobs are byte-identical to v0.38.1.
+Once every consumer pinned v0.38.2, every `fb56986`, `95732fd` and `2531d56`
+key was retired under step 4 of the lockstep below, so `policy.json` admits
+ci-workflows only at `cf316d1`; the older entries the tests read live verbatim
+in `fixtures/historical-contracts.json`, and the review notes in this section
+stay as the record the v0.38.2 terms were copied from.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
