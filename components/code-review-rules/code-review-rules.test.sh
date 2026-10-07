@@ -9,7 +9,7 @@ source "$root/harness/shell/lib.sh"
 script="$root/components/code-review-rules/code-review-rules.sh"
 work="$(mktemp -d)"
 if [[ -z "$work" ]]; then
-  printf 'ERROR: could not create a scratch directory under %s\n' "$root" >&2
+  printf 'ERROR: could not create a scratch directory\n' >&2
   exit 1
 fi
 trap 'rm -rf "$work"' EXIT

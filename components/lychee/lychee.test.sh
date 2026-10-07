@@ -22,7 +22,7 @@ http_fixture_root="$(mktemp -d)"
 # Without errexit a failed mktemp leaves the variable empty, and every scratch
 # path built from it would then resolve against the filesystem root.
 if [[ -z "$path_fixture_root" || -z "$http_fixture_root" ]]; then
-  printf 'ERROR: could not create scratch fixture directories under %s\n' "$root" >&2
+  printf 'ERROR: could not create scratch fixture directories\n' >&2
   exit 1
 fi
 # Armed before the fixture server launches, so an abort in between still reaps
