@@ -228,7 +228,9 @@ Two properties of that ride are deliberate:
 - **Failure behavior:** the action fails closed on an unreadable diff or an
   unresolvable manifest, no-ops when the repository is not a manifest target,
   and needs only `contents: read` (standards is public; the checkout of it
-  uses the job's ambient token with `persist-credentials: false`).
+  uses the job's ambient token with `persist-credentials: false`) and
+  `pull-requests: read` (the action lists the pull request's commits to
+  skip pull requests whose every commit is Dependabot's).
 - **The `actions/checkout` pin.** Unlike the Claude lane callers, this file
   carries a third-party action pin, and two consequences follow. In this
   repository, Dependabot's `github-actions` ecosystem scans
@@ -252,7 +254,8 @@ Two properties of that ride are deliberate:
 `managed-files-guard.test.sh` asserts, against the parsed YAML of each file:
 the `pull_request` trigger with the default `types` and a `paths` list equal
 to the managed union of the targets that receive that file, free of glob
-metacharacters; `contents: read` as the whole grant; the
+metacharacters; `contents: read` and `pull-requests: read` as the whole
+grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; a
 full-history, credential-free checkout pinned like the sibling workflows; the
