@@ -551,8 +551,9 @@ test("duplicate JSON members in the config fail closed", () => {
   );
 });
 
-test("an auto-merge allowlist entry that is not a whole publisher fails closed", async () => {
+test("an auto-merge publisher key that is not a whole publisher fails closed", async () => {
   const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+  const review = { tier: "auto", reviewed: "2026-10-08", basis: "test" };
   const policy = {
     schemaVersion: 1,
     scheduleInterval: "weekly",
@@ -561,7 +562,7 @@ test("an auto-merge allowlist entry that is not a whole publisher fails closed",
     requireGroups: true,
     autoMerge: {
       ecosystems: ["github-actions"],
-      publisherAllowlist: ["actions/checkout"],
+      publishers: { "actions/checkout": review },
       excludeSemverMajor: true,
       requiredCheck: "ci-status",
     },
@@ -570,9 +571,15 @@ test("an auto-merge allowlist entry that is not a whole publisher fails closed",
   await writeFile(policyPath, JSON.stringify(policy));
   await assert.rejects(
     auditRepository({ root, policyPath }),
-    (error) => error instanceof ConfigurationError && error.message.includes("publisherAllowlist"),
+    (error) => error instanceof ConfigurationError && error.message.includes("publishers"),
   );
-  policy.autoMerge.publisherAllowlist = ["actions/*"];
+  policy.autoMerge.publishers = { "actions/*": { ...review, tier: "unknown" } };
+  await writeFile(policyPath, JSON.stringify(policy));
+  await assert.rejects(
+    auditRepository({ root, policyPath }),
+    (error) => error instanceof ConfigurationError && error.message.includes("publishers"),
+  );
+  policy.autoMerge.publishers = { "actions/*": review };
   await writeFile(policyPath, JSON.stringify(policy));
   assert.deepEqual(await auditRepository({ root, policyPath }), []);
 });

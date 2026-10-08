@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 // Lockstep check: the ci-workflows `pr-automerge-dependabot.yml` reusable
-// carries its own copy of `autoMerge.publisherAllowlist` as the
-// PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at every
-// SHA runner-policy approves for it and fails when that constant differs from
-// `policy.json` at any of them. The pure checks are exported for automerge-lockstep.test.mjs.
+// carries its own copy of the `tier: auto` keys of `autoMerge.publishers` as
+// the PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at
+// every SHA runner-policy approves for it and fails when that constant differs
+// from those keys at any of them. The pure checks are exported for automerge-lockstep.test.mjs.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -59,13 +59,15 @@ export function extractPublisherAllowlist(workflowText) {
   }
 }
 
-// Order-sensitive: the two copies stay textually identical, so a reorder is drift.
+// Order-sensitive: the constant lists the auto-tier keys in policy.json order, so a reorder is drift.
 export function checkLockstep(dependabotPolicy, workflowText) {
-  const expected = dependabotPolicy.autoMerge.publisherAllowlist;
+  const expected = Object.keys(dependabotPolicy.autoMerge.publishers).filter(
+    (publisher) => dependabotPolicy.autoMerge.publishers[publisher].tier === "auto",
+  );
   const actual = extractPublisherAllowlist(workflowText);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new LockstepError(
-      `drift: ${REUSABLE_PATH} PUBLISHER_ALLOWLIST ${JSON.stringify(actual)} != policy.json autoMerge.publisherAllowlist ${JSON.stringify(expected)}`,
+      `drift: ${REUSABLE_PATH} PUBLISHER_ALLOWLIST ${JSON.stringify(actual)} != policy.json autoMerge.publishers tier auto ${JSON.stringify(expected)}`,
     );
   }
 }

@@ -57,14 +57,17 @@ The standard still sets the value explicitly rather than relying on the default.
 A GitHub Actions bump takes one of two lanes, recorded as data in the
 `autoMerge` block of [`policy.json`](policy.json):
 
-- **Auto lane.** The action's publisher is on the vendor allowlist
-  (`actions/*`, `github/*`, `anthropics/*`) and the update is not a semver
+- **Auto lane.** The action's publisher has `tier: auto` in
+  `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
+  entry with the date it was `reviewed` and the `basis` for its tier, and the
+  update is not a semver
   major. The pull request merges itself once the required `ci-status` check
   passes, with no human review. Every repository already trusts these
   publishers, who run the platform and the review agents, so a non-major
   release from them adds no new trust; the cooldown and `ci-status` catch a
   bad one.
-- **Manual lane.** Everything else: actions from community or
+- **Manual lane.** Everything else, whether unlisted or listed with
+  `tier: manual`: actions from community or
   single-maintainer publishers, and semver majors from any publisher. A human
   reviews and merges the pull request, and a stale bump is acceptable. A
   community publisher is a trust decision a person makes, and a major can
@@ -75,10 +78,10 @@ community action with a vendor action or a `gh` or script step.
 
 This component records the lanes; the ci-workflows
 `pr-automerge-dependabot.yml` reusable enforces the auto lane by arming
-auto-merge, and its `PUBLISHER_ALLOWLIST` constant copies
-`autoMerge.publisherAllowlist`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
+auto-merge, and its `PUBLISHER_ALLOWLIST` constant copies the `tier: auto`
+keys of `autoMerge.publishers`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
 fetches that reusable at every SHA its `runner-policy` contracts approve and
-fails when the two lists differ at any of them. It blocks from admission, with no report-only
+fails when the constant and those keys differ at any of them. It blocks from admission, with no report-only
 period: it compares two files at fixed revisions, so a run either matches or
 names the differing lists, and the admitting change's run against the pinned
 reusable matched.
