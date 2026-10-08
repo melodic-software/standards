@@ -13,8 +13,17 @@ const SHA_B = "b".repeat(40);
 const contractKey = (sha) =>
   `melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@${sha}`;
 
-const policy = (publisherAllowlist) => ({ autoMerge: { publisherAllowlist } });
-const POLICY = policy(["actions/*", "github/*", "anthropics/*"]);
+const policy = (tiers) => ({
+  autoMerge: {
+    publishers: Object.fromEntries(
+      Object.entries(tiers).map(([publisher, tier]) => [
+        publisher,
+        { tier, reviewed: "2026-10-08", basis: "test" },
+      ]),
+    ),
+  },
+});
+const POLICY = policy({ "actions/*": "auto", "github/*": "auto", "anthropics/*": "auto" });
 
 const workflow = (...allowlists) => `on:
   workflow_call:
@@ -51,6 +60,40 @@ test("an entry added to the reusable is drift", () => {
 
 test("an entry removed from the reusable is drift", () => {
   throwsLockstep(() => checkLockstep(POLICY, workflow('["actions/*","github/*"]')), /^drift: /u);
+});
+
+test("a manual-tier publisher absent from the reusable passes", () => {
+  const withManual = policy({
+    "actions/*": "auto",
+    "oven-sh/*": "manual",
+    "github/*": "auto",
+    "anthropics/*": "auto",
+  });
+  assert.doesNotThrow(() => checkLockstep(withManual, MATCHING));
+});
+
+test("an auto-tier publisher missing from the reusable is drift", () => {
+  const withExtraAuto = policy({
+    "actions/*": "auto",
+    "github/*": "auto",
+    "anthropics/*": "auto",
+    "docker/*": "auto",
+  });
+  throwsLockstep(() => checkLockstep(withExtraAuto, MATCHING), /^drift: .*docker\/\*/u);
+});
+
+test("a reusable entry the policy holds as manual is drift", () => {
+  const dockerManual = policy({
+    "actions/*": "auto",
+    "github/*": "auto",
+    "anthropics/*": "auto",
+    "docker/*": "manual",
+  });
+  throwsLockstep(
+    () =>
+      checkLockstep(dockerManual, workflow('["actions/*","github/*","anthropics/*","docker/*"]')),
+    /^drift: /u,
+  );
 });
 
 test("a reordered list is drift, since the copies stay identical", () => {
