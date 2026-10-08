@@ -33,6 +33,11 @@ jobs:
   audit:
     permissions:
       contents: read
+    # The App key lives only in the standards-sync environment, whose branch
+    # policy admits main; schedule and dispatch run there. No deployment record.
+    environment:
+      name: standards-sync
+      deployment: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -74,7 +79,7 @@ jobs:
       - name: Report the missing App credential
         if: env.HAS_APP_CREDENTIAL != 'true'
         run: |
-          echo "::warning::STANDARDS_SYNC_APP_* is not configured, so only the public-visibility half of the inventory check runs here; a newly created private sync target cannot be detected until it is."
+          echo "::warning::STANDARDS_SYNC_APP_* is not configured in the standards-sync environment, so only the public-visibility half of the inventory check runs here; a newly created private sync target cannot be detected until it is."
 
       - name: Check the inventory against visibility
         id: check
