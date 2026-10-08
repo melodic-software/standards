@@ -103,7 +103,7 @@ check_shape() {
     "$(managed_union "$destination")" "$(q '.on.pull_request.paths[]')"
   assert_silent "$p no paths entry carries a glob metacharacter" \
     "$(q '.on.pull_request.paths[]' | grep -E '[][*?+!]' || true)"
-  assert_eq "$p workflow token is contents: read and nothing else" 'contents=read' \
+  assert_eq "$p workflow token is contents: read and pull-requests: read and nothing else" 'contents=read,pull-requests=read' \
     "$(q '.permissions | to_entries | map(.key + "=" + .value) | join(",")')"
 
   assert_eq "$p concurrency group is the canonical concurrency-policy expression" \
