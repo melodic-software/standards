@@ -15,5 +15,5 @@ Each line names a rule CI does not enforce; the linked file states it in full.
   [ownership boundaries](README.md#ownership-boundaries).
 - Prose conventions reference an enforcing component instead of restating its rule:
   [conventions](conventions/README.md#how-this-is-consumed).
-- A scheduled check fails its run on drift; only the PR convention pin audit also keeps one issue:
+- No workflow here opens or maintains a GitHub issue; a scheduled check fails its run on drift:
   [CI posture](README.md#ci-posture).

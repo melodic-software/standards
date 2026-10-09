@@ -11,8 +11,7 @@ name: maintenance-audit-pr-convention-pins
 # observe, so the weekly run is what catches fleet drift. The push trigger
 # re-runs the scan when the policy or the checker changes, on the merge that
 # changes it; any other push cannot change the outcome.
-# Drift fails the run and opens or updates one drift issue; the first clean
-# run closes it.
+# Drift fails the run; it opens no issue.
 on:
   push:
     branches: [main]
@@ -46,9 +45,6 @@ jobs:
       deployment: false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      state: ${{ steps.scan.outputs.state }}
-      findings: ${{ steps.scan.outputs.findings }}
     env:
       # A boolean, never the credential (same shape as maintenance-repin-ci-workflows).
       HAS_APP_CREDENTIAL: >-
@@ -100,80 +96,7 @@ jobs:
         run: |
           echo "::error::STANDARDS_SYNC_APP_* is not configured in the standards-sync environment, so the private gate callers cannot be read and the scan fails."
 
-      # `state` is clean, drift (the scan printed `drift:` findings) or error
-      # (it could not run). The report job acts only on clean and drift, so
-      # an outage never closes or rewrites the drift issue.
       - name: Check every caller's pinned contract
-        id: scan
         env:
           LOCKSTEP_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -uo pipefail
-          # Exit code captured through `|| rc=$?`: the default shell carries
-          # `-e`, which `set -uo` does not clear.
-          rc=0
-          npm run --silent audit:pr-convention-pins >"$RUNNER_TEMP/scan.out" 2>&1 || rc=$?
-          cat "$RUNNER_TEMP/scan.out"
-          if [[ "$rc" -eq 0 ]]; then
-            state=clean
-          elif grep -q '^drift: ' "$RUNNER_TEMP/scan.out"; then
-            state=drift
-          else
-            state=error
-          fi
-          delimiter="EOF_$(openssl rand -hex 16)"
-          {
-            echo "state=$state"
-            echo "findings<<$delimiter"
-            grep '^drift: ' "$RUNNER_TEMP/scan.out" || true
-            echo "$delimiter"
-          } >>"$GITHUB_OUTPUT"
-          exit "$rc"
-
-  # One deduplicated issue, found by its fixed title: updated while drift
-  # lasts, opened when none is open, closed by the first clean run. Kept out
-  # of the audit job so `issues: write` never shares a job with the App token.
-  report:
-    needs: audit
-    if: ${{ !cancelled() && contains(fromJSON('["clean","drift"]'), needs.audit.outputs.state) }}
-    permissions:
-      issues: write
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Open, update or close the drift issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          STATE: ${{ needs.audit.outputs.state }}
-          FINDINGS: ${{ needs.audit.outputs.findings }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          title="PR convention pin drift"
-          numbers=$(gh api --paginate "repos/$GH_REPO/issues?state=open&per_page=100" \
-            --jq ".[] | select(.pull_request == null and .title == \"$title\") | .number")
-          number=${numbers%%$'\n'*}
-          if [[ "$STATE" == clean ]]; then
-            if [[ -n "$number" ]]; then
-              gh issue close "$number" --comment "The pin scan is clean again: $RUN_URL"
-            fi
-            exit 0
-          fi
-          body="$RUNNER_TEMP/body.md"
-          {
-            echo "maintenance-audit-pr-convention-pins.yml found gate callers whose pinned ci-workflows contract does not match components/pr-convention-policy/policy.json (ADR-0008)."
-            echo
-            echo "Latest failing run: $RUN_URL"
-            echo
-            echo '````text'
-            printf '%s\n' "$FINDINGS"
-            echo '````'
-            echo
-            echo "Each failing run rewrites this body; the first clean run closes the issue."
-          } >"$body"
-          if [[ -n "$number" ]]; then
-            gh issue edit "$number" --body-file "$body"
-          else
-            gh issue create --title "$title" --body-file "$body"
-          fi
+        run: npm run audit:pr-convention-pins
