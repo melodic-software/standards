@@ -8,17 +8,13 @@ name: maintenance-audit-pr-convention-pins
 # pr-require-checks.yml's `check-pr-convention-copies` job.
 #
 # Callers repin in their own repositories, which this repository cannot
-# observe, so the weekly run is what catches fleet drift. The push trigger
-# re-runs the scan when the policy or the checker changes, on the merge that
-# changes it; any other push cannot change the outcome.
+# observe, so the weekly run is what catches fleet drift. Every push to main
+# re-runs the scan: the policy, the checker and this repository's own caller
+# pins all live here, and no path filter has to track which files those are.
 # Drift fails the run; it opens no issue.
 on:
   push:
     branches: [main]
-    paths:
-      - components/pr-convention-policy/**
-      - package.json
-      - .github/workflows/maintenance-audit-pr-convention-pins.yml
   workflow_dispatch:
   schedule:
     # Off-minute weekly poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`,

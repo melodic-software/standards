@@ -210,6 +210,15 @@ exception for a deterministic check, on this evidence from the live consumers:
   and at the three pins, the hook on `main`), and every body matched the
   policy's verdict.
 
+The 2026-10-08 split (ADR-0008, Revisited) changes where each half runs, not
+what it checks. The copy comparisons still block pull requests, now in the
+`check-pr-convention-copies` job. The pin comparisons left the pull request
+path: `maintenance-audit-pr-convention-pins.yml` runs them on every push to
+`main`, weekly and on dispatch, and fails that run on drift, so they gate no
+merge. Both halves run the same comparison code the run above exercised. The
+pin audit needs only the token the main-only `standards-sync` environment
+mints, and its first run on `main` is its evidence for that environment.
+
 No baseline period is needed because there is no baseline to learn. The check
 is deterministic: the matrix is generated from `policy.json` and each copy's
 verdict on a body is a pure function of its source, so a clean run over every
