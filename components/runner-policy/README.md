@@ -1147,7 +1147,8 @@ every commit-relative path the secret-capable lanes reach
 (`detect-changes`, `gitleaks`, `check-exec-bit`, `check-machine-paths`,
 `check-comment-markers`) whose object SHAs changed only by shell re-indentation:
 `git diff -w` between the two tags is empty for them. The secret-capable copies
-(`maintenance-sync-standards`, `pr-review`, `pr-review-security`) and the
+(`intake-triage`, `maintenance-sync-standards`, `pr-review`,
+`pr-review-security`) and the
 `pr-run-checks` copy were signed off by hand on 2026-10-09.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
