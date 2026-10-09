@@ -125,7 +125,7 @@ the consumer's caller still carries the old list.
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 under the `pin-comment-convention` (`components/pin-comment-convention/`).
 Both files pin `.github/actions/check-managed-files` at
-`cf316d12b4a14fbdb96a339b7ad00ce935a8cad4` (v0.38.2) today. v0.34.0
+`ab83b01273026ab5c23c6f3b40e946d97a863fa2` (v0.39.3) today. v0.34.0
 (`7446b51`) gave the action that path; the pins below name its old path,
 `.github/actions/managed-files-guard`. The pin moves with each ci-workflows release through the cascade below.
 The earlier pins are recorded because of what they fixed:
