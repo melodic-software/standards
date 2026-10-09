@@ -1146,7 +1146,9 @@ every commit-relative path the secret-capable lanes reach
 (`$/report-lane-outcome`). `pr-run-checks` reaches five `$/` action trees
 (`detect-changes`, `gitleaks`, `check-exec-bit`, `check-machine-paths`,
 `check-comment-markers`) whose object SHAs changed only by shell re-indentation:
-`git diff -w` between the two tags is empty for them.
+`git diff -w` between the two tags is empty for them. The secret-capable copies
+and the `pr-run-checks` copy were signed off by hand under the owner's standing
+approval of this migration's contract sign-offs.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
