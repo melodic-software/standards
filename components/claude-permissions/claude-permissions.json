@@ -209,6 +209,7 @@
       "Bash(ruff check *--unsafe-fixes*)",
       "PowerShell(*:lefthook*)",
       "PowerShell(*SetEnvironmentVariable*LEFTHOOK*)",
+      "PowerShell(*env:*lefthook*)",
       "PowerShell(*lefthook* uninstall*)",
       "PowerShell(gh gpg-key delete*)",
       "PowerShell(gh ssh-key delete*)",

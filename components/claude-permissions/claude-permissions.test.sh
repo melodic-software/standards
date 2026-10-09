@@ -67,10 +67,12 @@ done
 #   $env:LEFTHOOK = '0'; git commit …
 #   Set-Item env:LEFTHOOK 0; git commit …
 #   ${env:LEFTHOOK} = "false"; git commit …
+#   Set-Item -Path Env:\LEFTHOOK -Value 0; git commit …
 #   [Environment]::SetEnvironmentVariable('LEFTHOOK', '0')
 # PowerShell rule matching is case-insensitive
 # (https://code.claude.com/docs/en/permissions), so `*:lefthook*` covers every
-# drive-qualified form in any casing, and `*SetEnvironmentVariable*LEFTHOOK*`
+# drive-qualified form in any casing, `*env:*lefthook*` the provider path with a
+# separator (`Env:\LEFTHOOK`), and `*SetEnvironmentVariable*LEFTHOOK*`
 # covers the .NET call. A bare `*LEFTHOOK*` row is not used: case-insensitive, it
 # also denies reading lefthook.yml. `*lefthook* uninstall*` denies removing the hooks.
 required_lefthook_denies=(
@@ -79,6 +81,7 @@ required_lefthook_denies=(
   'Bash(LEFTHOOK*=false *)'
   'PowerShell(*:lefthook*)'
   'PowerShell(*SetEnvironmentVariable*LEFTHOOK*)'
+  'PowerShell(*env:*lefthook*)'
   'PowerShell(*lefthook* uninstall*)'
 )
 for pattern in "${required_lefthook_denies[@]}"; do
