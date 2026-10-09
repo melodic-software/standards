@@ -32,6 +32,8 @@ repos_file=''
 fixtures=''
 
 needle='melodic-software/architecture'
+# The name ends at a character that cannot continue a repository name.
+pattern="${needle}($|[^A-Za-z0-9._-])"
 # The repository objects the fleet audits: not archived, not a disposable
 # test bed carrying the `sandbox` topic (pr-pipeline-sandbox), and not the
 # architecture repository, which is the target of the pointer.
@@ -74,7 +76,7 @@ done
 if [[ "$command" == file ]]; then
   [[ -d "$root" ]] || die "not a directory: $root"
   for f in AGENTS.md CLAUDE.md; do
-    if [[ -f "$root/$f" ]] && grep -qF -- "$needle" "$root/$f"; then
+    if [[ -f "$root/$f" ]] && grep -qE -- "$pattern" "$root/$f"; then
       printf 'OK: %s/%s names %s\n' "$root" "$f" "$needle"
       exit 0
     fi
@@ -128,7 +130,7 @@ for repo in $repos; do
   found=false
   for f in AGENTS.md CLAUDE.md; do
     fetch "$repo" "$f"
-    if [[ "$exists" == true ]] && grep -qF -- "$needle" "$scratch/content"; then
+    if [[ "$exists" == true ]] && grep -qE -- "$pattern" "$scratch/content"; then
       found=true
       break
     fi

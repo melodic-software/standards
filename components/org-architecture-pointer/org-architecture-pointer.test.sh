@@ -32,7 +32,8 @@ repo shim-only CLAUDE.md '@AGENTS.md'
 repo agents-without AGENTS.md '# Repo'
 repo neither README.md 'melodic-software/architecture'
 mkdir -p "$work/fleet/empty"
-repo near-miss AGENTS.md 'melodic-software/architectures-of-others'
+repo near-miss AGENTS.md 'melodic-software/architectures-of-others and melodic-software/architecture-x'
+repo bare-line AGENTS.md 'See melodic-software/architecture'
 
 # --- file ------------------------------------------------------------------
 out="$(bash "$script" file --root "$work/fleet/in-agents" 2>&1)"
@@ -55,17 +56,24 @@ assert_exit 'file ignores other files that name the repo' 1 $?
 out="$(bash "$script" file --root "$work/fleet/empty" 2>&1)"
 assert_exit 'file fails when neither file exists' 1 $?
 
+out="$(bash "$script" file --root "$work/fleet/near-miss" 2>&1)"
+assert_exit 'file fails on a longer repository name sharing the prefix' 1 $?
+
+out="$(bash "$script" file --root "$work/fleet/bare-line" 2>&1)"
+assert_exit 'file passes when the name ends the line' 0 $?
+
 # --- fleet -----------------------------------------------------------------
-printf '%s\n' in-agents in-claude in-both >"$work/ok.txt"
+printf '%s\n' in-agents in-claude in-both bare-line >"$work/ok.txt"
 out="$(bash "$script" fleet --repos "$work/ok.txt" --fixtures "$work/fleet" 2>&1)"
 assert_exit 'fleet passes when every repo conforms' 0 $?
-assert_contains 'fleet lists the conforming repos' "$out" 'OK: in-agents in-both in-claude'
+assert_contains 'fleet lists the conforming repos' "$out" 'OK: bare-line in-agents in-both in-claude'
 
-printf '%s\n' in-agents shim-only agents-without neither empty '' >"$work/mixed.txt"
+printf '%s\n' in-agents shim-only agents-without neither empty near-miss '' >"$work/mixed.txt"
 out="$(bash "$script" fleet --repos "$work/mixed.txt" --fixtures "$work/fleet" 2>&1)"
 assert_exit 'fleet fails when any repo does not conform' 1 $?
 assert_contains 'fleet names a shim-only repo' "$out" 'MISSING: shim-only:'
 assert_contains 'fleet names a repo without the substring' "$out" 'MISSING: agents-without:'
+assert_contains 'fleet names a longer-name near miss' "$out" 'MISSING: near-miss:'
 assert_contains 'fleet names a repo with neither file' "$out" 'MISSING: empty:'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: in-agents'
 
