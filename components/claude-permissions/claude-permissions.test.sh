@@ -42,15 +42,16 @@ else
   pass 'allow and withdraw are disjoint'
 fi
 
-# Mirror checkout's `--`-separator path-discard forms only. A bare
-# `git restore *` catch-all would also deny `git restore --staged <path>`,
-# and deny→ask→allow precedence cannot carve that exception back out.
+# Restore denies cover only the whole-tree discards (`.`, `:/`). Path-scoped
+# `git restore -- <path>` has no allow row, so the classifier judges it, and a
+# bare `git restore *` catch-all would also deny `git restore --staged <path>`.
 required_restore_denies=(
-  'Bash(git restore -- *)'
-  'Bash(git restore * -- *)'
-  'PowerShell(git restore -- *)'
-  'PowerShell(git restore * -- *)'
-  'PowerShell(git * restore -- *)'
+  'Bash(git restore .)'
+  'Bash(git restore :/)'
+  'PowerShell(git restore .)'
+  'PowerShell(git restore :/)'
+  'PowerShell(git * restore .)'
+  'PowerShell(git * restore :/)'
 )
 for pattern in "${required_restore_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \
@@ -62,23 +63,23 @@ for pattern in "${required_restore_denies[@]}"; do
 done
 
 # The Bash LEFTHOOK denies anchor on the inline-env spelling (`LEFTHOOK=0 cmd`),
-# which PowerShell lacks — its bypass shapes all reference the env var by name:
+# which PowerShell lacks; its bypass shapes reference the env var by name:
 #   $env:LEFTHOOK = '0'; git commit …
 #   Set-Item env:LEFTHOOK 0; git commit …
 #   ${env:LEFTHOOK} = "false"; git commit …
-# PowerShell's Env: drive is case-insensitive while these rules are literal
-# whole-string globs (`*` is the only metacharacter), so two anchors cover the
-# realistic spellings: `*LEFTHOOK*` catches every uppercase-name reference
-# whatever the drive-prefix casing ($env:/$Env:/$ENV:/Set-Item env:), and
-# `*:lefthook*` catches the lowercase-name drive-qualified forms without
-# denying a bare `lefthook run …` invocation. Exotic mixed-case names
-# (LeftHook) remain out of glob reach — accepted residual, recorded here.
+#   [Environment]::SetEnvironmentVariable('LEFTHOOK', '0')
+# PowerShell rule matching is case-insensitive
+# (https://code.claude.com/docs/en/permissions), so `*:lefthook*` covers every
+# drive-qualified form in any casing, and `*SetEnvironmentVariable*LEFTHOOK*`
+# covers the .NET call. A bare `*LEFTHOOK*` row is not used: case-insensitive, it
+# also denies reading lefthook.yml. `*lefthook* uninstall*` denies removing the hooks.
 required_lefthook_denies=(
   'Bash(LEFTHOOK*=0 *)'
   'Bash(LEFTHOOK*=FALSE *)'
   'Bash(LEFTHOOK*=false *)'
   'PowerShell(*:lefthook*)'
-  'PowerShell(*LEFTHOOK*)'
+  'PowerShell(*SetEnvironmentVariable*LEFTHOOK*)'
+  'PowerShell(*lefthook* uninstall*)'
 )
 for pattern in "${required_lefthook_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \

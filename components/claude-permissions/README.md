@@ -51,7 +51,7 @@ the primary consumer merges the file into a shared template-data namespace) carr
   residual: nothing in this floor distinguishes one key of that file from another.
 - **`allow`** lists the grants an unattended agent loop needs that no built-in mechanism carries:
   the routine non-destructive working verbs (add, commit, non-force push, pull,
-  checkout/switch, PR and issue CRUD), the babysit lane's gate tooling, and the read-only
+  checkout/switch, PR and issue CRUD), and the read-only
   inspection commands
   Claude Code does *not* pre-approve: every `gh` verb (read-only ones included) and every
   third-party linter. Force/destructive spellings stay covered by `deny`, which always
@@ -134,18 +134,12 @@ the primary consumer merges the file into a shared template-data namespace) carr
   the fleet default (`permissions.defaultMode: "auto"`) while trimming anything outside
   that set would reintroduce prompts.
 
-The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are interim shapes: the
-end state is each script exposed as a bare wrapper on the plugin `bin/` PATH so the rule
-names the command rather than the interpreter (trigger:
-melodic-software/claude-code-plugins#843, the PATH gap fix). Until that lands, both quoted
-and unquoted spellings stay pinned here, for the plugin scripts and equally for the two
-guarded `bin/` wrappers, whose real invocation shape is
-`bash "${CLAUDE_PLUGIN_ROOT}/bin/<wrapper>"` (claude-code-plugins `3fc72d351c`).
-Bare-wrapper rules stay OUT: the plugin `bin/` directory is not on the shell's PATH today,
-so a rule naming the bare command matches nothing and is dead weight until #843 makes the
-bare name resolve. The end state also does not restore pre-classifier handling under
-`classifyAllShell: true`: a bare wrapper is still a shell rule. It buys rule clarity and
-the non-auto posture, not a classifier bypass.
+The `${CLAUDE_PLUGIN_ROOT}` interpreter+script-path allow entries are retired and tombstoned.
+Rule text is matched literally and the variable in it is never expanded, while skills run the
+expanded absolute path, so the rows matched no real invocation; four of them also named a plugin
+`bin/` directory that source-control no longer ships. Bare-wrapper rules stay out too: the plugin
+`bin/` directory is not on the shell's PATH, so a rule naming the bare command matches nothing
+until melodic-software/claude-code-plugins#843 makes the bare name resolve.
 
 ### `withdraw`: tombstones for rows retired from `allow`
 
@@ -205,14 +199,15 @@ the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which p
 requires an immutable `<expect>`, and also honors `--force-if-includes` and the last-wins
 negations. The docs name a PreToolUse hook as the mechanism for exactly what globs cannot express.
 
-### Bare `git restore <path>` shares the same glob limit
+### `git restore <path>` is left to the classifier and hooks
 
-`deny` mirrors checkout's `--`-separator discard forms (`git restore -- <path>`,
-`git restore <opts> -- <path>`, and the whole-tree `.` / `:/` spellings). A catch-all
-`git restore *` would also match `git restore --staged <path>` (unstage without discarding),
-and deny→ask→allow precedence cannot carve that exception back out. Bare-path working-tree
-discards without `--` therefore remain a classifier/hook concern, same class as
-`--force-with-lease`.
+`deny` carries only the whole-tree `git restore` discards (`.` and `:/`). No `allow` row covers
+`git restore`, so a path-scoped restore, with or without `--`, goes to the classifier, which can
+tell a conflict-resolution restore from a discard of uncommitted work; the guardrails plugin's
+`block-dangerous-git` hook also refuses tree-wide pathspecs. A catch-all `git restore *` would
+also match `git restore --staged <path>` (unstage without discarding), and deny→ask→allow
+precedence cannot carve that exception back out. The checkout `--` discard forms stay denied,
+because `git checkout *` is allowed and resolves before the classifier.
 
 ## Composition model: data component, consumer-owned merge
 
@@ -280,7 +275,7 @@ session routes shell through the classifier. If it does, a rule here will not st
 prompt. The fix is a prose `autoMode.allow` entry in the consumer's user or managed
 settings. Reserve floor additions for grants that must hold in a non-auto session.
 
-**Removals carry the heavier burden, and exactly two arguments retire an entry.** The first:
+**Removals carry the heavier burden, and exactly three arguments retire an entry.** The first:
 Claude Code's built-in read-only set covers the command in every mode. The second: the rule is
 proven non-resolving: its command name resolves to no executable on any fleet machine, so the
 rule matches nothing and is dead weight; the evidence is a `command -v <name>` (or `Get-Command`)
@@ -289,7 +284,10 @@ named trigger (the two bare-wrapper tombstones seeded by this file are the stand
 their names resolve only when melodic-software/claude-code-plugins#843 lands, which is also their
 regrant trigger). A non-resolving removal still lands with its tombstone: the dead row is
 harmless where it lingers, but the tombstone is what actually clears it from machines that hold
-it. For the first argument, the claim must be tested
+it; a row whose literal text no real invocation contains is dead weight on the same footing. The
+third: a reviewed decision moves the grant into the consumer's prose `autoMode` entry because its
+conditions (which repository, whose pull request) cannot be written as a glob; `gh pr ready` is
+the standing example. For the first argument, the claim must be tested
 before it is acted on, never inferred: not from the command being read-only in spirit, not
 from a sibling command being covered, not from auto mode's classifier approving it. Auto-mode
 coverage is specifically *not* an argument: it does not reach the lanes that never enter
