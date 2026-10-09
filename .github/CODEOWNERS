@@ -1,0 +1,43 @@
+# Trust-root paths. A path is owned when its content reaches a privileged context:
+# (a) it runs or loads in a job that holds a secret or the standards-sync environment,
+#     or in a Claude lane that restores it from main before running;
+# (b) the sync copies it into other repositories at an executable or trust-bearing path;
+# (c) it decides what the sync distributes;
+# (d) it is policy that gates merges or runner routing;
+# (e) it is a workflow, an action, or this file.
+# The trust-root ruleset requires an approving review from a code owner listed here
+# before a change to these paths merges. Paths not listed have no owner and need no
+# code-owner review. The last matching entry wins; an entry with no owner unowns the path.
+
+/.github/ @kyle-sexton
+/.claude/ @kyle-sexton
+/CLAUDE.md @kyle-sexton
+/.mcp.json @kyle-sexton
+/package.json @kyle-sexton
+/distribution/ @kyle-sexton
+/components/biome/package.json @kyle-sexton
+/components/claude-lanes/ @kyle-sexton
+/components/claude-lanes-hosted/ @kyle-sexton
+/components/claude-permissions/ @kyle-sexton
+/components/claude-settings/ @kyle-sexton
+/components/cloud-bootstrap/ @kyle-sexton
+/components/cloud-environment/ @kyle-sexton
+/components/code-review-rules/ @kyle-sexton
+/components/comment-hygiene/ @kyle-sexton
+/components/dependabot-policy/ @kyle-sexton
+/components/dotnet-analysis/ @kyle-sexton
+/components/github-actions-conventions/rename-map.json @kyle-sexton
+/components/lefthook-*/ @kyle-sexton
+/components/lychee/ @kyle-sexton
+/components/managed-files-guard/ @kyle-sexton
+/components/mcp-launcher/ @kyle-sexton
+/components/path-detection/ @kyle-sexton
+/components/pr-convention-policy/ @kyle-sexton
+/components/runner-policy/ @kyle-sexton
+/components/trusted-actors/ @kyle-sexton
+/components/tsconfig/package.json @kyle-sexton
+
+# The dependabot-policy runtime is installed by no privileged job and is not synced,
+# so its lockfile bumps need no code-owner review. The policy and analyzer stay owned.
+/components/dependabot-policy/package.json
+/components/dependabot-policy/package-lock.json
