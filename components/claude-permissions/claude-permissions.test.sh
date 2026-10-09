@@ -114,14 +114,14 @@ done
 # denied. A single-force deny would pre-empt the classifier, and any allow row
 # would bypass its session-created check. Both allow spellings stay tombstoned.
 required_worktree_denies=(
-  'Bash(*worktree remove*--force --force*)'
-  'Bash(*worktree remove*--force -f*)'
-  'Bash(*worktree remove*-f --force*)'
-  'Bash(*worktree remove*-f -f*)'
-  'PowerShell(*worktree remove*--force --force*)'
-  'PowerShell(*worktree remove*--force -f*)'
-  'PowerShell(*worktree remove*-f --force*)'
-  'PowerShell(*worktree remove*-f -f*)'
+  'Bash(git *worktree remove*--force --force*)'
+  'Bash(git *worktree remove*--force -f*)'
+  'Bash(git *worktree remove*-f --force*)'
+  'Bash(git *worktree remove*-f -f*)'
+  'PowerShell(git *worktree remove*--force --force*)'
+  'PowerShell(git *worktree remove*--force -f*)'
+  'PowerShell(git *worktree remove*-f --force*)'
+  'PowerShell(git *worktree remove*-f -f*)'
 )
 for pattern in "${required_worktree_denies[@]}"; do
   if jq -e --arg pattern "$pattern" \
@@ -141,8 +141,28 @@ for pattern in 'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'
   fi
 done
 
-# The double-force rows lead with `*`; a deny row starting with the command
-# itself is a retired single-force spelling.
+# The double-force rows are `git *worktree remove...`; the `git ` anchor keeps
+# unrelated commands that merely contain the text out of the deny. Claude's `*`
+# matches any text, so the cases below translate each row to a regex.
+glob_to_regex() { printf '^%s$' "$(printf '%s' "$1" | sed -e 's/[.[\^$+?(){}|]/\\&/g' -e 's/\*/.*/g')"; }
+while IFS= read -r row; do
+  body="${row#*(}"
+  re="$(glob_to_regex "${body%)}")"
+  flags="${body#*remove*}"
+  flags="${flags#\*}"
+  flags="${flags%\*)}"
+  flags="${flags%\*}"
+  for cmd in "git worktree remove $flags /tmp/wt" "git -C /repo worktree remove $flags /tmp/wt"; do
+    if [[ "$cmd" =~ $re ]]; then pass "$row matches: $cmd"; else fail "$row matches: $cmd" "git form not matched"; fi
+  done
+  for cmd in 'grep "worktree remove --force --force" notes.md' "printf 'worktree remove -f -f'" \
+    'rg "worktree remove --force -f" .' "echo 'worktree remove -f --force'"; do
+    if [[ "$cmd" =~ $re ]]; then fail "$row skips: $cmd" 'unrelated command matched'; else pass "$row skips: $cmd"; fi
+  done
+done < <(jq -r '.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git \\*worktree remove"))' "$config")
+
+# A deny row with `git worktree remove` as a literal prefix is a retired
+# single-force spelling.
 single_force="$(jq -r '[.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git worktree remove"))] | join("\n")' "$config")"
 if [[ -n "$single_force" ]]; then
   fail 'deny has no single-force worktree rows' "retired rows returned: $single_force"

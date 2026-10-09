@@ -218,8 +218,10 @@ glob can express. `deny` carries only the double force (`-f -f`, `--force --forc
 spellings), which git requires to remove a locked worktree. The source-control claim gate locks
 every worktree it creates, so this denies the direct spelling that removes another session's
 claimed worktree; unlocking first, and a single `--force` on an unlocked worktree, reach the
-classifier. The rows lead
-with `*` so `git -C <repo> worktree remove` matches too. A double force split by the path
+classifier. The rows are
+anchored as `git *worktree remove*`, so `git -C <repo> worktree remove` matches too while an
+unrelated command that merely contains the text (`grep "worktree remove --force --force" notes.md`)
+does not. A double force split by the path
 (`-f <path> -f`) or bundled as `-ff` is not matched; the threat model below covers why.
 
 ### `gh pr merge --auto` has no floor row
