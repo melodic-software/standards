@@ -113,9 +113,11 @@ ruleset. Both of those follow from the organization-wide posture, whose
 reasoning and measurements are recorded once in the `melodic-software/github-iac`
 ADRs 0008 and 0014. Read them there rather than a copy here.
 
-Nothing in this repository opens, reopens, or maintains a GitHub issue, on a
-schedule or otherwise; `maintenance-audit-link-check-excludes.yml`,
+`maintenance-audit-link-check-excludes.yml`,
 `maintenance-audit-code-review-rules.yml` and
-`maintenance-audit-pr-convention-pins.yml` fail the run on drift.
+`maintenance-audit-pr-convention-pins.yml` fail the run on drift. Only the
+last also maintains a GitHub issue: one drift issue, found by its fixed title,
+opened or rewritten while caller pins drift and closed by the first clean run.
+Nothing else here opens, reopens, or maintains an issue.
 No link check reads external URLs: the blocking lychee check is offline-only, over
 local files and fragments.
