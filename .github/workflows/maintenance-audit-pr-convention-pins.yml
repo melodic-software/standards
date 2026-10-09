@@ -1,0 +1,102 @@
+name: maintenance-audit-pr-convention-pins
+
+# Lockstep drift check (ADR-0008), caller-pin half: dereferences the
+# ci-workflows artifact every gate caller pins and checks the contract at that
+# pin against policy.json. Five callers are private, so the scan reads through
+# a read-only standards-sync App token, which only a main run can mint. The
+# copy half needs no credential and runs on every pull request, as
+# pr-require-checks.yml's `check-pr-convention-copies` job.
+#
+# Callers repin in their own repositories, which this repository cannot
+# observe, so the weekly run is what catches fleet drift. The push trigger
+# re-runs the scan when the policy or the checker changes, on the merge that
+# changes it; any other push cannot change the outcome.
+# Drift fails the run; it opens no issue.
+on:
+  push:
+    branches: [main]
+    paths:
+      - components/pr-convention-policy/**
+      - package.json
+      - .github/workflows/maintenance-audit-pr-convention-pins.yml
+  workflow_dispatch:
+  schedule:
+    # Off-minute weekly poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`,
+    # maintenance-repin-ci-workflows's `41 14 * * *`, maintenance-audit-link-check-excludes's
+    # `23 15 * * *` and maintenance-audit-code-review-rules's `47 15 * * *`.
+    - cron: "29 7 * * 3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    permissions:
+      contents: read
+    # The App key lives only in the standards-sync environment, whose branch
+    # policy admits main; push, schedule and dispatch run there. No deployment
+    # record.
+    environment:
+      name: standards-sync
+      deployment: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # A boolean, never the credential (same shape as maintenance-repin-ci-workflows).
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: components/pr-convention-policy/package-lock.json
+
+      - name: Install pr-convention-policy dependencies
+        run: npm ci --prefix components/pr-convention-policy
+
+      # The scan runs each pinned composite's awk analyzer under
+      # `gawk --sandbox`, and the runner image's awk is not guaranteed to be
+      # gawk. Missing gawk fails the scan rather than skipping it.
+      - name: Ensure gawk for the sandboxed analyzer run
+        run: |
+          set -euo pipefail
+          if ! command -v gawk >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends gawk
+          fi
+          gawk --version | head -n 1
+
+      # Guarded on the secrets being present so an absent credential reaches
+      # the scan tokenless instead of dying inside the mint action; the scan
+      # then fails on the missing token. Not a skip either way.
+      - name: Mint a contents-read App token over the installation
+        id: app-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          owner: melodic-software # zizmor: ignore[github-app] read-only contents over the installation; the scan reads gate callers fleet-wide
+          permission-contents: read
+
+      - name: Report the missing App credential
+        if: env.HAS_APP_CREDENTIAL != 'true'
+        run: |
+          echo "::error::STANDARDS_SYNC_APP_* is not configured in the standards-sync environment, so the private gate callers cannot be read and the scan fails."
+
+      - name: Check every caller's pinned contract
+        env:
+          LOCKSTEP_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: npm run audit:pr-convention-pins

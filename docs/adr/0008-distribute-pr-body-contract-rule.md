@@ -92,3 +92,15 @@ The same change runs the composite's analyzer and the hook on sample bodies and
 blocks on any verdict the policy does not predict. Its rollout evidence, and why
 it needs no report-only period, is recorded in the component README's
 [Rollout](../../components/pr-convention-policy/README.md#rollout) section.
+
+## Revisited 2026-10-08: caller pins move to a main-only audit
+
+Five gate callers are private, so the pin scan needs the standards-sync App
+token, and that App's key now lives only in the `standards-sync` environment,
+which a pull-request run cannot enter. Decision 2 is split in two. The copy
+check (the live composite, the hook, the org template and the rules file, all
+public) still runs on every pull request, as the `check-pr-convention-copies`
+job. The pin scan runs in `maintenance-audit-pr-convention-pins.yml` on a push
+to `main` that touches the component, weekly, and on dispatch, and fails that
+run on drift. So a policy change no longer turns its own pull request red for a
+stale pin: the pin drift shows on the merge commit's audit run instead.

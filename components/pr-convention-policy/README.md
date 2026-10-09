@@ -84,12 +84,17 @@ rules as `CLOSING_ERE`, `NON_CLOSING_ERE`, `NO_ISSUE_ERE` and
 behavioral matrix; the inputs where the two still disagree are recorded under
 [Behavioral lockstep](#behavioral-lockstep). Those copies must change in lockstep with `policy.json`; letting them drift is
 exactly the failure #393 recorded. That lockstep is enforced by
-[`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008), which the
-`pr-convention-lockstep` CI lane runs against the live gate source, the
-source-control plugin's hook validator, the org PR template, the distributed
-`.claude/rules/pr-body-contract.md` rule, and the contract of the artifact each
-consumer pins (the composite, or the reusable until that repository takes its
-Phase 3 pull request) at that pinned SHA. The non-closing and negated-closer
+[`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008) in two modes. On every
+pull request, the `check-pr-convention-copies` job runs
+`npm run lint:pr-convention-copies` against the live gate source, the
+source-control plugin's hook validator, the org PR template and the distributed
+`.claude/rules/pr-body-contract.md` rule. On `main`,
+`maintenance-audit-pr-convention-pins.yml` runs
+`npm run audit:pr-convention-pins` with the standards-sync App token against
+the contract of the artifact each consumer pins (the composite, or the reusable
+until that repository takes its Phase 3 pull request) at that pinned SHA; a
+tokenless pin scan fails rather than checking only the public callers. The
+non-closing and negated-closer
 rules are checked in the live composite, at every composite pin, and in the
 hook; a reusable pin is checked for sections, keywords and markers only, since
 that transition-only artifact gained the two rules late (ci-workflows#544);
