@@ -216,8 +216,9 @@ catch-all grant would also pre-approve `git worktree remove --force <another ses
 which the consumer's prose `autoMode` entry limits to worktrees the session created, a condition no
 glob can express. `deny` carries only the double force (`-f -f`, `--force --force` and the two mixed
 spellings), which git requires to remove a locked worktree. The source-control claim gate locks
-every worktree it creates, so this keeps one session from removing another's claimed worktree,
-while a single `--force` on a session's own unlocked worktree reaches the classifier. The rows lead
+every worktree it creates, so this denies the direct spelling that removes another session's
+claimed worktree; unlocking first, and a single `--force` on an unlocked worktree, reach the
+classifier. The rows lead
 with `*` so `git -C <repo> worktree remove` matches too. A double force split by the path
 (`-f <path> -f`) or bundled as `-ff` is not matched; the threat model below covers why.
 

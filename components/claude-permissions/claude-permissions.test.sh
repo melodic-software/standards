@@ -111,8 +111,8 @@ for pattern in "${required_lefthook_denies[@]}"; do
 done
 
 # Worktree removal: only the double force (which overrides a claim lock) is
-# denied; a single --force and any allow row would bypass the classifier's
-# session-created check. Both allow spellings stay tombstoned.
+# denied. A single-force deny would pre-empt the classifier, and any allow row
+# would bypass its session-created check. Both allow spellings stay tombstoned.
 required_worktree_denies=(
   'Bash(*worktree remove*--force --force*)'
   'Bash(*worktree remove*--force -f*)'
@@ -141,12 +141,16 @@ for pattern in 'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'
   fi
 done
 
+# The double-force rows lead with `*`; a deny row starting with the command
+# itself is a retired single-force spelling.
+single_force="$(jq -r '[.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git worktree remove"))] | join("\n")' "$config")"
+if [[ -n "$single_force" ]]; then
+  fail 'deny has no single-force worktree rows' "retired rows returned: $single_force"
+else
+  pass 'deny has no single-force worktree rows'
+fi
+
 forbidden_denies=(
-  'Bash(git worktree remove * --force *)'
-  'Bash(git worktree remove --force *)'
-  'Bash(git worktree remove -f *)'
-  'PowerShell(git worktree remove --force *)'
-  'PowerShell(git worktree remove -f *)'
   'Bash(gh pr merge --auto *)'
   'Bash(gh pr merge --auto)'
 )
