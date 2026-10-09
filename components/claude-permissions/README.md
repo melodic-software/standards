@@ -209,6 +209,14 @@ also match `git restore --staged <path>` (unstage without discarding), and denyâ
 precedence cannot carve that exception back out. The checkout `--` discard forms stay denied,
 because `git checkout *` is allowed and resolves before the classifier.
 
+### `ruff check --unsafe-fixes` is denied, but a repo config can enable it
+
+`deny` rejects the `--unsafe-fixes` flag (`Bash(ruff check *--unsafe-fixes*)`). A repository whose
+ruff config sets `unsafe-fixes = true` passes that deny, because the setting is not on the command
+line. This is an accepted residual: unsafe fixes only rewrite working-tree code, the rewrite shows
+in the diff, and review covers it. The flag deny stops a one-off escalation, not the repo's
+configured choice.
+
 ## Composition model: data component, consumer-owned merge
 
 The sync engine is byte-exact and this file is NOT a Claude Code settings file. No consumer

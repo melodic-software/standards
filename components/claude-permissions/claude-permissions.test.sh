@@ -62,6 +62,23 @@ for pattern in "${required_restore_denies[@]}"; do
   fi
 done
 
+# `-n` is the short form of `--no-verify`; the glob forms `commit -n` alone
+# cannot match when other arguments precede the flag.
+required_commit_n_denies=(
+  'Bash(git commit * -n *)'
+  'Bash(git commit * -n)'
+  'Bash(git commit -n *)'
+  'Bash(git commit -n)'
+)
+for pattern in "${required_commit_n_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required --no-verify short-form rule"
+  fi
+done
+
 # The Bash LEFTHOOK denies anchor on the inline-env spelling (`LEFTHOOK=0 cmd`),
 # which PowerShell lacks; its bypass shapes reference the env var by name:
 #   $env:LEFTHOOK = '0'; git commit …
