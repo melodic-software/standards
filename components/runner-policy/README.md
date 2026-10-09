@@ -1150,6 +1150,10 @@ every commit-relative path the secret-capable lanes reach
 (`intake-triage`, `maintenance-sync-standards`, `pr-review`,
 `pr-review-security`) and the
 `pr-run-checks` copy were signed off by hand on 2026-10-09.
+Once every consumer pinned v0.39.3, every v0.38.2 (`cf316d1`) and v0.39.0
+key was retired under step 4 of the lockstep below, so `policy.json` admits ci-workflows
+only at `ab83b01`; the review notes in this section stay as the record the
+v0.39.3 terms were copied from.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
