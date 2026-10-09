@@ -31,6 +31,7 @@
 /components/lychee/ @kyle-sexton
 /components/managed-files-guard/ @kyle-sexton
 /components/mcp-launcher/ @kyle-sexton
+/components/org-architecture-pointer/ @kyle-sexton
 /components/path-detection/ @kyle-sexton
 /components/pr-convention-policy/ @kyle-sexton
 /components/runner-policy/ @kyle-sexton

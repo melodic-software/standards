@@ -277,6 +277,11 @@ jobs:
       - name: This repository's AGENTS.md carries the section
         if: ${{ !cancelled() }}
         run: bash components/code-review-rules/code-review-rules.sh file
+      # Other repositories are checked by the scheduled
+      # maintenance-audit-org-architecture-pointer workflow.
+      - name: Org architecture pointer contract test
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/org-architecture-pointer/org-architecture-pointer.test.sh
 
   check-powershell:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
