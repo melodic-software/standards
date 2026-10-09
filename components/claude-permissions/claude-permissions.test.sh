@@ -110,6 +110,55 @@ for pattern in "${required_lefthook_denies[@]}"; do
   fi
 done
 
+# Worktree removal: only the double force (which overrides a claim lock) is
+# denied; a single --force and any allow row would bypass the classifier's
+# session-created check. Both allow spellings stay tombstoned.
+required_worktree_denies=(
+  'Bash(*worktree remove*--force --force*)'
+  'Bash(*worktree remove*--force -f*)'
+  'Bash(*worktree remove*-f --force*)'
+  'Bash(*worktree remove*-f -f*)'
+  'PowerShell(*worktree remove*--force --force*)'
+  'PowerShell(*worktree remove*--force -f*)'
+  'PowerShell(*worktree remove*-f --force*)'
+  'PowerShell(*worktree remove*-f -f*)'
+)
+for pattern in "${required_worktree_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required double-force worktree rule"
+  fi
+done
+
+for pattern in 'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.withdraw | index($pattern) != null' "$config" >/dev/null; then
+    pass "withdraw includes $pattern"
+  else
+    fail "withdraw includes $pattern" "worktree removal is judged by the classifier"
+  fi
+done
+
+forbidden_denies=(
+  'Bash(git worktree remove * --force *)'
+  'Bash(git worktree remove --force *)'
+  'Bash(git worktree remove -f *)'
+  'PowerShell(git worktree remove --force *)'
+  'PowerShell(git worktree remove -f *)'
+  'Bash(gh pr merge --auto *)'
+  'Bash(gh pr merge --auto)'
+)
+for pattern in "${forbidden_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    fail "deny omits $pattern" "retired deny must not return"
+  else
+    pass "deny omits $pattern"
+  fi
+done
+
 # settings.local.json is personal overrides, not a credential store, and a
 # Read deny also blocks Edit — those rows must not return.
 #

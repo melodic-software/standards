@@ -209,6 +209,25 @@ also match `git restore --staged <path>` (unstage without discarding), and denyâ
 precedence cannot carve that exception back out. The checkout `--` discard forms stay denied,
 because `git checkout *` is allowed and resolves before the classifier.
 
+### `git worktree remove` is left to the classifier; only the double force is denied
+
+No `allow` row covers `git worktree remove`; both spellings are tombstoned in `withdraw`. A
+catch-all grant would also pre-approve `git worktree remove --force <another session's worktree>`,
+which the consumer's prose `autoMode` entry limits to worktrees the session created, a condition no
+glob can express. `deny` carries only the double force (`-f -f`, `--force --force` and the two mixed
+spellings), which git requires to remove a locked worktree. The source-control claim gate locks
+every worktree it creates, so this keeps one session from removing another's claimed worktree,
+while a single `--force` on a session's own unlocked worktree reaches the classifier. The rows lead
+with `*` so `git -C <repo> worktree remove` matches too. A double force split by the path
+(`-f <path> -f`) or bundled as `-ff` is not matched; the threat model below covers why.
+
+### `gh pr merge --auto` has no floor row
+
+Merge permission depends on the repository, who opened the pull request and whether its reviews
+finished, so it lives in the consumer's prose `autoMode` entry. The former `gh pr merge --auto`
+denies matched only the flag-first spelling, never the documented number-first one
+(`gh pr merge <N> --squash --auto`), so they blocked one ordering of an otherwise allowed command.
+
 ### `ruff check --unsafe-fixes` is denied, but a repo config can enable it
 
 `deny` rejects the `--unsafe-fixes` flag (`Bash(ruff check *--unsafe-fixes*)`). A repository whose
