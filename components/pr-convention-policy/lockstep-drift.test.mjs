@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -22,6 +23,8 @@ import {
   checkPinnedReusable,
   DriftError,
   detectArtifactPin,
+  FetchError,
+  MODES,
   maskCode,
   parseCallerPin,
   parseCompositeNegation,
@@ -32,12 +35,15 @@ import {
   parseGatePatterns,
   parseGateSections,
   parseMarkdownHeadings,
+  parseMode,
   parseValidatorNegation,
   parseValidatorNonClosing,
   parseValidatorPatterns,
   parseValidatorSections,
   readGateComposite,
+  requirePinScanToken,
   resolveConsumerArtifact,
+  runPinScan,
 } from "./lockstep-drift.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
@@ -1603,4 +1609,47 @@ test("a global probe does not go stateful across repeated keyword probes", () =>
   for (const keyword of POLICY.body.closingKeywords) {
     assert.ok(patterns.keyword.test(` ${keyword} #12 `), `${keyword} probes on every call`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Mode selection: the copy check and the pin scan run separately.
+// ---------------------------------------------------------------------------
+
+test("the CLI takes exactly one known mode", () => {
+  assert.deepEqual(MODES, ["copies", "pins"]);
+  assert.equal(parseMode(["copies"]), "copies");
+  assert.equal(parseMode(["pins"]), "pins");
+  for (const argv of [[], ["all"], ["copies", "pins"], ["--mode=copies"]]) {
+    assert.throws(
+      () => parseMode(argv),
+      /usage: lockstep-drift\.mjs <copies\|pins>/,
+      argv.join(" "),
+    );
+  }
+});
+
+test("the pin scan needs a token and fails without one", async () => {
+  for (const env of [{}, { LOCKSTEP_GITHUB_TOKEN: "", GITHUB_TOKEN: "" }]) {
+    assert.throws(() => requirePinScanToken(env), FetchError);
+    await assert.rejects(runPinScan(env), FetchError);
+  }
+  requirePinScanToken({ LOCKSTEP_GITHUB_TOKEN: "app-token" });
+  requirePinScanToken({ GITHUB_TOKEN: "workflow-token" });
+});
+
+// End to end through the CLI: no mode, or a tokenless pin scan, exits non-zero
+// before any network read, so neither can pass by skipping.
+test("the CLI fails a missing mode and a tokenless pin scan", () => {
+  const script = path.join(MODULE_DIRECTORY, "lockstep-drift.mjs");
+  const run = (args) =>
+    spawnSync(process.execPath, [script, ...args], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+  const noMode = run([]);
+  assert.equal(noMode.status, 1);
+  assert.match(noMode.stderr, /usage: lockstep-drift\.mjs <copies\|pins>/);
+  const pins = run(["pins"]);
+  assert.equal(pins.status, 1);
+  assert.match(pins.stderr, /needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN/);
 });

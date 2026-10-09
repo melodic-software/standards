@@ -20,7 +20,8 @@
 // extractor, so a mixed fleet passes and a drifted artifact of either kind
 // still fails.
 //
-// CLI mode fetches live sources over the GitHub contents API and exits
+// The CLI takes one mode, `copies` or `pins` (see MODES), fetches live
+// sources over the GitHub contents API and exits
 // non-zero on drift; every network failure is a distinct `fetch-error`
 // failure, never a skip. Parsing and comparison logic is exported for the
 // hermetic fixture tests in `lockstep-drift.test.mjs`.
@@ -48,8 +49,8 @@ const RULES_FILE_PATH = path.join(
 
 // Contents-API URLs, not raw.githubusercontent: several consumers are private
 // repositories, and the API honors the token `LOCKSTEP_GITHUB_TOKEN` (or
-// `GITHUB_TOKEN`) that the CI lane mints from the org GitHub App. Public
-// sources still resolve unauthenticated.
+// `GITHUB_TOKEN`). The pin audit mints that token from the org GitHub App;
+// the copy check reads only public sources, with the workflow token or none.
 const API_BASE = "https://api.github.com/repos/melodic-software";
 const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
 
@@ -1141,24 +1142,58 @@ export async function resolveConsumerArtifact(repo, cachedText, listNames = list
   return reusable ?? { kind: "none" };
 }
 
-export async function runLiveCheck() {
-  const policy = parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH);
+// The copy check and the pin scan run separately. The copies live in public
+// repositories and need no token beyond a public read, so they run on every
+// pull request; the pin scan reads private gate callers and needs the
+// standards-sync App token, which only a `main` run can mint.
+export const MODES = ["copies", "pins"];
+
+export function parseMode(argv) {
+  if (argv.length !== 1 || !MODES.includes(argv[0])) {
+    throw new Error(`usage: lockstep-drift.mjs <${MODES.join("|")}>`);
+  }
+  return argv[0];
+}
+
+// A tokenless pin scan could read only the public callers; fail it rather
+// than let it pass on part of the fleet.
+export function requirePinScanToken(env) {
+  if (!(env.LOCKSTEP_GITHUB_TOKEN || env.GITHUB_TOKEN)) {
+    throw new FetchError(
+      "fetch-error: the pin scan reads private gate callers and needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN; neither is set",
+    );
+  }
+}
+
+async function readPolicy() {
+  return parseUniqueJson(await readFile(POLICY_PATH, "utf8"), POLICY_PATH);
+}
+
+function cachedFetcher(fetcher) {
   const cache = new Map();
-  const cached = (fetcher) => async (url) => {
+  return async (url) => {
     if (!cache.has(url)) {
       cache.set(url, await fetcher(url));
     }
     return cache.get(url);
   };
-  const cachedText = cached(fetchText);
+}
 
-  const texts = {
-    ...(await readGateComposite(cached(fetchTextOrNull))),
-    hookValidator: await cachedText(COPY_SOURCES.hookValidator),
-    orgTemplate: await cachedText(COPY_SOURCES.orgTemplate),
+export async function runCopyCheck() {
+  const policy = await readPolicy();
+  return checkCopies(policy, {
+    ...(await readGateComposite(fetchTextOrNull)),
+    hookValidator: await fetchText(COPY_SOURCES.hookValidator),
+    orgTemplate: await fetchText(COPY_SOURCES.orgTemplate),
     rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
-  };
-  const errors = checkCopies(policy, texts);
+  });
+}
+
+export async function runPinScan(env = process.env) {
+  requirePinScanToken(env);
+  const policy = await readPolicy();
+  const cachedText = cachedFetcher(fetchText);
+  const errors = [];
 
   // A consumer whose fetch fails is reported and the loop continues, so one
   // unreachable private repository cannot mask drift findings collected from
@@ -1173,8 +1208,7 @@ export async function runLiveCheck() {
       }
       if (found.kind === "composite") {
         // `main` means a local `./` reference: the artifact is that
-        // repository's own tree, which for ci-workflows is the gate source
-        // already fetched above (the cache makes this free).
+        // repository's own tree.
         const source = found.sha === "main" ? repo : "ci-workflows";
         const ref = found.sha;
         resolutions.set(repo, {
@@ -1209,7 +1243,8 @@ export async function runLiveCheck() {
 // repo-wide, which would blind the rule everywhere else in this component.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
-    const errors = await runLiveCheck();
+    const mode = parseMode(process.argv.slice(2));
+    const errors = await (mode === "copies" ? runCopyCheck() : runPinScan());
     if (errors.length > 0) {
       for (const message of errors) {
         // biome-ignore lint/suspicious/noConsole: CLI drift output is this script's interface
@@ -1218,7 +1253,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       process.exit(1);
     }
     // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
-    console.log("pr-convention lockstep: all copies and consumer pins match policy.json");
+    console.log(
+      `pr-convention lockstep: every ${mode === "copies" ? "copy" : "consumer pin"} matches policy.json`,
+    );
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
     console.error(error.message);

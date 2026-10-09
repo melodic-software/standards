@@ -773,22 +773,20 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run lint:pr-convention-policy
 
-  # Lockstep drift check (ADR-0008). Separate job, not a step in
-  # check-policies: the live enforcement run fetches the gate reusable,
-  # the plugin hook validator, the org PR template, and every caller's pin
-  # over the network, and that non-hermetic dependency must not contaminate
-  # the hermetic component lane. The fixture tests run first so a parser
-  # regression reads as a test failure, not as drift.
-  verify-pr-convention-lockstep:
+  # Lockstep drift check (ADR-0008), copy half. Separate job, not a step in
+  # check-policies: the live run fetches the gate composite, the plugin hook
+  # validator and the org PR template over the network, and that
+  # non-hermetic dependency must not contaminate the hermetic component lane.
+  # The fixture tests run first so a parser regression reads as a test
+  # failure, not as drift. Every copy lives in a public repository, so the
+  # workflow token suffices; the caller-pin half reads private repositories
+  # and runs on main in maintenance-audit-pr-convention-pins.yml.
+  check-pr-convention-copies:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      HAS_APP_CREDENTIAL: >-
-        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
-            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -816,30 +814,10 @@ jobs:
           gawk --version | head -n 1
       - name: Test lockstep parsers and mutation probes (hermetic)
         run: npm run test:pr-convention-lockstep
-      # Four gate callers are private repositories, so the live check reads
-      # every source through the contents API with a contents-read token from
-      # the standards-sync App (the maintenance-audit-link-check-excludes precedent). The
-      # mint step is guarded on the secrets being present so an absent
-      # credential reaches the enforcement step tokenless instead of dying
-      # inside the mint action; the private fetches then fail as
-      # `fetch-error` and the lane goes red. Not a skip either way. Two run
-      # kinds see no repository secrets: fork PRs, which carry none by
-      # design, and Dependabot PRs, which resolve the same two names from
-      # this repository's Dependabot secrets. Mirror both there whenever the
-      # App key rotates, or every Dependabot PR fails this lane.
-      - name: Mint a contents-read App token over the installation
-        id: lockstep-token
-        if: env.HAS_APP_CREDENTIAL == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
-          owner: melodic-software # zizmor: ignore[github-app] read-only contents over the installation; the lockstep check reads gate callers fleet-wide
-          permission-contents: read
-      - name: Enforce lockstep against live copies and caller pins
+      - name: Enforce lockstep against the live copies
         env:
-          LOCKSTEP_GITHUB_TOKEN: ${{ steps.lockstep-token.outputs.token }}
-        run: npm run lint:pr-convention-lockstep
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run lint:pr-convention-copies
 
   check-github-actions:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -1090,7 +1068,7 @@ jobs:
       - check-dotnet
       - check-go
       - check-policies
-      - verify-pr-convention-lockstep
+      - check-pr-convention-copies
       - check-github-actions
       - pr-audit-workflows
       - pr-scan-dependencies
@@ -1135,7 +1113,7 @@ jobs:
             ${{ needs.check-dotnet.result }}
             ${{ needs.check-go.result }}
             ${{ needs.check-policies.result }}
-            ${{ needs.verify-pr-convention-lockstep.result }}
+            ${{ needs.check-pr-convention-copies.result }}
             ${{ needs.check-github-actions.result }}
             ${{ needs.pr-audit-workflows.result }}
             ${{ needs.pr-scan-dependencies.result }}
