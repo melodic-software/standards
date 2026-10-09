@@ -110,6 +110,79 @@ for pattern in "${required_lefthook_denies[@]}"; do
   fi
 done
 
+# Worktree removal: only the double force (which overrides a claim lock) is
+# denied. A single-force deny would pre-empt the classifier, and any allow row
+# would bypass its session-created check. Both allow spellings stay tombstoned.
+required_worktree_denies=(
+  'Bash(git *worktree remove*--force --force*)'
+  'Bash(git *worktree remove*--force -f*)'
+  'Bash(git *worktree remove*-f --force*)'
+  'Bash(git *worktree remove*-f -f*)'
+  'PowerShell(git *worktree remove*--force --force*)'
+  'PowerShell(git *worktree remove*--force -f*)'
+  'PowerShell(git *worktree remove*-f --force*)'
+  'PowerShell(git *worktree remove*-f -f*)'
+)
+for pattern in "${required_worktree_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    pass "deny includes $pattern"
+  else
+    fail "deny includes $pattern" "missing required double-force worktree rule"
+  fi
+done
+
+for pattern in 'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.withdraw | index($pattern) != null' "$config" >/dev/null; then
+    pass "withdraw includes $pattern"
+  else
+    fail "withdraw includes $pattern" "worktree removal is judged by the classifier"
+  fi
+done
+
+# The double-force rows are `git *worktree remove...`; the `git ` anchor keeps
+# unrelated commands that merely contain the text out of the deny. Claude's `*`
+# matches any text, so the cases below translate each row to a regex.
+glob_to_regex() { printf '^%s$' "$(printf '%s' "$1" | sed -e 's/[.[\^$+?(){}|]/\\&/g' -e 's/\*/.*/g')"; }
+while IFS= read -r row; do
+  body="${row#*(}"
+  re="$(glob_to_regex "${body%)}")"
+  flags="${body#*remove*}"
+  flags="${flags#\*}"
+  flags="${flags%\*)}"
+  flags="${flags%\*}"
+  for cmd in "git worktree remove $flags /tmp/wt" "git -C /repo worktree remove $flags /tmp/wt"; do
+    if [[ "$cmd" =~ $re ]]; then pass "$row matches: $cmd"; else fail "$row matches: $cmd" "git form not matched"; fi
+  done
+  for cmd in 'grep "worktree remove --force --force" notes.md' "printf 'worktree remove -f -f'" \
+    'rg "worktree remove --force -f" .' "echo 'worktree remove -f --force'"; do
+    if [[ "$cmd" =~ $re ]]; then fail "$row skips: $cmd" 'unrelated command matched'; else pass "$row skips: $cmd"; fi
+  done
+done < <(jq -r '.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git \\*worktree remove"))' "$config")
+
+# A deny row with `git worktree remove` as a literal prefix is a retired
+# single-force spelling.
+single_force="$(jq -r '[.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git worktree remove"))] | join("\n")' "$config")"
+if [[ -n "$single_force" ]]; then
+  fail 'deny has no single-force worktree rows' "retired rows returned: $single_force"
+else
+  pass 'deny has no single-force worktree rows'
+fi
+
+forbidden_denies=(
+  'Bash(gh pr merge --auto *)'
+  'Bash(gh pr merge --auto)'
+)
+for pattern in "${forbidden_denies[@]}"; do
+  if jq -e --arg pattern "$pattern" \
+    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
+    fail "deny omits $pattern" "retired deny must not return"
+  else
+    pass "deny omits $pattern"
+  fi
+done
+
 # settings.local.json is personal overrides, not a credential store, and a
 # Read deny also blocks Edit — those rows must not return.
 #
