@@ -1139,6 +1139,17 @@ from `app-client-id` and `app-private-key` to `STANDARDS_SYNC_APP_CLIENT_ID` and
 `STANDARDS_SYNC_APP_PRIVATE_KEY`, so a caller repinning to v0.39.0 must
 rename the keys it passes under `secrets:`. The caller-side values, caller
 permissions and `runs-on` routing are unchanged.
+All nine are also registered at the v0.39.3 tag
+`ab83b01273026ab5c23c6f3b40e946d97a863fa2`, each a verbatim copy of its
+v0.39.0 entry. Every workflow blob is byte-identical between the two tags, and so is
+every commit-relative path the secret-capable lanes reach
+(`$/report-lane-outcome`). `pr-run-checks` reaches five `$/` action trees
+(`detect-changes`, `gitleaks`, `check-exec-bit`, `check-machine-paths`,
+`check-comment-markers`) whose object SHAs changed only by shell re-indentation:
+`git diff -w` between the two tags is empty for them. The secret-capable copies
+(`intake-triage`, `maintenance-sync-standards`, `pr-review`,
+`pr-review-security`) and the
+`pr-run-checks` copy were signed off by hand on 2026-10-09.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
