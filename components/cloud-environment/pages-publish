@@ -7,11 +7,13 @@
 #   pages-publish <file> --visibility public|private [--id <id>]
 #   pages-publish --delete <id> --visibility public|private
 #
-# Operator values come only from <passwd home>/.config/pages-publish/config,
-# where <passwd home> is field 6 of `getent passwd "$(id -un)"`. HOME,
-# XDG_CONFIG_HOME and every other run-time variable are ignored, because a
-# repository's settings can set them. The file must be owned by the current
-# user with mode 0600 and hold these KEY=VALUE lines:
+# Operator values come from <passwd home>/.config/pages-publish/config, where
+# <passwd home> is field 6 of `getent passwd "$(id -un)"`, or, when that file
+# does not exist, from the Key Vault secret pages-publish-config, read with
+# VAULT_EXEC_VAULT unset. HOME, XDG_CONFIG_HOME and every other run-time
+# variable are ignored, because a repository's settings can set them. The file
+# must be owned by the current user with mode 0600. Either source holds these
+# KEY=VALUE lines:
 #   PUBLIC_ENDPOINT, PRIVATE_ENDPOINT          https://<host> upload origins
 #   PUBLIC_TOKEN_SECRET, PRIVATE_TOKEN_SECRET  vault names of the bearer tokens
 #   PRIVATE_ACCESS_ID_SECRET, PRIVATE_ACCESS_KEY_SECRET
@@ -77,35 +79,68 @@ fi
 
 # ---------------------------------------------------------------- config
 
-home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
-[[ "$home" == /* ]] || die 5 'cannot resolve the home directory from the passwd database'
-config="$home/.config/pages-publish/config"
-[[ -f "$config" && ! -L "$config" ]] || die 5 "config $config is missing"
-owner_mode="$(stat -c '%u %a' "$config" 2>/dev/null || stat -f '%u %Lp' "$config" 2>/dev/null)"
-[[ "$owner_mode" == "$(id -u) 600" ]] ||
-  die 5 "config $config must be owned by uid $(id -u) with mode 0600 (found: ${owner_mode:-unknown})"
-
 declare -A cfg=()
 keys=(PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET
   PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET)
-while IFS= read -r line || [[ -n "$line" ]]; do
-  line="${line%$'\r'}"
-  [[ -z "${line//[[:space:]]/}" || "$line" == '#'* ]] && continue
-  key="${line%%=*}"
-  [[ "$line" == *=* && " ${keys[*]} " == *" $key "* ]] || die 5 "config $config: unknown line '${key}'"
-  cfg[$key]="${line#*=}"
-done <"$config"
-for key in "${keys[@]}"; do
-  value="${cfg[$key]:-}"
-  [[ -n "$value" ]] || die 5 "config $config: $key is missing"
-  if [[ "$key" == *_ENDPOINT ]]; then
-    value="${value%/}"
-    [[ "$value" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || die 5 "config $config: $key must be an https://<host> origin"
-    cfg[$key]="$value"
-  else
-    [[ "$value" =~ ^[A-Za-z0-9-]{1,127}$ ]] || die 5 "config $config: $key is not a vault secret name"
+
+# parse_config <source>: reads KEY=VALUE text on stdin into cfg and validates
+# it, exiting 5 with <source> in the message. A message names a key or a line
+# number, never a value.
+parse_config() {
+  local src="$1" line key value n=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    n=$((n + 1))
+    line="${line%$'\r'}"
+    [[ -z "${line//[[:space:]]/}" || "$line" == '#'* ]] && continue
+    key="${line%%=*}"
+    [[ "$line" == *=* && "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die 5 "config $src: line $n is not KEY=VALUE"
+    [[ " ${keys[*]} " == *" $key "* ]] || die 5 "config $src: unknown line '${key}'"
+    cfg[$key]="${line#*=}"
+  done
+  for key in "${keys[@]}"; do
+    value="${cfg[$key]:-}"
+    [[ -n "$value" ]] || die 5 "config $src: $key is missing"
+    if [[ "$key" == *_ENDPOINT ]]; then
+      value="${value%/}"
+      [[ "$value" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || die 5 "config $src: $key must be an https://<host> origin"
+      cfg[$key]="$value"
+    else
+      [[ "$value" =~ ^[A-Za-z0-9-]{1,127}$ ]] || die 5 "config $src: $key is not a vault secret name"
+    fi
+  done
+}
+
+# load_config: the one place that picks the config source. The file is an
+# override: when it exists it must be a regular file owned by the current user
+# with mode 0600. Otherwise the same text comes from the Key Vault secret
+# pages-publish-config, read with VAULT_EXEC_VAULT unset so a repository's env
+# block cannot point the read at another vault. The value reaches this script
+# through vault-exec's environment and a builtin printf, never argv.
+load_config() {
+  local home config owner_mode text secret=pages-publish-config
+  home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
+  [[ "$home" == /* ]] || die 5 'cannot resolve the home directory from the passwd database'
+  config="$home/.config/pages-publish/config"
+  if [[ -e "$config" || -L "$config" ]]; then
+    [[ -f "$config" && ! -L "$config" ]] || die 5 "config $config is not a regular file"
+    owner_mode="$(stat -c '%u %a' "$config" 2>/dev/null || stat -f '%u %Lp' "$config" 2>/dev/null)"
+    [[ "$owner_mode" == "$(id -u) 600" ]] ||
+      die 5 "config $config must be owned by uid $(id -u) with mode 0600 (found: ${owner_mode:-unknown})"
+    # shellcheck disable=SC2094 # the argument is only a label in messages
+    parse_config "$config" <"$config"
+    return
   fi
-done
+  command -v vault-exec >/dev/null 2>&1 ||
+    die 5 "no config $config, and vault-exec is not on PATH to read Key Vault secret $secret"
+  # shellcheck disable=SC2016 # expanded by the inner shell
+  text="$(env -u VAULT_EXEC_VAULT -u PP_CONFIG vault-exec --env "PP_CONFIG=$secret" -- \
+    bash -c 'printf "%s" "$PP_CONFIG"' 2>/dev/null)" ||
+    die 5 "no config $config, and Key Vault secret $secret could not be read"
+  [[ -n "${text//[[:space:]]/}" ]] || die 5 "no config $config, and Key Vault secret $secret is empty"
+  parse_config "Key Vault secret $secret" <<<"$text"
+}
+
+load_config
 
 # ---------------------------------------------------------------- upload
 

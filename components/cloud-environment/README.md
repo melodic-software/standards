@@ -189,15 +189,22 @@ built from the page URL the host returns; `--delete` prints nothing.
 | 2 | usage |
 | 3 | the file is not a regular file under `${TMPDIR:-/tmp}` (after `realpath`), or carries no builder stamp `<!-- rv-gen:<name> sha256:<64 hex> -->` |
 | 4 | credential-shaped content, found here before any network call or by the host (HTTP 422) |
-| 5 | config missing or invalid, or not owned by the current user with mode 0600 |
+| 5 | config missing or invalid: a config file that is not a regular file owned by the current user with mode 0600, or, with no file, a Key Vault read that fails or holds invalid text |
 | 6 | the token could not be resolved, or the upload or an HTTP answer failed |
 
-**Config.** Operator values come only from
+**Config.** Operator values come from
 `<passwd home>/.config/pages-publish/config`, where `<passwd home>` is field 6
-of `getent passwd "$(id -un)"`. `HOME`, `XDG_CONFIG_HOME` and every other
-run-time variable are ignored, because a repository's settings can set
-environment variables. The file holds `KEY=VALUE` lines (blank lines and `#`
-comments allowed, any other key refused):
+of `getent passwd "$(id -un)"`, when that file exists; it overrides Key Vault
+and must be a regular file owned by the current user with mode 0600. When it
+does not exist, the same text is read from the Key Vault secret
+`pages-publish-config` through [`vault-exec`](#key-vault-resolver), with
+`VAULT_EXEC_VAULT` unset for that read so a repository's `env` block cannot
+point it at another vault. A missing `vault-exec`, a failed read, an empty
+value or invalid content exits 5 with one stderr line that never prints the
+value. `HOME`, `XDG_CONFIG_HOME` and every other run-time variable are
+ignored, because a repository's settings can set environment variables. Both
+sources hold `KEY=VALUE` lines (blank lines and `#` comments allowed, any
+other key refused) and go through one parser:
 
 | Key | Value |
 |---|---|
@@ -268,7 +275,8 @@ same for its Key Vault reads.
 **Trusted inputs.** A caller-set `HTTPS_PROXY` or `CURL_CA_BUNDLE` is honored by
 design: cloud sessions route through the agent proxy with its CA bundle. The
 config file is trusted once it passes the owner and mode 0600 check, since
-forging it needs write access to the home directory.
+forging it needs write access to the home directory. The Key Vault config is
+trusted because it is read from the default vault only.
 
 **Setup.** After `vault-exec`, the script installs `pages-publish` to
 `~/.local/bin/pages-publish` the same way: a copy without the marker line is
@@ -282,8 +290,10 @@ environment's variables, so they win over anything the bootstrap wrote:
   `PAGES_PUBLISH_PUBLIC_TOKEN_SECRET`, `PAGES_PUBLISH_PRIVATE_TOKEN_SECRET`,
   `PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET` and
   `PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET`, when all six are set, become the
-  config above, mode 0600, at the passwd-home path. A partial set logs a
-  `WARN` naming the missing variables and writes no config.
+  config file above, mode 0600, at the passwd-home path, which then overrides
+  the Key Vault secret. They are optional: with none set, no file is written
+  and `pages-publish` reads Key Vault. A partial set logs a `WARN` naming the
+  missing variables and writes no config.
 
 ## Calling contract (frozen)
 

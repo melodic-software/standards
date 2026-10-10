@@ -19,13 +19,22 @@ cat >"$tmp/bin/getent" <<'STUB'
 printf '%s:x:%s:%s::%s:/bin/bash\n' "$2" "$(id -u)" "$(id -g)" "$STUB_HOME"
 STUB
 # vault-exec stub: each --env NAME=secret sets NAME to SENTINEL-<secret>, then
-# the command runs. STUB_VAULT_RC makes the read fail.
+# the command runs. STUB_VAULT_RC makes the read fail. A read of the secret
+# pages-publish-config is logged to $STUB_CALLS/kv-config with the
+# VAULT_EXEC_VAULT it saw, and answers the text of the file $STUB_KV_CONFIG,
+# or exits STUB_KV_RC when that is set.
 cat >"$tmp/bin/vault-exec" <<'STUB'
 #!/usr/bin/env bash
 [[ -z "${STUB_VAULT_RC:-}" ]] || exit "$STUB_VAULT_RC"
 while [[ "$1" != -- ]]; do
   pair="$2"
-  export "${pair%%=*}=SENTINEL-${pair#*=}"
+  if [[ "${pair#*=}" == pages-publish-config ]]; then
+    printf 'VAULT_EXEC_VAULT=%s\n' "${VAULT_EXEC_VAULT-<unset>}" >>"$STUB_CALLS/kv-config"
+    [[ -z "${STUB_KV_RC:-}" ]] || exit "$STUB_KV_RC"
+    export "${pair%%=*}=$(cat "$STUB_KV_CONFIG")"
+  else
+    export "${pair%%=*}=SENTINEL-${pair#*=}"
+  fi
   shift 2
 done
 shift
@@ -397,8 +406,43 @@ write_config "$tmp/home" EXTRA=1
 check_config 'an unknown key'
 write_config "$tmp/home" PUBLIC_TOKEN_SECRET='bad name'
 check_config 'a secret name that is not a vault name'
+mv "$tmp/home/.config/pages-publish/config" "$tmp/home/.config/pages-publish/real"
+ln -s real "$tmp/home/.config/pages-publish/config"
+run "$clean" --visibility public
+assert_exit 'config exits 5: a symlinked config file' 5 "$rc"
+assert_eq 'a symlinked config file skips the Key Vault read' no "$([[ -e "$tmp/calls/kv-config" ]] && echo yes || echo no)"
+mv "$tmp/home/.config/pages-publish/real" "$tmp/home/.config/pages-publish/config"
+
+# Key Vault: with no config file, the same text comes from the secret
+# pages-publish-config; a file present overrides it.
+STUB_SEQ="$pub_ok" run "$clean" --visibility public
+assert_eq 'a config file present skips the Key Vault read' no "$([[ -e "$tmp/calls/kv-config" ]] && echo yes || echo no)"
+
+mkdir -p "$tmp/kv"
+write_config "$tmp/kv" PUBLIC_ENDPOINT=https://kv-public.example.test
+export STUB_KV_CONFIG="$tmp/kv/.config/pages-publish/config"
 rm "$tmp/home/.config/pages-publish/config"
-check_config 'no config file'
+VAULT_EXEC_VAULT=kv-attacker STUB_SEQ="$pub_ok" run "$clean" --visibility public
+assert_exit 'no file and a valid Key Vault config uploads' 0 "$rc"
+assert_eq 'the upload uses the Key Vault endpoint' 'https://kv-public.example.test/_upload' "$(url_of 1)"
+assert_contains 'the bearer token comes from the Key Vault config' "$stdin_all" 'Bearer SENTINEL-pub-token'
+assert_eq 'the Key Vault read sees VAULT_EXEC_VAULT unset' 'VAULT_EXEC_VAULT=<unset>' "$(cat "$tmp/calls/kv-config" 2>/dev/null)"
+
+# check_kv <label>: no file, and the Key Vault read fails or holds bad text.
+check_kv() {
+  run "$clean" --visibility public
+  assert_exit "Key Vault config exits 5: $1" 5 "$rc"
+  assert_eq "Key Vault refusal makes no call: $1" 0 "$calls"
+  assert_eq "Key Vault refusal is one stderr line: $1" 1 "$(printf '%s\n' "$err" | wc -l | tr -d ' ')"
+}
+STUB_KV_RC=1 check_kv 'vault-exec fails'
+write_config "$tmp/kv" PUBLIC_ENDPOINT=http://kv-public.example.test
+check_kv 'an http endpoint'
+printf 'leaked-value-0123456789\n' >"$STUB_KV_CONFIG"
+check_kv 'a line that is not KEY=VALUE'
+assert_not_contains 'a bad Key Vault line is not echoed' "$err" 'leaked-value'
+printf '\n' >"$STUB_KV_CONFIG"
+check_kv 'an empty secret'
 
 check_usage() {
   local label="$1"
