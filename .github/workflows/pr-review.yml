@@ -49,7 +49,7 @@ jobs:
       pull-requests: write   # post review + track_progress tracking comment
       id-token: write        # OIDC — mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2 # v0.39.3
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@5cd38773d83a5277d887eecf0994608983998fa3 # v0.39.7
     with:
       # DEVIATION from the component, which names the managed fleet label:
       # this repository is PUBLIC, and runner-policy admits a fleet label only
