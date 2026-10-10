@@ -18,6 +18,12 @@ for `$/` steps. Remove the ignore when
 [rhysd/actionlint#732](https://github.com/rhysd/actionlint/issues/732) ships
 and the pinned actionlint is bumped.
 
+A second scoped ignore admits GitHub's GA `concurrency.queue` key, which
+actionlint 1.7.12 rejects with `unexpected key "queue" for "concurrency"
+section` ([rhysd/actionlint#654](https://github.com/rhysd/actionlint/issues/654)).
+claude-code-plugins `pr-refine.yml` uses `queue: max` for its per-PR write
+queue. Remove the ignore when #654 ships and the pinned actionlint is bumped.
+
 Execution and the engine pin are owned by the actionlint action in
 `ci-workflows`. `fixtures/` and `actionlint.test.sh` prove the allowlist against
 that entrypoint: a two-job fleet-label workflow lints clean with the config, an
@@ -26,4 +32,6 @@ run reproduces both label errors. The control case is the removal tripwire: it
 fails once a fleet label becomes built-in, so the stale entry gets dropped.
 The `$/` cases follow the same shape: a `$/` workflow lints clean, a ref-less
 `owner/repo/path` still fails, and a configless control run reports the `$/`
-reference, which fails once actionlint accepts it natively.
+reference, which fails once actionlint accepts it natively. The queue cases
+match: a queue workflow lints clean, an unrelated unexpected key still fails,
+and a configless control run reports the queue message.
