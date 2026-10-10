@@ -286,8 +286,14 @@ trusted because it is read from the default vault only.
 **Setup.** After `vault-exec`, the script installs `pages-publish` to
 `~/.local/bin/pages-publish` the same way: a copy without the marker line is
 left alone with `WARN pages-publish: <dest> is not ours`. After the repo
-bootstrap, whatever its outcome, it writes two operator files from the
-environment's variables, so they win over anything the bootstrap wrote:
+bootstrap, whatever its outcome, it writes two operator files from variables
+the setup step receives, so they win over anything the bootstrap wrote.
+claude.ai passes an environment's variables to the session, not to the setup
+script ([Set environment variables](https://code.claude.com/docs/en/cloud-environments),
+as of 2026-10-10), so in a cloud environment these variables take effect only
+if the setup step itself is given them; otherwise `pages-publish` reads Key
+Vault and the [rendered-views preference](#rendered-views-preference) comes
+from its hook.
 
 - `RENDERED_VIEWS_MD`, when set, replaces
   `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md`.
@@ -299,6 +305,25 @@ environment's variables, so they win over anything the bootstrap wrote:
   the Key Vault secret. They are optional: with none set, no file is written
   and `pages-publish` reads Key Vault. A partial set logs a `WARN` naming the
   missing variables and writes no config.
+
+## Rendered-views preference
+
+In cloud sessions the preference comes from the Key Vault secret
+`rendered-views-md`. [`rendered-views-sync`](rendered-views-sync) runs as a
+user-scope `SessionStart` hook (matcher `startup|resume`, timeout 30 seconds).
+When `CLAUDE_CODE_REMOTE` is `true`, it reads the secret through the
+`vault-exec` beside it, with `VAULT_EXEC_VAULT` unset, and a non-empty value
+replaces `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md`. An absent or
+empty secret leaves the file as it was. The value never comes from an
+environment variable, because a repository's settings can set those, and it
+is never printed. The hook always exits 0; a failure is one line on stderr.
+
+**Setup.** After `pages-publish`, the script installs `rendered-views-sync` to
+`~/.local/bin/rendered-views-sync` the same way, then adds the hook to
+`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`, replacing any earlier entry
+for the same command so a rebuild adds no duplicate. Every other key and hook
+in the file survives. A refused install registers no hook, and a settings file
+that is not a single JSON object is left as it was with a `WARN`.
 
 ## Calling contract (frozen)
 
@@ -397,7 +422,8 @@ the snapshot.
   rebuilt, so reverting the commit and forcing a rebuild restores the prior
   state; in an emergency the bootstrap can pin a commit SHA in the raw URL
   instead of `main`. The pin covers this script only: the plugin catalog, the
-  permission floor, `vault-exec` and `pages-publish` are still fetched from `main`.
+  permission floor, `vault-exec`, `pages-publish` and `rendered-views-sync` are
+  still fetched from `main`.
 
 The scope boundary holds as elsewhere in this repository: this component owns
 the shared environment baseline, which includes deriving the fleet plugin

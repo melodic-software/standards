@@ -536,4 +536,52 @@ assert_exit 'no PAGES_PUBLISH_* variables is a quiet no-op' 0 "$rc"
 assert_file_absent 'no PAGES_PUBLISH_* variables writes no config' "$pp_path"
 rm -rf "$pp_tmp"
 
+# Rendered-views hook: installed like pages-publish, then registered as a
+# SessionStart hook in the user settings file.
+rv_rel='components/cloud-environment/rendered-views-sync'
+assert_eq 'setup.sh fetches rendered-views-sync from its published path' \
+  "https://raw.githubusercontent.com/melodic-software/standards/main/$rv_rel" \
+  "$(sed -n "s/^RENDERED_VIEWS_SYNC_URL='\(.*\)'\$/\1/p" "$script")"
+rv_marker="$(sed -n "s/^RENDERED_VIEWS_SYNC_MARKER='\(.*\)'\$/\1/p" "$script")"
+grep -qxF "$rv_marker" "$root/$rv_rel"
+rc=$?
+assert_exit 'rendered-views-sync carries the marker setup.sh installs by' 0 "$rc"
+rv_tmp="$(mktemp -d "$TEST_TMPDIR/rv_tmp.XXXXXX")"
+install_rendered_views_sync "$root/$rv_rel" "$rv_tmp/bin/rendered-views-sync"
+rc=$?
+assert_exit 'rendered-views-sync installs into a missing ~/.local/bin' 0 "$rc"
+
+rv_settings="$rv_tmp/settings.json"
+rv_cmd='/home/u/.local/bin/rendered-views-sync'
+printf '%s' '{"model":"x","permissions":{"deny":["Bash(rm *)"]},"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"other-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"stop-hook"}]}]}}' >"$rv_settings"
+register_session_hook "$rv_settings" "$rv_cmd"
+rc=$?
+assert_exit 'the hook registers into an existing settings file' 0 "$rc"
+assert_eq 'the SessionStart entry is the documented shape' \
+  '{"matcher":"startup|resume","hooks":[{"type":"command","command":"/home/u/.local/bin/rendered-views-sync","timeout":30}]}' \
+  "$(jq -c '.hooks.SessionStart[-1]' "$rv_settings")"
+assert_eq 'an unrelated SessionStart hook survives' 'other-hook' \
+  "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$rv_settings")"
+assert_eq 'other events and keys survive' 'stop-hook x Bash(rm *)' \
+  "$(jq -r '"\(.hooks.Stop[0].hooks[0].command) \(.model) \(.permissions.deny[0])"' "$rv_settings")"
+cp "$rv_settings" "$rv_tmp/first.json"
+register_session_hook "$rv_settings" "$rv_cmd"
+cmp -s "$rv_settings" "$rv_tmp/first.json"
+rc=$?
+assert_exit 'registering twice is byte-identical (no duplicate entry)' 0 "$rc"
+assert_eq 'the hook appears once' 1 \
+  "$(jq --arg c "$rv_cmd" '[.hooks.SessionStart[].hooks[] | select(.command == $c)] | length' "$rv_settings")"
+register_session_hook "$rv_tmp/new/settings.json" "$rv_cmd"
+assert_eq 'a missing settings file starts from {}' 1 \
+  "$(jq '.hooks.SessionStart | length' "$rv_tmp/new/settings.json")"
+for bad in '{"hooks": ' '["x"]' '{"hooks":{"SessionStart":{}}}'; do
+  printf '%s' "$bad" >"$rv_tmp/bad.json"
+  register_session_hook "$rv_tmp/bad.json" "$rv_cmd" 2>/dev/null
+  rc=$?
+  assert_nonzero "registration refuses $bad" "$rc"
+  assert_eq "a refusal leaves $bad as it was" "$bad" "$(cat "$rv_tmp/bad.json")"
+done
+assert_eq 'refusals leave no temp file behind' '' "$(find "$rv_tmp" -name '*.hook.*')"
+rm -rf "$rv_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1

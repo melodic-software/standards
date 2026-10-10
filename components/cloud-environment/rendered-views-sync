@@ -1,0 +1,49 @@
+#!/bin/bash
+# melodic-software/standards cloud-environment rendered-views-sync
+#
+# SessionStart hook, installed by setup.sh to ~/.local/bin/rendered-views-sync
+# beside vault-exec. In a cloud session (CLAUDE_CODE_REMOTE=true) it reads the
+# Key Vault secret rendered-views-md from the default vault and, when the value
+# is non-empty, replaces ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md
+# with it. An absent or empty secret leaves any existing file alone. The value
+# never comes from an environment variable, because a repository's settings can
+# set those, and it is never printed. PATH is fixed and the vault-exec beside
+# this script is the one called, so a repository's PATH cannot substitute one.
+# Always exits 0 and writes nothing to stdout, which SessionStart would add to
+# the session's context; a failure is one line on stderr.
+set -u
+[[ "${CLAUDE_CODE_REMOTE:-}" == true ]] || exit 0
+PATH=/usr/local/bin:/usr/bin:/bin
+
+fail() {
+  printf 'rendered-views-sync: %s\n' "$1" >&2
+  exit 0
+}
+
+[[ -n "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]] || fail 'neither CLAUDE_CONFIG_DIR nor HOME is set; not synced'
+dest="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md"
+vault_exec="$(dirname -- "${BASH_SOURCE[0]}")/vault-exec"
+[[ -x "$vault_exec" ]] || fail "$vault_exec not found; not synced"
+
+# The inner shell takes the value from its environment, never from argv, and
+# writes a temp file beside the destination, then renames it over it.
+read -r -d '' write_value <<'INNER'
+[[ -n "${RV_MD:-}" ]] || exit 0
+if [[ "$RV_MD" == *$'\r'* ]]; then
+  echo 'rendered-views-sync: secret rendered-views-md holds a carriage return' >&2
+  exit 1
+fi
+tmp="$1.sync.$$"
+if mkdir -p "${1%/*}" && printf '%s\n' "${RV_MD%$'\n'}" >"$tmp" &&
+  chmod 0644 "$tmp" && mv -f "$tmp" "$1"; then
+  exit 0
+fi
+rm -f "$tmp"
+exit 1
+INNER
+
+env -u VAULT_EXEC_VAULT -u VAULT_EXEC_RETRY_DELAY_SEC -u RV_MD VAULT_EXEC_BUDGET_SEC=20 \
+  "$vault_exec" --optional --env RV_MD=rendered-views-md -- \
+  bash -c "$write_value" rendered-views-sync "$dest" >/dev/null ||
+  fail "$dest not updated"
+exit 0
