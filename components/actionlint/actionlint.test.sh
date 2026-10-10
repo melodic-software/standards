@@ -105,7 +105,7 @@ assert_contains 'the unrelated key is reported' "$out" 'unexpected key "unknown-
 assert_not_contains 'the queue suppression stays scoped to its exact message' "$out" "$queue_message"
 
 # Control: without the config the queue key must be rejected. When this case
-# fails, rhysd/actionlint#654 shipped in the pinned engine; drop the ignore
+# fails, the pinned engine accepts `queue` natively; drop the ignore
 # instead of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-key.yml"
