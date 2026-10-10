@@ -82,6 +82,19 @@ rc=$?
 assert_exit 'a hostile .curlrc does not stop an --optional run' 0 "$rc"
 assert_file_absent 'the real curl never reads a planted .curlrc' "$tmp/home/planted-trace"
 
+# A json.py planted in the working directory or on PYTHONPATH must not replace
+# the parser: it would let anyone who can write a file there forge any value.
+mkdir -p "$tmp/planted"
+cat >"$tmp/planted/json.py" <<'EOF'
+def load(_):
+    return {"value": "FORGED"}
+EOF
+# shellcheck disable=SC2016 # $TOKEN expands in the child shell
+out="$(STUB_STATUS=200 STUB_BODY="$ok_body" PYTHONPATH="$tmp/planted" \
+  env --chdir="$tmp/planted" "$script" --env TOKEN=my-secret -- \
+  bash -c 'printf "%s" "$TOKEN"' </dev/null 2>/dev/null)"
+assert_eq 'a planted json.py never forges the value' "$value" "$out"
+
 run 200 "$ok_body" '' --env TOKEN=my-secret -- true
 assert_eq 'stdout carries nothing of its own' '' "$out"
 assert_eq 'stderr is silent on success' '' "$err"

@@ -7,13 +7,15 @@
 #   pages-publish <file> --visibility public|private [--id <id>]
 #   pages-publish --delete <id> --visibility public|private
 #
-# Operator values come from <passwd home>/.config/pages-publish/config, where
-# <passwd home> is field 6 of `getent passwd "$(id -un)"`, or, when that file
-# does not exist, from the Key Vault secret pages-publish-config, read with
-# VAULT_EXEC_VAULT unset. HOME, XDG_CONFIG_HOME and every other run-time
-# variable are ignored, because a repository's settings can set them. The file
-# must be owned by the current user with mode 0600. Either source holds these
-# KEY=VALUE lines:
+# Operator values come only from the Key Vault secret pages-publish-config,
+# read with VAULT_EXEC_VAULT unset so a repository's env block cannot point the
+# read at another vault. There is no local file override: the config names the
+# vault secrets this script sends and the hosts it sends them to, and this
+# command runs without a permission prompt, so any writable source would let a
+# process running as the user send any vault secret to any host. Key Vault
+# writes are permission-gated and audited. To change the config, run
+# `az keyvault secret set --name pages-publish-config ...`. The secret holds
+# these KEY=VALUE lines:
 #   PUBLIC_ENDPOINT, PRIVATE_ENDPOINT          https://<host> upload origins
 #   PUBLIC_TOKEN_SECRET, PRIVATE_TOKEN_SECRET  vault names of the bearer tokens
 #   PRIVATE_ACCESS_ID_SECRET, PRIVATE_ACCESS_KEY_SECRET
@@ -31,7 +33,11 @@
 # is retried once as a private create.
 #
 # Secrets are resolved by vault-exec and reach curl only as config lines on
-# its stdin, never in argv. On success stdout is one JSON line
+# its stdin, never in argv. The environment still matters elsewhere: PATH
+# selects vault-exec, curl, awk and gitleaks, TMPDIR sets the temp dir the
+# page must be under, and BASH_ENV is sourced here and by the inner shells.
+# Setting those already runs code as the user; the guarantee is only that no
+# config-file write changes where secrets go. On success stdout is one JSON line
 # {"id":..., "visibility":..., "url":...}; --delete prints nothing.
 # Exit codes: 2 usage, 3 input not a stamped temp-dir page, 4 credential
 # content (here or at the host), 5 config missing or invalid, 6 upload failed.
@@ -110,40 +116,18 @@ parse_config() {
   done
 }
 
-# load_config: the one place that picks the config source. The file is an
-# override: when it exists it must be a regular file owned by the current user
-# with mode 0600. Otherwise the same text comes from the Key Vault secret
-# pages-publish-config, read with VAULT_EXEC_VAULT unset so a repository's env
-# block cannot point the read at another vault. The value reaches this script
+# load_config: reads the config from the Key Vault secret pages-publish-config,
+# the only source (see the header for why). The value reaches this script
 # through vault-exec's environment and a builtin printf, never argv.
 load_config() {
-  local home config owner_mode text secret=pages-publish-config
-  home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
-  [[ "$home" == /* ]] || die 5 'cannot resolve the home directory from the passwd database'
-  config="$home/.config/pages-publish/config"
-  if [[ ! -e "$config" && ! -L "$config" ]]; then
-    # Fall back to Key Vault only when the lookup says the file does not exist;
-    # any other reason it cannot be seen (an untraversable directory) fails closed.
-    local why
-    why="$(stat -- "$config" 2>&1 >/dev/null)"
-    [[ "$why" == *'No such file or directory'* ]] ||
-      die 5 "cannot tell whether config $config exists"
-  else
-    [[ -f "$config" && ! -L "$config" ]] || die 5 "config $config is not a regular file"
-    owner_mode="$(stat -c '%u %a' "$config" 2>/dev/null || stat -f '%u %Lp' "$config" 2>/dev/null)"
-    [[ "$owner_mode" == "$(id -u) 600" ]] ||
-      die 5 "config $config must be owned by uid $(id -u) with mode 0600 (found: ${owner_mode:-unknown})"
-    # shellcheck disable=SC2094 # the argument is only a label in messages
-    parse_config "$config" <"$config"
-    return
-  fi
+  local text secret=pages-publish-config
   command -v vault-exec >/dev/null 2>&1 ||
-    die 5 "no config $config, and vault-exec is not on PATH to read Key Vault secret $secret"
+    die 5 "vault-exec is not on PATH to read Key Vault secret $secret"
   # shellcheck disable=SC2016 # expanded by the inner shell
   text="$(env -u VAULT_EXEC_VAULT -u PP_CONFIG vault-exec --env "PP_CONFIG=$secret" -- \
     bash -c 'printf "%s" "$PP_CONFIG"' 2>/dev/null)" ||
-    die 5 "no config $config, and Key Vault secret $secret could not be read"
-  [[ -n "${text//[[:space:]]/}" ]] || die 5 "no config $config, and Key Vault secret $secret is empty"
+    die 5 "Key Vault secret $secret could not be read"
+  [[ -n "${text//[[:space:]]/}" ]] || die 5 "Key Vault secret $secret is empty"
   parse_config "Key Vault secret $secret" <<<"$text"
 }
 
