@@ -1159,9 +1159,10 @@ All nine are also registered at the v0.39.8 tag
 v0.39.3 entry: no reusable's `workflow_call` inputs, secrets, workflow or job
 permissions, or `runs-on` routing changed between the two tags. Four blobs are
 byte-identical (`intake-label-needs-triage`, `pr-scan-dependencies`,
-`pr-audit-workflows`, `pr-automerge-dependabot`), and the claude-lanes lockstep
-copies them. It declines the other five, which were signed off by hand on
-2026-10-10. `intake-triage`, `pr-review` and `pr-review-security` bump
+`pr-audit-workflows`, `pr-automerge-dependabot`), and the claude-lanes
+lockstep's surface comparison finds them unchanged. It declines the other five,
+and because any decline suppresses every lockstep write, all nine entries were
+registered by hand and signed off on 2026-10-10. `intake-triage`, `pr-review` and `pr-review-security` bump
 `anthropics/claude-code-action` from v1.0.241 to v1.0.245 (`6fed3ca`) on the
 step that receives `CLAUDE_CODE_OAUTH_TOKEN`, so their credential references
 change; `pr-review` and `pr-review-security` also reword the rate-limit
