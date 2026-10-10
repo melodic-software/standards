@@ -51,8 +51,9 @@ permissions:
 #
 # The cost of the branch: a contract-only run no longer queues behind the full
 # run whose `ci-lanes` status it carries forward, so the two race. The
-# `ci-status` composite closes that with a bounded wait on EARLIER incomplete
-# runs on the same head SHA; see `carry-forward-wait-seconds` on the job below.
+# `ci-status` composite closes that without waiting: with `yield-to-full-run` a
+# contract-only run fails at once while a full run is in flight on the same head
+# SHA, whose newer ci-status then decides the gate; see the job below.
 #
 # One hazard the branch does not remove, because no concurrency setting both
 # removes it and keeps supersession: the full branch is keyed on the pull
@@ -1052,10 +1053,10 @@ jobs:
   ci-status:
     if: ${{ !cancelled() }}
     permissions:
-      # `actions: read` lets the carry-forward wait list the workflow runs on
-      # this head SHA, so it can block on an EARLIER incomplete run instead of
-      # reading a `ci-lanes` status the full run has not written yet.
-      actions: read
+      # `yield-to-full-run` lists this workflow's runs on the head SHA, and
+      # `rerun-contract-only-siblings` re-runs the red contract-only ones once
+      # the full run records `success`. Write covers the read.
+      actions: write
       contents: read
       # pr-contract upserts the advisory linkage comment and moves the linkage
       # label; ci-status records the `ci-lanes` commit status the carry-forward
@@ -1080,7 +1081,10 @@ jobs:
       - test-cloud-environment
       - test-distribution
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # No run waits for another: with `yield-to-full-run` a contract-only run
+    # lists in-flight runs once and reads the status once, and a full run's
+    # ci-status runs after its lanes, so either finishes in seconds.
+    timeout-minutes: 3
     steps:
       - name: Check the pull-request contract
         uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@ab83b01273026ab5c23c6f3b40e946d97a863fa2 # v0.39.3
@@ -1101,12 +1105,15 @@ jobs:
         with:
           treat-skipped-as: fail
           token: ${{ github.token }}
-          # The job's `timeout-minutes: 15` minus 60 s, so the wait always
-          # loses to the job timeout and a stuck earlier run cannot turn this
-          # into a silent 15-minute hang. The ceiling has to cover the full
-          # run it waits on: this repository's `pr-require-checks` p95 wall is ~2 minutes
-          # (last 20 pull-request runs, 79-127 s), so 840 s is generous.
-          carry-forward-wait-seconds: '840'
+          # A contract-only run never waits: while a full run on the SHA is in
+          # flight it fails with "superseded by full run <url>", and that run's
+          # newer ci-status decides the gate. Once the full run records
+          # `success` it re-runs those red contract-only runs, which then read
+          # the `success` and replace their red check runs. This workflow is
+          # not draft-gated, so the re-run is unconditional.
+          yield-to-full-run: 'true'
+          rerun-contract-only-siblings: 'true'
+          carry-forward-wait-seconds: '0'
           results: >-
             ${{ needs.check-shell.result }}
             ${{ needs.check-markdown-and-links.result }}
