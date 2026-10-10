@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-10.1'
+SCRIPT_VERSION='2026-10-10.2'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -260,8 +260,24 @@ register_session_hook() {
   return 1
 }
 
-# Sourced by setup.test.sh for the plugin-list, permission-floor, installer and
-# session-hook helpers only.
+# log_retired_inputs: one log line per retired setup input that is still set,
+# naming its replacement and never its value. setup.sh no longer reads them:
+# claude.ai passes an environment's variables to the session, not to this
+# script, so they never reached a cloud cache build.
+log_retired_inputs() {
+  local var
+  [[ -n "${RENDERED_VIEWS_MD+set}" ]] &&
+    log 'WARN RENDERED_VIEWS_MD is set but ignored; the preference comes from Key Vault secret rendered-views-md through the rendered-views-sync hook'
+  for var in PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET; do
+    var="PAGES_PUBLISH_$var"
+    [[ -n "${!var+set}" ]] &&
+      log "WARN $var is set but ignored; pages-publish reads its config from Key Vault secret pages-publish-config"
+  done
+  return 0
+}
+
+# Sourced by setup.test.sh for the plugin-list, permission-floor, installer,
+# session-hook and retired-input helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -273,6 +289,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 rm -f "$STAMP" "$STAMP_FALLBACK" 2>/dev/null
 log "start version=$SCRIPT_VERSION"
+log_retired_inputs
 
 # Resolve the repo checkout root explicitly instead of trusting CWD: on a
 # real cache build (SW2030, 2026-08-23, version 2026-08-15.3) the build's

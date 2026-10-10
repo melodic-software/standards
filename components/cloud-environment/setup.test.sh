@@ -520,4 +520,23 @@ done
 assert_eq 'refusals leave no temp file behind' '' "$(find "$rv_tmp" -name '*.hook.*')"
 rm -rf "$rv_tmp"
 
+# Retired inputs: a set RENDERED_VIEWS_MD or PAGES_PUBLISH_* logs that it is
+# ignored and names the replacement, never the value; none set logs nothing.
+ri_tmp="$(mktemp -d)"
+LOG="$ri_tmp/setup.log"
+: >"$LOG"
+log_retired_inputs
+assert_eq 'no retired input set logs nothing' '' "$(cat "$LOG")"
+RENDERED_VIEWS_MD='rv-secret-value' PAGES_PUBLISH_PRIVATE_ENDPOINT='pp-secret-value' log_retired_inputs
+ri_log="$(cat "$LOG")"
+assert_contains 'a set RENDERED_VIEWS_MD names its replacement' "$ri_log" \
+  'RENDERED_VIEWS_MD is set but ignored; the preference comes from Key Vault secret rendered-views-md'
+assert_contains 'a set PAGES_PUBLISH_* names its replacement' "$ri_log" \
+  'PAGES_PUBLISH_PRIVATE_ENDPOINT is set but ignored; pages-publish reads its config from Key Vault secret pages-publish-config'
+assert_eq 'one line per set retired input' 2 "$(wc -l <"$LOG" | tr -d ' ')"
+assert_not_contains 'the log never echoes a retired value' "$ri_log" 'secret-value'
+assert_contains 'setup.sh logs retired inputs after the start line' "$(cat "$script")" \
+  $'log "start version=$SCRIPT_VERSION"\nlog_retired_inputs'
+rm -rf "$ri_tmp"
+
 [[ $FAILED -eq 0 ]] || exit 1

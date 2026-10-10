@@ -293,6 +293,22 @@ config is trusted because it is read from the default vault only.
 left alone with `WARN pages-publish: <dest> is not ours`. Setup writes no
 config for it.
 
+**Retired setup inputs.** `setup.sh` no longer reads `RENDERED_VIEWS_MD` or
+the six `PAGES_PUBLISH_*` config variables (`PAGES_PUBLISH_PUBLIC_ENDPOINT`,
+`PAGES_PUBLISH_PRIVATE_ENDPOINT`, `PAGES_PUBLISH_PUBLIC_TOKEN_SECRET`,
+`PAGES_PUBLISH_PRIVATE_TOKEN_SECRET`, `PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET`,
+`PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET`). claude.ai passes an environment's
+variables to the session, never to the setup script
+([Set environment variables](https://code.claude.com/docs/en/cloud-environments),
+as of 2026-10-10), so they never reached a cloud cache build. The
+pages-publish config now comes only from the Key Vault secret
+`pages-publish-config`, and the cloud rendered-views preference from the Key
+Vault secret `rendered-views-md` through the
+[`rendered-views-sync` hook](#rendered-views-preference); a local machine keeps
+`~/.claude/rendered-views.md` as a file it manages itself. Any of these
+variables still set logs one `WARN <name> is set but ignored` line naming its
+replacement, never its value.
+
 ## Rendered-views preference
 
 In cloud sessions the preference comes from the Key Vault secret
