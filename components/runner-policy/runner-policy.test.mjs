@@ -36,6 +36,7 @@ const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
 const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
 const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
 const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
+const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -8991,6 +8992,38 @@ test("every reusable contract at the v0.30.1 tag copies its v0.29.1 entry forwar
       `${reusable} at the v0.30.1 tag is not a verbatim copy of its v0.29.1 entry`,
     );
   }
+});
+
+// v0.39.8 moves no input, secret, permission or routing field: the claude
+// lanes bump claude-code-action, the sync lane and the markdownlint action bump
+// setup-node, and the other reusables are byte-identical.
+test("every reusable contract at the v0.39.8 tag copies its v0.39.3 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = [
+    "intake-triage",
+    "intake-label-needs-triage",
+    "maintenance-sync-standards",
+    "pr-audit-workflows",
+    "pr-automerge-dependabot",
+    "pr-review",
+    "pr-review-security",
+    "pr-run-checks",
+    "pr-scan-dependencies",
+  ];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${LIVE_CI_WORKFLOWS_SHA}`];
+    assert.ok(previous, `expected a v0.39.3 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`],
+      previous,
+      `${reusable} at the v0.39.8 tag is not a verbatim copy of its v0.39.3 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_39_8}`)).length,
+    reusables.length,
+  );
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily

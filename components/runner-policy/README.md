@@ -1154,6 +1154,23 @@ Once every consumer pinned v0.39.3, every v0.38.2 (`cf316d1`) and v0.39.0
 key was retired under step 4 of the lockstep below, so `policy.json` admits ci-workflows
 only at `ab83b01`; the review notes in this section stay as the record the
 v0.39.3 terms were copied from.
+All nine are also registered at the v0.39.8 tag
+`594987abe8657a40bccc13d301f1f0d5cccb5348`, and each contract equals its
+v0.39.3 entry: no reusable's `workflow_call` inputs, secrets, workflow or job
+permissions, or `runs-on` routing changed between the two tags. Four blobs are
+byte-identical (`intake-label-needs-triage`, `pr-scan-dependencies`,
+`pr-audit-workflows`, `pr-automerge-dependabot`), and the claude-lanes
+lockstep's surface comparison finds them unchanged. It declines the other five,
+and because any decline suppresses every lockstep write, all nine entries were
+registered by hand and signed off on 2026-10-10. `intake-triage`, `pr-review` and `pr-review-security` bump
+`anthropics/claude-code-action` from v1.0.241 to v1.0.245 (`6fed3ca`) on the
+step that receives `CLAUDE_CODE_OAUTH_TOKEN`, so their credential references
+change; `pr-review` and `pr-review-security` also reword the rate-limit
+failure summary, and `$/report-lane-outcome` rewords only its rate-limit error
+message. `maintenance-sync-standards` bumps `actions/setup-node` from v7.0.0
+to v7.1.0 (`949feb2`) and is declined on shape, because its `sync` job routes
+through `needs`. `pr-run-checks` keeps its blob, but its `$/markdownlint`
+action tree takes the same `setup-node` bump.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
