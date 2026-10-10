@@ -552,13 +552,13 @@ rc=$?
 assert_exit 'rendered-views-sync installs into a missing ~/.local/bin' 0 "$rc"
 
 rv_settings="$rv_tmp/settings.json"
-rv_cmd='/home/u/.local/bin/rendered-views-sync'
+rv_cmd="$rv_tmp/bin/rendered-views-sync"
 printf '%s' '{"model":"x","permissions":{"deny":["Bash(rm *)"]},"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"other-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"stop-hook"}]}]}}' >"$rv_settings"
 register_session_hook "$rv_settings" "$rv_cmd"
 rc=$?
 assert_exit 'the hook registers into an existing settings file' 0 "$rc"
 assert_eq 'the SessionStart entry is the documented shape' \
-  '{"matcher":"startup|resume","hooks":[{"type":"command","command":"/home/u/.local/bin/rendered-views-sync","timeout":30}]}' \
+  "{\"matcher\":\"startup|resume\",\"hooks\":[{\"type\":\"command\",\"command\":\"$rv_cmd\",\"timeout\":30}]}" \
   "$(jq -c '.hooks.SessionStart[-1]' "$rv_settings")"
 assert_eq 'an unrelated SessionStart hook survives' 'other-hook' \
   "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$rv_settings")"
