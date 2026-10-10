@@ -199,9 +199,14 @@ and must be a regular file owned by the current user with mode 0600. When it
 does not exist, the same text is read from the Key Vault secret
 `pages-publish-config` through [`vault-exec`](#key-vault-resolver), with
 `VAULT_EXEC_VAULT` unset for that read so a repository's `env` block cannot
-point it at another vault. A missing `vault-exec`, a failed read, an empty
-value or invalid content exits 5 with one stderr line that never prints the
-value. `HOME`, `XDG_CONFIG_HOME` and every other run-time variable are
+point it at another vault; the token reads below unset it the same way. A
+missing `vault-exec`, a failed read, an empty value or invalid content exits
+5 with one stderr line that never prints the value, and so does a config path
+whose existence cannot be determined (an untraversable directory): only a
+confirmed missing file falls back to Key Vault. Reads of `pages-publish-config`
+and every other secret this script resolves are audited by the vault's own
+diagnostic logs, which record the caller identity; the secret holds no
+credential values, only endpoints and secret names. `HOME`, `XDG_CONFIG_HOME` and every other run-time variable are
 ignored, because a repository's settings can set environment variables. Both
 sources hold `KEY=VALUE` lines (blank lines and `#` comments allowed, any
 other key refused) and go through one parser:

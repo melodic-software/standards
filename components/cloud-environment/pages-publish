@@ -121,7 +121,14 @@ load_config() {
   home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
   [[ "$home" == /* ]] || die 5 'cannot resolve the home directory from the passwd database'
   config="$home/.config/pages-publish/config"
-  if [[ -e "$config" || -L "$config" ]]; then
+  if [[ ! -e "$config" && ! -L "$config" ]]; then
+    # Fall back to Key Vault only when the lookup says the file does not exist;
+    # any other reason it cannot be seen (an untraversable directory) fails closed.
+    local why
+    why="$(stat -- "$config" 2>&1 >/dev/null)"
+    [[ "$why" == *'No such file or directory'* ]] ||
+      die 5 "cannot tell whether config $config exists"
+  else
     [[ -f "$config" && ! -L "$config" ]] || die 5 "config $config is not a regular file"
     owner_mode="$(stat -c '%u %a' "$config" 2>/dev/null || stat -f '%u %Lp' "$config" 2>/dev/null)"
     [[ "$owner_mode" == "$(id -u) 600" ]] ||
@@ -160,7 +167,8 @@ send() {
       --env "PP_ACCESS_KEY=${cfg[PRIVATE_ACCESS_KEY_SECRET]}")
   fi
   # shellcheck disable=SC2016 # expanded by the inner shell
-  resp="$(vault-exec "${envs[@]}" -- bash -c '
+  # VAULT_EXEC_VAULT is unset so every read here uses the default vault, as in load_config.
+  resp="$(env -u VAULT_EXEC_VAULT vault-exec "${envs[@]}" -- bash -c '
     set -u
     bad="[\"\\\\[:cntrl:]]"
     for v in "$PP_TOKEN" "${PP_ACCESS_ID-}" "${PP_ACCESS_KEY-}"; do

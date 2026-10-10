@@ -22,9 +22,11 @@ STUB
 # the command runs. STUB_VAULT_RC makes the read fail. A read of the secret
 # pages-publish-config is logged to $STUB_CALLS/kv-config with the
 # VAULT_EXEC_VAULT it saw, and answers the text of the file $STUB_KV_CONFIG,
-# or exits STUB_KV_RC when that is set.
+# or exits STUB_KV_RC when that is set. Every call logs the VAULT_EXEC_VAULT it
+# saw to $STUB_CALLS/vault-env.
 cat >"$tmp/bin/vault-exec" <<'STUB'
 #!/usr/bin/env bash
+printf 'VAULT_EXEC_VAULT=%s\n' "${VAULT_EXEC_VAULT-<unset>}" >>"$STUB_CALLS/vault-env"
 [[ -z "${STUB_VAULT_RC:-}" ]] || exit "$STUB_VAULT_RC"
 while [[ "$1" != -- ]]; do
   pair="$2"
@@ -415,8 +417,9 @@ mv "$tmp/home/.config/pages-publish/real" "$tmp/home/.config/pages-publish/confi
 
 # Key Vault: with no config file, the same text comes from the secret
 # pages-publish-config; a file present overrides it.
-STUB_SEQ="$pub_ok" run "$clean" --visibility public
+VAULT_EXEC_VAULT=kv-attacker STUB_SEQ="$pub_ok" run "$clean" --visibility public
 assert_eq 'a config file present skips the Key Vault read' no "$([[ -e "$tmp/calls/kv-config" ]] && echo yes || echo no)"
+assert_eq 'the token read sees VAULT_EXEC_VAULT unset' 'VAULT_EXEC_VAULT=<unset>' "$(cat "$tmp/calls/vault-env" 2>/dev/null)"
 
 mkdir -p "$tmp/kv"
 write_config "$tmp/kv" PUBLIC_ENDPOINT=https://kv-public.example.test
@@ -427,6 +430,8 @@ assert_exit 'no file and a valid Key Vault config uploads' 0 "$rc"
 assert_eq 'the upload uses the Key Vault endpoint' 'https://kv-public.example.test/_upload' "$(url_of 1)"
 assert_contains 'the bearer token comes from the Key Vault config' "$stdin_all" 'Bearer SENTINEL-pub-token'
 assert_eq 'the Key Vault read sees VAULT_EXEC_VAULT unset' 'VAULT_EXEC_VAULT=<unset>' "$(cat "$tmp/calls/kv-config" 2>/dev/null)"
+assert_eq 'the config and token reads both see VAULT_EXEC_VAULT unset' \
+  $'VAULT_EXEC_VAULT=<unset>\nVAULT_EXEC_VAULT=<unset>' "$(cat "$tmp/calls/vault-env" 2>/dev/null)"
 
 # check_kv <label>: no file, and the Key Vault read fails or holds bad text.
 check_kv() {
@@ -443,6 +448,31 @@ check_kv 'a line that is not KEY=VALUE'
 assert_not_contains 'a bad Key Vault line is not echoed' "$err" 'leaked-value'
 printf '\n' >"$STUB_KV_CONFIG"
 check_kv 'an empty secret'
+write_config "$tmp/kv"
+
+# An untraversable config directory hides whether the file exists: fail closed.
+if [[ "$(id -u)" -eq 0 ]]; then
+  skip_case 'an untraversable config directory: root can traverse it'
+else
+  chmod 000 "$tmp/home/.config/pages-publish"
+  run "$clean" --visibility public
+  chmod 700 "$tmp/home/.config/pages-publish"
+  assert_exit 'an untraversable config directory exits 5' 5 "$rc"
+  assert_contains 'an untraversable config directory is named' "$err" 'cannot tell whether config'
+  assert_eq 'an untraversable config directory skips the Key Vault read' no \
+    "$([[ -e "$tmp/calls/vault-env" ]] && echo yes || echo no)"
+fi
+
+# vault-exec missing from PATH, with the getent stub kept.
+mkdir -p "$tmp/novault"
+ln -s "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/gitleaks" "$tmp/novault/"
+if PATH="$tmp/novault:/usr/bin:/bin" command -v vault-exec >/dev/null; then
+  skip_case 'vault-exec not on PATH: a system vault-exec is in /usr/bin or /bin'
+else
+  PATH="$tmp/novault:/usr/bin:/bin" run "$clean" --visibility public
+  assert_exit 'no file and no vault-exec on PATH exits 5' 5 "$rc"
+  assert_contains 'no vault-exec on PATH is named' "$err" 'is not on PATH'
+fi
 
 check_usage() {
   local label="$1"
