@@ -189,27 +189,27 @@ built from the page URL the host returns; `--delete` prints nothing.
 | 2 | usage |
 | 3 | the file is not a regular file under `${TMPDIR:-/tmp}` (after `realpath`), or carries no builder stamp `<!-- rv-gen:<name> sha256:<64 hex> -->` |
 | 4 | credential-shaped content, found here before any network call or by the host (HTTP 422) |
-| 5 | config missing or invalid: a config file that is not a regular file owned by the current user with mode 0600, or, with no file, a Key Vault read that fails or holds invalid text |
+| 5 | config missing or invalid: `vault-exec` not on `PATH`, or a Key Vault read that fails, is empty or holds invalid text |
 | 6 | the token could not be resolved, or the upload or an HTTP answer failed |
 
-**Config.** Operator values come from
-`<passwd home>/.config/pages-publish/config`, where `<passwd home>` is field 6
-of `getent passwd "$(id -un)"`, when that file exists; it overrides Key Vault
-and must be a regular file owned by the current user with mode 0600. When it
-does not exist, the same text is read from the Key Vault secret
-`pages-publish-config` through [`vault-exec`](#key-vault-resolver), with
-`VAULT_EXEC_VAULT` unset for that read so a repository's `env` block cannot
-point it at another vault; the token reads below unset it the same way. A
-missing `vault-exec`, a failed read, an empty value or invalid content exits
-5 with one stderr line that never prints the value, and so does a config path
-whose existence cannot be determined (an untraversable directory): only a
-confirmed missing file falls back to Key Vault. Reads of `pages-publish-config`
-and every other secret this script resolves are audited by the vault's own
-diagnostic logs, which record the caller identity; the secret holds no
-credential values, only endpoints and secret names. `HOME`, `XDG_CONFIG_HOME` and every other run-time variable are
-ignored, because a repository's settings can set environment variables. Both
-sources hold `KEY=VALUE` lines (blank lines and `#` comments allowed, any
-other key refused) and go through one parser:
+**Config.** Operator values come only from the Key Vault secret
+`pages-publish-config`, read through [`vault-exec`](#key-vault-resolver) with
+`VAULT_EXEC_VAULT` unset so a repository's `env` block cannot point the read at
+another vault; the token reads below unset it the same way. There is no local
+file override and no environment-variable override. The config names which
+vault secrets the script sends and which hosts it sends them to, and
+`Bash(pages-publish *)` is pre-approved in the permission floor, so a source
+any process running as the user can write would let it send any vault secret
+to any host without a prompt. Key Vault writes are permission-gated and
+audited, so they are the only way to change it. A local operator changes the
+config with `az keyvault secret set --vault-name <vault> --name
+pages-publish-config --file <config>`. A missing `vault-exec`, a failed read,
+an empty value or invalid content exits 5 with one stderr line that never
+prints the value. Reads of `pages-publish-config` and every other secret this
+script resolves are audited by the vault's own diagnostic logs, which record
+the caller identity; the secret holds no credential values, only endpoints and
+secret names. It holds `KEY=VALUE` lines (blank lines and `#` comments
+allowed, any other key refused):
 
 | Key | Value |
 |---|---|
@@ -278,33 +278,15 @@ host never receives the Access headers. Requests are `https` only and send
 same for its Key Vault reads.
 
 **Trusted inputs.** A caller-set `HTTPS_PROXY` or `CURL_CA_BUNDLE` is honored by
-design: cloud sessions route through the agent proxy with its CA bundle. The
-config file is trusted once it passes the owner and mode 0600 check, since
-forging it needs write access to the home directory. The Key Vault config is
-trusted because it is read from the default vault only.
+design: cloud sessions route through the agent proxy with its CA bundle.
+`PATH` selects `vault-exec`, `curl`, `awk` and `gitleaks`, and `TMPDIR` sets the
+temp dir a page must be under. The Key Vault config is trusted because it is
+read from the default vault only.
 
 **Setup.** After `vault-exec`, the script installs `pages-publish` to
 `~/.local/bin/pages-publish` the same way: a copy without the marker line is
-left alone with `WARN pages-publish: <dest> is not ours`. After the repo
-bootstrap, whatever its outcome, it writes two operator files from variables
-the setup step receives, so they win over anything the bootstrap wrote.
-claude.ai passes an environment's variables to the session, not to the setup
-script ([Set environment variables](https://code.claude.com/docs/en/cloud-environments),
-as of 2026-10-10), so in a cloud environment these variables take effect only
-if the setup step itself is given them; otherwise `pages-publish` reads Key
-Vault and the [rendered-views preference](#rendered-views-preference) comes
-from its hook.
-
-- `RENDERED_VIEWS_MD`, when set, replaces
-  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md`.
-- `PAGES_PUBLISH_PUBLIC_ENDPOINT`, `PAGES_PUBLISH_PRIVATE_ENDPOINT`,
-  `PAGES_PUBLISH_PUBLIC_TOKEN_SECRET`, `PAGES_PUBLISH_PRIVATE_TOKEN_SECRET`,
-  `PAGES_PUBLISH_PRIVATE_ACCESS_ID_SECRET` and
-  `PAGES_PUBLISH_PRIVATE_ACCESS_KEY_SECRET`, when all six are set, become the
-  config file above, mode 0600, at the passwd-home path, which then overrides
-  the Key Vault secret. They are optional: with none set, no file is written
-  and `pages-publish` reads Key Vault. A partial set logs a `WARN` naming the
-  missing variables and writes no config.
+left alone with `WARN pages-publish: <dest> is not ours`. Setup writes no
+config for it.
 
 ## Rendered-views preference
 

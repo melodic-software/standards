@@ -62,11 +62,10 @@ CLAUDE_PERMISSIONS_URL='https://raw.githubusercontent.com/melodic-software/stand
 VAULT_EXEC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/vault-exec'
 VAULT_EXEC_MARKER='# melodic-software/standards cloud-environment vault-exec'
 # Page uploader: this component's pages-publish, installed beside vault-exec
-# the same way (see install_pages_publish). Its config is written from the six
-# PAGES_PUBLISH_* environment variables (see write_pages_publish_config).
+# the same way (see install_pages_publish). It reads its config from Key Vault
+# at run time.
 PAGES_PUBLISH_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/pages-publish'
 PAGES_PUBLISH_MARKER='# melodic-software/standards cloud-environment pages-publish'
-PAGES_PUBLISH_KEYS='PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET'
 # Rendered-views preference: this component's rendered-views-sync, installed
 # beside vault-exec the same way and registered as a user-scope SessionStart
 # hook (see register_session_hook), since the cache build cannot read Key Vault.
@@ -261,63 +260,8 @@ register_session_hook() {
   return 1
 }
 
-# pages_publish_config_path: the one path pages-publish reads its config from,
-# under the passwd-database home of the current user (never HOME).
-pages_publish_config_path() {
-  local home
-  home="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
-  [[ "$home" == /* ]] || return 1
-  printf '%s/.config/pages-publish/config\n' "$home"
-}
-
-# write_pages_publish_config <dest>: write the six PAGES_PUBLISH_* variables as
-# KEY=VALUE lines to <dest> with mode 0600. None set: nothing to do. Some set,
-# or a value holding a line break: a WARN naming them, and no config written.
-write_pages_publish_config() {
-  local dest="$1" tmp="$1.write.$$" key var missing=() bad=() lines=''
-  for key in $PAGES_PUBLISH_KEYS; do
-    var="PAGES_PUBLISH_$key"
-    if [[ -z "${!var:-}" ]]; then
-      missing+=("$var")
-    elif [[ "${!var}" == *[$'\n\r']* ]]; then
-      bad+=("$var")
-    else
-      lines+="$key=${!var}"$'\n'
-    fi
-  done
-  if [[ ${#missing[@]} -eq 6 ]]; then
-    log 'pages-publish: no PAGES_PUBLISH_* variables set; no config written'
-    return 0
-  fi
-  if [[ ${#missing[@]} -gt 0 || ${#bad[@]} -gt 0 ]]; then
-    log "WARN pages-publish: config not written; missing: ${missing[*]:-none}; line break in: ${bad[*]:-none}"
-    return 1
-  fi
-  if (umask 077 && mkdir -p "${dest%/*}" && printf '%s' "$lines" >"$tmp") &&
-    chmod 0600 "$tmp" && mv -f "$tmp" "$dest"; then
-    log "pages-publish: config written to $dest"
-    return 0
-  fi
-  rm -f "$tmp"
-  log "WARN pages-publish: config write to $dest failed"
-  return 1
-}
-
-# write_rendered_views <dest>: replace <dest> with RENDERED_VIEWS_MD when it is
-# set, whatever a repo bootstrap wrote there before.
-write_rendered_views() {
-  local dest="$1"
-  [[ -n "${RENDERED_VIEWS_MD:-}" ]] || return 0
-  if mkdir -p "${dest%/*}" && printf '%s\n' "$RENDERED_VIEWS_MD" >"$dest"; then
-    log "rendered-views: $dest written from RENDERED_VIEWS_MD"
-    return 0
-  fi
-  log "WARN rendered-views: write to $dest failed"
-  return 1
-}
-
 # Sourced by setup.test.sh for the plugin-list, permission-floor, installer and
-# operator-file helpers only.
+# session-hook helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -592,23 +536,6 @@ else
   # Unambiguous no-op: the root WAS resolved, the repo just has no bootstrap.
   # The unresolved-root case logs its own distinct line above.
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
-fi
-
-# Operator files from the environment's variables, after the repo bootstrap
-# whatever its outcome, so the environment's values win over anything the
-# bootstrap wrote: the rendered-views preference and the pages-publish config.
-# claude.ai passes an environment's variables to the session, not to this
-# script, so these apply only where the setup step receives them; in cloud
-# sessions the rendered-views-sync hook and pages-publish read Key Vault.
-if [[ -n "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]]; then
-  write_rendered_views "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md"
-elif [[ -n "${RENDERED_VIEWS_MD:-}" ]]; then
-  log 'WARN rendered-views: neither CLAUDE_CONFIG_DIR nor HOME is set; not written'
-fi
-if pages_publish_config="$(pages_publish_config_path)"; then
-  write_pages_publish_config "$pages_publish_config"
-else
-  log 'WARN pages-publish: no passwd home for the current user; config not written'
 fi
 
 # Permission floor (standards#653): union the fleet's reviewed
