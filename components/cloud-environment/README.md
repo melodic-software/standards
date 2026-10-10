@@ -279,9 +279,14 @@ same for its Key Vault reads.
 
 **Trusted inputs.** A caller-set `HTTPS_PROXY` or `CURL_CA_BUNDLE` is honored by
 design: cloud sessions route through the agent proxy with its CA bundle.
-`PATH` selects `vault-exec`, `curl`, `awk` and `gitleaks`, and `TMPDIR` sets the
-temp dir a page must be under. The Key Vault config is trusted because it is
-read from the default vault only.
+`PATH` selects `vault-exec`, `curl`, `awk` and `gitleaks`, `TMPDIR` sets the
+temp dir a page must be under, and `BASH_ENV` is sourced by `pages-publish` and
+its inner shells. The scripts themselves live in user-writable `~/.local/bin`.
+Whoever can set those variables or overwrite those files can already run code
+as the user, so the guarantee is narrower: no write to a config file alone can
+change where secrets go. `vault-exec` parses with `python3 -I`, so neither the
+working directory nor `PYTHON*` variables reach its import path. The Key Vault
+config is trusted because it is read from the default vault only.
 
 **Setup.** After `vault-exec`, the script installs `pages-publish` to
 `~/.local/bin/pages-publish` the same way: a copy without the marker line is

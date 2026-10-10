@@ -34,8 +34,10 @@
 #
 # Secrets are resolved by vault-exec and reach curl only as config lines on
 # its stdin, never in argv. The environment still matters elsewhere: PATH
-# selects vault-exec, curl, awk and gitleaks, and TMPDIR sets the temp dir the
-# page must be under. On success stdout is one JSON line
+# selects vault-exec, curl, awk and gitleaks, TMPDIR sets the temp dir the
+# page must be under, and BASH_ENV is sourced here and by the inner shells.
+# Setting those already runs code as the user; the guarantee is only that no
+# config-file write changes where secrets go. On success stdout is one JSON line
 # {"id":..., "visibility":..., "url":...}; --delete prints nothing.
 # Exit codes: 2 usage, 3 input not a stamped temp-dir page, 4 credential
 # content (here or at the host), 5 config missing or invalid, 6 upload failed.

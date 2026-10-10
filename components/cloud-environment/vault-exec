@@ -105,8 +105,10 @@ for i in "${!names[@]}"; do
   value=''
   if [[ $curl_rc -eq 0 && "$status" == 200 ]]; then
     # The trailing sentinel keeps a value's own trailing newlines intact
-    # through the command substitution.
-    if value="$(printf '%s' "$body" | python3 -c '
+    # through the command substitution. -I keeps the working directory and
+    # PYTHON* variables off the import path, so a planted json.py cannot forge
+    # the value.
+    if value="$(printf '%s' "$body" | python3 -I -c '
 import json, sys
 v = json.load(sys.stdin).get("value")
 if not isinstance(v, str):
