@@ -87,4 +87,31 @@ rc=$?
 assert_nonzero 'a $/ reference fails without the config (removal tripwire)' "$rc"
 assert_contains 'control run reports the $/ reference' "$out" 'specifying action "$/.github/actions/typos"'
 
+# `concurrency.queue`: the scoped ignore admits it, and only its exact message.
+queue_message='unexpected key "queue" for "concurrency" section'
+cp "$config" "$project/.github/"
+rm -f "$project"/.github/workflows/*.yml
+cp components/actionlint/fixtures/good/queue-concurrency.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_exit 'a concurrency.queue workflow lints clean with the config' 0 "$rc"
+assert_silent 'the queue run emits no findings' "$out"
+
+cp components/actionlint/fixtures/bad/unknown-key.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'an unrelated unexpected key still fails with the config' "$rc"
+assert_contains 'the unrelated key is reported' "$out" 'unexpected key "unknown-key"'
+assert_not_contains 'the queue suppression stays scoped to its exact message' "$out" "$queue_message"
+
+# Control: without the config the queue key must be rejected. When this case
+# fails, rhysd/actionlint#654 shipped in the pinned engine; drop the ignore
+# instead of patching this test.
+rm "$project/.github/actionlint.yaml" \
+  "$project/.github/workflows/unknown-key.yml"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'a concurrency.queue workflow fails without the config (removal tripwire)' "$rc"
+assert_contains 'control run reports the queue message' "$out" "$queue_message"
+
 [[ $FAILED -eq 0 ]] || exit 1

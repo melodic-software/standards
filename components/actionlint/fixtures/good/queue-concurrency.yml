@@ -1,0 +1,13 @@
+# The GA `concurrency.queue` key the pinned actionlint rejects
+# (rhysd/actionlint#654), in the shape claude-code-plugins pr-refine.yml uses.
+name: queue-concurrency fixture
+on: push
+concurrency:
+  group: fixture-${{ github.ref }}
+  queue: max
+jobs:
+  noop:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: exit 0
