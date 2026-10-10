@@ -992,6 +992,7 @@ jobs:
           components/cloud-environment/setup.test.sh
           components/cloud-environment/vault-exec.test.sh
           components/cloud-environment/pages-publish.test.sh
+          components/cloud-environment/rendered-views-sync.test.sh
           components/cloud-bootstrap/cloud-bootstrap.test.sh
           .cursor/install.test.sh
       - name: Set up Node

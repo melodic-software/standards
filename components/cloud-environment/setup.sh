@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-04.2'
+SCRIPT_VERSION='2026-10-10.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -67,6 +67,11 @@ VAULT_EXEC_MARKER='# melodic-software/standards cloud-environment vault-exec'
 PAGES_PUBLISH_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/pages-publish'
 PAGES_PUBLISH_MARKER='# melodic-software/standards cloud-environment pages-publish'
 PAGES_PUBLISH_KEYS='PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET'
+# Rendered-views preference: this component's rendered-views-sync, installed
+# beside vault-exec the same way and registered as a user-scope SessionStart
+# hook (see register_session_hook), since the cache build cannot read Key Vault.
+RENDERED_VIEWS_SYNC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/rendered-views-sync'
+RENDERED_VIEWS_SYNC_MARKER='# melodic-software/standards cloud-environment rendered-views-sync'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
 
@@ -217,6 +222,44 @@ install_marked() {
 }
 install_vault_exec() { install_marked "$VAULT_EXEC_MARKER" "$@"; }
 install_pages_publish() { install_marked "$PAGES_PUBLISH_MARKER" "$@"; }
+install_rendered_views_sync() { install_marked "$RENDERED_VIEWS_SYNC_MARKER" "$@"; }
+
+# register_session_hook <settings json> <command>: add one SessionStart command
+# hook for <command> to a Claude Code settings file, after removing any earlier
+# entry for the same command, so a re-run leaves the file byte-identical. Every
+# other key, event and hook survives. A missing file starts from {}. Returns
+# non-zero and leaves the file untouched when it is not a single JSON object,
+# when its hooks or hooks.SessionStart has the wrong type, or when a write
+# fails. Written like compose_permissions_floor: a copy, then a rename.
+register_session_hook() {
+  local settings="$1" cmd="$2" src="$1" tmp="$1.hook.$$"
+  mkdir -p "${settings%/*}" || return 1
+  if [[ -e "$settings" ]]; then
+    cp -p "$settings" "$tmp" || {
+      rm -f "$tmp"
+      return 1
+    }
+  else
+    src=/dev/null
+  fi
+  if jq -n --arg cmd "$cmd" '[inputs] as $docs
+      | if ($docs | length) == 0 then {}
+        elif ($docs | length) == 1 and ($docs[0] | type) == "object" then $docs[0]
+        else error("settings file is not a single JSON object") end
+      | if (.hooks // {} | type) == "object" and (.hooks.SessionStart // [] | type) == "array"
+        then . else error("hooks is not an object of arrays") end
+      | .hooks.SessionStart = ([(.hooks.SessionStart // [])[]
+          | if (.hooks | type) == "array"
+            then .hooks |= map(select(.command != $cmd)) else . end
+          | select(.hooks != [])]
+        + [{matcher: "startup|resume",
+            hooks: [{type: "command", command: $cmd, timeout: 30}]}])' \
+    "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
 
 # pages_publish_config_path: the one path pages-publish reads its config from,
 # under the passwd-database home of the current user (never HOME).
@@ -554,6 +597,9 @@ fi
 # Operator files from the environment's variables, after the repo bootstrap
 # whatever its outcome, so the environment's values win over anything the
 # bootstrap wrote: the rendered-views preference and the pages-publish config.
+# claude.ai passes an environment's variables to the session, not to this
+# script, so these apply only where the setup step receives them; in cloud
+# sessions the rendered-views-sync hook and pages-publish read Key Vault.
 if [[ -n "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]]; then
   write_rendered_views "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rendered-views.md"
 elif [[ -n "${RENDERED_VIEWS_MD:-}" ]]; then
@@ -629,6 +675,29 @@ else
     esac
   fi
   rm -f "$pages_publish_file" 2>/dev/null
+
+  # Rendered-views preference, the same way, then registered as a user-scope
+  # SessionStart hook in the settings file the permission floor was composed
+  # into. Registered only when this build installed it, so no session runs a
+  # hook whose script is missing or someone else's.
+  rv_sync_dest="$HOME/.local/bin/rendered-views-sync"
+  rv_sync_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-rendered-views-sync.$$")"
+  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
+    "$RENDERED_VIEWS_SYNC_URL" -o "$rv_sync_file" >>"$LOG" 2>&1; then
+    log 'WARN rendered-views-sync: fetch failed; not installed this build'
+  elif ! install_rendered_views_sync "$rv_sync_file" "$rv_sync_dest" >>"$LOG" 2>&1; then
+    log "WARN rendered-views-sync: install refused (fetched file invalid, $rv_sync_dest is not ours, or a failed write); no hook registered"
+  elif ! command -v jq >/dev/null 2>&1; then
+    log 'WARN rendered-views-sync: installed, but jq is not available; no hook registered'
+  else
+    user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+    if register_session_hook "$user_settings" "$rv_sync_dest" >>"$LOG" 2>&1; then
+      log "rendered-views-sync installed to $rv_sync_dest and registered as a SessionStart hook in $user_settings"
+    else
+      log "WARN rendered-views-sync: hook registration refused (invalid settings or a failed write); $user_settings unchanged"
+    fi
+  fi
+  rm -f "$rv_sync_file" 2>/dev/null
 fi
 
 # Temp-file hygiene: without this the fetched installers — and this script
