@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests the lychee component: the good fixture's local links and anchors resolve
-# on disk, the bad fixture's broken references are flagged, and the accept list
-# for a manual online run treats a live 429 as a pass while an unaccepted 404
-# still fails.
+# on disk, the bad fixture's broken references are flagged, JavaScript-rendered
+# fragments are remapped away, and a manual online run retries a 429 and then
+# fails it instead of accepting it.
 # Skips cleanly when the engine or the fixture server's runtime is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
@@ -13,7 +13,7 @@ cd "$root" || exit 1
 config='lychee.toml'
 
 command -v lychee >/dev/null 2>&1 || skip_suite 'lychee not installed'
-command -v python3 >/dev/null 2>&1 || skip_suite 'python3 not installed (serves the accept-list HTTP fixture)'
+command -v python3 >/dev/null 2>&1 || skip_suite 'python3 not installed (serves the status-code HTTP fixture)'
 # The include_fragments = "full" config key requires a recent lychee.
 require_min_version lychee "$(lychee --version | awk '{ print $2 }')" 0.24.2
 
@@ -186,6 +186,33 @@ assert_contains 'stale personal-owner URL remains checked' \
 assert_contains 'public raw-content sibling remains checked' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/ci-runner/'
 
+# Expected rows are the fixture URLs with the fragment cut by hand, the rule the
+# remap comment in the config states; the second group proves each rule is
+# scoped and does not strip every fragment on its host.
+remap_dump="$(lychee --dump --config "$config" components/lychee/fixtures/good/Remap.md 2>&1)"
+rc=$?
+assert_exit 'remap dump needs no network and exits 0' 0 "$rc"
+for remapped in \
+  'https://github.com/example-owner/example-repo/issues/1' \
+  'https://github.com/example-owner/example-repo/pull/2/files' \
+  'https://github.com/example-owner/example-repo/pull/3' \
+  'https://github.com/example-owner/example-repo/discussions/4' \
+  'https://pypi.org/project/example-package/' \
+  'https://docs.github.com/en/graphql/reference/objects' \
+  'https://docs.github.com/graphql/reference/enums'; do
+  assert_row_count "remapped without its fragment: $remapped" "$remap_dump" 1 \
+    "^$(printf '%s' "$remapped" | sed 's/[.]/\\./g')\$"
+done
+assert_row_count 'no remapped row keeps a JavaScript-rendered fragment' "$remap_dump" 0 \
+  '#(issuecomment-|discussion_r|pullrequestreview-|discussioncomment-|files$|pullrequest$|mergeablestate$)'
+for kept in \
+  'https://github.com/example-owner/example-repo/blob/main/README.md#usage' \
+  'https://github.com/example-owner/example-repo/issues/5#event-555' \
+  'https://pypi.org/project/example-package/#description' \
+  'https://docs.github.com/en/rest/issues/issues#list-repository-issues'; do
+  assert_contains "fragment outside the remap rules is kept: $kept" "$remap_dump" "$kept"
+done
+
 lychee --offline --config "$config" \
   components/lychee/fixtures/good/Clean.md components/lychee/fixtures/good/Target.md >/dev/null 2>&1
 rc=$?
@@ -197,11 +224,13 @@ assert_exit 'bad fixture exits 2' 2 "$rc"
 assert_contains 'bad fixture flags the missing fragment' "$out" 'Cannot find fragment'
 assert_contains 'bad fixture flags the missing file' "$out" 'does-not-exist.md'
 
-# The accept list only takes effect against a real response, so nothing above can
-# reach it. A local server answers 429 on one path and an unaccepted 404 on a
-# control path, proving the accepted code passes and the suite still fails on a
-# rejected one.
-python3 - "$http_fixture_root/port" <<'PY' >/dev/null 2>"$http_fixture_root/server.err" &
+# Status handling only takes effect against a real response, so nothing above can
+# reach it. A local server answers 429 on one path and 200 on a control path,
+# and records every request to the throttled path: the config sets no `accept`,
+# so a 429 must be retried and then fail, while the 200 control proves the
+# server and the default accepted range work.
+python3 - "$http_fixture_root/port" "$http_fixture_root/throttled-hits" \
+  <<'PY' >/dev/null 2>"$http_fixture_root/server.err" &
 import socketserver
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -209,7 +238,11 @@ from http.server import BaseHTTPRequestHandler
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(429 if "throttled" in self.path else 404)
+        throttled = "throttled" in self.path
+        if throttled:
+            with open(sys.argv[2], "a", encoding="utf-8") as hits:
+                hits.write(self.command + "\n")
+        self.send_response(429 if throttled else 200)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -239,44 +272,52 @@ if [[ -s "$http_fixture_root/port" ]]; then
 fi
 
 if [[ -z "$http_port" ]]; then
-  # A silent skip would let the accept-list contract go unexercised while the
+  # A silent skip would let the status-code contract go unexercised while the
   # suite reports green, so an unbindable server is a harness defect, not an
   # environmental skip. The captured stderr carries the only account of why the
   # bind never happened.
-  fail 'accept-list fixture server reports its bound port' \
+  fail 'status-code fixture server reports its bound port' \
     "no port after 5s; server stderr: $(cat "$http_fixture_root/server.err" 2>/dev/null)"
 else
   # The config excludes loopback, so the fixture URL needs --include to be
   # checked at all; that keeps the production exclusion intact. The pattern is a
   # bare token because MSYS/git-bash rewrites backslashes inside an argument
   # containing `://`, which would silently mangle an anchored URL regex.
-  accept_probe='lychee-accept-probe'
-  printf '<http://127.0.0.1:%s/%s/throttled>\n' "$http_port" "$accept_probe" \
+  status_probe='lychee-status-probe'
+  printf '<http://127.0.0.1:%s/%s/throttled>\n' "$http_port" "$status_probe" \
     >"$http_fixture_root/Throttled.md"
-  printf '<http://127.0.0.1:%s/%s/absent>\n' "$http_port" "$accept_probe" \
-    >"$http_fixture_root/Absent.md"
+  printf '<http://127.0.0.1:%s/%s/live>\n' "$http_port" "$status_probe" \
+    >"$http_fixture_root/Live.md"
 
-  accept_dump="$(lychee --dump --config "$config" --include "$accept_probe" \
+  status_dump="$(lychee --dump --config "$config" --include "$status_probe" \
     "$http_fixture_root/Throttled.md" 2>&1)"
   assert_contains 'rate-limited fixture URL is checked, not silently excluded' \
-    "$accept_dump" "http://127.0.0.1:$http_port/$accept_probe/throttled"
+    "$status_dump" "http://127.0.0.1:$http_port/$status_probe/throttled"
 
-  accept_out="$(lychee --no-progress --config "$config" --include "$accept_probe" \
+  live_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
+    "$http_fixture_root/Live.md" 2>&1)"
+  rc=$?
+  assert_exit '200 control exits 0' 0 "$rc"
+  # Exit 0 alone is also what checking nothing looks like; the OK count proves a
+  # request was made and its 200 was accepted.
+  assert_contains '200 control is counted as a checked OK link' "$live_out" '1 OK'
+
+  throttled_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
     "$http_fixture_root/Throttled.md" 2>&1)"
   rc=$?
-  assert_exit 'accepted 429 exits 0' 0 "$rc"
-  # Exit 0 alone is also what checking nothing looks like; the OK count proves a
-  # request was made and its 429 was accepted.
-  assert_contains 'accepted 429 is counted as a checked OK link' "$accept_out" '1 OK'
-
-  reject_out="$(lychee --no-progress --config "$config" --include "$accept_probe" \
-    "$http_fixture_root/Absent.md" 2>&1)"
-  rc=$?
-  assert_nonzero 'unaccepted 404 control still fails' "$rc"
+  assert_nonzero 'persistent 429 fails the run' "$rc"
   # A dead or unreachable server also exits non-zero; naming the status keeps the
-  # control from passing for the wrong reason.
-  assert_contains 'unaccepted 404 control fails on the status code itself' \
-    "$reject_out" 'Rejected status code: 404'
+  # case from passing for the wrong reason.
+  assert_contains 'persistent 429 fails on the status code itself' \
+    "$throttled_out" 'Rejected status code: 429'
+  # One request would mean the 429 was taken as final; more than one proves
+  # lychee retried it, the behavior an accepted 429 would skip.
+  throttled_hits="$(wc -l <"$http_fixture_root/throttled-hits" 2>/dev/null || printf '0')"
+  if ((throttled_hits > 1)); then
+    pass "persistent 429 is retried before failing — $throttled_hits requests"
+  else
+    fail 'persistent 429 is retried before failing' "requests: $throttled_hits"
+  fi
 fi
 
 [[ $FAILED -eq 0 ]] || exit 1
