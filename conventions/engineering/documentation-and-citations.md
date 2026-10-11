@@ -25,6 +25,8 @@ A recorded upstream default, version gate, or price belongs in durable content o
 
 ## Label the basis of a recommendation
 
-Every recommendation, and every recommended number, default, limit, or "best practice", carries a `Basis:` label that names where it came from: a `file:line`, a tool's output, or a URL retrieved for it in the current session, or `judgment` when no source stands behind it. The label lets a reader check the claim without re-deriving it and shows which claims rest on the author alone.
+Every recommendation, option, or decision an author or agent presents, and every recommended number, default, limit, or "best practice" in it, carries a `Basis:` label that names where it came from: a `file:line`, a tool's output, or a URL retrieved for it in the current session, or `judgment` when no source stands behind it. The label lets a reader check the claim without re-deriving it and shows which claims rest on the author alone.
+
+The rule covers what is presented from now on: a reply, a pull request or issue body, a design or decision record. It does not require relabeling tracked prose written before it, and a convention document is not such a presentation: its rules rest on its sources footer.
 
 `judgment` is not enough for a decision that spans repositories, changes shared infrastructure, cannot be undone, or bears on security. When research cannot settle such a decision, present it as an open question that names the evidence that would settle it, not as a recommendation.
