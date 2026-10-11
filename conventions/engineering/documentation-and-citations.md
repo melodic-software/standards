@@ -22,3 +22,9 @@ Keep research provenance separate from product documentation:
 ## Time-bound external claims need a recheck trigger
 
 A recorded upstream default, version gate, or price belongs in durable content only with an explicit recheck trigger: a date, an automation, or a tracked task. Prefer linking and fetching at read time over storing a snapshot at all. A snapshot with no recheck trigger is drift waiting to happen.
+
+## Label the basis of a recommendation
+
+Every recommendation, and every recommended number, default, limit, or "best practice", carries a `Basis:` label that names where it came from: a `file:line`, a tool's output, or a URL retrieved for it in the current session, or `judgment` when no source stands behind it. The label lets a reader check the claim without re-deriving it and shows which claims rest on the author alone.
+
+`judgment` is not enough for a decision that spans repositories, changes shared infrastructure, cannot be undone, or bears on security. When research cannot settle such a decision, present it as an open question that names the evidence that would settle it, not as a recommendation.

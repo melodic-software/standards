@@ -52,6 +52,10 @@ Cite a source by something durable: a file's documented heading, a configuration
 
 The same discipline holds outside prose. Deduplicate with the language's idiomatic mechanism rather than copying a literal across call sites: a shared constant, a build property and its reference, a YAML anchor and alias, a JSON `$ref`, an environment variable with a default. A repeated literal is both the duplication and the missing name; the named constant deduplicates and documents in one move.
 
+## History lives in version control
+
+Where and when something came from is a fact the version-control history already owns. An origin or history aside in code, comments, configuration, or docs (a "ported from" note, an "added on <date>" comment) copies that fact into a second place nothing keeps current. Leave it out; [`legacy-and-migration-debt.md`](https://github.com/melodic-software/standards/blob/main/conventions/engineering/legacy-and-migration-debt.md) covers the related case of prose that narrates a migration.
+
 ## Sources
 
 - Hunt/Thomas, *The Pragmatic Programmer* (20th Anniv.) DRY chapter: [DRY excerpt (PDF)](https://media.pragprog.com/titles/tpp20/dry.pdf)

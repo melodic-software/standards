@@ -172,6 +172,26 @@ components:
       - repository-text
     files:
       .editorconfig-checker.json: .editorconfig-checker.json
+  # Team-layer engineering standards (standards contract 1.0.2, defined in
+  # melodic-software/claude-code-plugins docs/conventions/standards/): the
+  # conventions/engineering/ files that govern day-to-day agent and human work,
+  # plus a thin index, at docs/standards/ where planning and review skills load
+  # only the files whose index rows match the task. Targets: every
+  # pr-body-contract-rule target. Links inside the synced files are absolute
+  # URLs, because a relative link would point at a file the target lacks. The
+  # index is managed: the engine has no seed-once mode, so a target that wants
+  # its own layout relocates the team layer through `.claude/standards.yaml`
+  # `standards_dir`, or moves this component to `locally-owned`.
+  engineering-standards:
+    files:
+      components/engineering-standards/standards-index.md: docs/standards/README.md
+      conventions/engineering/bulk-mutation.md: docs/standards/bulk-mutation.md
+      conventions/engineering/concise-prose.md: docs/standards/concise-prose.md
+      conventions/engineering/deterministic-work-execution.md: docs/standards/deterministic-work-execution.md
+      conventions/engineering/documentation-and-citations.md: docs/standards/documentation-and-citations.md
+      conventions/engineering/reference-dont-duplicate.md: docs/standards/reference-dont-duplicate.md
+      conventions/engineering/simpler-code.md: docs/standards/simpler-code.md
+      conventions/engineering/source-authority-tiers.md: docs/standards/source-authority-tiers.md
   github-actions-conventions:
     files:
       components/github-actions-conventions/vocabulary.json: .github/standards/github-actions-conventions/vocabulary.json
@@ -356,6 +376,7 @@ targets:
     managed:
       - cloud-bootstrap
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lychee
       - managed-files-guard-caller
@@ -391,6 +412,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - go-analysis
       - lychee
@@ -411,6 +433,7 @@ targets:
       - cloud-bootstrap
       - comment-hygiene-action
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lychee
       - markdownlint
@@ -451,6 +474,7 @@ targets:
       - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lefthook-base
       - lefthook-dotnet
@@ -474,6 +498,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - editorconfig-checker
+      - engineering-standards
       - github-actions-conventions
       - gitleaks
       - lychee
@@ -575,6 +600,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lychee
       - managed-files-guard-caller
@@ -606,6 +632,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lefthook-base
       - lefthook-powershell
@@ -635,6 +662,7 @@ targets:
       - cloud-bootstrap
       - dotnet-analysis
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lefthook-base
       - lefthook-dotnet
@@ -668,6 +696,7 @@ targets:
       # policy convergence — medley's enforcement policy stays its own in the
       # wrapper.
       - comment-hygiene-tools
+      - engineering-standards
       - lychee
       - managed-files-guard-fleet-caller
       # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
@@ -733,6 +762,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - editorconfig-checker
+      - engineering-standards
       - gitleaks
       - lefthook-base
       - lefthook-powershell
