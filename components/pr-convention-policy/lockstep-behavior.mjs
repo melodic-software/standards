@@ -385,11 +385,38 @@ export function extractCompositeAnalyzer(runShText, location) {
   return match[1].replaceAll(`'"'"'`, "'");
 }
 
-export function runCompositeAnalyzer(program, body, location) {
+// From ci-workflows#733 on, the analyzer reads its issue-reference grammar
+// from ENVIRON["ISSUE_REF_PATTERN"], which run.sh fills from the
+// `issue-ref-pattern` input and otherwise from its DEFAULT_ISSUE_REF_PATTERN.
+// Returns that default, or null for a composite that still inlines `#N`. A
+// composite that reads the variable without declaring the default and the
+// fallback is drift: the gate would then run with no reference grammar.
+export function parseCompositeIssueRef(runShText, location) {
+  if (!runShText.includes('ENVIRON["ISSUE_REF_PATTERN"]')) {
+    return null;
+  }
+  const declaration = runShText.match(/^DEFAULT_ISSUE_REF_PATTERN='([^']+)'$/m);
+  const wired =
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: bash, not a JS template
+    runShText.includes('ISSUE_REF_PATTERN="${ISSUE_REF_PATTERN:-$DEFAULT_ISSUE_REF_PATTERN}"') &&
+    /^export ISSUE_REF_PATTERN DEFAULT_ISSUE_REF_PATTERN$/m.test(runShText);
+  if (!declaration || !wired) {
+    throw new DriftError(
+      `${location}: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback`,
+    );
+  }
+  return declaration[1];
+}
+
+export function runCompositeAnalyzer(program, body, location, issueRef = null) {
+  // The analyzer runs with the default pattern, as it does for every caller
+  // that leaves `issue-ref-pattern` unset; policy.json describes `#N` only.
+  const refEnv =
+    issueRef === null ? {} : { ISSUE_REF_PATTERN: issueRef, DEFAULT_ISSUE_REF_PATTERN: issueRef };
   const result = run(
     "gawk",
     ["--sandbox", "--", program],
-    { input: body, env: { ...SANDBOX_ENV, LC_ALL: "C.UTF-8" } },
+    { input: body, env: { ...SANDBOX_ENV, LC_ALL: "C.UTF-8", ...refEnv } },
     location,
     "analyzer",
   );
@@ -414,11 +441,12 @@ const compositeMismatchCache = new Map();
 
 export function checkCompositeBehavior(runShText, policy, location) {
   const program = extractCompositeAnalyzer(runShText, location);
-  const key = `${JSON.stringify(policy.body)}\0${program}`;
+  const issueRef = parseCompositeIssueRef(runShText, location);
+  const key = `${JSON.stringify(policy.body)}\0${program}\0${issueRef}`;
   if (!compositeMismatchCache.has(key)) {
     const mismatches = [];
     for (const { line, body, expect } of linkageMatrix(policy)) {
-      const actual = runCompositeAnalyzer(program, body, location);
+      const actual = runCompositeAnalyzer(program, body, location, issueRef);
       if (describe(actual) !== describe(expect)) {
         mismatches.push({ line, expected: describe(expect), actual: describe(actual) });
       }
