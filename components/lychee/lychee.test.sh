@@ -162,18 +162,12 @@ assert_not_contains 'current Medium article is excluded' "$dump_out" \
   'https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f'
 assert_not_contains 'Fortmatic postmortem is excluded' "$dump_out" \
   'https://medium.com/fortmatic/postmortem-service-disruption-from-expired-ssl-certificate-a993a59272a0'
-assert_not_contains 'current Miro article is excluded' "$dump_out" \
-  'https://help.miro.com/hc/en-us/articles/31624028247058'
-assert_not_contains 'current IsDown page is excluded' "$dump_out" \
-  'https://isdown.app/status/anthropic'
 assert_not_contains 'current firecrawl-cli package page is excluded' "$dump_out" \
   'https://www.npmjs.com/package/firecrawl-cli'
 assert_not_contains 'current Miro API package page is excluded' "$dump_out" \
   'https://www.npmjs.com/package/@mirohq/miro-api'
 assert_not_contains 'current MySQL isolation manual page is excluded' "$dump_out" \
   'https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html'
-assert_not_contains 'current W3C time-zone guidance is excluded' "$dump_out" \
-  'https://www.w3.org/International/wiki/WorkingWithTimeZones'
 assert_not_contains 'current ACM DL paper is excluded' "$dump_out" \
   'https://dl.acm.org/doi/10.1145/3611643.3613871'
 assert_not_contains 'current ACM Queue article is excluded' "$dump_out" \
@@ -185,8 +179,21 @@ assert_not_contains 'current ACM Queue article is excluded' "$dump_out" \
 # proves the rest of the host is still checked.
 assert_row_count 'current Genius API docs root is excluded' "$dump_out" 0 \
   '^https://docs\.genius\.com/?$'
-assert_not_contains 'current NTIA SBOM report is excluded' "$dump_out" \
-  'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf'
+# Row count: the profile URL is a prefix of the status URL that stays checked.
+assert_row_count 'x.com profile is excluded' "$dump_out" 0 '^https://x\.com/ExampleHandle/?$'
+assert_not_contains 'x.com article is excluded' "$dump_out" \
+  'https://x.com/ExampleHandle/article/1'
+assert_not_contains 'x.com i/ article is excluded' "$dump_out" 'https://x.com/i/article/1'
+# Each URL below passed a GitHub-runner retest, so its exclude was dropped.
+for checked in \
+  'https://help.miro.com/hc/en-us/articles/31624028247058' \
+  'https://isdown.app/status/anthropic' \
+  'https://www.w3.org/International/wiki/WorkingWithTimeZones' \
+  'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf' \
+  'https://www.linkedin.com/posts/example' \
+  'https://x.com/ExampleHandle/status/1'; do
+  assert_contains "runner-passing URL is checked: $checked" "$dump_out" "$checked"
+done
 assert_not_contains 'example.com is excluded by lychee default' "$dump_out" \
   'https://example.com/placeholder'
 assert_not_contains 'example.org is excluded by lychee default' "$dump_out" \
@@ -194,22 +201,15 @@ assert_not_contains 'example.org is excluded by lychee default' "$dump_out" \
 assert_eq 'config carries no example-domain exclude' '0' \
   "$(grep -cF 'example\.' "$config" || true)"
 assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
-assert_contains 'another Miro help path remains checked' "$dump_out" \
-  'https://help.miro.com/hc/en-us/articles/example'
-assert_contains 'another IsDown path remains checked' "$dump_out" 'https://isdown.app/status/example'
 assert_contains 'another npm package remains checked' "$dump_out" 'https://www.npmjs.com/package/example'
 assert_contains 'another MySQL manual path remains checked' "$dump_out" \
   'https://dev.mysql.com/doc/refman/8.4/en/example.html'
-assert_contains 'another W3C International path remains checked' \
-  "$dump_out" 'https://www.w3.org/International/'
 assert_contains 'another ACM DL DOI remains checked' "$dump_out" \
   'https://dl.acm.org/doi/10.1145/example'
 assert_contains 'another ACM Queue article remains checked' "$dump_out" \
   'https://queue.acm.org/detail.cfm?id=1'
 assert_contains 'another Genius docs path remains checked' "$dump_out" \
   'https://docs.genius.com/example'
-assert_contains 'another NTIA publication remains checked' "$dump_out" \
-  'https://www.ntia.gov/files/ntia/publications/example.pdf'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \

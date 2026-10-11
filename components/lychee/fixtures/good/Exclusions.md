@@ -23,20 +23,24 @@ The exact current public URLs that reject automated link checkers are excluded:
 
 - <https://medium.com/@ziobrando/the-rise-and-fall-of-the-dungeon-master-c2d511eed12f>
 - <https://medium.com/fortmatic/postmortem-service-disruption-from-expired-ssl-certificate-a993a59272a0>
-- <https://help.miro.com/hc/en-us/articles/31624028247058>
-- <https://isdown.app/status/anthropic>
 - <https://www.npmjs.com/package/firecrawl-cli>
 - <https://www.npmjs.com/package/@mirohq/miro-api>
 - <https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html>
-- <https://www.w3.org/International/wiki/WorkingWithTimeZones>
 - <https://dl.acm.org/doi/10.1145/3611643.3613871>
 - <https://queue.acm.org/detail.cfm?id=3454124>
 - <https://docs.genius.com/>
+- <https://x.com/ExampleHandle>
+- <https://x.com/ExampleHandle/article/1>
+- <https://x.com/i/article/1>
 
-A host the checker cannot complete a TLS handshake against, though the chain
-verifies elsewhere:
+Pages that passed a GitHub-runner retest and are checked again:
 
+- <https://help.miro.com/hc/en-us/articles/31624028247058>
+- <https://isdown.app/status/anthropic>
+- <https://www.w3.org/International/wiki/WorkingWithTimeZones>
 - <https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf>
+- <https://www.linkedin.com/posts/example>
+- <https://x.com/ExampleHandle/status/1>
 
 Placeholder domains lychee excludes by default, with no config entry:
 
@@ -46,15 +50,11 @@ Placeholder domains lychee excludes by default, with no config entry:
 Other paths on those public hosts remain subject to checking:
 
 - <https://medium.com/example>
-- <https://help.miro.com/hc/en-us/articles/example>
-- <https://isdown.app/status/example>
 - <https://www.npmjs.com/package/example>
 - <https://dev.mysql.com/doc/refman/8.4/en/example.html>
-- <https://www.w3.org/International/>
 - <https://dl.acm.org/doi/10.1145/example>
 - <https://queue.acm.org/detail.cfm?id=1>
 - <https://docs.genius.com/example>
-- <https://www.ntia.gov/files/ntia/publications/example.pdf>
 
 Public siblings and stale pre-transfer owner links remain subject to checking:
 
