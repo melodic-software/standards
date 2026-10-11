@@ -10,7 +10,8 @@ name: maintenance-audit-link-check-excludes
 # reading the standards-sync App installation's repository set: github-iac
 # holds that set equal to the sync-manifest target roster, so every sync
 # target's visibility is known here. Private repositories that are not sync
-# targets stay outside both halves; the script reports them as unverified.
+# targets stay outside both halves: the script reports the ones already listed
+# as unverified and cannot see one missing from the list.
 #
 # The App token is minted metadata-read only, over the installation's whole
 # repository set, and is used for exactly one read. It cannot write anything.

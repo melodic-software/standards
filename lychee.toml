@@ -8,6 +8,12 @@
 # checks both anchor and text fragments).
 include_fragments = "full"
 
+# Expand input globs into dot-directories too. Without it `**/*.md` skips every
+# tracked file under `.github/`, `.claude/` and similar, so their links were
+# never checked. A glob input does not honor `.gitignore`, so local-only
+# dot-directories are excluded by path below.
+hidden = true
+
 # A 429 is the SERVER rate-limiting the checker, never evidence the link is
 # dead, and it lands on whichever host the shared CI runner IP happens to be
 # throttled against that run, so it names a different healthy URL each time. The
@@ -28,6 +34,9 @@ exclude_path = [
   '\.venv',
   '(^|/)bin/',
   '(^|/)obj/',
+  # The org's never-committed local working directory. Either separator, so a
+  # local Windows run matches too.
+  '(^|[/\\])\.work[/\\]',
 ]
 
 # URL excludes for a manual online run (the offline lane skips URLs entirely):
