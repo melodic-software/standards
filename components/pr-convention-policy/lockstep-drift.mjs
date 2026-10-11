@@ -33,7 +33,11 @@ import { pathToFileURL } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
-import { checkCompositeBehavior, checkHookBehavior } from "./lockstep-behavior.mjs";
+import {
+  checkCompositeBehavior,
+  checkHookBehavior,
+  parseCompositeIssueRef,
+} from "./lockstep-behavior.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
 const MODULE_DIRECTORY = import.meta.dirname;
@@ -123,7 +127,10 @@ function collect(errors, fn) {
     if (!(error instanceof DriftError)) {
       throw error;
     }
-    errors.push(error.message);
+    // Checks that share a parser can raise its finding verbatim; report it once.
+    if (!errors.includes(error.message)) {
+      errors.push(error.message);
+    }
   }
 }
 
@@ -146,8 +153,32 @@ export function parseCompositeSections(runShText, location) {
 // were: extract each declared pattern and probe it with every policy
 // keyword/marker. A keyword that survives only in a comment or an error
 // message no longer passes.
+//
+// Before ci-workflows#733 the keyword scan is an inline `/.../` literal. From
+// #733 on it is `closing_regex`, assembled in the analyzer's BEGIN block from
+// the keyword alternation, a separator (custom pattern or default), and the
+// reference pattern; the default-pattern form is the one rebuilt here, since
+// it is what runs for every caller that leaves `issue-ref-pattern` unset.
+function compositeKeywordPattern(runShText, location) {
+  const literal = runShText.match(/match\(chunk, \/(.+)\/\)\) break/);
+  if (literal) {
+    return literal[1];
+  }
+  if (!/match\(chunk, closing_regex\)\) break/.test(runShText)) {
+    return null;
+  }
+  const issueRef = parseCompositeIssueRef(runShText, location);
+  const separator = runShText.match(/^\s*separator = custom \? "[^"]*" : "([^"]*)"$/m);
+  const assembled = runShText.match(/^\s*closing_regex = "([^"]*)" separator ref$/m);
+  const reference = /^\s*ref = "\(" ref "\)"$/m.test(runShText);
+  if (issueRef === null || !separator || !assembled || !reference) {
+    return null;
+  }
+  return `${assembled[1]}${separator[1]}(${issueRef})`;
+}
+
 export function parseCompositePatterns(runShText, location) {
-  const keyword = runShText.match(/match\(chunk, \/(.+)\/\)\) break/);
+  const keyword = compositeKeywordPattern(runShText, location);
   const marker = runShText.match(/tolower\(body\) ~ \/(.+)\/\) print "no-issue"/);
   if (!keyword || !marker) {
     throw new DriftError(
@@ -166,7 +197,7 @@ export function parseCompositePatterns(runShText, location) {
       `${location}: the closing-keyword scan no longer lowercases the line (\`lower = tolower(line)\`), so the extracted pattern is not the one the gate applies`,
     );
   }
-  return { keyword: new RegExp(keyword[1]), marker: new RegExp(marker[1]) };
+  return { keyword: new RegExp(keyword), marker: new RegExp(marker[1]) };
 }
 
 function parseActionYml(actionYmlText, location) {
@@ -220,6 +251,24 @@ export function parseCompositeRequireScope(actionYmlText, location) {
   throw new DriftError(
     `${location}: \`inputs.require-scope.default\` is not a boolean: ${JSON.stringify(declared)}`,
   );
+}
+
+// The behavioral check runs the analyzer with run.sh's DEFAULT_ISSUE_REF_PATTERN.
+// A caller that leaves `issue-ref-pattern` unset gets action.yml's default
+// instead, and any value other than run.sh's own default switches the analyzer
+// to its custom-pattern rules (a mandatory keyword separator), so the two
+// defaults must agree for the behavioral verdict to describe the gate.
+export function assertCompositeIssueRefDefault(runShText, actionYmlText, location) {
+  const issueRef = parseCompositeIssueRef(runShText, location);
+  if (issueRef === null) {
+    return;
+  }
+  const declared = parseActionYml(actionYmlText, location)?.inputs?.["issue-ref-pattern"]?.default;
+  if (declared !== undefined && declared !== "" && declared !== issueRef) {
+    throw new DriftError(
+      `${location}: action.yml's \`issue-ref-pattern\` default ${JSON.stringify(declared)} differs from run.sh's DEFAULT_ISSUE_REF_PATTERN ${JSON.stringify(issueRef)}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -370,8 +419,14 @@ export function parseValidatorNonClosing(shellText, location) {
   return { markers: nonClosingAlternation(declaration[1], location) };
 }
 
+// The marker test is an inline literal before ci-workflows#733 and
+// `non_closing_regex` (its marker prefix, then the reference) from #733 on.
 export function parseCompositeNonClosing(runShText, location) {
-  const declaration = runShText.match(/rest ~ \/(.+)\/\) \{\s*has_non_closing = 1/);
+  const declaration =
+    runShText.match(/rest ~ \/(.+)\/\) \{\s*has_non_closing = 1/) ??
+    (/rest ~ non_closing_regex\) \{\s*has_non_closing = 1/.test(runShText)
+      ? runShText.match(/^\s*non_closing_regex = "([^"]*)" ref "[^"]*"$/m)
+      : null);
   if (!declaration) {
     throw new DriftError(
       `${location}: the \`rest ~ /.../\` non-closing marker test (has_non_closing = 1) was not found in run.sh`,
@@ -409,7 +464,7 @@ export function assertCompositeVerdictReads(runShText, location) {
     ],
     [
       "a `non-closing` report satisfies linkage",
-      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then\s*\n\s*linkage_errors\+=\('Missing a native closing keyword/,
+      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then\s*\n\s*linkage_errors\+=\((?:'Missing a native|"Missing a \$\{keyword_kind\}) closing keyword/,
     ],
     [
       "a `negated` report is a linkage error",
@@ -915,7 +970,10 @@ export function checkCopies(policy, texts) {
       "hook validator (negated closers)",
     ),
   );
-  run(() => checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)"));
+  run(() => assertCompositeIssueRefDefault(texts.gateRun, texts.gateAction, "gate composite"));
+  run(() =>
+    checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)", "gate composite"),
+  );
   run(() => assertCompositeVerdictReads(texts.gateRun, "gate composite (verdict)"));
   run(() => checkHookBehavior(texts.hookValidator, policy, "hook validator (behavior)"));
   return errors;
@@ -986,7 +1044,8 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
   );
   run(() => assertNonClosing(parseCompositeNonClosing(runShText, location), policy, location));
   run(() => assertNegation(parseCompositeNegation(runShText, location), policy, location));
-  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`));
+  run(() => assertCompositeIssueRefDefault(runShText, actionYmlText, location));
+  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`, location));
   run(() => assertCompositeVerdictReads(runShText, `${location} (verdict)`));
   return errors;
 }
