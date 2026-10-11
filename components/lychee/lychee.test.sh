@@ -191,7 +191,9 @@ for checked in \
   'https://www.w3.org/International/wiki/WorkingWithTimeZones' \
   'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf' \
   'https://www.linkedin.com/posts/example' \
-  'https://x.com/ExampleHandle/status/1'; do
+  'https://x.com/ExampleHandle/status/1' \
+  'https://x.com/i/status/1' \
+  'https://x.com/i/web/status/1'; do
   assert_contains "runner-passing URL is checked: $checked" "$dump_out" "$checked"
 done
 assert_not_contains 'example.com is excluded by lychee default' "$dump_out" \

@@ -88,7 +88,7 @@ exclude = [
   # posts stay checked; profiles, articles and the terms page stay excluded.
   # twitter.com needs no entry: lychee excludes it by default.
   '^https?://(www\.)?x\.com/[^/?#]+(/(article|tos)(/[^?#]*)?)?/?([?#].*)?$',
-  '^https?://(www\.)?x\.com/i/',
+  '^https?://(www\.)?x\.com/i/article/',
   # Bot blocks on live pages, each scoped to the cited URL so the rest of the
   # host stays checked: 403 to lychee on a GitHub runner (2026-10-11). Medium
   # and npmjs also answer 403 to curl and a browser User-Agent; dev.mysql.com

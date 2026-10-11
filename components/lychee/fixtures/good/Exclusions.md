@@ -41,6 +41,8 @@ Pages that passed a GitHub-runner retest and are checked again:
 - <https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf>
 - <https://www.linkedin.com/posts/example>
 - <https://x.com/ExampleHandle/status/1>
+- <https://x.com/i/status/1>
+- <https://x.com/i/web/status/1>
 
 Placeholder domains lychee excludes by default, with no config entry:
 
