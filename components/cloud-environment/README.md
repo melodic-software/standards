@@ -15,7 +15,7 @@ toolchains the fleet pins (.NET SDKs, Node 24, `gh`, PowerShell) inside the
 committed, idempotent `.claude/cloud-bootstrap.sh`.
 The full fleet plan, per-repo templates, and verification
 checklist live in
-[claude-code-plugins `docs/CLOUD-FLEET-SETUP.md`](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/CLOUD-FLEET-SETUP.md).
+[claude-code-plugins `docs/cloud-fleet-setup.md`](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/cloud-fleet-setup.md).
 
 ## Bootstrap (paste into the environment's setup script field)
 
