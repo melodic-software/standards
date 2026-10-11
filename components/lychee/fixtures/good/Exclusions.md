@@ -25,6 +25,7 @@ The exact current public URLs that reject automated link checkers are excluded:
 - <https://medium.com/fortmatic/postmortem-service-disruption-from-expired-ssl-certificate-a993a59272a0>
 - <https://www.npmjs.com/package/firecrawl-cli>
 - <https://www.npmjs.com/package/@mirohq/miro-api>
+- <https://help.miro.com/hc/en-us/articles/31624028247058>
 - <https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html>
 - <https://dl.acm.org/doi/10.1145/3611643.3613871>
 - <https://queue.acm.org/detail.cfm?id=3454124>
@@ -35,7 +36,6 @@ The exact current public URLs that reject automated link checkers are excluded:
 
 Pages that passed a GitHub-runner retest and are checked again:
 
-- <https://help.miro.com/hc/en-us/articles/31624028247058>
 - <https://isdown.app/status/anthropic>
 - <https://www.w3.org/International/wiki/WorkingWithTimeZones>
 - <https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf>
@@ -57,6 +57,7 @@ Other paths on those public hosts remain subject to checking:
 - <https://dl.acm.org/doi/10.1145/example>
 - <https://queue.acm.org/detail.cfm?id=1>
 - <https://docs.genius.com/example>
+- <https://help.miro.com/hc/en-us/articles/example>
 
 Public siblings and stale pre-transfer owner links remain subject to checking:
 

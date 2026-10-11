@@ -166,6 +166,8 @@ assert_not_contains 'current firecrawl-cli package page is excluded' "$dump_out"
   'https://www.npmjs.com/package/firecrawl-cli'
 assert_not_contains 'current Miro API package page is excluded' "$dump_out" \
   'https://www.npmjs.com/package/@mirohq/miro-api'
+assert_not_contains 'current Miro help article is excluded' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/31624028247058'
 assert_not_contains 'current MySQL isolation manual page is excluded' "$dump_out" \
   'https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html'
 assert_not_contains 'current ACM DL paper is excluded' "$dump_out" \
@@ -186,7 +188,6 @@ assert_not_contains 'x.com article is excluded' "$dump_out" \
 assert_not_contains 'x.com i/ article is excluded' "$dump_out" 'https://x.com/i/article/1'
 # Each URL below passed a GitHub-runner retest, so its exclude was dropped.
 for checked in \
-  'https://help.miro.com/hc/en-us/articles/31624028247058' \
   'https://isdown.app/status/anthropic' \
   'https://www.w3.org/International/wiki/WorkingWithTimeZones' \
   'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf' \
@@ -212,6 +213,8 @@ assert_contains 'another ACM Queue article remains checked' "$dump_out" \
   'https://queue.acm.org/detail.cfm?id=1'
 assert_contains 'another Genius docs path remains checked' "$dump_out" \
   'https://docs.genius.com/example'
+assert_contains 'another Miro help article remains checked' "$dump_out" \
+  'https://help.miro.com/hc/en-us/articles/example'
 assert_contains 'public organization sibling remains checked' \
   "$dump_out" 'https://github.com/melodic-software/ci-runner'
 assert_contains 'stale personal-owner URL remains checked' \
