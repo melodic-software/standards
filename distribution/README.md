@@ -408,8 +408,8 @@ lists the managed destinations of the targets that receive it) and the workflow
 on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The
 fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
-the fleet-enrolled private targets (`claude-code-proxy`, `dotfiles`,
-`github-iac`, `medley`, `provisioning`), where runner-policy requires the
+the fleet-enrolled private targets (`agent-automations`,
+`claude-code-proxy`, `dotfiles`, `github-iac`, `medley`, `provisioning`), where runner-policy requires the
 fleet literal for every read-only job. claude-code-proxy is fleet-enrolled in
 github-iac and its `ci.yml` runs on the fleet label, though it has no
 `.github/runner-policy.json`. No target manages both.
