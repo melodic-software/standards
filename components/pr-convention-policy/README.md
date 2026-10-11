@@ -6,7 +6,9 @@ keywords (or an explicit no-issue marker). This is a standards-internal record
 and self-test. It is not distributed to consumers
 ([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md));
 the gate consumers actually run is the `ci-workflows` `check-contract` composite
-(v0.20.0 onward, `449157aaa8e30f7b1457305d8048ebe6168e174a`), which each
+(introduced in v0.20.0, `449157aaa8e30f7b1457305d8048ebe6168e174a`, as
+`.github/actions/pr-contract`; moved to
+`.github/actions/pr-require-checks/check-contract` in v0.34.0), which each
 repository pins directly as a step inside its `ci-status` job. Its predecessor
 is the `pr-issue-linkage.yml` reusable, which every repository leaves during
 Phase 3 of the ci-perf program (melodic-software/github-iac#396), one pull
