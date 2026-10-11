@@ -10,8 +10,9 @@ include_fragments = "full"
 
 # Expand input globs into dot-directories too. Without it `**/*.md` skips every
 # tracked file under `.github/`, `.claude/` and similar, so their links were
-# never checked. A glob input does not honor `.gitignore`, so local-only
-# dot-directories are excluded by path below.
+# never checked. A glob input does not honor `.gitignore`, so a local run also
+# reads ignored dot-directories; the two that hold whole trees of markdown,
+# `.work/` and `.claude/worktrees/`, are excluded by path below.
 hidden = true
 
 # A 429 is the SERVER rate-limiting the checker, never evidence the link is
@@ -37,6 +38,8 @@ exclude_path = [
   # The org's never-committed local working directory. Either separator, so a
   # local Windows run matches too.
   '(^|[/\\])\.work[/\\]',
+  # Claude Code's in-repo worktrees: whole nested checkouts.
+  '(^|[/\\])\.claude[/\\]worktrees[/\\]',
 ]
 
 # URL excludes for a manual online run (the offline lane skips URLs entirely):
