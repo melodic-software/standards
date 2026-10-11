@@ -85,6 +85,31 @@ assert_contains 'nested fixture lookalike remains checked' \
 assert_contains 'nested components prefix remains checked' \
   "$path_dump" 'https://www.rfc-editor.org/rfc/rfc3986?boundary=nested-prefix'
 
+# Consumers pass a `**/*.md` glob, so only a glob input exercises `hidden` and
+# the `.work/` and `.claude/worktrees/` path excludes; explicit file paths
+# bypass both. One link per location names where it came from.
+dot_root="$path_fixture_root/dot-directories"
+mkdir -p "$dot_root/.github" "$dot_root/.work" "$dot_root/nested/.work" \
+  "$dot_root/.claude/worktrees/lane" "$dot_root/.claude/rules" "$dot_root/.workshop"
+for location in .github .work nested/.work .claude/worktrees/lane .claude/rules .workshop; do
+  printf '<https://www.rfc-editor.org/rfc/rfc3986?dot=%s>\n' "$location" \
+    >"$dot_root/$location/Link.md"
+done
+glob_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" './**/*.md' 2>&1)"
+rc=$?
+assert_exit 'dot-directory glob dump needs no network and exits 0' 0 "$rc"
+assert_contains 'glob input reaches .github/' "$glob_dump" 'dot=.github'
+assert_contains 'glob input reaches .claude/ outside worktrees' "$glob_dump" 'dot=.claude/rules'
+assert_contains '.work lookalike directory stays checked' "$glob_dump" 'dot=.workshop'
+assert_not_contains 'root .work/ is excluded' "$glob_dump" 'dot=.work>'
+assert_row_count 'no .work/ link at any depth is checked' "$glob_dump" 0 'dot=(nested/)?\.work$'
+assert_not_contains '.claude/worktrees/ is excluded' "$glob_dump" 'dot=.claude/worktrees'
+# Control: the same glob without `hidden` skips the dot-directories, so the
+# .github/ assertion above passes because of the config key.
+unhidden_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" --hidden=false \
+  './**/*.md' 2>&1)"
+assert_not_contains 'without hidden the glob skips .github/' "$unhidden_dump" 'dot=.github'
+
 # The private-repo inventory is derived, not copied: the two entries must be
 # byte-identical to what private-repo-inventory.sh renders for the set it reads
 # back from the file (sorted, unique, both hosts carrying the same set). Whether
@@ -314,7 +339,7 @@ else
   # lychee retried it, the behavior an accepted 429 would skip.
   throttled_hits="$(wc -l <"$http_fixture_root/throttled-hits" 2>/dev/null || printf '0')"
   if ((throttled_hits > 1)); then
-    pass "persistent 429 is retried before failing — $throttled_hits requests"
+    pass "persistent 429 is retried before failing: $throttled_hits requests"
   else
     fail 'persistent 429 is retried before failing' "requests: $throttled_hits"
   fi
