@@ -220,6 +220,14 @@ components:
       - shellcheck
     files:
       components/lefthook-shellcheck/lefthook.yml: .lefthook/shellcheck.yml
+  # Link-check config for every target's offline lychee lane. Deliberate
+  # non-targets:
+  # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
+  #   code or authored docs, like claude-lane-sandbox; not a sync target.
+  # - knowledge-corpus: its markdown is mostly scraped third-party material
+  #   whose links this org does not author or repair, and it is deferred from
+  #   the sync roster (see the Phase 4 note near `targets:`).
+  # - standards: manifest source, not a target.
   lychee:
     files:
       lychee.toml: lychee.toml
