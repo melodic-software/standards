@@ -37,6 +37,7 @@ const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
 const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
 const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
 const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
+const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9023,6 +9024,28 @@ test("every reusable contract at the v0.39.8 tag copies its v0.39.3 entry forwar
   }
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_39_8}`)).length,
+    reusables.length,
+  );
+});
+
+// v0.40.0 adds one input to the two review lanes, `allowed-bot-sender-ids`,
+// and changes no secret, permission or routing field; no other reusable is
+// registered at it.
+test("the review contracts at the v0.40.0 tag are their v0.39.8 entries plus allowed-bot-sender-ids", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`];
+    assert.ok(previous, `expected a v0.39.8 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_40_0}`],
+      { ...previous, allowedInputs: [...previous.allowedInputs, "allowed-bot-sender-ids"] },
+      `${reusable} at the v0.40.0 tag is not its v0.39.8 entry plus allowed-bot-sender-ids`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_40_0}`)).length,
     reusables.length,
   );
 });

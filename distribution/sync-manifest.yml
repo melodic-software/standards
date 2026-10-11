@@ -99,7 +99,9 @@ components:
   # its destinations retire.
   #
   # The security lane has no path gating from ci-workflows v0.29.0: it reviews
-  # every non-draft same-repository PR whose actor is not a bot, and a target's `.github/claude-security-paths`
+  # every non-draft same-repository PR whose actor is not a bot (or is a bot
+  # whose sender id the caller lists in `allowed-bot-sender-ids`, from
+  # ci-workflows v0.40.0), and a target's `.github/claude-security-paths`
   # file is no longer read. The manifest never synced that file, so a target
   # removes its copy in a repo-local PR if it wants to.
   #
