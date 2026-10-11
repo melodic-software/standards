@@ -392,6 +392,11 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - typos
+  # Link-check config only: its pr-require-checks lane turns lychee-offline on
+  # once this delivers lychee.toml. Its other configs stay repo-owned.
+  melodic-software/agent-automations:
+    managed:
+      - lychee
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
   # no considered exclusion is overridden). Same shape as the two sibling
