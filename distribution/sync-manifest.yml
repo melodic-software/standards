@@ -270,9 +270,9 @@ components:
   #   runner-policy admits on a public repository and on a private one not
   #   enrolled for local routing.
   # - managed-files-guard-fleet-caller: the managed fleet label, for the
-  #   private targets enrolled for local routing (claude-code-proxy,
-  #   dotfiles, github-iac, medley, provisioning), where a fixed hosted
-  #   read-only job fails the runner-policy gate.
+  #   private targets enrolled for local routing (agent-automations,
+  #   claude-code-proxy, dotfiles, github-iac, medley, provisioning), where a
+  #   fixed hosted read-only job fails the runner-policy gate.
   # Deliberate exclusions:
   # - ci-workflows: `locally-owned` — it hosts the action and already runs
   #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
@@ -392,6 +392,14 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - typos
+  # Link-check config plus the managed-files guard every target carries: its
+  # pr-require-checks lane turns lychee-offline on once this delivers
+  # lychee.toml. Private and fleet-enrolled in github-iac, so it takes the
+  # fleet-routed guard caller. Its other configs stay repo-owned.
+  melodic-software/agent-automations:
+    managed:
+      - lychee
+      - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
   # no considered exclusion is overridden). Same shape as the two sibling

@@ -60,8 +60,8 @@ target's `ci-status`.
 
 **Fleet-routed caller.** `managed-files-guard-fleet.yml` runs on the managed
 fleet label `melodic-ubuntu-24.04-x64`. It is managed for the private targets
-enrolled for local CI routing: `claude-code-proxy`, `dotfiles`, `github-iac`,
-`medley`, and `provisioning`. On a routing-enrolled repository,
+enrolled for local CI routing: `agent-automations`, `claude-code-proxy`,
+`dotfiles`, `github-iac`, `medley`, and `provisioning`. On a routing-enrolled repository,
 `runner-policy` requires every eligible read-only job either to name the
 managed fleet label or to carry a reviewed hosted exception, so a fixed
 `runs-on: ubuntu-24.04` job fails the gate there, and the fleet label is
