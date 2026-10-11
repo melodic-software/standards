@@ -55,13 +55,18 @@ const POLICY = parseUniqueJson(
 
 // The two executable copies are vendored verbatim, because the behavioral
 // layer runs them: the composite's run.sh from ci-workflows
-// a932d486c5a4d0a959c42e60ff015f50cf2103f3 and the hook validator from
+// 8b3cc4bf282b30e51dd0eef31e2997b978770cea (ci-workflows#733, the
+// `issue-ref-pattern` shape, plus one `spellchecker:ignore-next-line` awk
+// comment for this repository's typos lane), the same run.sh from ci-workflows
+// a932d486c5a4d0a959c42e60ff015f50cf2103f3 (the inline `#N` shape older pins
+// still run), and the hook validator from
 // claude-code-plugins 53d5c6a09dfb5890b9767b447a28ca10ba922173. The `.txt`
 // suffix keeps the shell lint lanes off code this repository does not own.
 // Refresh them when either upstream changes shape the tests depend on.
 const readFixture = (name) =>
   readFile(path.join(MODULE_DIRECTORY, "fixtures", "lockstep", name), "utf8");
 const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
+const LITERAL_REF_COMPOSITE_RUN = await readFixture("check-contract-run-literal-ref.sh.txt");
 const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
 
 const GOOD_COMPOSITE_ACTION = [
@@ -75,6 +80,9 @@ const GOOD_COMPOSITE_ACTION = [
   "      Comma-separated allowed Conventional Commits types. The default is the",
   "      twelve types policy.json declares.",
   "    default: build,chore,ci,docs,feat,fix,perf,refactor,revert,security,style,test",
+  "  issue-ref-pattern:",
+  "    description: POSIX extended regex for the issue reference.",
+  "    default: '([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
   "runs:",
   "  using: composite",
   "",
@@ -407,6 +415,75 @@ test("a composite at a consumer pin passes when it matches policy", () => {
     ),
     [],
   );
+});
+
+test("a composite pin that still inlines the #N reference passes", () => {
+  assert.deepEqual(
+    checkPinnedComposite(
+      POLICY,
+      "codex-plugins",
+      "d".repeat(40),
+      LITERAL_REF_COMPOSITE_RUN,
+      GOOD_COMPOSITE_ACTION,
+    ),
+    [],
+  );
+});
+
+// From ci-workflows#733 the analyzer reads its reference grammar from the
+// environment, so each link from run.sh's default to the analyzer is checked.
+test("an issue-ref-pattern composite that loses its default is drift", () => {
+  for (const [from, to] of [
+    [/^DEFAULT_ISSUE_REF_PATTERN=.*$/m, "DEFAULT_ISSUE_REF_PATTERN="],
+    ["export ISSUE_REF_PATTERN DEFAULT_ISSUE_REF_PATTERN", "export DEFAULT_ISSUE_REF_PATTERN"],
+  ]) {
+    const errors = mutate("gateRun", from, to);
+    assert.deepEqual(errors, [
+      "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
+    ]);
+    // Three checks read the default; a consumer pin reports the finding once.
+    const pinned = checkPinnedComposite(
+      POLICY,
+      "codex-plugins",
+      "d".repeat(40),
+      GOOD_COMPOSITE_RUN.replace(from, to),
+      GOOD_COMPOSITE_ACTION,
+    );
+    assert.equal(pinned.length, 1, pinned.join("; "));
+    assert.match(pinned[0], /^caller codex-plugins pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
+  }
+});
+
+test("an issue-ref-pattern default that drops the #N grammar is drift", () => {
+  const errors = mutate(
+    "gateRun",
+    "DEFAULT_ISSUE_REF_PATTERN='([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
+    "DEFAULT_ISSUE_REF_PATTERN='[a-z]+-[0-9]+'",
+  );
+  assert.ok(
+    errors.some((e) => e.startsWith("gate composite (enforcement patterns): ")),
+    errors.join("; "),
+  );
+  assert.ok(
+    errors.some((e) => e.startsWith("gate composite (behavior): ")),
+    errors.join("; "),
+  );
+});
+
+test("the default closing scan losing its optional colon is drift", () => {
+  const errors = mutate("gateRun", ': "[ \\t]*:?[ \\t]*"', ': "[ \\t]+"');
+  assertOnlyBehavior(errors, "gateRun", /should be closing, got no linkage/);
+});
+
+test("an action.yml issue-ref-pattern default that differs from run.sh is drift", () => {
+  const texts = goodTexts();
+  texts.gateAction = texts.gateAction.replace(
+    "default: '([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'",
+    "default: '#[0-9]+'",
+  );
+  const errors = checkCopies(POLICY, texts);
+  assert.equal(errors.length, 1, errors.join("; "));
+  assert.match(errors[0], /^gate composite: action\.yml's .*differs from run\.sh/);
 });
 
 test("a composite pin predating the security type is drift at that pin", () => {
