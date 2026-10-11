@@ -24,14 +24,30 @@ went public; the alternations sorted and identical) and in the scheduled
 `maintenance-audit-link-check-excludes` workflow for the direction it cannot (a new private
 sync target missing from the list, read from the standards-sync App
 installation). Private repositories outside the sync roster are the residual
-the check reports as unverified. A new private repository therefore fails
-that scheduled workflow within a day; fix it at this source, never in a
-consumer's synced copy, which the next sync overwrites. Public
+the check reports as unverified, and no check catches one missing from the
+list, so run `generate --write` whenever the org gains a private repository.
+A new private sync target fails that scheduled workflow within a day; fix it at
+this source, never in a consumer's synced copy, which the next sync overwrites. Public
 siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
 exceptions are scoped to the exact URL, not the host: every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside
 the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`
 list. Lychee documents `exclude` values as URL regular expressions in its
 [link-exclusion recipe][1].
+
+## Run the online check
+
+From a consumer's root, with the pinned Lychee version:
+
+```bash
+GITHUB_TOKEN="$(gh auth token)" lychee --config lychee.toml --no-progress \
+  --max-retries 2 './**/*.md'
+```
+
+The token lifts github.com's unauthenticated rate limit. A token that can read
+a private repository makes Lychee report that repository's links OK without
+checking the path, which is one more reason the private inventory above stays
+an exclude list. Lychee also reads a `.lycheeignore` in the working directory
+on top of `--config`, so a consumer's local file widens these excludes.
 
 [1]: https://lychee.cli.rs/recipes/excluding-links/

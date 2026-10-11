@@ -3,6 +3,9 @@
 Private repositories intentionally excluded from an unauthenticated manual
 online run:
 
+- <https://github.com/melodic-software/agent-automations>
+- <https://github.com/melodic-software/architecture>
+- <https://github.com/melodic-software/azure-iac>
 - <https://github.com/melodic-software/claude-code-proxy>
 - <https://github.com/melodic-software/dotfiles>
 - <https://github.com/melodic-software/github-iac>
