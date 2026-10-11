@@ -77,6 +77,14 @@ on:
       - _typos.toml
       - docs/adr/README.md
       - docs/adr/adr-template.md
+      - docs/standards/README.md
+      - docs/standards/bulk-mutation.md
+      - docs/standards/concise-prose.md
+      - docs/standards/deterministic-work-execution.md
+      - docs/standards/documentation-and-citations.md
+      - docs/standards/reference-dont-duplicate.md
+      - docs/standards/simpler-code.md
+      - docs/standards/source-authority-tiers.md
       - dot_local/bin/executable_pages-publish
       - dot_markdownlint-cli2.jsonc
       - eng/dotnet-analysis/Directory.Build.props

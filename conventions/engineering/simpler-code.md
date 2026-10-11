@@ -27,3 +27,15 @@ A reduction is **right** when it removes copy-paste duplication where the abstra
 A reduction is **wrong** when it suppresses an analyzer rule, drops a test, disables a lint, hides intent behind cleverness, or forces one abstraction onto two cases that are not actually the same.
 
 When in doubt, prefer the form that makes the next change cheaper.
+
+## Build only what someone acts on
+
+Before proposing anything new (code, a check, a process, a document, a configuration value, a dependency), name who uses its output and what they do with it. If nobody does, do not build it. When a problem has a removable cause, remove the cause rather than adding something that detects the problem or works around it. Between options that solve the same problem, count the moving parts and choose the one with the fewest.
+
+## No bottleneck without a reason
+
+Do not serialize work behind a single shared lock, a one-at-a-time queue, or a recurring manual step unless correctness or consent requires it: concurrent writes to the same state, or a person's go-ahead before a destructive change. Otherwise keep the shared thing safe by narrowing scope and protecting it, not by making it exclusive.
+
+## Precedent is not a reason to keep something
+
+An earlier answer, a design brief, or an existing pattern in the repository does not justify keeping a mechanism the evidence shows is unneeded. Say so, cite the evidence, and recommend removing it.
