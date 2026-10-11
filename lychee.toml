@@ -1,6 +1,7 @@
 # lychee ruleset: repo-agnostic link-checking config.
 # The offline CI lane runs with --offline (external URLs skipped); a manual
-# online run reuses this file with the network enabled.
+# online run (command in components/lychee/README.md) reuses this file with the
+# network enabled.
 # Ref: https://github.com/lycheeverse/lychee/blob/master/lychee.example.toml
 
 # Verify #fragment/anchor targets resolve, not just the file path ("full"
@@ -86,10 +87,11 @@ exclude = [
   # GENERATED, not hand-edited: the two alternations below are derived from
   # actual repository visibility by components/lychee/private-repo-inventory.sh
   # (`generate --write` regenerates them; `check` fails CI and the scheduled
-  # lychee-private-inventory workflow when they disagree with visibility, the
-  # drift that produced standards#212 and #483). The optional \.git arm covers
+  # maintenance-audit-link-check-excludes workflow when they disagree with
+  # visibility, the drift that produced standards#212 and #483). The optional
+  # \.git arm covers
   # HTTPS clone URLs: the dot after the repo name would otherwise miss the
   # [/#?] boundary.
-  '^https?://github\.com/melodic-software/(claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)(\.git)?([/#?]|$)',
-  '^https?://raw\.githubusercontent\.com/melodic-software/(claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)/',
+  '^https?://github\.com/melodic-software/(agent-automations|architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)(\.git)?([/#?]|$)',
+  '^https?://raw\.githubusercontent\.com/melodic-software/(agent-automations|architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)/',
 ]
