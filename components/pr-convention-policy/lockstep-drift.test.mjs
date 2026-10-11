@@ -438,10 +438,19 @@ test("an issue-ref-pattern composite that loses its default is drift", () => {
     ["export ISSUE_REF_PATTERN DEFAULT_ISSUE_REF_PATTERN", "export DEFAULT_ISSUE_REF_PATTERN"],
   ]) {
     const errors = mutate("gateRun", from, to);
-    assert.ok(
-      errors.some((e) => /does not declare and export DEFAULT_ISSUE_REF_PATTERN/.test(e)),
-      errors.join("; "),
+    assert.deepEqual(errors, [
+      "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
+    ]);
+    // Three checks read the default; a consumer pin reports the finding once.
+    const pinned = checkPinnedComposite(
+      POLICY,
+      "codex-plugins",
+      "d".repeat(40),
+      GOOD_COMPOSITE_RUN.replace(from, to),
+      GOOD_COMPOSITE_ACTION,
     );
+    assert.equal(pinned.length, 1, pinned.join("; "));
+    assert.match(pinned[0], /^caller codex-plugins pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
   }
 });
 
@@ -474,7 +483,7 @@ test("an action.yml issue-ref-pattern default that differs from run.sh is drift"
   );
   const errors = checkCopies(POLICY, texts);
   assert.equal(errors.length, 1, errors.join("; "));
-  assert.match(errors[0], /^gate composite \(issue-ref-pattern\): .*differs from run\.sh/);
+  assert.match(errors[0], /^gate composite: action\.yml's .*differs from run\.sh/);
 });
 
 test("a composite pin predating the security type is drift at that pin", () => {

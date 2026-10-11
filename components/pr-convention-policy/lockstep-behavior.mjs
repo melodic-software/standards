@@ -439,9 +439,11 @@ export function runCompositeAnalyzer(program, body, location, issueRef = null) {
 // analyzer and policy serves them all.
 const compositeMismatchCache = new Map();
 
-export function checkCompositeBehavior(runShText, policy, location) {
+// `wiringLocation` names a broken DEFAULT_ISSUE_REF_PATTERN the way the static
+// checks do, so the caller's collector reports it once, not once per check.
+export function checkCompositeBehavior(runShText, policy, location, wiringLocation = location) {
   const program = extractCompositeAnalyzer(runShText, location);
-  const issueRef = parseCompositeIssueRef(runShText, location);
+  const issueRef = parseCompositeIssueRef(runShText, wiringLocation);
   const key = `${JSON.stringify(policy.body)}\0${program}\0${issueRef}`;
   if (!compositeMismatchCache.has(key)) {
     const mismatches = [];

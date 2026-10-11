@@ -127,7 +127,10 @@ function collect(errors, fn) {
     if (!(error instanceof DriftError)) {
       throw error;
     }
-    errors.push(error.message);
+    // Checks that share a parser can raise its finding verbatim; report it once.
+    if (!errors.includes(error.message)) {
+      errors.push(error.message);
+    }
   }
 }
 
@@ -967,14 +970,10 @@ export function checkCopies(policy, texts) {
       "hook validator (negated closers)",
     ),
   );
+  run(() => assertCompositeIssueRefDefault(texts.gateRun, texts.gateAction, "gate composite"));
   run(() =>
-    assertCompositeIssueRefDefault(
-      texts.gateRun,
-      texts.gateAction,
-      "gate composite (issue-ref-pattern)",
-    ),
+    checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)", "gate composite"),
   );
-  run(() => checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)"));
   run(() => assertCompositeVerdictReads(texts.gateRun, "gate composite (verdict)"));
   run(() => checkHookBehavior(texts.hookValidator, policy, "hook validator (behavior)"));
   return errors;
@@ -1046,7 +1045,7 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
   run(() => assertNonClosing(parseCompositeNonClosing(runShText, location), policy, location));
   run(() => assertNegation(parseCompositeNegation(runShText, location), policy, location));
   run(() => assertCompositeIssueRefDefault(runShText, actionYmlText, location));
-  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`));
+  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`, location));
   run(() => assertCompositeVerdictReads(runShText, `${location} (verdict)`));
   return errors;
 }
