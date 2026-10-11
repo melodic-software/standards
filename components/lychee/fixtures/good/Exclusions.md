@@ -38,6 +38,11 @@ verifies elsewhere:
 
 - <https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf>
 
+Placeholder domains lychee excludes by default, with no config entry:
+
+- <https://example.com/placeholder>
+- <https://www.example.org/placeholder>
+
 Other paths on those public hosts remain subject to checking:
 
 - <https://medium.com/example>

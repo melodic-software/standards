@@ -44,6 +44,10 @@ GITHUB_TOKEN="$(gh auth token)" lychee --config lychee.toml --no-progress \
   --max-retries 2 './**/*.md'
 ```
 
+In `standards` itself, add `--exclude-path '(^|/)components/lychee/fixtures/'`:
+the fixtures hold placeholder URLs and intentionally broken links that the
+offline test harness reads, so they are test data, not links to check.
+
 The token lifts github.com's unauthenticated rate limit. A token that can read
 a private repository makes Lychee report that repository's links OK without
 checking the path, which is one more reason the private inventory above stays

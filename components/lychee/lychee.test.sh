@@ -187,6 +187,12 @@ assert_row_count 'current Genius API docs root is excluded' "$dump_out" 0 \
   '^https://docs\.genius\.com/?$'
 assert_not_contains 'current NTIA SBOM report is excluded' "$dump_out" \
   'https://www.ntia.gov/files/ntia/publications/sbom_minimum_elements_report.pdf'
+assert_not_contains 'example.com is excluded by lychee default' "$dump_out" \
+  'https://example.com/placeholder'
+assert_not_contains 'example.org is excluded by lychee default' "$dump_out" \
+  'https://www.example.org/placeholder'
+assert_eq 'config carries no example-domain exclude' '0' \
+  "$(grep -cF 'example\.' "$config" || true)"
 assert_contains 'another Medium path remains checked' "$dump_out" 'https://medium.com/example'
 assert_contains 'another Miro help path remains checked' "$dump_out" \
   'https://help.miro.com/hc/en-us/articles/example'
