@@ -1171,6 +1171,16 @@ message. `maintenance-sync-standards` bumps `actions/setup-node` from v7.0.0
 to v7.1.0 (`949feb2`) and is declined on shape, because its `sync` job routes
 through `needs`. `pr-run-checks` keeps its blob, but its `$/markdownlint`
 action tree takes the same `setup-node` bump.
+`pr-review` and `pr-review-security` are also registered at the v0.40.0 tag
+`a92020292976c2e9b50f7adc922693a45a6c1226`, each equal to its v0.39.8 entry
+plus the input `allowed-bot-sender-ids`, signed off by hand on 2026-10-11.
+That input admits a bot sender whose numeric user id the caller lists and hands
+only that sender's login to the action's `allowed_bots`; an empty or malformed
+list admits no bot. Neither lane changes a secret, a workflow or job
+permission, or `runs-on` routing, and no composite action either lane reaches
+changes. The lockstep declines both on `inputs`. The claude lane callers pass
+`${{ vars.AUTOMATION_LANES_APP_SENDER_ID }}`, which is empty, so no bot is
+reviewed, in a repository that does not set the variable.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
