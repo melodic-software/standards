@@ -5,7 +5,7 @@ Conventional Commits titles, required body sections, and native closing
 keywords (or an explicit no-issue marker). This is a standards-internal record
 and self-test. It is not distributed to consumers
 ([ADR-0005](../../docs/adr/0005-retire-pr-convention-policy-distribution.md));
-the gate consumers actually run is the `ci-workflows` `pr-contract` composite
+the gate consumers actually run is the `ci-workflows` `check-contract` composite
 (v0.20.0 onward, `449157aaa8e30f7b1457305d8048ebe6168e174a`), which each
 repository pins directly as a step inside its `ci-status` job. Its predecessor
 is the `pr-issue-linkage.yml` reusable, which every repository leaves during
@@ -34,7 +34,7 @@ the allowed types listed in [`policy.json`](policy.json). The fleet includes
 and it is not a semver/changelog axis (that remains on PR titles that ship
 release-impacting work under `feat`/`fix`).
 
-The `pr-contract` composite's `types` input defaults to exactly these twelve,
+The `check-contract` composite's `types` input defaults to exactly these twelve,
 `security` included, so the gate and `policy.json` now agree. The predecessor
 `semantic-pr` reusable carried the action's eleven spec-aligned defaults and no
 caller passed a `types:` value, which meant a `security:` title this policy
@@ -71,9 +71,9 @@ marker.
 
 The `## Related` section is fleet-wide house style (reconciled in #247); this
 component encodes the rule the gate enforces. The authoritative gate is the
-`ci-workflows` `pr-contract` composite, which hardcodes its own copy of the
+`ci-workflows` `check-contract` composite, which hardcodes its own copy of the
 contract: the section list as the `section_report("<name>")` calls in
-[`run.sh`](https://github.com/melodic-software/ci-workflows/blob/main/.github/actions/pr-contract/run.sh),
+[`run.sh`](https://github.com/melodic-software/ci-workflows/blob/main/.github/actions/pr-require-checks/check-contract/run.sh),
 the closing keywords and no-issue markers as the awk patterns beside them, the
 non-closing markers as the `rest ~ /^(refs|relates[ \t]+to):.../` test in
 `scan_line`, the negation rule as `negation_trigger`, and the allowed title
