@@ -1201,7 +1201,7 @@ triage, and `human-label` (default `needs-human`) on
 `intake-label-needs-triage`, which skips the floor for an issue already routed
 to a person. The new steps use only the job's existing `github.token`, so no
 secret, workflow or job permission, or `runs-on` routing changes. Callers that
-keep the default labels pass neither input.
+keep the default labels pass neither input. Signed off by hand on 2026-10-12.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
