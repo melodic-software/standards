@@ -237,9 +237,7 @@ test("slot names the pull request pipeline model relies on parse as stage plus f
     "pr-review-security",
     "pr-verify",
     "pr-explain",
-    "pr-address-feedback",
-    "pr-fix-ci",
-    "pr-update",
+    "pr-unblock",
     "pr-merge",
     "pr-automerge",
     "post-merge-verify",
@@ -254,6 +252,9 @@ test("slot names the pull request pipeline model relies on parse as stage plus f
     modifier: "go",
   });
   assert.equal(parseSlotName("pr-gatekeep", vocabulary).function, undefined);
+  for (const retired of ["pr-update", "pr-fix-ci", "pr-address-feedback"]) {
+    assert.equal(parseSlotName(retired, vocabulary).function, undefined, retired);
+  }
 });
 
 test("activity names follow the grammar", () => {
