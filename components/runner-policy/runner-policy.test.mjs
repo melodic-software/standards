@@ -38,6 +38,7 @@ const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
 const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
 const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
 const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
+const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9047,6 +9048,32 @@ test("the review contracts at the v0.40.0 tag are their v0.39.8 entries plus all
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_40_0}`)).length,
     reusables.length,
+  );
+});
+
+// v0.41.0 adds completion verification to the two review lanes and changes no
+// input, secret, permission or routing field; maintenance-sync-standards is
+// byte-identical to v0.39.8. Each copies its newest entry forward verbatim.
+test("every reusable contract at the v0.41.0 tag copies its previous entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const bases = {
+    "pr-review": REPINE_LANE_SHA_V0_40_0,
+    "pr-review-security": REPINE_LANE_SHA_V0_40_0,
+    "maintenance-sync-standards": REPINE_LANE_SHA_V0_39_8,
+  };
+  for (const [reusable, base] of Object.entries(bases)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${base}`];
+    assert.ok(previous, `expected a ${base} contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_41_0}`],
+      previous,
+      `${reusable} at the v0.41.0 tag is not a verbatim copy of its ${base} entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_41_0}`)).length,
+    Object.keys(bases).length,
   );
 });
 
