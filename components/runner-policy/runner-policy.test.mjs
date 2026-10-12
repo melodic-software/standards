@@ -39,6 +39,7 @@ const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
 const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
 const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
 const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
+const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9074,6 +9075,28 @@ test("every reusable contract at the v0.41.0 tag copies its previous entry forwa
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_41_0}`)).length,
     Object.keys(bases).length,
+  );
+});
+
+// v0.42.0 adds one input to each intake lane and changes no secret, permission
+// or routing field; no other reusable is registered at it.
+test("the intake contracts at the v0.42.0 tag are their v0.39.8 entries plus one input", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const added = { "intake-triage": "floor-label", "intake-label-needs-triage": "human-label" };
+  for (const [reusable, input] of Object.entries(added)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`];
+    assert.ok(previous, `expected a v0.39.8 contract for ${reusable}`);
+    const current = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_0}`];
+    assert.deepEqual(
+      { ...current, allowedInputs: [...current.allowedInputs].sort() },
+      { ...previous, allowedInputs: [...previous.allowedInputs, input].sort() },
+      `${reusable} at the v0.42.0 tag is not its v0.39.8 entry plus ${input}`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_0}`)).length,
+    Object.keys(added).length,
   );
 });
 
