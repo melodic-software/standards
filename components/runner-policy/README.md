@@ -1181,6 +1181,18 @@ permission, or `runs-on` routing, and no composite action either lane reaches
 changes. The lockstep declines both on `inputs`. The claude lane callers pass
 `${{ vars.AUTOMATION_LANES_APP_SENDER_ID }}`, which is empty, so no bot is
 reviewed, in a repository that does not set the variable.
+All three are registered at the v0.41.0 tag
+`a621ef8112677a519b662ec5d2547475c0101f7e`, each a verbatim copy of its newest
+entry (`pr-review` and `pr-review-security` from v0.40.0,
+`maintenance-sync-standards` from v0.39.8), signed off by hand on 2026-10-12.
+The review lanes gain completion verification: a step that checks the review
+was posted before the lane reports one, a step that writes the whole pull
+request diff, and two `$/report-lane-outcome` inputs that turn a missing review
+into the red class `incomplete`. The new steps use only the job's existing
+`github.token`, so no input, secret, workflow or job permission, or `runs-on`
+routing changes; the lockstep declines both lanes on `credentialReferences`.
+`maintenance-sync-standards.yml` is byte-identical to v0.39.8 and is declined
+on shape, because its `sync` job routes through `needs`.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
