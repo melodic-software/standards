@@ -156,7 +156,7 @@ jobs:
           globs: '**/*.md !components/**/fixtures/bad/**'
       - name: Set up Node
         if: ${{ !cancelled() }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -355,7 +355,7 @@ jobs:
           persist-credentials: false
       - name: Set up Node
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -524,7 +524,7 @@ jobs:
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
       - name: Set up Node
         if: ${{ !cancelled() }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       # Each supported TypeScript release in turn, installed on PATH so the
@@ -605,7 +605,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Set up Node
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       - name: Verify toolchain
@@ -718,7 +718,7 @@ jobs:
           persist-credentials: false
       - name: Set up Node
         if: ${{ !cancelled() }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -799,7 +799,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -862,7 +862,7 @@ jobs:
       # the distribution dependencies. Inert while the Bash engine is live.
       - name: Set up Node
         if: ${{ !cancelled() }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -998,7 +998,7 @@ jobs:
           .cursor/install.test.sh
       - name: Set up Node
         if: ${{ !cancelled() }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       - name: MCP launcher --vault tests
@@ -1017,7 +1017,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
