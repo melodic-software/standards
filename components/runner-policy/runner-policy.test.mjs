@@ -40,6 +40,7 @@ const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
 const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
 const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
 const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
+const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9097,6 +9098,28 @@ test("the intake contracts at the v0.42.0 tag are their v0.39.8 entries plus one
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_0}`)).length,
     Object.keys(added).length,
+  );
+});
+
+// v0.42.1 changes only the verify step's script in the two review lanes and no
+// input, secret, permission or routing field; maintenance-sync-standards is
+// byte-identical to v0.41.0. Each copies its v0.41.0 entry forward verbatim.
+test("every reusable contract at the v0.42.1 tag copies its v0.41.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_41_0}`];
+    assert.ok(previous, `expected a v0.41.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_1}`],
+      previous,
+      `${reusable} at the v0.42.1 tag is not a verbatim copy of its v0.41.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_1}`)).length,
+    reusables.length,
   );
 });
 

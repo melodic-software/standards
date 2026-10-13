@@ -1202,6 +1202,15 @@ triage, and `human-label` (default `needs-human`) on
 to a person. The new steps use only the job's existing `github.token`, so no
 secret, workflow or job permission, or `runs-on` routing changes. Callers that
 keep the default labels pass neither input. Signed off by hand on 2026-10-12.
+`pr-review`, `pr-review-security` and `maintenance-sync-standards` are
+registered at the v0.42.1 tag `4cfd14e8b6f8b740f5f0af27f80139a0d40a596d`, each
+a verbatim copy of its v0.41.0 entry, signed off by hand on 2026-10-12. Only
+the review lanes' completion-verification script changes: the `claude-lane:`
+footer must be an inline comment's last non-blank line, and a comment with no
+footer fails the lane as class `incomplete`. No input, secret, workflow or job
+permission, or `runs-on` routing changes. `maintenance-sync-standards.yml` is
+byte-identical to v0.41.0 and is declined on shape; the lockstep withholds the
+two review lanes because any decline suppresses every write.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
