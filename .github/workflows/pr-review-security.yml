@@ -24,9 +24,11 @@ on:
 permissions:
   contents: read
 
-# No top-level concurrency block, as in the component: a security review is
-# never cancelled. The `delegated-job-level` exception in
-# .github/concurrency-policy.json waives the canonical block.
+# Per-PR supersede group, as in the component: a newer event for the same PR
+# cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   pr-review-security:
@@ -37,10 +39,6 @@ jobs:
       pull-requests: write   # post the security review + tracking comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    # Per-PR serialization without cancellation.
-    concurrency:
-      group: pr-review-security-${{ github.event.pull_request.number || github.run_id }}
-      cancel-in-progress: false
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@4cfd14e8b6f8b740f5f0af27f80139a0d40a596d # v0.42.1
     with:
       # DEVIATION from the component, which names the managed fleet label:
