@@ -30,7 +30,7 @@
       { "name": "respond-mention", "status": "in-use" },
       {
         "name": "unblock",
-        "status": "in-use",
+        "status": "reserved",
         "purpose": "Promote issues whose last blocker closed."
       }
     ],
