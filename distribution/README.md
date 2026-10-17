@@ -358,8 +358,10 @@ fleet sibling except for comments, `runner: ubuntu-24.04` and the workflow
 `name:`, which equals each file's stem; the job ids match, so the check
 contexts do too. The destinations differ because
 a destination has one owning component. They are `managed` for agent-plugins,
-ci-runner, claude-code-account-rotation, claude-code-plugins, codex-plugins
-and cursor-plugins.
+ci-runner, claude-code-account-rotation, codex-plugins and cursor-plugins.
+claude-code-plugins holds both as `locally-owned`: its callers resolve the
+review model from its own `models:` config, which no other target has (see the
+comment on its `locally-owned:` entry in `sync-manifest.yml`).
 `.github` stays exempt (near-zero PR traffic).
 
 - On a public repository the lanes review only pull requests from

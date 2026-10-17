@@ -51,9 +51,9 @@ components:
   # - .github: exempt from lane components (near-zero PR traffic).
   # - standards: manifest source, not a target — keeps its repo-local caller.
   # - Public targets: agent-plugins, ci-runner, claude-code-account-rotation,
-  #   claude-code-plugins, codex-plugins and cursor-plugins take the HOSTED
-  #   lane callers below,
-  #   never these fleet-label ones (see the public-shape note below).
+  #   codex-plugins and cursor-plugins take the HOSTED lane callers below,
+  #   never these fleet-label ones (see the public-shape note below);
+  #   claude-code-plugins owns its copies of them (its target block).
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
   #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
@@ -519,8 +519,6 @@ targets:
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
-      - claude-review-hosted-caller
-      - claude-security-review-hosted-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -539,10 +537,13 @@ targets:
       - shellcheck
       - trusted-actors
       - typos
-    # Takes the hosted lane pair like the other public targets. Its former
-    # hand-written callers sat at the fleet destinations with the same
-    # workflow names and concurrency groups, and the sync never deletes a
-    # file, so a repo-local claude-code-plugins pull request deletes them.
+    # The hosted lane pair is locally owned here, so this repository's copies
+    # can resolve their models through its own resolve-config action and pass
+    # them as `model-args` (ci-workflows v0.45.0). No other target has that
+    # action and a `models:` block in its pr-pipeline config, so the shared
+    # callers keep the reusable defaults. Removal trigger: a second target
+    # routing its review models that way, which moves the resolve step into
+    # the shared component.
     #
     # `ruff`: the canonical policy reports 385 findings against that tree
     # against 166 under upstream's bare defaults, so adoption is a migration
@@ -556,6 +557,8 @@ targets:
     # implicit policy nobody chose. Removal trigger: that migration being
     # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       # Directory-source dogfooding: this repo's bootstrap carries same-version
       # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
