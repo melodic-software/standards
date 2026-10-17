@@ -761,6 +761,45 @@ const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE =
     '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
   );
 
+// The ci-workflows maintenance-sync-standards `sync` job shape: the matrix
+// comes from another job's output, but runs-on reads an input, so the matrix
+// only fans out steps and routes nothing.
+const REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE = `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: \${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        run: echo 'matrix={"include":[{"repo":"a"}]}' >> "$GITHUB_OUTPUT"
+  scan:
+    needs: plan
+    runs-on: \${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix: \${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - run: echo "\${{ matrix.repo }}"
+`;
+
+const withCosmeticStep = (source) =>
+  source.replace(
+    `      - run: echo "\${{ matrix.repo }}"`,
+    `      - run: echo "\${{ matrix.repo }}"\n      - run: echo "cosmetic step-body change, not security-relevant"`,
+  );
+
 const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
 on:
   workflow_call:
@@ -6016,6 +6055,75 @@ test("Dependabot SHA bump that resolves run defaults through a needs indirection
     /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
   );
 });
+
+const NEEDS_MATRIX_CALLER = `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`;
+
+test("Dependabot SHA bump auto-approves a needs-derived matrix that no routing field reads", async () => {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": NEEDS_MATRIX_CALLER },
+  });
+  const findings = await audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE,
+      [DEPENDABOT_BUMP_SHA]: withCosmeticStep(REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE),
+    }),
+  });
+  assert.deepEqual(findings, []);
+});
+
+for (const [label, from, to] of [
+  [
+    "runs-on reads a matrix value",
+    `    runs-on: \${{ inputs.runner }}`,
+    `    runs-on: \${{ matrix.runner }}`,
+  ],
+  [
+    "runs-on reads the strategy context",
+    `    runs-on: \${{ inputs.runner }}`,
+    `    runs-on: \${{ strategy.job-total > 1 && inputs.runner || 'ubuntu-24.04' }}`,
+  ],
+  [
+    "environment reads a matrix value",
+    "    strategy:",
+    `    environment: \${{ matrix.environment }}\n    strategy:`,
+  ],
+  [
+    "container reads a matrix value",
+    "    strategy:",
+    `    container: \${{ matrix.image }}\n    strategy:`,
+  ],
+  [
+    "run defaults read a job env value taken from the matrix",
+    "    strategy:",
+    `    env:\n      SH: \${{ matrix.shell }}\n    defaults:\n      run:\n        shell: \${{ env.SH }}\n    strategy:`,
+  ],
+]) {
+  test(`Dependabot SHA bump is declined when a needs-derived matrix routes because ${label}`, async () => {
+    const source = REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE.replace(from, to);
+    assert.notEqual(source, REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE);
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: { "ci.yml": NEEDS_MATRIX_CALLER },
+    });
+    const findings = await audit(root, {
+      fetchImpl: fetchImplFor({ [SHA]: source, [DEPENDABOT_BUMP_SHA]: withCosmeticStep(source) }),
+    });
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding);
+    assert.match(
+      contractFinding.message,
+      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
+    );
+  });
+}
 
 // Regression test: allowedCallerPermissions is trusted for something the
 // compared auto-approval surface (workflow_call, permissions, routing,
