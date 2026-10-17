@@ -44,6 +44,7 @@ const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
 const REPINE_LANE_SHA_V0_42_2 = "a623e29085a3be885718cf9c0c0eca85bb53dd97";
 const REPINE_LANE_SHA_V0_44_0 = "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7";
 const REPINE_LANE_SHA_V0_44_1 = "bc02e0504d83df70a2c95fcf3651d0f1eac3e252";
+const REPINE_LANE_SHA_V0_45_0 = "3c8a4b2aeff5871cf72d35a686692bc6f0d44815";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9193,6 +9194,33 @@ test("every reusable contract at the v0.44.1 tag copies its v0.44.0 entry forwar
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_1}`)).length,
     reusables.length,
+  );
+});
+
+// v0.45.0 adds the model-args input to the review lanes, and intake-triage's
+// claude-args becomes callable; each entry is its predecessor plus exactly
+// that one input. maintenance-sync-standards is unchanged.
+test("every reusable contract at the v0.45.0 tag copies its predecessor and adds only its new input", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const successors = {
+    "pr-review": { previousSha: REPINE_LANE_SHA_V0_44_1, added: ["model-args"] },
+    "pr-review-security": { previousSha: REPINE_LANE_SHA_V0_44_1, added: ["model-args"] },
+    "intake-triage": { previousSha: REPINE_LANE_SHA_V0_42_0, added: ["claude-args"] },
+    "maintenance-sync-standards": { previousSha: REPINE_LANE_SHA_V0_44_1, added: [] },
+  };
+  for (const [reusable, { previousSha, added }] of Object.entries(successors)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${previousSha}`];
+    assert.ok(previous, `expected a previous contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_45_0}`],
+      { ...previous, allowedInputs: [...previous.allowedInputs, ...added] },
+      `${reusable} at the v0.45.0 tag is not its previous entry plus ${added.join(", ") || "nothing"}`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_45_0}`)).length,
+    Object.keys(successors).length,
   );
 });
 

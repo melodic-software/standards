@@ -1238,6 +1238,20 @@ attempt, the security lane's review step drops from 14 to 13 minutes and the
 review lane's job timeout rises from 13 to 16 minutes (ci-workflows#760).
 `maintenance-sync-standards` is unchanged. No input, secret, workflow or job
 permission, or `runs-on` routing changes.
+At the v0.45.0 tag `3c8a4b2aeff5871cf72d35a686692bc6f0d44815`
+(ci-workflows#763), `pr-review` and `pr-review-security` copy their v0.44.1
+entries and add the `model-args` input: resolve-config's model arguments,
+appended after `claude-args` in place of `--model` and `--effort`, and failing
+the job unless they match `[--model <alias>] --max-turns <n> [--effort <level>]`.
+`intake-triage` copies its v0.42.0 entry (`182aca3`) and adds `claude-args`,
+whose default moves from `--model claude-sonnet-5 --max-turns 15` to
+`--model sonnet --effort medium --max-turns 30`. Since v0.42.0 intake also runs
+only on `opened` issues from an OWNER or MEMBER (or a listed bot that authored
+the issue), bumps `anthropics/claude-code-action` to v1.0.250 on the step that
+receives `CLAUDE_CODE_OAUTH_TOKEN`, and gains an `allowed-bot-sender-ids`
+input, which stays unregistered because no caller passes it.
+`maintenance-sync-standards` is a verbatim copy of its v0.44.1 entry. No
+secret, workflow or job permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
