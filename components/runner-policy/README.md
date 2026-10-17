@@ -1211,6 +1211,14 @@ footer fails the lane as class `incomplete`. No input, secret, workflow or job
 permission, or `runs-on` routing changes. `maintenance-sync-standards.yml` is
 byte-identical to v0.41.0 and is declined on shape; the lockstep withholds the
 two review lanes because any decline suppresses every write.
+`pr-review` and `pr-review-security` are registered at the v0.42.2 tag
+`a623e29085a3be885718cf9c0c0eca85bb53dd97`, each a verbatim copy of its v0.42.1
+entry, signed off by hand on 2026-10-16. Each lane bumps
+`anthropics/claude-code-action` from v1.0.245 to v1.0.250 (`a26b07d`) on the
+step that receives `CLAUDE_CODE_OAUTH_TOKEN`, and that step gains the env var
+`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"` (ci-workflows#752) so review runs
+stop ending incomplete. No input, secret, workflow or job permission, or
+`runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
