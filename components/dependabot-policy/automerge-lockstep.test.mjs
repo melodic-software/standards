@@ -62,14 +62,14 @@ test("an entry removed from the reusable is drift", () => {
   throwsLockstep(() => checkLockstep(POLICY, workflow('["actions/*","github/*"]')), /^drift: /u);
 });
 
-test("a manual-tier publisher absent from the reusable passes", () => {
-  const withManual = policy({
+test("a review-tier publisher absent from the reusable passes", () => {
+  const withReview = policy({
     "actions/*": "auto",
-    "oven-sh/*": "manual",
+    "oven-sh/*": "review",
     "github/*": "auto",
     "anthropics/*": "auto",
   });
-  assert.doesNotThrow(() => checkLockstep(withManual, MATCHING));
+  assert.doesNotThrow(() => checkLockstep(withReview, MATCHING));
 });
 
 test("an auto-tier publisher missing from the reusable is drift", () => {
@@ -82,16 +82,16 @@ test("an auto-tier publisher missing from the reusable is drift", () => {
   throwsLockstep(() => checkLockstep(withExtraAuto, MATCHING), /^drift: .*docker\/\*/u);
 });
 
-test("a reusable entry the policy holds as manual is drift", () => {
-  const dockerManual = policy({
+test("a reusable entry the policy holds as review is drift", () => {
+  const dockerReview = policy({
     "actions/*": "auto",
     "github/*": "auto",
     "anthropics/*": "auto",
-    "docker/*": "manual",
+    "docker/*": "review",
   });
   throwsLockstep(
     () =>
-      checkLockstep(dockerManual, workflow('["actions/*","github/*","anthropics/*","docker/*"]')),
+      checkLockstep(dockerReview, workflow('["actions/*","github/*","anthropics/*","docker/*"]')),
     /^drift: /u,
   );
 });
