@@ -1219,6 +1219,16 @@ step that receives `CLAUDE_CODE_OAUTH_TOKEN`, and that step gains the env var
 `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"` (ci-workflows#752) so review runs
 stop ending incomplete. No input, secret, workflow or job permission, or
 `runs-on` routing changes.
+`pr-review`, `pr-review-security` and `maintenance-sync-standards` are
+registered at the v0.44.0 tag `58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7`, each
+a verbatim copy of its previous entry (v0.42.2 for the review lanes, v0.42.1
+for `maintenance-sync-standards`), signed off by hand on 2026-10-17. The review
+lanes gain optional `model` and `effort` inputs and an optional
+`fallback-claude-code-oauth-token` secret (ci-workflows#756), keep one marker
+comment carrying the summary and drop `track_progress` (ci-workflows#757). No
+caller passes the new inputs or secret, so the contracts stay closed to them.
+`maintenance-sync-standards` only bumps `actions/create-github-app-token`. No
+workflow or job permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

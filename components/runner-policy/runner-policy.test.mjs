@@ -42,6 +42,7 @@ const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
 const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
 const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
 const REPINE_LANE_SHA_V0_42_2 = "a623e29085a3be885718cf9c0c0eca85bb53dd97";
+const REPINE_LANE_SHA_V0_44_0 = "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9142,6 +9143,33 @@ test("every reusable contract at the v0.42.2 tag copies its v0.42.1 entry forwar
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_2}`)).length,
     reusables.length,
+  );
+});
+
+// v0.44.0 adds the optional model and effort inputs and the optional
+// fallback-claude-code-oauth-token secret to the review lanes; no caller passes
+// them, so the contracts stay closed to them. No permission or routing change.
+// maintenance-sync-standards only bumps create-github-app-token.
+test("every reusable contract at the v0.44.0 tag copies its previous entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const previousShas = {
+    "pr-review": REPINE_LANE_SHA_V0_42_2,
+    "pr-review-security": REPINE_LANE_SHA_V0_42_2,
+    "maintenance-sync-standards": REPINE_LANE_SHA_V0_42_1,
+  };
+  for (const [reusable, previousSha] of Object.entries(previousShas)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${previousSha}`];
+    assert.ok(previous, `expected a previous contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_0}`],
+      previous,
+      `${reusable} at the v0.44.0 tag is not a verbatim copy of its previous entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_0}`)).length,
+    Object.keys(previousShas).length,
   );
 });
 
