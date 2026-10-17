@@ -563,6 +563,7 @@ test("an auto-merge publisher key that is not a whole publisher fails closed", a
     autoMerge: {
       ecosystems: ["github-actions"],
       publishers: { "actions/checkout": review },
+      reviewOnly: [],
       excludeSemverMajor: true,
       requiredCheck: "ci-status",
     },
@@ -582,4 +583,47 @@ test("an auto-merge publisher key that is not a whole publisher fails closed", a
   policy.autoMerge.publishers = { "actions/*": review };
   await writeFile(policyPath, JSON.stringify(policy));
   assert.deepEqual(await auditRepository({ root, policyPath }), []);
+});
+
+test("a review-only dependency entry needs its scope and the control it cites", async () => {
+  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+  const entry = {
+    repository: "melodic-software/standards",
+    ecosystem: "npm",
+    directory: "/distribution",
+    dependency: "yaml",
+    reviewed: "2026-10-16",
+    basis: "test",
+    control: "distribution/THREAT-MODEL.md#npm-supply-chain-production-engine",
+  };
+  const policy = {
+    schemaVersion: 1,
+    scheduleInterval: "weekly",
+    cooldownMinimumDays: 3,
+    maxOpenPullRequests: 5,
+    requireGroups: true,
+    autoMerge: {
+      ecosystems: ["github-actions"],
+      publishers: { "actions/*": { tier: "auto", reviewed: "2026-10-08", basis: "test" } },
+      reviewOnly: [entry],
+      excludeSemverMajor: true,
+      requiredCheck: "ci-status",
+    },
+  };
+  const policyPath = path.join(root, "policy.json");
+  await writeFile(policyPath, JSON.stringify(policy));
+  assert.deepEqual(await auditRepository({ root, policyPath }), []);
+  const { control: _control, ...withoutControl } = entry;
+  for (const reviewOnly of [
+    [withoutControl],
+    [{ ...entry, directory: "distribution" }],
+    undefined,
+  ]) {
+    policy.autoMerge.reviewOnly = reviewOnly;
+    await writeFile(policyPath, JSON.stringify(policy));
+    await assert.rejects(
+      auditRepository({ root, policyPath }),
+      (error) => error instanceof ConfigurationError,
+    );
+  }
 });

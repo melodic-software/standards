@@ -64,14 +64,16 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   (`github-actions`) comes from a publisher with `tier: auto` in
   `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
   entry with the date it was `reviewed` and the `basis` for its tier.
-  `ci-status` is not red, and the updates in the commit's
+  No update is a security-critical dependency (below). `ci-status` is not
+  red, and the updates in the commit's
   `updated-dependencies` metadata agree with the title or the group's
   `Updates` lines. The pull request merges once `ci-status` passes, with no
   review. Every repository already trusts these publishers, who run the
   platform and the review agents, so a non-major release from them adds no
   new trust; the cooldown and `ci-status` catch a bad one.
 - **Review tier.** Everything else: a major from any publisher, an action
-  from an unlisted publisher or one listed with `tier: review`, a red
+  from an unlisted publisher or one listed with `tier: review`, a
+  security-critical dependency, a red
   `ci-status`, or updates the lane cannot read. An AI review lane reads the
   update and its release notes as data and records one verdict bound to the
   head it reviewed: `merge`, `fix` (push a fix commit, then review again),
@@ -79,6 +81,14 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   or `escalate`. A security update is never closed. The merge lane merges a
   review-tier pull request only on a `merge` verdict at its current head,
   and only once `ci-status` passes there.
+
+**Security-critical dependencies.** A dependency a threat model singles out
+is listed in `autoMerge.reviewOnly`, each entry scoped by `repository`,
+`ecosystem` and `directory` (as in `dependabot.yml`), with the date it was
+`reviewed`, its `basis`, and the threat-model `control` it answers to. An
+update to a listed dependency is always review tier, whatever its version
+change, and a `merge` verdict on it must cite that control and say what the
+review checked against it.
 
 Prefer removing review-tier actions over reviewing their bumps: replace a
 community action with a vendor action or a `gh` or script step.

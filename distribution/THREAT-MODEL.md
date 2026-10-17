@@ -152,9 +152,14 @@ controls, never derived from the current dependency tree's shape:
   `npm ci` refuses drift from it, bounding registry-substitution risk.
 - **Runtime pin:** `engines` requires Node 24+; workflows install via
   SHA-pinned setup-node reading the repository's `.node-version`.
-- **Update policy:** the nested Dependabot root covers `distribution/`, but a
-  `yaml` bump is a production-parser change requiring human review, excluded
-  from any current or future automerge policy.
+- **Update policy:** the nested Dependabot root covers `distribution/`, and a
+  `yaml` bump is a production-parser change that never takes the auto tier.
+  The dependabot-policy `autoMerge.reviewOnly` list names it, so every bump
+  takes the AI review tier, and a `merge` verdict must cite this control: the
+  release notes and diff show no change to how `yaml` parses manifests
+  (duplicate keys, aliases, merge keys, scalar typing) and add no dependency
+  or lifecycle script. See the
+  [merge tiers](../components/dependabot-policy/README.md#merge-tiers-for-dependabot-pull-requests).
 
 ## Review triggers
 

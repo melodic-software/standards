@@ -78,9 +78,11 @@ Always check:
   (`conventions/review/error-handling.md#atomicity`).
 - No Dependabot pull request waits on a human. One whose updates are all
   non-major, with GitHub Actions only from `actions/*`, `github/*` or
-  `anthropics/*`, merges once `ci-status` passes; any other, a major
-  included, merges on an AI review lane's `merge` verdict at its current
-  head once `ci-status` passes. A change that adds an action from another
+  `anthropics/*`, and none in the policy's `reviewOnly` security-critical
+  list, merges once `ci-status` passes; any other, a major included, merges
+  on an AI review lane's `merge` verdict at its current head once
+  `ci-status` passes, and a verdict on a security-critical dependency cites
+  the threat-model control it checked. A change that adds an action from another
   publisher says why no vendor action or `gh` or script step serves
   (`components/dependabot-policy/README.md#merge-tiers-for-dependabot-pull-requests`).
 

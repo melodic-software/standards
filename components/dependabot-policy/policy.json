@@ -23,6 +23,17 @@
         "basis": "Anthropic publishes the review agents every repository trusts; claude-code-action also pulls oven-sh/setup-bun (SHA-pinned) and installs bun packages and the Claude Code CLI at runtime, so this tier trusts those transitively."
       }
     },
+    "reviewOnly": [
+      {
+        "repository": "melodic-software/standards",
+        "ecosystem": "npm",
+        "directory": "/distribution",
+        "dependency": "yaml",
+        "reviewed": "2026-10-16",
+        "basis": "The sync engine parses every manifest with yaml inside the credentialed sync job, so a parser change reaches every consumer.",
+        "control": "distribution/THREAT-MODEL.md#npm-supply-chain-production-engine"
+      }
+    ],
     "excludeSemverMajor": true,
     "requiredCheck": "ci-status"
   }
