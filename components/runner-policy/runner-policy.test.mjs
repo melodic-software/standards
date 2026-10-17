@@ -41,6 +41,7 @@ const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
 const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
 const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
 const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
+const REPINE_LANE_SHA_V0_42_2 = "a623e29085a3be885718cf9c0c0eca85bb53dd97";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9119,6 +9120,27 @@ test("every reusable contract at the v0.42.1 tag copies its v0.41.0 entry forwar
   }
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_1}`)).length,
+    reusables.length,
+  );
+});
+
+// v0.42.2 bumps the claude-code-action pin and sets one env var on the review
+// lanes' action step, with no input, secret, permission or routing change.
+test("every reusable contract at the v0.42.2 tag copies its v0.42.1 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_1}`];
+    assert.ok(previous, `expected a v0.42.1 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_2}`],
+      previous,
+      `${reusable} at the v0.42.2 tag is not a verbatim copy of its v0.42.1 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_2}`)).length,
     reusables.length,
   );
 });
