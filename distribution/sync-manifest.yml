@@ -165,6 +165,12 @@ components:
   comment-hygiene-tools:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
+  # The central Dependabot policy, read at the base by a target's Dependabot
+  # merge classifiers (claude-code-plugins sends every update to a dependency
+  # its `autoMerge.reviewOnly` lists to the review tier).
+  dependabot-policy:
+    files:
+      components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
   dotnet-analysis:
     files:
       components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
@@ -515,6 +521,7 @@ targets:
       - actionlint
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - github-actions-conventions

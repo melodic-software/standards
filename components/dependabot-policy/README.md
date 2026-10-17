@@ -26,6 +26,10 @@ npm ci --prefix .github/standards/dependabot-policy
 node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
 ```
 
+The `dependabot-policy` sync component ships `policy.json` alone to that
+path, for a target whose Dependabot merge classifiers read it at the base
+(claude-code-plugins reads `autoMerge.reviewOnly`).
+
 ## The standard
 
 The canonical values live in [`policy.json`](policy.json). Each `updates` entry
