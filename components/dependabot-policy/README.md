@@ -28,7 +28,61 @@ node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
 
 The `dependabot-policy` sync component ships `policy.json` alone to that
 path, for a target whose Dependabot merge classifiers read it at the base
-(claude-code-plugins reads `autoMerge.reviewOnly`).
+(claude-code-plugins reads `autoMerge.reviewOnly`). Its admission evidence is
+[below](#sync-component-admission-evidence).
+
+## Sync component admission evidence
+
+Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
+This covers the policy-only payload. The earlier analyzer-and-runtime payload
+was retired with no targets in #430 and is not reintroduced.
+
+- **Live consumer**: melodic-software/claude-code-plugins (melodic-software/claude-code-plugins#7717).
+  Its pr-merge lane (`babysit_merge_policy.dependabot_eligibility`) and
+  pr-unblock lane (`.github/scripts/pr-unblock/dispatch.mjs` and the
+  `dependency-select` step of `pr-run-activity-write.yml`) read
+  `.github/standards/dependabot-policy/policy.json` at the base. An update
+  to a dependency `autoMerge.reviewOnly` lists for that repository goes to the
+  AI review tier (`review-only:<dependency>`).
+- **Owner and outcome**: owned by the `standards` maintainers. Problem: a
+  hijacked non-major release of a dependency that runs in a job holding a
+  secret merges at tier `auto` with no review. Acceptance: once the sync PR
+  lands the file, no claude-code-plugins Dependabot pull request carries
+  `dependabot-policy-unreadable`, and the next `@anthropic-ai/claude-code`
+  update carries `review-only:@anthropic-ai/claude-code`. Rollback: move the
+  component to claude-code-plugins' `locally-owned` list, which keeps the
+  last synced file in place. Removing the file without reverting the
+  consumer's classifiers sends every Dependabot pull request to review,
+  because they fail closed.
+- **Delivery boundary**: exact materialization. `policy.json` stays the only
+  authority for the tiers. The consumer reads its synced copy at the base,
+  which the pull request under review cannot change.
+- **Alternatives and overlap**: a copy in the consumer would be a second
+  authority that drifts. Reading this repository at run time would put a
+  cross-repository token into the lanes. Syncing the full analyzer payload
+  ships a runtime the consumer never runs. The destination path is not
+  shared with `runner-policy` or `trusted-actors`, and no other component
+  routes Dependabot tiers.
+- **Operational fit**: the consumer's classifier tests cover a match
+  (review, then merge on a verdict), a non-match (auto) and an unreadable
+  policy (review): 1642 engine tests and 219 pr-unblock tests pass on
+  claude-code-plugins#7717. Live-run evidence follows the first sync, since
+  the file does not reach the consumer before this change merges. Runtime:
+  one contents-API read or one local file read per run. Privileges: the
+  lanes' existing read tokens, no new credential. Failure behavior: a
+  missing, non-JSON or malformed file makes every Dependabot pull request
+  tier `review`.
+- **Upstream health**: no third-party dependency.
+- **Legal and security fit**: first-party JSON under the repository's
+  license. No dependency, no network boundary, no executable content. The
+  file is trusted only from the consumer's base branch.
+- **Update path**: no dependency root. Entries change by a reviewed pull
+  request here and reach the consumer through `standards-sync`.
+- **Verification**: `npm run test:dependabot-policy` and
+  `npm run lint:dependabot-policy` validate the file against
+  [`policy.schema.json`](policy.schema.json). `distribution/sync-manifest.test.sh`
+  and `components/managed-files-guard/managed-files-guard.test.sh` cover the
+  mapping and the guard's path union.
 
 ## The standard
 
