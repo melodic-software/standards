@@ -52,34 +52,57 @@ cooldown natively: the option applies only to version updates
 ([options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)).
 The standard still sets the value explicitly rather than relying on the default.
 
-## Merge lanes for GitHub Actions bumps
+## Merge tiers for Dependabot pull requests
 
-A GitHub Actions bump takes one of two lanes, recorded as data in the
+No Dependabot pull request waits on a human. Each one takes one of two
+tiers, and automated lanes merge both; the publisher tiers are data in the
 `autoMerge` block of [`policy.json`](policy.json):
 
-- **Auto lane.** The action's publisher has `tier: auto` in
+- **Auto tier.** Every update in the pull request is non-major: the first
+  numeric version component does not change, and below 1.0 the second does
+  not either. Every update in an `autoMerge.ecosystems` ecosystem
+  (`github-actions`) comes from a publisher with `tier: auto` in
   `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
-  entry with the date it was `reviewed` and the `basis` for its tier, and the
-  update is not a semver
-  major. The pull request merges itself once the required `ci-status` check
-  passes, with no human review. Every repository already trusts these
-  publishers, who run the platform and the review agents, so a non-major
-  release from them adds no new trust; the cooldown and `ci-status` catch a
-  bad one.
-- **Manual lane.** Everything else, whether unlisted or listed with
-  `tier: manual`: actions from community or
-  single-maintainer publishers, and semver majors from any publisher. A human
-  reviews and merges the pull request, and a stale bump is acceptable. A
-  community publisher is a trust decision a person makes, and a major can
-  change behavior that `ci-status` does not exercise.
+  entry with the date it was `reviewed` and the `basis` for its tier.
+  `ci-status` is not red, and the updates in the commit's
+  `updated-dependencies` metadata agree with the title or the group's
+  `Updates` lines. The pull request merges once `ci-status` passes, with no
+  review. Every repository already trusts these publishers, who run the
+  platform and the review agents, so a non-major release from them adds no
+  new trust; the cooldown and `ci-status` catch a bad one.
+- **Review tier.** Everything else: a major from any publisher, an action
+  from an unlisted publisher or one listed with `tier: review`, a red
+  `ci-status`, or updates the lane cannot read. An AI review lane reads the
+  update and its release notes as data and records one verdict bound to the
+  head it reviewed: `merge`, `fix` (push a fix commit, then review again),
+  `close` (close the pull request and propose a Dependabot `ignore` entry),
+  or `escalate`. A security update is never closed. The merge lane merges a
+  review-tier pull request only on a `merge` verdict at its current head,
+  and only once `ci-status` passes there.
 
-Prefer removing manual-lane actions over reviewing their bumps: replace a
+Prefer removing review-tier actions over reviewing their bumps: replace a
 community action with a vendor action or a `gh` or script step.
 
-This component records the lanes; the ci-workflows
-`pr-automerge-dependabot.yml` reusable enforces the auto lane by arming
-auto-merge, and its `PUBLISHER_ALLOWLIST` constant copies the `tier: auto`
-keys of `autoMerge.publishers`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
+### Who merges
+
+A repository whose default branch uses a merge queue merges through its
+merge lane, which adds the pull request to the queue with a GitHub App
+token. `GITHUB_TOKEN` cannot: "If the target branch uses a merge queue, the
+built-in `GITHUB_TOKEN` cannot add pull requests to the queue. In this case,
+you must authenticate the workflow with a personal access token or a GitHub
+App token that has permission to merge"
+([Automating Dependabot with GitHub Actions](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions)).
+In [claude-code-plugins](https://github.com/melodic-software/claude-code-plugins)
+the pr-merge lane merges both tiers and the pr-unblock lane writes the
+review verdicts.
+
+The ci-workflows `pr-automerge-dependabot.yml` reusable arms GitHub
+auto-merge with `GITHUB_TOKEN` on auto-tier GitHub Actions bumps. It is valid
+only in a repository without a merge queue. Until such a repository runs a
+review lane, its review-tier pull requests stay open.
+
+The reusable's `PUBLISHER_ALLOWLIST` constant copies the `tier: auto` keys
+of `autoMerge.publishers`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
 fetches that reusable at every SHA its `runner-policy` contracts approve and
 fails when the constant and those keys differ at any of them. It blocks from admission, with no report-only
 period: it compares two files at fixed revisions, so a run either matches or

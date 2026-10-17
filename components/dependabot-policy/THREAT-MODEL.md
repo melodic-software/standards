@@ -66,18 +66,19 @@ are trusted only at their reviewed Git revision.
 | A high-frequency schedule reintroduces the bot-burst the policy exists to prevent. | Each entry must schedule on the standard interval; a daily or absent interval is a finding unless a reasoned exception waives it. | The non-weekly-schedule and `tracks-upstream-release` exception cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | An exception becomes a blanket bypass or outlives its cause. | Exceptions are keyed to one entry, use an allowlisted reason with a justification, waive only named rules, and fail on an unused waiver or a missing entry. The pull-request cap is not waivable. | The exception-waive, unused-waiver, missing-entry, unknown-reason, unknown-waiver, and missing-justification cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | YAML or JSON ambiguity hides a different policy. | The parser requires unique keys and disables aliases and merge keys; duplicate JSON members are rejected before `JSON.parse`, per [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). A non-`version: 2` config is a finding. | The malformed-config, duplicate-member, and unsupported-version cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
-| The auto-merge reusable's `PUBLISHER_ALLOWLIST` drifts from the `tier: auto` keys of `autoMerge.publishers`, so a publisher this policy routes to the manual lane merges unreviewed. | The lockstep reads the reusable's SHAs from its `runner-policy` contract keys (at least one; old and new coexist during a repin), fetches the reusable at each SHA over the GitHub contents API (three attempts), and fails on a fetch error, a missing or repeated constant, or any difference at any SHA. | `npm run lint:dependabot-automerge-lockstep` in the `check-policies` CI job. |
+| The auto-merge reusable's `PUBLISHER_ALLOWLIST` drifts from the `tier: auto` keys of `autoMerge.publishers`, so a publisher this policy routes to the review tier merges with no AI review. | The lockstep reads the reusable's SHAs from its `runner-policy` contract keys (at least one; old and new coexist during a repin), fetches the reusable at each SHA over the GitHub contents API (three attempts), and fails on a fetch error, a missing or repeated constant, or any difference at any SHA. | `npm run lint:dependabot-automerge-lockstep` in the `check-policies` CI job. |
 | A change weakens validation unnoticed. | The central and repository schemas reject unknown shapes and reasons; the runtime is exactly locked; CI runs the behavioral tests and then audits this repository. | [`policy.schema.json`](policy.schema.json), [`dependabot-policy.schema.json`](dependabot-policy.schema.json), [`package-lock.json`](package-lock.json), and the `check-policies` CI job. |
 
 ## Residual and accepted risk
 
 - The analyzer checks policy shape, not dependency safety. It does not evaluate
   whether a specific bump is malicious; the cooldown soak, security-update
-  bypass, the required `ci-status` check, and human review of every
-  manual-lane pull request remain the controls for that. An auto-lane bump
-  (a non-major release from an allowlisted vendor publisher) merges with no
-  human review, so for that lane the cooldown and `ci-status` are the only
-  controls; see the [merge lanes](README.md#merge-lanes-for-github-actions-bumps).
+  bypass, the required `ci-status` check, and the AI review verdict on every
+  review-tier pull request remain the controls for that. No person reads a
+  Dependabot pull request before it merges: an auto-tier bump has only the
+  cooldown and `ci-status`, and a compromised review-tier release that passes
+  `ci-status` and the review merges too; see the
+  [merge tiers](README.md#merge-tiers-for-dependabot-pull-requests).
 - Dependabot options can change after a passing audit. The standard tracks the
   reviewed option set and values, not all future service behavior.
 - Grouping and the pull-request cap bound bot-pull-request volume but not the

@@ -38,7 +38,7 @@
             "additionalProperties": false,
             "required": ["tier", "reviewed", "basis"],
             "properties": {
-              "tier": { "enum": ["auto", "manual"] },
+              "tier": { "enum": ["auto", "review"] },
               "reviewed": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
               "basis": { "type": "string", "minLength": 1 }
             }
