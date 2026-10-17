@@ -84,7 +84,7 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
 
 **Security-critical dependencies.** A dependency a threat model singles out
 is listed in `autoMerge.reviewOnly`, each entry scoped by `repository`,
-`ecosystem` and `directory` (as in `dependabot.yml`), with the date it was
+`ecosystem`, `directory` (as in `dependabot.yml`) and `dependency`, with the date it was
 `reviewed`, its `basis`, and the threat-model `control` it answers to. An
 update to a listed dependency is always review tier, whatever its version
 change, and a `merge` verdict on it must cite that control and say what the
