@@ -43,6 +43,7 @@ const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
 const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
 const REPINE_LANE_SHA_V0_42_2 = "a623e29085a3be885718cf9c0c0eca85bb53dd97";
 const REPINE_LANE_SHA_V0_44_0 = "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7";
+const REPINE_LANE_SHA_V0_44_1 = "bc02e0504d83df70a2c95fcf3651d0f1eac3e252";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9170,6 +9171,28 @@ test("every reusable contract at the v0.44.0 tag copies its previous entry forwa
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_0}`)).length,
     Object.keys(previousShas).length,
+  );
+});
+
+// v0.44.1 adds a bubblewrap install step to the review lanes and retunes their
+// timeouts; maintenance-sync-standards is unchanged. No input, secret,
+// permission or routing change.
+test("every reusable contract at the v0.44.1 tag copies its v0.44.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_0}`];
+    assert.ok(previous, `expected a v0.44.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_1}`],
+      previous,
+      `${reusable} at the v0.44.1 tag is not a verbatim copy of its v0.44.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_1}`)).length,
+    reusables.length,
   );
 });
 

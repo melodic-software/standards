@@ -1229,6 +1229,15 @@ comment carrying the summary and drop `track_progress` (ci-workflows#757). No
 caller passes the new inputs or secret, so the contracts stay closed to them.
 `maintenance-sync-standards` only bumps `actions/create-github-app-token`. No
 workflow or job permission, or `runs-on` routing changes.
+The same three are registered at the v0.44.1 tag
+`bc02e0504d83df70a2c95fcf3651d0f1eac3e252`, each a verbatim copy of its v0.44.0
+entry, signed off by hand on 2026-10-17. The review lanes gain an "Install
+subprocess isolation" step (bubblewrap and socat through apt-get, the AppArmor
+userns sysctl lifted on GitHub-hosted runners only) before the first review
+attempt, the security lane's review step drops from 14 to 13 minutes and the
+review lane's job timeout rises from 13 to 16 minutes (ci-workflows#760).
+`maintenance-sync-standards` is unchanged. No input, secret, workflow or job
+permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
