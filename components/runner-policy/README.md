@@ -1252,6 +1252,17 @@ receives `CLAUDE_CODE_OAUTH_TOKEN`, and gains an `allowed-bot-sender-ids`
 input, which stays unregistered because no caller passes it.
 `maintenance-sync-standards` is a verbatim copy of its v0.44.1 entry. No
 secret, workflow or job permission, or `runs-on` routing changes.
+`pr-review`, `pr-review-security` and `maintenance-sync-standards` are
+registered at the v0.48.0 tag `96b50d451c4483c476f2f963674e0a3ba9d50fe3`, each
+a verbatim copy of its v0.45.0 entry, signed off by hand on 2026-10-17. Only
+`pr-review.yml` changes (ci-workflows#765): a step writes the pull request
+description and the title and body of each issue it closes to a file the model
+reads as data, through one read-only GraphQL query on the job's existing
+`github.token`. Issue comments are kept only when the author is OWNER, MEMBER
+or COLLABORATOR of that issue's own repository; issue titles and bodies are not
+filtered by author. The lockstep
+declines it on `credentialReferences`; the other two are byte-identical. No
+input, secret, workflow or job permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
