@@ -46,6 +46,7 @@ const REPINE_LANE_SHA_V0_44_0 = "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7";
 const REPINE_LANE_SHA_V0_44_1 = "bc02e0504d83df70a2c95fcf3651d0f1eac3e252";
 const REPINE_LANE_SHA_V0_45_0 = "3c8a4b2aeff5871cf72d35a686692bc6f0d44815";
 const REPINE_LANE_SHA_V0_48_0 = "96b50d451c4483c476f2f963674e0a3ba9d50fe3";
+const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9353,6 +9354,28 @@ test("every reusable contract at the v0.48.0 tag copies its v0.45.0 entry forwar
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_48_0}`)).length,
     reusables.length,
+  );
+});
+
+// v0.49.0 gates intake by author id and admits a workflow_dispatch for a
+// listed actor; intake-triage is its v0.45.0 entry plus exactly those inputs.
+test("intake-triage at the v0.49.0 tag copies its v0.45.0 entry and adds only the author-gate inputs", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const workflowPath = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
+  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_45_0}`];
+  assert.ok(previous, "expected a v0.45.0 contract for intake-triage");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_49_0}`], {
+    ...previous,
+    allowedInputs: [
+      ...previous.allowedInputs,
+      "issue-number",
+      "allowed-author-ids",
+      "allowed-bot-sender-ids",
+    ],
+  });
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_49_0}`)).length,
+    1,
   );
 });
 

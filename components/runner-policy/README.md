@@ -1263,6 +1263,18 @@ or COLLABORATOR of that issue's own repository; issue titles and bodies are not
 filtered by author. The lockstep
 declines it on `credentialReferences`; the other two are byte-identical. No
 input, secret, workflow or job permission, or `runs-on` routing changes.
+`intake-triage` is registered at the v0.49.0 tag
+`ff8cd36321423de961381e608e4a31563e74adb3` (ci-workflows#773, #774), sign-off
+pending. It copies its v0.45.0 entry and adds `issue-number`,
+`allowed-author-ids` and `allowed-bot-sender-ids`. The OWNER or MEMBER gate
+becomes a numeric-id allowlist: an `opened` issue runs only when its author
+opened it and the author's id is in `allowed-author-ids` (a bot's sender id in
+`allowed-bot-sender-ids`). A `workflow_dispatch` run triages `issue-number`,
+validated against `^[1-9][0-9]{0,9}$` and read from the API, only for an actor
+whose id is in one of the two lists. A new `skipped` job takes
+`issues: write`, inside the caller grant, to apply the new `skipped-label`
+input, which stays unregistered because no caller passes it. No secret or
+`runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
