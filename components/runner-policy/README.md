@@ -1276,7 +1276,7 @@ whose id is in one of the two lists. A new `skipped` job takes
 input, which stays unregistered because no caller passes it. No secret or
 `runs-on` routing changes.
 `pr-automerge-dependabot` is registered at the v0.50.0 tag
-`d223a6446680fb261e264d1dea9efba46f20ead2` (ci-workflows#783), signed off by
+`d223a6446680fb261e264d1dea9efba46f20ead2` (ci-workflows#783), registered by
 hand on 2026-10-18. It copies its v0.39.8 entry (`594987a`) and adds two
 inputs: `package-auto-merge` (boolean, default `true`), which also arms npm,
 pip and NuGet patch and minor bumps, and `review-only-dependencies` (a JSON
