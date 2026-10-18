@@ -1264,8 +1264,8 @@ filtered by author. The lockstep
 declines it on `credentialReferences`; the other two are byte-identical. No
 input, secret, workflow or job permission, or `runs-on` routing changes.
 `intake-triage` is registered at the v0.49.0 tag
-`ff8cd36321423de961381e608e4a31563e74adb3` (ci-workflows#773, #774), sign-off
-pending. It copies its v0.45.0 entry and adds `issue-number`,
+`ff8cd36321423de961381e608e4a31563e74adb3` (ci-workflows#773, #774), signed off
+by hand on 2026-10-18. It copies its v0.45.0 entry and adds `issue-number`,
 `allowed-author-ids` and `allowed-bot-sender-ids`. The OWNER or MEMBER gate
 becomes a numeric-id allowlist: an `opened` issue runs only when its author
 opened it and the author's id is in `allowed-author-ids` (a bot's sender id in
