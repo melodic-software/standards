@@ -8,8 +8,6 @@
     { "id": 206951365, "login": "cursor[bot]", "kind": "bot" },
     { "id": 49699333, "login": "dependabot[bot]", "kind": "bot" },
     { "id": 300666570, "login": "melodic-standards-sync[bot]", "kind": "bot" },
-    { "id": 199175422, "login": "chatgpt-codex-connector[bot]", "kind": "bot" },
-    { "id": 41898282, "login": "github-actions[bot]", "kind": "bot" },
     { "id": 288071998, "login": "melodic-ai[bot]", "kind": "bot" },
     { "id": 296023097, "login": "melodic-software-github-iac[bot]", "kind": "bot" },
     { "id": 300690090, "login": "melodic-ci-runner-host[bot]", "kind": "bot" },

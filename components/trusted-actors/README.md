@@ -30,7 +30,9 @@ is a `User` account listed as `bot`), and `human` for a person. A lane that gran
 extra power to listed humans, such as `eval-browser-dispatch`, so excludes agent
 identities.
 
-Owner decision Q661 (2026-10-18) trusts Codex, GitHub Actions, Cursor, Claude and
-the org's own GitHub Apps. Because `github-actions[bot]` and
-`chatgpt-codex-connector[bot]` are listed, text either account writes reaches a
-lane prompt. Add the bot user of each new App owned by `melodic-software`.
+`github-actions[bot]` is absent on purpose: a canary test posts as that account
+to prove untrusted text is dropped. Do not add it.
+
+`chatgpt-codex-connector[bot]` (id 199175422) is absent until a live test shows
+that a commenter with no write access and no linked Codex account cannot make it
+reply. If one can, a stranger could have a trusted bot post text they chose.
