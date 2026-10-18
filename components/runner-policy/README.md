@@ -1061,7 +1061,8 @@ fails the gate; it never calls a merge mutation, so the required `ci-status`
 check still decides the merge. The caller owns the trigger; the job runs only
 on `pull_request` with PR author id 49699333. Its one job declares
 `contents: write` and `pull-requests: write`, which is the exact
-`allowedCallerPermissions` map. Its only input is `runner` and it takes no
+`allowedCallerPermissions` map. At that tag its only input is `runner`
+(v0.50.0 adds two, below) and it takes no
 secrets. It pins `dependabot/fetch-metadata` v3.1.0
 (`25dd0e34f4fe68f24cc83900b1fe3fe149efef98`) and `actions/github-script` v9.0.0
 (`3a2844b7e9c422d3c10d287c895573f7108da1b3`), and checks out nothing. Its
