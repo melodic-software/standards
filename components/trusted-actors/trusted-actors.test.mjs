@@ -41,16 +41,11 @@ test("every id is listed once", () => {
   );
 });
 
-test("github-actions[bot] is not trusted", () => {
-  assert.equal(
-    list.actors.some((actor) => actor.id === 41898282),
-    false,
-  );
-});
-
-test("chatgpt-codex-connector[bot] is not trusted", () => {
-  assert.equal(
-    list.actors.some((actor) => actor.id === 199175422),
-    false,
-  );
+test("the Q661 bots are trusted", () => {
+  for (const id of [41898282, 199175422]) {
+    assert.equal(
+      list.actors.some((actor) => actor.id === id && actor.kind === "bot"),
+      true,
+    );
+  }
 });
