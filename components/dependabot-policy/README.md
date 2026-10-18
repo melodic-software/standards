@@ -118,11 +118,16 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
 
 - **Auto tier.** Every update in the pull request is non-major: the first
   numeric version component does not change, and below 1.0 the second does
-  not either. Every update in an `autoMerge.ecosystems` ecosystem
-  (`github-actions`) comes from a publisher with `tier: auto` in
+  not either. Every update is in an `autoMerge.ecosystems` ecosystem
+  (`github-actions`, `npm`, `pip`, `nuget`, spelled as in `dependabot.yml`;
+  the auto-merge workflow checks fetch-metadata's `npm_and_yarn` for npm).
+  A `github-actions` update comes from a publisher with `tier: auto` in
   `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
-  entry with the date it was `reviewed` and the `basis` for its tier.
-  No update is a security-critical dependency (below). `ci-status` is not
+  entry with the date it was `reviewed` and the `basis` for its tier; an
+  `npm`, `pip` or `nuget` update needs no publisher entry. No update is a
+  security-critical dependency (below), and no package is named in the
+  repository's `autoMerge.reviewOnly` entries, which the caller passes as
+  `review-only-dependencies` and the workflow never arms. `ci-status` is not
   red, and the updates in the commit's
   `updated-dependencies` metadata agree with the title or the group's
   `Updates` lines. The pull request merges once `ci-status` passes, with no
