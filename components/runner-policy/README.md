@@ -1061,7 +1061,8 @@ fails the gate; it never calls a merge mutation, so the required `ci-status`
 check still decides the merge. The caller owns the trigger; the job runs only
 on `pull_request` with PR author id 49699333. Its one job declares
 `contents: write` and `pull-requests: write`, which is the exact
-`allowedCallerPermissions` map. Its only input is `runner` and it takes no
+`allowedCallerPermissions` map. At that tag its only input is `runner`
+(v0.50.0 adds two, below) and it takes no
 secrets. It pins `dependabot/fetch-metadata` v3.1.0
 (`25dd0e34f4fe68f24cc83900b1fe3fe149efef98`) and `actions/github-script` v9.0.0
 (`3a2844b7e9c422d3c10d287c895573f7108da1b3`), and checks out nothing. Its
@@ -1275,6 +1276,13 @@ whose id is in one of the two lists. A new `skipped` job takes
 `issues: write`, inside the caller grant, to apply the new `skipped-label`
 input, which stays unregistered because no caller passes it. No secret or
 `runs-on` routing changes.
+`pr-automerge-dependabot` is registered at the v0.50.0 tag
+`d223a6446680fb261e264d1dea9efba46f20ead2` (ci-workflows#783), registered by
+hand on 2026-10-18. It copies its v0.39.8 entry (`594987a`) and adds two
+inputs: `package-auto-merge` (boolean, default `true`), which also arms npm,
+pip and NuGet patch and minor bumps, and `review-only-dependencies` (a JSON
+array, default `[]`) of package names never armed. No secret, workflow or job
+permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

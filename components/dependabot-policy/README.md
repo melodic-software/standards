@@ -118,17 +118,28 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
 
 - **Auto tier.** Every update in the pull request is non-major: the first
   numeric version component does not change, and below 1.0 the second does
-  not either. Every update in an `autoMerge.ecosystems` ecosystem
-  (`github-actions`) comes from a publisher with `tier: auto` in
+  not either. Every update is in an `autoMerge.ecosystems` ecosystem
+  (`github-actions`, `npm`, `pip`, `nuget`, spelled as in `dependabot.yml`;
+  the auto-merge workflow checks fetch-metadata's `npm_and_yarn` for npm).
+  A `github-actions` update comes from a publisher with `tier: auto` in
   `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
-  entry with the date it was `reviewed` and the `basis` for its tier.
-  No update is a security-critical dependency (below). `ci-status` is not
+  entry with the date it was `reviewed` and the `basis` for its tier; an
+  `npm`, `pip` or `nuget` update needs no publisher entry. No update is a
+  security-critical dependency (below), and no package is named in the
+  repository's `autoMerge.reviewOnly` entries, which the caller passes as
+  `review-only-dependencies` and the workflow never arms. `ci-status` is not
   red, and the updates in the commit's
   `updated-dependencies` metadata agree with the title or the group's
   `Updates` lines. The pull request merges once `ci-status` passes, with no
-  review. Every repository already trusts these publishers, who run the
-  platform and the review agents, so a non-major release from them adds no
-  new trust; the cooldown and `ci-status` catch a bad one.
+  review. For `github-actions`, every repository already trusts these
+  publishers, who run the platform and the review agents, so a non-major
+  release from them adds no new trust. For `npm`, `pip` and `nuget` the basis
+  is the owner's decision (2026-10-18) that the organization never runs
+  vulnerable versions, so non-major package updates merge and majors never
+  take the auto tier. In both, the cooldown (each repository's
+  `cooldown.default-days`, at least the 3-day floor), `ci-status`, the
+  non-major rule and the `autoMerge.reviewOnly` opt-out catch a bad release;
+  see the [threat model](THREAT-MODEL.md).
 - **Review tier.** Everything else: a major from any publisher, an action
   from an unlisted publisher or one listed with `tier: review`, a
   security-critical dependency, a red
@@ -165,7 +176,10 @@ the pr-merge lane merges both tiers and the pr-unblock lane writes the
 review verdicts.
 
 The ci-workflows `pr-automerge-dependabot.yml` reusable arms GitHub
-auto-merge with `GITHUB_TOKEN` on auto-tier GitHub Actions bumps. It is valid
+auto-merge with `GITHUB_TOKEN` on auto-tier bumps: GitHub Actions from
+`tier: auto` publishers and, unless the caller passes
+`package-auto-merge: false`, npm, pip and NuGet packages not in its
+`review-only-dependencies`. It is valid
 only in a repository without a merge queue. Until such a repository runs a
 review lane, its review-tier pull requests stay open.
 

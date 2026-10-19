@@ -67,6 +67,7 @@ are trusted only at their reviewed Git revision.
 | An exception becomes a blanket bypass or outlives its cause. | Exceptions are keyed to one entry, use an allowlisted reason with a justification, waive only named rules, and fail on an unused waiver or a missing entry. The pull-request cap is not waivable. | The exception-waive, unused-waiver, missing-entry, unknown-reason, unknown-waiver, and missing-justification cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | YAML or JSON ambiguity hides a different policy. | The parser requires unique keys and disables aliases and merge keys; duplicate JSON members are rejected before `JSON.parse`, per [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). A non-`version: 2` config is a finding. | The malformed-config, duplicate-member, and unsupported-version cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | The auto-merge reusable's `PUBLISHER_ALLOWLIST` drifts from the `tier: auto` keys of `autoMerge.publishers`, so a publisher this policy routes to the review tier merges with no AI review. | The lockstep reads the reusable's SHAs from its `runner-policy` contract keys (at least one; old and new coexist during a repin), fetches the reusable at each SHA over the GitHub contents API (three attempts), and fails on a fetch error, a missing or repeated constant, or any difference at any SHA. | `npm run lint:dependabot-automerge-lockstep` in the `check-policies` CI job. |
+| A compromised or hijacked non-major release of an npm, pip or NuGet dependency, including one whose install script runs in CI, merges at the auto tier with no human review. | Owner decision (2026-10-18): packages auto-merge only on a patch or minor update (below 1.0, patch only); each repository's `cooldown.default-days` soaks the release for at least the 3-day floor; `ci-status` must pass; a dependency listed in `autoMerge.reviewOnly`, which the caller passes as `review-only-dependencies`, is never armed. | The cooldown cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs), `autoMerge.reviewOnly` in [`policy.json`](policy.json), and the package gate tests in the ci-workflows reusable (ci-workflows#783). |
 | A change weakens validation unnoticed. | The central and repository schemas reject unknown shapes and reasons; the runtime is exactly locked; CI runs the behavioral tests and then audits this repository. | [`policy.schema.json`](policy.schema.json), [`dependabot-policy.schema.json`](dependabot-policy.schema.json), [`package-lock.json`](package-lock.json), and the `check-policies` CI job. |
 
 ## Residual and accepted risk
@@ -79,6 +80,10 @@ are trusted only at their reviewed Git revision.
   cooldown and `ci-status`, and a compromised review-tier release that passes
   `ci-status` and the review merges too; see the
   [merge tiers](README.md#merge-tiers-for-dependabot-pull-requests).
+- The owner accepted (2026-10-18) that a malicious npm, pip or NuGet patch or
+  minor release that outlasts the cooldown, passes `ci-status` and is not in
+  `autoMerge.reviewOnly` merges with no review, and that its install script
+  runs wherever CI installs it.
 - Dependabot options can change after a passing audit. The standard tracks the
   reviewed option set and values, not all future service behavior.
 - Grouping and the pull-request cap bound bot-pull-request volume but not the
