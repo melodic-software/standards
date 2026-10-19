@@ -64,11 +64,11 @@ components:
   #   `targets:` records why), so neither can take these components.
   #   songwriting carries repo-local copies of the fleet callers by owner
   #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
-  #   longer holds. knowledge-corpus is DEFERRED: its scraped third-party HTML
-  #   is content an agent later reads, which is a prompt-injection surface
-  #   rather than a code-quality one. Its repo-local lane PR
-  #   (knowledge-corpus#53) is held as a draft pending the owner's call on
-  #   this deferral. Removal trigger: prompt-injection hardening for a
+  #   longer holds. knowledge-corpus stays DEFERRED by owner decision
+  #   2026-10-19: it has no code, and its scraped third-party HTML is content
+  #   an agent later reads, which is a prompt-injection surface rather than a
+  #   code-quality one. Its repo-local lane PR (knowledge-corpus#53) is
+  #   closed. Removal trigger: prompt-injection hardening for a
   #   review lane over untrusted third-party content — and then for a security
   #   or content-scanning lane, not for claude-review as written.
   #
