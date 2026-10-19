@@ -48,27 +48,27 @@ components:
   #
   # Each component targets the repos that run that lane TODAY. Deliberate
   # exclusions:
-  # - .github: exempt from lane components (near-zero PR traffic).
+  # Every repository runs both lanes: the guarded-merge rule requires a
+  # finished AI review check, so a repository without the lanes cannot have
+  # its pull requests merged by an agent. Exceptions to management:
   # - standards: manifest source, not a target — keeps its repo-local caller.
-  # - Public targets: agent-plugins, ci-runner, claude-code-account-rotation,
-  #   codex-plugins and cursor-plugins take the HOSTED lane callers below,
-  #   never these fleet-label ones (see the public-shape note below);
-  #   claude-code-plugins owns its copies of them (its target block).
+  # - Public targets: .github, agent-plugins, ci-runner,
+  #   claude-code-account-rotation, codex-plugins and cursor-plugins take the
+  #   HOSTED lane callers below, never these fleet-label ones (see the
+  #   public-shape note below); claude-code-plugins owns its copies of them
+  #   (its target block).
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
   #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
-  # - knowledge-corpus, songwriting: their PLANNED-target record is retired by
-  #   the same retarget. Neither ever held a target block, so nothing left
-  #   `targets:`; what went is that record and their `TARGET_VISIBILITY`
-  #   entries. This bullet answers the review-LANE question only — whether
-  #   either joins the sync-target ROSTER is a separate question, answered at
-  #   the Phase 4 fleet-expansion comment near `targets:` (knowledge-corpus
-  #   deferred on a structural LFS blocker; songwriting dropped). On the lane:
-  #   neither is a code repo, so a code-review lane has near-zero signal.
-  #   songwriting (lyric files) is dropped outright. knowledge-corpus is
-  #   DEFERRED rather than dropped: its scraped third-party HTML is content
-  #   an agent later reads, which is a prompt-injection surface rather than a
-  #   code-quality one. Removal trigger: prompt-injection hardening for a
+  # - knowledge-corpus, songwriting: not sync targets (the Phase 4 note near
+  #   `targets:` records why), so neither can take these components.
+  #   songwriting carries repo-local copies of the fleet callers by owner
+  #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
+  #   longer holds. knowledge-corpus is DEFERRED: its scraped third-party HTML
+  #   is content an agent later reads, which is a prompt-injection surface
+  #   rather than a code-quality one. Its repo-local lane PR
+  #   (knowledge-corpus#53) is held as a draft pending the owner's call on
+  #   this deferral. Removal trigger: prompt-injection hardening for a
   #   review lane over untrusted third-party content — and then for a security
   #   or content-scanning lane, not for claude-review as written.
   #
@@ -105,9 +105,8 @@ components:
   # file is no longer read. The manifest never synced that file, so a target
   # removes its copy in a repo-local PR if it wants to.
   #
-  # `claude-security-review-caller` is managed for the private adopters
-  # dotfiles, github-iac, medley and provisioning (their target blocks
-  # below). One shared shape for both visibilities is still blocked: both callers pass
+  # `claude-security-review-caller` is managed for the private targets
+  # (their target blocks below). One shared shape for both visibilities is still blocked: both callers pass
   # the fleet label `melodic-review-ubuntu-24.04-x64` as a literal
   # `with.runner`, and runner-policy admits a fleet label only for an enrolled
   # private consumer (`public-self-hosted-routing` otherwise), consulting
@@ -390,6 +389,8 @@ components:
 targets:
   melodic-software/.github:
     managed:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
       - cloud-bootstrap
       - editorconfig-checker
       - engineering-standards
@@ -403,9 +404,11 @@ targets:
   # Link-check config plus the managed-files guard every target carries: its
   # pr-require-checks lane turns lychee-offline on once this delivers
   # lychee.toml. Private and fleet-enrolled in github-iac, so it takes the
-  # fleet-routed guard caller. Its other configs stay repo-owned.
+  # fleet-routed guard and lane callers. Its other configs stay repo-owned.
   melodic-software/agent-automations:
     managed:
+      - claude-review-caller
+      - claude-security-review-caller
       - lychee
       - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit

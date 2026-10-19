@@ -344,8 +344,9 @@ fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
 differently for each lane:
 
-- Both components are `managed` for the private targets claude-code-proxy,
-  dotfiles, github-iac, medley and provisioning, so every PR there gets both
+- Both components are `managed` for the private targets agent-automations,
+  claude-code-proxy, dotfiles, github-iac, medley and provisioning, so every
+  PR there gets both
   advisory lanes. Public repos, `claude-code-plugins` and `ci-workflows`
   among them, remain ineligible for the fleet-routed shape.
 
@@ -357,12 +358,16 @@ sourced from `components/claude-lanes-hosted/` and materialized at
 fleet sibling except for comments, `runner: ubuntu-24.04` and the workflow
 `name:`, which equals each file's stem; the job ids match, so the check
 contexts do too. The destinations differ because
-a destination has one owning component. They are `managed` for agent-plugins,
-ci-runner, claude-code-account-rotation, codex-plugins and cursor-plugins.
+a destination has one owning component. They are `managed` for .github,
+agent-plugins, ci-runner, claude-code-account-rotation, codex-plugins and
+cursor-plugins.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
-`.github` stays exempt (near-zero PR traffic).
+knowledge-corpus and songwriting are not sync targets. songwriting carries
+repo-local copies of the fleet callers; knowledge-corpus's lane stays deferred
+over its prompt-injection surface (see the lane comment in
+`sync-manifest.yml`).
 
 - On a public repository the lanes review only pull requests from
   same-repository branches. Fork and Dependabot pull requests get no secrets,
