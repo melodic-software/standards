@@ -47,6 +47,7 @@ const REPINE_LANE_SHA_V0_44_1 = "bc02e0504d83df70a2c95fcf3651d0f1eac3e252";
 const REPINE_LANE_SHA_V0_45_0 = "3c8a4b2aeff5871cf72d35a686692bc6f0d44815";
 const REPINE_LANE_SHA_V0_48_0 = "96b50d451c4483c476f2f963674e0a3ba9d50fe3";
 const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
+const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -3758,6 +3759,88 @@ test("privileged reusable contracts accept only direct same-name secret mappings
       expression,
     );
   }
+});
+
+function roleContract(overrides = {}) {
+  return {
+    routing: "runner-input",
+    runnerInput: "runner",
+    role: "automations",
+    allowedInputs: ["runner", "role"],
+    allowedSecrets: {
+      CLAUDE_API_KEY: `\${{ secrets.AUTOMATIONS_CLAUDE_API_KEY }}`,
+    },
+    allowedCallerPermissions: { contents: "read", issues: "write" },
+    ...overrides,
+  };
+}
+
+function roleCaller(role, secret = "AUTOMATIONS_CLAUDE_API_KEY") {
+  return `permissions: read-all
+jobs:
+  intake:
+    permissions:
+      contents: read
+      issues: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ${FLEET_LABEL}
+      role: ${role}
+    secrets:
+      CLAUDE_API_KEY: \${{ secrets.${secret} }}
+`;
+}
+
+test("a privileged contract that declares a role accepts that role's prefixed secret", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract() },
+    },
+    workflows: { "intake.yml": roleCaller("automations") },
+  });
+  assert.ok(!(await audit(root)).some(({ rule }) => rule === "runner-target-contract"));
+});
+
+test("a role-prefixed secret is refused for another role or with no declared role", async () => {
+  for (const contract of [
+    roleContract({
+      allowedSecrets: { CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}` },
+    }),
+    roleContract({ role: undefined, allowedInputs: ["runner"] }),
+  ]) {
+    const root = await repository({
+      policyOverrides: {
+        approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      },
+    });
+    await assert.rejects(() => audit(root), /allowedSecrets\.CLAUDE_API_KEY must be exactly/);
+  }
+});
+
+test("a contract that declares a role must allow the role input", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract({ allowedInputs: ["runner"] }),
+      },
+    },
+  });
+  await assert.rejects(() => audit(root), /allowedInputs must include role when role is declared/);
+});
+
+test("a caller must pass the contract's role as a literal", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract() },
+    },
+    workflows: { "intake.yml": roleCaller("reviews") },
+  });
+  assert.ok(
+    (await audit(root)).some(
+      ({ rule, message }) =>
+        rule === "runner-target-contract" && message.includes("must receive role: automations"),
+    ),
+  );
 });
 
 test("every runner-input contract accepts only whole named-secret mapping values", async () => {
@@ -9375,6 +9458,28 @@ test("intake-triage at the v0.49.0 tag copies its v0.45.0 entry and adds only th
   });
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_49_0}`)).length,
+    1,
+  );
+});
+
+// v0.51.0 runs intake on run-claude-cli, funded by a named role; intake-triage
+// is its v0.49.0 entry plus `role` and the automations role's two secrets.
+test("intake-triage at the v0.51.0 tag copies its v0.49.0 entry and adds only the role input and secrets", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const workflowPath = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
+  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_49_0}`];
+  assert.ok(previous, "expected a v0.49.0 contract for intake-triage");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_51_0}`], {
+    ...previous,
+    role: "automations",
+    allowedInputs: [...previous.allowedInputs, "role"],
+    allowedSecrets: {
+      CLAUDE_API_KEY: `\${{ secrets.AUTOMATIONS_CLAUDE_API_KEY }}`,
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.AUTOMATIONS_CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+  });
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_51_0}`)).length,
     1,
   );
 });

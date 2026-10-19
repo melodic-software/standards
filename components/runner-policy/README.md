@@ -224,6 +224,14 @@ unknown secret names, and alternate expressions:
   the ordinary explicit read-only requirement unless the contract also names
   `allowedCallerPermissions`, and every secret-capable runner-input contract
   is excluded from the Dependabot auto-approval extension below.
+  A contract with `allowedCallerPermissions` maps each secret to its own name
+  (`NAME: ${{ secrets.NAME }}`). A contract that also declares a funding
+  `role` (lower kebab, and `role` must be in `allowedInputs`) may instead map
+  it to that role's prefixed name, `NAME: ${{ secrets.<ROLE>_NAME }}`, with
+  `<ROLE>` upper-snake (`issue-lane` is `ISSUE_LANE`), and its caller must pass
+  `role:` as that exact literal. Role-named secrets let several funding roles
+  share one repository; the role stays a reviewed literal, never an
+  expression, and every other rename is still refused.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the immutable called workflow and rejects any caller-added input that was
   not part of the review.
@@ -1282,6 +1290,17 @@ hand on 2026-10-18. It copies its v0.39.8 entry (`594987a`) and adds two
 inputs: `package-auto-merge` (boolean, default `true`), which also arms npm,
 pip and NuGet patch and minor bumps, and `review-only-dependencies` (a JSON
 array, default `[]`) of package names never armed. No secret, workflow or job
+permission, or `runs-on` routing changes.
+`intake-triage` is registered at the v0.51.0 tag
+`f129f4c142d00ec3feacbf2b9102d327088504bf` (ci-workflows#784), sign-off
+pending. It copies its v0.49.0 entry, adds the `role` input and replaces the
+one secret with the `automations` role's two: `CLAUDE_API_KEY` from
+`AUTOMATIONS_CLAUDE_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` from
+`AUTOMATIONS_CLAUDE_CODE_OAUTH_TOKEN`. The lane now runs the CLI through the
+run-claude-cli action, which refuses to start without root-owned managed
+settings, removed sudo and docker access, and bubblewrap; the API key leg runs
+first and the subscription leg only after a credit stop. The v0.49.0 entry
+stays until claude-code-plugins repins its caller. No workflow or job
 permission, or `runs-on` routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
