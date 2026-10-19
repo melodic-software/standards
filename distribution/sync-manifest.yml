@@ -61,10 +61,16 @@ components:
   #   block its own runners) does not apply to the hosted shape: those jobs
   #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
   # - knowledge-corpus, songwriting: not sync targets (the Phase 4 note near
-  #   `targets:` records why), so each carries repo-local copies of the fleet
-  #   callers. knowledge-corpus's scraped third-party HTML reaches the review
-  #   agent as diff content, a prompt-injection surface accepted for an
-  #   advisory lane that holds no write access beyond its review comments.
+  #   `targets:` records why), so neither can take these components.
+  #   songwriting carries repo-local copies of the fleet callers by owner
+  #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
+  #   longer holds. knowledge-corpus is DEFERRED: its scraped third-party HTML
+  #   is content an agent later reads, which is a prompt-injection surface
+  #   rather than a code-quality one. Its repo-local lane PR
+  #   (knowledge-corpus#53) is held as a draft pending the owner's call on
+  #   this deferral. Removal trigger: prompt-injection hardening for a
+  #   review lane over untrusted third-party content — and then for a security
+  #   or content-scanning lane, not for claude-review as written.
   #
   # PUBLIC SHAPE, ACCEPTED AS AN INTERIM (#622): `claude-review-hosted-caller`
   # and `claude-security-review-hosted-caller`, sourced from

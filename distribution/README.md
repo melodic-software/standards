@@ -364,8 +364,10 @@ cursor-plugins.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
-knowledge-corpus and songwriting are not sync targets and carry repo-local
-copies of the fleet callers.
+knowledge-corpus and songwriting are not sync targets. songwriting carries
+repo-local copies of the fleet callers; knowledge-corpus's lane stays deferred
+over its prompt-injection surface (see the lane comment in
+`sync-manifest.yml`).
 
 - On a public repository the lanes review only pull requests from
   same-repository branches. Fork and Dependabot pull requests get no secrets,
