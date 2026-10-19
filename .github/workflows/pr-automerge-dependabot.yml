@@ -1,10 +1,13 @@
 name: pr-automerge-dependabot
 
 # Thin caller of the org's pr-automerge-dependabot reusable workflow
-# (melodic-software/ci-workflows). It arms GitHub auto-merge (squash) on a
-# Dependabot pull request that bumps only actions/*, github/* or anthropics/*
-# GitHub Actions by a minor or patch version. Arming never merges: GitHub
-# merges once every required check, `ci-status` included, passes.
+# (melodic-software/ci-workflows). It arms GitHub auto-merge (squash) on
+# Dependabot minor and patch bumps under the merge tiers in
+# components/dependabot-policy/README.md: GitHub Actions from `tier: auto`
+# publishers, and npm, pip and NuGet packages outside
+# `review-only-dependencies` (this repository's `autoMerge.reviewOnly`
+# entries). Arming never merges: GitHub merges once every required check,
+# `ci-status` included, passes.
 
 on:
   pull_request:
@@ -20,7 +23,8 @@ jobs:
     permissions:
       contents: write # enablePullRequestAutoMerge
       pull-requests: write # enable or disable auto-merge on the PR
-    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2 # v0.39.3
+    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@d223a6446680fb261e264d1dea9efba46f20ead2 # v0.50.0
     with:
       # Public repository: runner-policy admits only a hosted label here.
       runner: ubuntu-24.04
+      review-only-dependencies: '["yaml"]'
