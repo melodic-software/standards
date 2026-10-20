@@ -459,7 +459,7 @@ test("a bounded-scan composite that drifts from its static anchors is drift", ()
       "++seen == 4) break",
       /negated-closer rule wordWindow is 4, policy says 5/,
     ],
-    ['ch == ";" || ch == ",") break', 'ch == ";") break', /negation_trigger's window/],
+    ['ch == ";" || ch == ",") break', 'ch == ";") break', /^gate composite \(behavior\): /],
     [
       "tail = substr(line, start, keyword_index - start)",
       "tail = substr(line, 1, keyword_index - 1)",

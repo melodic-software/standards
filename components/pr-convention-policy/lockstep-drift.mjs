@@ -532,21 +532,16 @@ export function parseValidatorNegation(shellText, location) {
 // sentence punctuation. Before ci-workflows#815 `negation_trigger` cuts the
 // preceding text at the punctuation, then keeps the last N words
 // (`first = (count > N) ? ...`). From #815 it scans backward and stops at the
-// Nth word boundary (`++seen == N`) or the punctuation, whichever comes first.
-const NEGATION_PUNCTUATION_TEST = 'ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == ","';
-
+// Nth word boundary (`++seen == N`) or the punctuation, whichever comes first,
+// and the window is the slice from there to the keyword. The punctuation set
+// itself is left to the behavioral layer, which runs it.
 function compositeNegationWindow(runShText) {
-  const punctuation = NEGATION_PUNCTUATION_TEST.replaceAll(/[.!?|()]/g, "\\$&");
   const lastWords = runShText.match(/first = \(count > (\d+)\) \? count - (\d+) : 1/);
-  if (lastWords && new RegExp(`if \\(${punctuation}\\) \\{\\s*cut = i\\s*break`).test(runShText)) {
+  if (lastWords) {
     return lastWords;
   }
   const backward = runShText.match(/if \(in_word && has_letter && \+\+seen == (\d+)\) break/);
-  if (
-    backward &&
-    new RegExp(`if \\(${punctuation}\\) break`).test(runShText) &&
-    /^\s*tail = substr\(line, start, keyword_index - start\)$/m.test(runShText)
-  ) {
+  if (backward && /^\s*tail = substr\(line, start, keyword_index - start\)$/m.test(runShText)) {
     return backward;
   }
   return null;
