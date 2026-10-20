@@ -9538,9 +9538,15 @@ test("every reusable contract at the v0.55.0 tag copies its v0.54.0 entry and ad
       `${reusable} at the v0.55.0 tag is not its v0.54.0 entry plus ${inputs.join(", ") || "nothing"}`,
     );
   }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_55_0}`)).length,
-    Object.keys(added).length,
+  // maintenance-check-links-online is new at this tag (#824), so it has no
+  // v0.54.0 entry to copy.
+  assert.deepEqual(
+    new Set(
+      Object.keys(contracts)
+        .filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_55_0}`))
+        .map((key) => key.split("/").at(-1).split(".yml@")[0]),
+    ),
+    new Set([...Object.keys(added), "maintenance-check-links-online"]),
   );
 });
 
