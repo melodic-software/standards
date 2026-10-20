@@ -85,10 +85,12 @@ jobs:
       # empty and the reusable reviews no bot.
       allowed-bot-sender-ids: ${{ vars.AUTOMATION_LANES_APP_SENDER_ID }}
       # People whose closing issues the review reads in full, by numeric user
-      # id: the `human` entries of components/trusted-actors/trusted-actors.json,
-      # the list intake-triage callers pass as their allowed-author-ids.
-      # trusted-actors.test.mjs fails when the two differ. Empty would replace
-      # every person's closing issue with a placeholder.
+      # id: the `human` entries of components/trusted-actors/trusted-actors.json.
+      # trusted-actors.test.mjs fails when this value, in either claude-review
+      # component or standards' own pr-review.yml, differs from them. Empty
+      # would replace every person's closing issue with a placeholder. The
+      # bot ids in allowed-bot-sender-ids above also mark issues those bots
+      # wrote as trusted closing-issue context.
       allowed-author-ids: '153232337'
     # Pass only the one named secret (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the

@@ -1331,7 +1331,7 @@ passes `github.token` to each git call through the environment instead
 `intake-triage` is a verbatim copy too: the model jobs drop to `issues: read`
 and a new model-free `apply` job on GitHub-hosted `ubuntu-24.04` writes the
 labels and comment (ci-workflows#821), and the model sees only comments by
-trusted authors (#830). No secret, caller permission, or self-hosted routing
+trusted authors (ci-workflows#830). No secret, caller permission, or self-hosted routing
 changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
