@@ -1320,6 +1320,19 @@ input, with `contents: read` and `issues: write` inside the caller grant, and
 only when the `claude` job reports a credit stop or had no API key. A new
 `status` job with `permissions: {}` reports for both. No input, secret or
 caller-permission changes, and no new self-hosted routing.
+At the v0.55.0 tag `3a2c748fdef9cfb9ceec5a66289e21842189689f`, pending the
+owner's sign-off on standards#826's pull request, `pr-review` copies its
+v0.54.0 entry and adds `allowed-author-ids` (ci-workflows#828): the numeric ids
+of people whose closing issues the code review reads in full; an empty list
+replaces every person's closing issue with a placeholder. `pr-review-security`
+is a verbatim copy: its checkout now persists no credential, and its scope step
+passes `github.token` to each git call through the environment instead
+(ci-workflows#818). `maintenance-sync-standards` is a verbatim copy.
+`intake-triage` is a verbatim copy too: the model jobs drop to `issues: read`
+and a new model-free `apply` job on GitHub-hosted `ubuntu-24.04` writes the
+labels and comment (ci-workflows#821), and the model sees only comments by
+trusted authors (#830). No secret, caller permission, or self-hosted routing
+changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
