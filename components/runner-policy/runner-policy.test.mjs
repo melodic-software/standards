@@ -48,6 +48,7 @@ const REPINE_LANE_SHA_V0_45_0 = "3c8a4b2aeff5871cf72d35a686692bc6f0d44815";
 const REPINE_LANE_SHA_V0_48_0 = "96b50d451c4483c476f2f963674e0a3ba9d50fe3";
 const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
 const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
+const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9481,6 +9482,28 @@ test("intake-triage at the v0.51.0 tag copies its v0.49.0 entry and adds only th
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_51_0}`)).length,
     1,
+  );
+});
+
+// v0.54.0 adds a subprocess-sandbox probe and a Bun install check to both
+// review lanes; maintenance-sync-standards changes only a comment.
+// No input, secret, permission or routing change.
+test("every reusable contract at the v0.54.0 tag copies its v0.48.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_48_0}`];
+    assert.ok(previous, `expected a v0.48.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_54_0}`],
+      previous,
+      `${reusable} at the v0.54.0 tag is not a verbatim copy of its v0.48.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_54_0}`)).length,
+    reusables.length,
   );
 });
 
