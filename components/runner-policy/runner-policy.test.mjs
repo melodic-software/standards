@@ -49,6 +49,7 @@ const REPINE_LANE_SHA_V0_48_0 = "96b50d451c4483c476f2f963674e0a3ba9d50fe3";
 const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
 const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
 const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
+const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9514,6 +9515,38 @@ test("every reusable contract at the v0.54.0 tag copies its v0.48.0 entry forwar
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_54_0}`)).length,
     reusables.length + 1,
+  );
+});
+
+// v0.55.0 adds pr-review's allowed-author-ids input; every other entry,
+// intake-triage included, carries its v0.54.0 entry forward unchanged.
+test("every reusable contract at the v0.55.0 tag copies its v0.54.0 entry and adds only its new input", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const added = {
+    "pr-review": ["allowed-author-ids"],
+    "pr-review-security": [],
+    "maintenance-sync-standards": [],
+    "intake-triage": [],
+  };
+  for (const [reusable, inputs] of Object.entries(added)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_54_0}`];
+    assert.ok(previous, `expected a v0.54.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`],
+      { ...previous, allowedInputs: [...previous.allowedInputs, ...inputs] },
+      `${reusable} at the v0.55.0 tag is not its v0.54.0 entry plus ${inputs.join(", ") || "nothing"}`,
+    );
+  }
+  // maintenance-check-links-online is new at this tag (#824), so it has no
+  // v0.54.0 entry to copy.
+  assert.deepEqual(
+    new Set(
+      Object.keys(contracts)
+        .filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_55_0}`))
+        .map((key) => key.split("/").at(-1).split(".yml@")[0]),
+    ),
+    new Set([...Object.keys(added), "maintenance-check-links-online"]),
   );
 });
 
