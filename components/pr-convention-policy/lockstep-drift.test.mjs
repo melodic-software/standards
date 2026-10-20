@@ -59,7 +59,10 @@ const POLICY = parseUniqueJson(
 // `issue-ref-pattern` shape, plus one `spellchecker:ignore-next-line` awk
 // comment for this repository's typos lane), the same run.sh from ci-workflows
 // a932d486c5a4d0a959c42e60ff015f50cf2103f3 (the inline `#N` shape older pins
-// still run), and the hook validator from
+// still run), the same run.sh from ci-workflows
+// cc7613fbf8bacca72700d6498c32145c05fe1f09 (ci-workflows#815, the gsub
+// keyword pass and bounded backward negation scan, with the same awk
+// comment), and the hook validator from
 // claude-code-plugins 53d5c6a09dfb5890b9767b447a28ca10ba922173. The `.txt`
 // suffix keeps the shell lint lanes off code this repository does not own.
 // Refresh them when either upstream changes shape the tests depend on.
@@ -67,6 +70,7 @@ const readFixture = (name) =>
   readFile(path.join(MODULE_DIRECTORY, "fixtures", "lockstep", name), "utf8");
 const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
 const LITERAL_REF_COMPOSITE_RUN = await readFixture("check-contract-run-literal-ref.sh.txt");
+const BOUNDED_SCAN_COMPOSITE_RUN = await readFixture("check-contract-run-bounded-scan.sh.txt");
 const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
 
 const GOOD_COMPOSITE_ACTION = [
@@ -430,6 +434,54 @@ test("a composite pin that still inlines the #N reference passes", () => {
   );
 });
 
+test("a composite pin with the bounded negation scan passes", () => {
+  assert.deepEqual(
+    checkPinnedComposite(
+      POLICY,
+      "codex-plugins",
+      "d".repeat(40),
+      BOUNDED_SCAN_COMPOSITE_RUN,
+      GOOD_COMPOSITE_ACTION,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    checkCopies(POLICY, { ...goodTexts(), gateRun: BOUNDED_SCAN_COMPOSITE_RUN }),
+    [],
+  );
+});
+
+// Each static anchor of the ci-workflows#815 shape, mutated away, is drift.
+test("a bounded-scan composite that drifts from its static anchors is drift", () => {
+  for (const [from, to, expected] of [
+    [
+      "++seen == 5) break",
+      "++seen == 4) break",
+      /negated-closer rule wordWindow is 4, policy says 5/,
+    ],
+    ['ch == ";" || ch == ",") break', 'ch == ";") break', /negation_trigger's window/],
+    [
+      "tail = substr(line, start, keyword_index - start)",
+      "tail = substr(line, 1, keyword_index - 1)",
+      /negation_trigger's window/,
+    ],
+    [
+      'gsub(closing_regex, "\\n&\\n", marked)',
+      'gsub(non_closing_regex, "\\n&\\n", marked)',
+      /match expressions not found/,
+    ],
+    ["marked = lower\n", "marked = line\n", /match expressions not found/],
+  ]) {
+    const mutated = BOUNDED_SCAN_COMPOSITE_RUN.replace(from, to);
+    assert.notEqual(mutated, BOUNDED_SCAN_COMPOSITE_RUN, `mutation did not apply: ${from}`);
+    const errors = checkCopies(POLICY, { ...goodTexts(), gateRun: mutated });
+    assert.ok(
+      errors.some((e) => e.startsWith("gate composite") && expected.test(e)),
+      `${from}: ${errors.join("; ")}`,
+    );
+  }
+});
+
 // From ci-workflows#733 the analyzer reads its reference grammar from the
 // environment, so each link from run.sh's default to the analyzer is checked.
 test("an issue-ref-pattern composite that loses its default is drift", () => {
@@ -623,6 +675,7 @@ test("non-closing and negation parsers read the policy's values from both copies
   const expectedNegation = negationData(POLICY.body.negatedClosers);
   assert.deepEqual(parseValidatorNegation(GOOD_VALIDATOR, "hook"), expectedNegation);
   assert.deepEqual(parseCompositeNegation(GOOD_COMPOSITE_RUN, "gate"), expectedNegation);
+  assert.deepEqual(parseCompositeNegation(BOUNDED_SCAN_COMPOSITE_RUN, "gate"), expectedNegation);
 });
 
 test("the sample matrix covers every policy value, inside and just outside the window", () => {
