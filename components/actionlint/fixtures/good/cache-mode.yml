@@ -1,0 +1,11 @@
+# The job-level `cache-mode` key the pinned actionlint rejects, in the shape
+# ci-workflows intake-triage.yml uses.
+name: cache-mode fixture
+on: push
+jobs:
+  noop:
+    runs-on: ubuntu-24.04
+    cache-mode: none
+    steps:
+      - name: No-op
+        run: exit 0
