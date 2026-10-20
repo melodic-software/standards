@@ -9501,9 +9501,19 @@ test("every reusable contract at the v0.54.0 tag copies its v0.48.0 entry forwar
       `${reusable} at the v0.54.0 tag is not a verbatim copy of its v0.48.0 entry`,
     );
   }
+  // intake-triage's caller moves from f129f4c (v0.51.0), whose contract
+  // carries forward unchanged: inputs, secrets and caller permissions match.
+  const intake = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
+  const intakePrevious = contracts[`${intake}@f129f4c142d00ec3feacbf2b9102d327088504bf`];
+  assert.ok(intakePrevious, "expected the v0.51.0 intake-triage contract");
+  assert.deepEqual(
+    contracts[`${intake}@${REPINE_LANE_SHA_V0_54_0}`],
+    intakePrevious,
+    "intake-triage at the v0.54.0 tag is not a verbatim copy of its v0.51.0 entry",
+  );
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_54_0}`)).length,
-    reusables.length,
+    reusables.length + 1,
   );
 });
 
