@@ -346,7 +346,6 @@
       "Bash(bash ${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-resolve-thread*)",
       "Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/babysit-readiness-gate.sh*)",
       "Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/fetch-all-pr-comments.sh*)",
-      "Bash(gh pr ready *)",
       "Bash(git branch --list *)",
       "Bash(git branch)",
       "Bash(git diff *)",

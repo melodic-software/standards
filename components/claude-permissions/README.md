@@ -316,8 +316,8 @@ regrant trigger). A non-resolving removal still lands with its tombstone: the de
 harmless where it lingers, but the tombstone is what actually clears it from machines that hold
 it; a row whose literal text no real invocation contains is dead weight on the same footing. The
 third: a reviewed decision moves the grant into the consumer's prose `autoMode` entry because its
-conditions (which repository, whose pull request) cannot be written as a glob; `gh pr ready` is
-the standing example. For the first argument, the claim must be tested
+conditions (which repository, whose pull request) cannot be written as a glob. For the first
+argument, the claim must be tested
 before it is acted on, never inferred: not from the command being read-only in spirit, not
 from a sibling command being covered, not from auto mode's classifier approving it. Auto-mode
 coverage is specifically *not* an argument: it does not reach the lanes that never enter
