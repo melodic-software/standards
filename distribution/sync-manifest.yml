@@ -258,6 +258,16 @@ components:
   lychee:
     files:
       lychee.toml: lychee.toml
+  # Weekly online link-check callers (ci-workflows#739), the third recorded
+  # exception to the workflow-caller exclusion in README.md: one source file
+  # per opted-in target, because the cron minute and day differ per target
+  # and a component has exact bytes. Each destination carries the repository
+  # name because destinations are unique across components. The schedule
+  # also needs the target's `link-check-online` org property set to true; the
+  # reusable reads it at run time (components/lychee-online/README.md).
+  lychee-online-claude-code-plugins:
+    files:
+      components/lychee-online/targets/claude-code-plugins.yml: .github/workflows/maintenance-check-links-online-claude-code-plugins.yml
   # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
   # workflow calling the ci-workflows `check-managed-files` composite action,
   # which fails a consumer PR that hand-edits one of that repository's
@@ -528,6 +538,7 @@ targets:
       - github-actions-conventions
       - gitleaks
       - lychee
+      - lychee-online-claude-code-plugins
       - managed-files-guard-caller
       - markdownlint
       - node-runtime

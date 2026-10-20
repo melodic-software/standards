@@ -29,6 +29,7 @@
 /components/github-actions-conventions/rename-map.json @kyle-sexton
 /components/lefthook-*/ @kyle-sexton
 /components/lychee/ @kyle-sexton
+/components/lychee-online/ @kyle-sexton
 /components/managed-files-guard/ @kyle-sexton
 /components/mcp-launcher/ @kyle-sexton
 /components/org-architecture-pointer/ @kyle-sexton
