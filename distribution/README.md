@@ -86,10 +86,11 @@ Native adoption remains authoritative where it naturally lives:
 
 - package and `extends` references in consumer manifests;
 - actions and reusable workflows in consumer workflow files, with the
-  Claude review-lane callers and the managed-files-guard caller as the
-  recorded exceptions (see
-  [Claude review-lane caller components](#claude-review-lane-caller-components)
-  and [managed-files-guard caller component](#managed-files-guard-caller-component));
+  Claude review-lane callers, the managed-files-guard caller and the online
+  link-check callers as the recorded exceptions (see
+  [Claude review-lane caller components](#claude-review-lane-caller-components),
+  [managed-files-guard caller component](#managed-files-guard-caller-component)
+  and [online link-check caller components](#online-link-check-caller-components));
 - repository governance in the relevant `github-iac` repository;
 - repository reachability and App access in live GitHub state.
 
@@ -271,9 +272,10 @@ melodic-software/github-iac#466, which adds
 The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
 each consumer. The
-[Claude review-lane callers](#claude-review-lane-caller-components) and the
-[managed-files-guard caller](#managed-files-guard-caller-component) are the
-two recorded exceptions to that workflow-shape rule. A materialization PR is
+[Claude review-lane callers](#claude-review-lane-caller-components), the
+[managed-files-guard caller](#managed-files-guard-caller-component) and the
+[online link-check callers](#online-link-check-caller-components) are the
+three recorded exceptions to that workflow-shape rule. A materialization PR is
 not an adoption completion signal until its corresponding integration PR
 supplies this wiring and CI passes.
 
@@ -427,6 +429,23 @@ already runs the guard from its own tree. The check is advisory (not in any
 until the soak completes. Rationale, pins, the advance path through the
 `maintenance-repin-ci-workflows` cascade, and the promotion record live in
 [`components/managed-files-guard/README.md`](../components/managed-files-guard/README.md).
+
+## Online link-check caller components
+
+One component per opted-in target, `lychee-online-<repo>`, materializes
+`.github/workflows/maintenance-check-links-online-<repo>.yml`: a thin caller
+for the `ci-workflows` reusable `maintenance-check-links-online.yml`
+(ci-workflows#739), which runs lychee online against the target's managed
+`lychee.toml`. It is the third recorded exception to the consumer-owned-caller
+rule, for the same reason as the first two: one definition at one pin across
+every target that runs it. Each target has its own source file under
+`components/lychee-online/targets/` because the cron minute and day differ
+per target and this manifest has no per-target values; the destination
+carries the repository name because a destination has one owning component.
+A scheduled run also needs the target's `link-check-online` org property set
+to `true`, which the reusable reads at run time; a dispatched run always
+checks. The opt-in steps and the cron slots in use live in
+[`components/lychee-online/README.md`](../components/lychee-online/README.md).
 
 ## Review-instructions reconciliation (medley)
 
