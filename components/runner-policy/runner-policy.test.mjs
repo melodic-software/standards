@@ -9657,3 +9657,39 @@ test("the fleet-routed managed-files-guard caller is rejected outright on a publ
   );
   assert.ok(rules.has("public-self-hosted-routing"), `${source} is expected to be private-only`);
 });
+
+// Each online link-check caller (components/lychee-online/) calls a
+// ci-workflows reusable, so its pin needs a contract entry, and its managed
+// targets include claude-code-plugins, which runs this gate. The shipped bytes
+// must audit clean on every target that manages them.
+test("every online link-check caller audits clean on every target that manages it", async () => {
+  const manifest = parse(
+    await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
+  );
+  const components = Object.keys(manifest.components).filter((name) =>
+    name.startsWith("lychee-online-"),
+  );
+  assert.ok(components.length > 0, "expected at least one lychee-online-<repo> component");
+  for (const component of components) {
+    const sources = Object.keys(manifest.components[component].files);
+    assert.equal(sources.length, 1, `expected ${component} to ship exactly one file`);
+    const body = await readFile(new URL(`../../${sources[0]}`, import.meta.url), "utf8");
+    const managedTargets = Object.entries(manifest.targets)
+      .filter(([, definition]) => (definition.managed ?? []).includes(component))
+      .map(([target]) => target);
+    assert.deepEqual(
+      managedTargets,
+      [`melodic-software/${component.slice("lychee-online-".length)}`],
+      `${component} must be managed for exactly the repository it names`,
+    );
+    for (const target of managedTargets) {
+      const visibility = isPublicTarget(target) ? "public" : "private";
+      const root = await consumerCarrying({ body, visibility, selfHostedCi: false });
+      assert.deepEqual(
+        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        [],
+        `${sources[0]} is managed for ${target} (${visibility}) but does not audit clean there`,
+      );
+    }
+  }
+});
