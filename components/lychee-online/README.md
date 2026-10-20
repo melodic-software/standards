@@ -42,8 +42,28 @@ The caller pins the reusable by full SHA, and
 `components/runner-policy/policy.json` carries the matching
 `approvedReusableWorkflowContracts` entry, since `claude-code-plugins` runs the
 runner-policy gate. These callers are not in the
-`maintenance-repin-ci-workflows` cascade: a re-pin moves the caller pin and
-adds the contract entry by hand, in one pull request.
+`maintenance-repin-ci-workflows` cascade, and every consumer's Dependabot
+ignores `melodic-software/ci-workflows/*`, so the pin moves by hand:
+
+- **Owner**: `@kyle-sexton` (`.github/CODEOWNERS`).
+- **Release source**: the
+  [ci-workflows releases](https://github.com/melodic-software/ci-workflows/releases).
+  Resolve a tag's commit with
+  `gh api repos/melodic-software/ci-workflows/git/ref/tags/<tag>`, and
+  dereference it if the ref is an annotated tag object.
+- **Trigger**: each `chore/repin-claude-lanes` pull request that
+  `.github/workflows/maintenance-repin-ci-workflows.yml` (daily) opens for a
+  new ci-workflows release. Its reviewer runs the procedure below in the same
+  review window.
+- **Procedure**:
+  1. Diff `.github/workflows/maintenance-check-links-online.yml` between the
+     pinned commit and the new tag. If it is unchanged, a re-pin is optional.
+  2. If the `workflow_call` inputs, secrets or permissions changed, update the
+     contract's `allowedInputs`, `allowedSecrets` and
+     `minimumCallerPermissions`.
+  3. Move every target's caller pin (`@<sha> # <tag>`) and the
+     `policy.json` contract key together, in one pull request.
+  4. Run `node --test components/runner-policy/runner-policy.test.mjs`.
 
 ## Exceptions
 
