@@ -1320,8 +1320,8 @@ input, with `contents: read` and `issues: write` inside the caller grant, and
 only when the `claude` job reports a credit stop or had no API key. A new
 `status` job with `permissions: {}` reports for both. No input, secret or
 caller-permission changes, and no new self-hosted routing.
-At the v0.55.0 tag `3a2c748fdef9cfb9ceec5a66289e21842189689f`, pending the
-owner's sign-off on standards#826's pull request, `pr-review` copies its
+At the v0.55.0 tag `3a2c748fdef9cfb9ceec5a66289e21842189689f`, signed off by
+hand on 2026-10-20 on standards#826's pull request, `pr-review` copies its
 v0.54.0 entry and adds `allowed-author-ids` (ci-workflows#828): the numeric ids
 of people whose closing issues the code review reads in full; an empty list
 replaces every person's closing issue with a placeholder. `pr-review-security`
