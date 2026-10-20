@@ -673,7 +673,7 @@
         "pull-requests": "read"
       }
     },
-    "melodic-software/ci-workflows/.github/workflows/maintenance-check-links-online.yml@85b2e58bef824ac41cb12a73309436c867ab054c": {
+    "melodic-software/ci-workflows/.github/workflows/maintenance-check-links-online.yml@3a2c748fdef9cfb9ceec5a66289e21842189689f": {
       "routing": "runner-input",
       "runnerInput": "runner",
       "allowedInputs": [
