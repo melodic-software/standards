@@ -159,12 +159,20 @@ export function parseCompositeSections(runShText, location) {
 // the keyword alternation, a separator (custom pattern or default), and the
 // reference pattern; the default-pattern form is the one rebuilt here, since
 // it is what runs for every caller that leaves `issue-ref-pattern` unset.
+// From ci-workflows#815 `scan_line` finds the matches with one
+// `gsub(closing_regex, ...)` pass over the lowercased line instead of a
+// `match(chunk, closing_regex)` loop; either form applies `closing_regex`.
 function compositeKeywordPattern(runShText, location) {
   const literal = runShText.match(/match\(chunk, \/(.+)\/\)\) break/);
   if (literal) {
     return literal[1];
   }
-  if (!/match\(chunk, closing_regex\)\) break/.test(runShText)) {
+  const matchLoop = /match\(chunk, closing_regex\)\) break/.test(runShText);
+  const gsubPass =
+    /^\s*marked = lower$/m.test(runShText) &&
+    /^\s*gsub\(closing_regex, "\\n&\\n", marked\)$/m.test(runShText) &&
+    /^\s*count = split\(marked, pieces, "\\n"\)$/m.test(runShText);
+  if (!matchLoop && !gsubPass) {
     return null;
   }
   const issueRef = parseCompositeIssueRef(runShText, location);
@@ -520,8 +528,27 @@ export function parseValidatorNegation(shellText, location) {
   };
 }
 
+// The window is the last N words before the keyword, cut at the nearest
+// sentence punctuation. Before ci-workflows#815 `negation_trigger` cuts the
+// preceding text at the punctuation, then keeps the last N words
+// (`first = (count > N) ? ...`). From #815 it scans backward and stops at the
+// Nth word boundary (`++seen == N`) or the punctuation, whichever comes first,
+// and the window is the slice from there to the keyword. The punctuation set
+// itself is left to the behavioral layer, which runs it.
+function compositeNegationWindow(runShText) {
+  const lastWords = runShText.match(/first = \(count > (\d+)\) \? count - (\d+) : 1/);
+  if (lastWords) {
+    return lastWords;
+  }
+  const backward = runShText.match(/if \(in_word && has_letter && \+\+seen == (\d+)\) break/);
+  if (backward && /^\s*tail = substr\(line, start, keyword_index - start\)$/m.test(runShText)) {
+    return backward;
+  }
+  return null;
+}
+
 export function parseCompositeNegation(runShText, location) {
-  const window = runShText.match(/first = \(count > (\d+)\) \? count - (\d+) : 1/);
+  const window = compositeNegationWindow(runShText);
   const affirmative = runShText.match(
     /if \(lower == "(\w+)" && i < count && tolower\(words\[i \+ 1\]\) == "(\w+)"\) continue/,
   );
