@@ -1302,6 +1302,24 @@ settings, removed sudo and docker access, and bubblewrap; the API key leg runs
 first and the subscription leg only after a credit stop. The v0.49.0 entry
 stays until claude-code-plugins repins its caller. No workflow or job
 permission, or `runs-on` routing changes.
+`pr-review`, `pr-review-security` and `maintenance-sync-standards` are
+registered at the v0.54.0 tag `7b362428c76085a160e28656cd2c75c3147a69ff`, each
+a verbatim copy of its v0.48.0 entry, signed off by hand on 2026-10-20. Both review lanes add a
+step that probes the bubblewrap subprocess sandbox before any model run and
+fails the lane as `sandbox-unavailable` when it cannot create a namespace
+(ci-workflows#796), check that the action installed Bun (#780), pass both
+results to the commit-relative `report-lane-outcome` action, and bump
+claude-code-action to v1.0.252. `maintenance-sync-standards` changes only a
+comment. No input, secret, workflow or job permission, or `runs-on` routing
+changes.
+`intake-triage` is registered at the same v0.54.0 tag, a verbatim copy of its
+v0.51.0 entry, signed off by hand on 2026-10-20. The subscription leg moves out
+of the `claude` job into a new `subscription` job (ci-workflows#803) that runs
+on a fresh GitHub-hosted `ubuntu-24.04` runner, never the caller's `runner`
+input, with `contents: read` and `issues: write` inside the caller grant, and
+only when the `claude` job reports a credit stop or had no API key. A new
+`status` job with `permissions: {}` reports for both. No input, secret or
+caller-permission changes, and no new self-hosted routing.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
