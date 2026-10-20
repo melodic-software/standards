@@ -114,4 +114,31 @@ rc=$?
 assert_nonzero 'a concurrency.queue workflow fails without the config (removal tripwire)' "$rc"
 assert_contains 'control run reports the queue message' "$out" "$queue_message"
 
+# Job-level `cache-mode`: the scoped ignore admits it, and only its exact message.
+cache_mode_message='unexpected key "cache-mode" for "job" section'
+cp "$config" "$project/.github/"
+rm -f "$project"/.github/workflows/*.yml
+cp components/actionlint/fixtures/good/cache-mode.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_exit 'a job cache-mode workflow lints clean with the config' 0 "$rc"
+assert_silent 'the cache-mode run emits no findings' "$out"
+
+cp components/actionlint/fixtures/bad/unknown-key.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'an unrelated unexpected job key still fails with the config' "$rc"
+assert_contains 'the unrelated job key is reported' "$out" 'unexpected key "unknown-key"'
+assert_not_contains 'the cache-mode suppression stays scoped to its exact message' "$out" "$cache_mode_message"
+
+# Control: without the config the cache-mode key must be rejected. When this
+# case fails, the pinned engine accepts `cache-mode` natively; drop the ignore
+# instead of patching this test.
+rm "$project/.github/actionlint.yaml" \
+  "$project/.github/workflows/unknown-key.yml"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'a job cache-mode workflow fails without the config (removal tripwire)' "$rc"
+assert_contains 'control run reports the cache-mode message' "$out" "$cache_mode_message"
+
 [[ $FAILED -eq 0 ]] || exit 1
