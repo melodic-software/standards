@@ -1347,6 +1347,12 @@ also runs when the API refuses the key with status 401 or 402, a 403 stops
 the run, and the CLI default moves from 2.1.304 to `latest`
 (ci-workflows#840, ci-workflows#841). No input, secret, caller permission, or
 routing changes.
+At the v0.59.0 tag `4aff99320ef484a7beac35ee3a7b7b854ec1e33f`, signed off by
+hand on 2026-10-21, `maintenance-check-links-online` is a verbatim copy of its
+v0.55.0 entry. Its `workflow_call` inputs, secrets, top-level and job
+permissions and `runs-on` are unchanged; a new report step lists timeouts and
+accepted 429 and 5xx links in the job summary (ci-workflows#844). No input,
+secret, caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
