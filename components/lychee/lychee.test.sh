@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests the lychee component: the good fixture's local links and anchors resolve
 # on disk, the bad fixture's broken references are flagged, JavaScript-rendered
-# fragments are remapped away, and a manual online run retries a 429 and then
-# fails it instead of accepting it.
+# fragments are remapped away, and an online run passes a 429, a 5xx or a
+# timeout while a 404 or 410 still fails it.
 # Skips cleanly when the engine or the fixture server's runtime is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
@@ -261,24 +261,28 @@ assert_contains 'bad fixture flags the missing fragment' "$out" 'Cannot find fra
 assert_contains 'bad fixture flags the missing file' "$out" 'does-not-exist.md'
 
 # Status handling only takes effect against a real response, so nothing above can
-# reach it. A local server answers 429 on one path and 200 on a control path,
-# and records every request to the throttled path: the config sets no `accept`,
-# so a 429 must be retried and then fail, while the 200 control proves the
-# server and the default accepted range work.
-python3 - "$http_fixture_root/port" "$http_fixture_root/throttled-hits" \
+# reach it. A local server answers the status code named by the path's last
+# segment (`hang` sleeps past the client timeout) and records every request
+# path. The expected outcomes are the owner's rule the config comment states: a
+# 429, a 5xx or a timeout passes the run, a 404 or 410 fails it, and a 200 still
+# passes because the default 2xx range is restated.
+python3 - "$http_fixture_root/port" "$http_fixture_root/hits" \
   <<'PY' >/dev/null 2>"$http_fixture_root/server.err" &
 import socketserver
 import sys
+import time
 from http.server import BaseHTTPRequestHandler
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        throttled = "throttled" in self.path
-        if throttled:
-            with open(sys.argv[2], "a", encoding="utf-8") as hits:
-                hits.write(self.command + "\n")
-        self.send_response(429 if throttled else 200)
+        with open(sys.argv[2], "a", encoding="utf-8") as hits:
+            hits.write(self.path + "\n")
+        last = self.path.rstrip("/").rsplit("/", 1)[-1]
+        if last == "hang":
+            time.sleep(5)
+            last = "200"
+        self.send_response(int(last))
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -288,10 +292,12 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-# Port 0 takes an ephemeral port, and the port file is written only after the
-# bind succeeds — that ordering is what makes the caller's readiness poll mean
-# "the server is listening" rather than "the process started".
-server = socketserver.TCPServer(("127.0.0.1", 0), Handler)
+# Threaded, so the hanging path does not hold up the others. Port 0 takes an
+# ephemeral port, and the port file is written only after the bind succeeds —
+# that ordering is what makes the caller's readiness poll mean "the server is
+# listening" rather than "the process started".
+socketserver.ThreadingTCPServer.daemon_threads = True
+server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)
 with open(sys.argv[1], "w", encoding="utf-8") as handle:
     handle.write(str(server.server_address[1]))
 server.serve_forever()
@@ -320,40 +326,54 @@ else
   # bare token because MSYS/git-bash rewrites backslashes inside an argument
   # containing `://`, which would silently mangle an anchored URL regex.
   status_probe='lychee-status-probe'
-  printf '<http://127.0.0.1:%s/%s/throttled>\n' "$http_port" "$status_probe" \
-    >"$http_fixture_root/Throttled.md"
-  printf '<http://127.0.0.1:%s/%s/live>\n' "$http_port" "$status_probe" \
-    >"$http_fixture_root/Live.md"
+  for code in 200 429 500 503 599 404 410 hang; do
+    printf '<http://127.0.0.1:%s/%s/%s>\n' "$http_port" "$status_probe" "$code" \
+      >"$http_fixture_root/Status$code.md"
+  done
 
   status_dump="$(lychee --dump --config "$config" --include "$status_probe" \
-    "$http_fixture_root/Throttled.md" 2>&1)"
-  assert_contains 'rate-limited fixture URL is checked, not silently excluded' \
-    "$status_dump" "http://127.0.0.1:$http_port/$status_probe/throttled"
+    "$http_fixture_root/Status429.md" 2>&1)"
+  assert_contains 'status fixture URL is checked, not silently excluded' \
+    "$status_dump" "http://127.0.0.1:$http_port/$status_probe/429"
 
-  live_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
-    "$http_fixture_root/Live.md" 2>&1)"
-  rc=$?
-  assert_exit '200 control exits 0' 0 "$rc"
   # Exit 0 alone is also what checking nothing looks like; the OK count proves a
-  # request was made and its 200 was accepted.
-  assert_contains '200 control is counted as a checked OK link' "$live_out" '1 OK'
+  # request was made and its status was accepted.
+  for code in 200 429 500 503 599; do
+    status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
+      "$http_fixture_root/Status$code.md" 2>&1)"
+    rc=$?
+    assert_exit "$code passes the run" 0 "$rc"
+    assert_contains "$code is counted as a checked OK link" "$status_out" '1 OK'
+  done
+  # The cost the config comment names: an accepted 429 is final on the first
+  # reply, so lychee does not retry it.
+  assert_row_count 'accepted 429 is requested once, not retried' \
+    "$(<"$http_fixture_root/hits")" 1 "/$status_probe/429\$"
 
-  throttled_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
-    "$http_fixture_root/Throttled.md" 2>&1)"
+  for code in 404 410; do
+    status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
+      "$http_fixture_root/Status$code.md" 2>&1)"
+    rc=$?
+    assert_nonzero "dead link $code fails the run" "$rc"
+    # An unreachable server also exits non-zero; naming the status keeps the
+    # case from passing for the wrong reason.
+    assert_contains "dead link $code fails on the status code itself" \
+      "$status_out" "Rejected status code: $code"
+  done
+
+  # A short timeout and no retries keep the case fast; the timeout is still
+  # reported, it just does not fail the run.
+  status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
+    --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" 2>&1)"
   rc=$?
-  assert_nonzero 'persistent 429 fails the run' "$rc"
-  # A dead or unreachable server also exits non-zero; naming the status keeps the
-  # case from passing for the wrong reason.
-  assert_contains 'persistent 429 fails on the status code itself' \
-    "$throttled_out" 'Rejected status code: 429'
-  # One request would mean the 429 was taken as final; more than one proves
-  # lychee retried it, the behavior an accepted 429 would skip.
-  throttled_hits="$(wc -l <"$http_fixture_root/throttled-hits" 2>/dev/null || printf '0')"
-  if ((throttled_hits > 1)); then
-    pass "persistent 429 is retried before failing: $throttled_hits requests"
-  else
-    fail 'persistent 429 is retried before failing' "requests: $throttled_hits"
-  fi
+  assert_exit 'timeout passes the run' 0 "$rc"
+  assert_contains 'timeout is still reported' "$status_out" '1 Timeouts'
+  # Control: the same request without accept_timeouts fails, so the pass above
+  # comes from the config key.
+  lychee --no-progress --config "$config" --include "$status_probe" --accept-timeouts=false \
+    --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" >/dev/null 2>&1
+  rc=$?
+  assert_nonzero 'without accept_timeouts a timeout fails the run' "$rc"
 fi
 
 [[ $FAILED -eq 0 ]] || exit 1

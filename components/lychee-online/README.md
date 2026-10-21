@@ -5,8 +5,9 @@ reusable `.github/workflows/maintenance-check-links-online.yml`
 (ci-workflows#739). The reusable runs lychee with the network on over the
 target's Markdown with its managed [`lychee.toml`](../lychee/README.md) and
 its own `.lycheeignore`, writes the report to the job summary, fails red on a
-broken link, and holds only the `GITHUB_TOKEN`. It opens no issue and posts
-no comment, and it is not part of any `ci-status`.
+broken link, and holds only the `GITHUB_TOKEN`. A 429, a 5xx or a timeout does
+not fail the run (the `accept` comment in the managed `lychee.toml` says why).
+It opens no issue and posts no comment, and it is not part of any `ci-status`.
 
 ## Opt-in
 
@@ -70,5 +71,4 @@ ignores `melodic-software/ci-workflows/*`, so the pin moves by hand:
 Exact-URL `.lycheeignore` entries in the target, each with a dated reason,
 only for pages proven alive that block the checker; shared ones go in the
 managed `lychee.toml`. Per-host pacing (standards#775, removed in #776) did not
-stop runner 429s, and a single red run on a github.com blob page 503 is not
-proof of rot.
+stop runner 429s, so the managed config accepts 429 and 5xx instead.

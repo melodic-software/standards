@@ -52,6 +52,7 @@ const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
 const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
 const REPINE_LANE_SHA_V0_56_0 = "1bb8953644d16f21d10718962c6702f01ea3308a";
 const REPINE_LANE_SHA_V0_58_0 = "5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c";
+const REPINE_LANE_SHA_V0_59_0 = "4aff99320ef484a7beac35ee3a7b7b854ec1e33f";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9597,6 +9598,22 @@ test("both intake contracts at the v0.58.0 tag copy their v0.56.0 entries forwar
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_58_0}`)).length,
     reusables.length,
+  );
+});
+
+// v0.59.0 keeps the online link check's interface: inputs, secrets and
+// permissions are unchanged and only steps move (ci-workflows#844), so its
+// v0.55.0 entry carries forward verbatim.
+test("the online link-check contract at the v0.59.0 tag copies its v0.55.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const workflowPath =
+    "melodic-software/ci-workflows/.github/workflows/maintenance-check-links-online.yml";
+  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`];
+  assert.ok(previous, "expected a v0.55.0 contract for maintenance-check-links-online");
+  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_59_0}`], previous);
+  assert.deepEqual(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_59_0}`)),
+    [`${workflowPath}@${REPINE_LANE_SHA_V0_59_0}`],
   );
 });
 
