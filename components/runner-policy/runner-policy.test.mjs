@@ -51,6 +51,7 @@ const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
 const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
 const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
 const REPINE_LANE_SHA_V0_56_0 = "1bb8953644d16f21d10718962c6702f01ea3308a";
+const REPINE_LANE_SHA_V0_58_0 = "5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9573,6 +9574,29 @@ test("both intake contracts at the v0.56.0 tag copy their reviewed entries forwa
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_56_0}`)).length,
     Object.keys(previousSha).length,
+  );
+});
+
+// v0.58.0 keeps both intake interfaces: intake-label-needs-triage is
+// byte-identical, and intake-triage changes only steps and job outputs (the
+// 401/402 subscription handoff and the `latest` CLI default), so each entry
+// carries its v0.56.0 contract forward verbatim.
+test("both intake contracts at the v0.58.0 tag copy their v0.56.0 entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["intake-triage", "intake-label-needs-triage"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_56_0}`];
+    assert.ok(previous, `expected a v0.56.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_58_0}`],
+      previous,
+      `${reusable} at the v0.58.0 tag is not a verbatim copy of its v0.56.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_58_0}`)).length,
+    reusables.length,
   );
 });
 

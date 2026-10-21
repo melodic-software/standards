@@ -1339,6 +1339,14 @@ hand on 2026-10-21, `intake-triage` is a verbatim copy of its v0.55.0 entry and
 Each file's git blob at the tag equals the one at the SHA its copied entry
 reviewed; the release changes only pr-require-checks actions
 (ci-workflows#836). No input, secret, caller permission, or routing changes.
+At the v0.58.0 tag `5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c`, sign-off
+pending, both intake entries are verbatim copies of their v0.56.0 entries.
+`intake-label-needs-triage` is byte-identical. `intake-triage` keeps its
+`workflow_call` inputs, secrets and job permissions; the subscription job now
+also runs when the API refuses the key with status 401 or 402, a 403 stops
+the run, and the CLI default moves from 2.1.304 to `latest`
+(ci-workflows#840, ci-workflows#841). No input, secret, caller permission, or
+routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
