@@ -53,6 +53,7 @@ const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
 const REPINE_LANE_SHA_V0_56_0 = "1bb8953644d16f21d10718962c6702f01ea3308a";
 const REPINE_LANE_SHA_V0_58_0 = "5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c";
 const REPINE_LANE_SHA_V0_59_0 = "4aff99320ef484a7beac35ee3a7b7b854ec1e33f";
+const REPINE_LANE_SHA_V0_59_1 = "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9614,6 +9615,30 @@ test("the online link-check contract at the v0.59.0 tag copies its v0.55.0 entry
   assert.deepEqual(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_59_0}`)),
     [`${workflowPath}@${REPINE_LANE_SHA_V0_59_0}`],
+  );
+});
+
+// v0.59.1 keeps both review interfaces: inputs, secrets and permissions are
+// unchanged; the claude-code-action pin moves from v1.0.252 to v1.0.253 on the
+// steps that receive the OAuth token (ci-workflows#838) and the findings count
+// is raised to the summary's manifest flag lines (ci-workflows#848), so each
+// v0.55.0 entry carries forward verbatim.
+test("both review contracts at the v0.59.1 tag copy their v0.55.0 entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["pr-review", "pr-review-security"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`];
+    assert.ok(previous, `expected a v0.55.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_59_1}`],
+      previous,
+      `${reusable} at the v0.59.1 tag is not a verbatim copy of its v0.55.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_59_1}`)).length,
+    reusables.length,
   );
 });
 

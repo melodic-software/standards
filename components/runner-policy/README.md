@@ -1353,6 +1353,13 @@ v0.55.0 entry. Its `workflow_call` inputs, secrets, top-level and job
 permissions and `runs-on` are unchanged; a new report step lists timeouts and
 accepted 429 and 5xx links in the job summary (ci-workflows#844). No input,
 secret, caller permission, or routing changes.
+At the v0.59.1 tag `8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b`, sign-off
+pending, `pr-review` and `pr-review-security` are verbatim copies of their
+v0.55.0 entries. Their `workflow_call` inputs, secrets and permissions are
+unchanged; the claude-code-action pin moves from v1.0.252 to v1.0.253 on both
+review steps, which receive the OAuth token (ci-workflows#838), and the
+findings count is raised to the summary's manifest flag lines
+(ci-workflows#848). No input, secret, caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
