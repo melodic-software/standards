@@ -1333,6 +1333,12 @@ and a new model-free `apply` job on GitHub-hosted `ubuntu-24.04` writes the
 labels and comment (ci-workflows#821), and the model sees only comments by
 trusted authors (ci-workflows#830). No secret, caller permission, or self-hosted routing
 changes.
+At the v0.56.0 tag `1bb8953644d16f21d10718962c6702f01ea3308a`, sign-off
+pending, `intake-triage` is a verbatim copy of its v0.55.0 entry and
+`intake-label-needs-triage` a verbatim copy of its v0.42.0 entry (`182aca3`).
+Each file's git blob at the tag equals the one at the SHA its copied entry
+reviewed; the release changes only pr-require-checks actions
+(ci-workflows#836). No input, secret, caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

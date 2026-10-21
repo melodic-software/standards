@@ -50,6 +50,7 @@ const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
 const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
 const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
 const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
+const REPINE_LANE_SHA_V0_56_0 = "1bb8953644d16f21d10718962c6702f01ea3308a";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9547,6 +9548,31 @@ test("every reusable contract at the v0.55.0 tag copies its v0.54.0 entry and ad
         .map((key) => key.split("/").at(-1).split(".yml@")[0]),
     ),
     new Set([...Object.keys(added), "maintenance-check-links-online"]),
+  );
+});
+
+// v0.56.0 changes only pr-require-checks actions; both intake files are
+// byte-identical to the SHA their previous entry reviewed, so each entry
+// carries forward verbatim.
+test("both intake contracts at the v0.56.0 tag copy their reviewed entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const previousSha = {
+    "intake-triage": REPINE_LANE_SHA_V0_55_0,
+    "intake-label-needs-triage": REPINE_LANE_SHA_V0_42_0,
+  };
+  for (const [reusable, sha] of Object.entries(previousSha)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${sha}`];
+    assert.ok(previous, `expected a ${sha} contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_56_0}`],
+      previous,
+      `${reusable} at the v0.56.0 tag is not a verbatim copy of its ${sha} entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_56_0}`)).length,
+    Object.keys(previousSha).length,
   );
 });
 
