@@ -224,12 +224,27 @@ unrelated command that merely contains the text (`grep "worktree remove --force 
 does not. A double force split by the path
 (`-f <path> -f`) or bundled as `-ff` is not matched; the threat model below covers why.
 
-### `gh pr merge --auto` has no floor row
+### Routine `gh` SDLC work is allowed; GitHub rulesets gate merges
 
-Merge permission depends on the repository, who opened the pull request and whether its reviews
-finished, so it lives in the consumer's prose `autoMode` entry. The former `gh pr merge --auto`
-denies matched only the flag-first spelling, never the documented number-first one
-(`gh pr merge <N> --squash --auto`), so they blocked one ordering of an otherwise allowed command.
+The floor allows the routine `gh` SDLC set in both shells: `gh pr merge` (`--auto` included),
+`close`, `reopen`, `ready` and `update-branch`, `gh issue develop`, `gh run cancel`, and read-only
+verbs such as `gh pr status`, `gh workflow list|view`, `gh release list|view`, `gh secret list` and
+`gh ruleset list|view|check`. The operator decided that agents run planned GitHub work unattended,
+locally and in cloud sessions, with GitHub's rulesets and required checks as the merge gate
+(melodic-software/dotfiles#1227). The rows live here, not in the dotfiles user layer alone, because
+cloud sessions read only this floor (see the cloud layer below; melodic-software/dotfiles#1239).
+
+`deny` keeps the parts that are not routine: `--admin` merges, which bypass those rulesets and stay
+the operator's break-glass (melodic-software/dotfiles#1249); `--merge` and `--rebase`, so merges
+stay squash-only; `gh api *bypass_rules*`; `gh repo delete`, `gh gist delete`; and `gh auth token`
+and the `gh auth status` token flags. `gh auth status` itself has no allow row, because a bundled
+`-at` prints the token. `gh api` writes, `gh secret set`, ruleset writes, `gh workflow run`,
+`gh run rerun` and `gh release create|edit|upload` get no allow row and stay with the classifier.
+`claude-permissions.test.sh` asserts all three groups.
+
+The former `gh pr merge --auto` denies matched only the flag-first spelling, never the documented
+number-first one (`gh pr merge <N> --squash --auto`), so they blocked one ordering of an otherwise
+allowed command; the test keeps them out.
 
 ### `ruff check --unsafe-fixes` is denied, but a repo config can enable it
 

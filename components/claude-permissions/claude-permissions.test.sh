@@ -209,4 +209,53 @@ for pattern in "${forbidden_read_denies[@]}"; do
   fi
 done
 
+# Routine gh SDLC work (melodic-software/dotfiles#1227, #1249) is allowed in both
+# shells, while admin, merge-commit and rebase merges, bypass_rules, repository
+# and gist deletion, and token disclosure stay denied. The allow rows must not
+# reach gh api writes, secrets, rulesets, workflow dispatch, reruns or releases.
+# `matching_rows <surface> <shell> <command>` prints every row of that surface
+# and shell matching the command; PowerShell rules match case-insensitively
+# (https://code.claude.com/docs/en/permissions).
+matching_rows() {
+  local surface="$1" shell="$2" cmd="$3" row body re
+  while IFS= read -r row; do
+    body="${row#*(}"
+    re="$(glob_to_regex "${body%)}")"
+    if [[ "$shell" == PowerShell ]]; then shopt -s nocasematch; fi
+    if [[ "$cmd" =~ $re ]]; then printf '%s\n' "$row"; fi
+    shopt -u nocasematch
+  done < <(jq -r --arg surface "$surface" --arg shell "$shell(" \
+    '.claudePermissions[$surface][] | select(startswith($shell))' "$config")
+}
+
+for shell in Bash PowerShell; do
+  for cmd in 'gh pr merge 1 -R melodic-software/x --squash --auto' 'gh pr close 1' 'gh pr ready 1' \
+    'gh pr reopen 1' 'gh pr update-branch 1' 'gh issue develop 1' 'gh run cancel 1' 'gh workflow view ci.yml'; do
+    if [[ -n "$(matching_rows allow "$shell" "$cmd")" && -z "$(matching_rows deny "$shell" "$cmd")" ]]; then
+      pass "$shell allows: $cmd"
+    else
+      fail "$shell allows: $cmd" 'routine gh row missing or denied'
+    fi
+  done
+  for cmd in 'gh pr merge 1 -R melodic-software/x --squash --admin' 'gh pr merge --admin 1' \
+    'gh pr merge 1 --merge' 'gh pr merge 1 --rebase' 'gh repo delete o/r --yes' 'gh gist delete 1' \
+    'gh auth token --hostname github.com' 'gh auth status --show-token' 'gh auth status -t' \
+    'gh api -X PUT repos/o/r/pulls/1/merge-async -f bypass_rules=true'; do
+    if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
+      pass "$shell denies: $cmd"
+    else
+      fail "$shell denies: $cmd" 'no deny row matches'
+    fi
+  done
+  for cmd in 'gh api -X POST repos/o/r/issues' 'gh secret set TOKEN' 'gh ruleset create' \
+    'gh workflow run deploy.yml' 'gh run rerun 1' 'gh release create v1.0.0' 'gh auth status'; do
+    rows="$(matching_rows allow "$shell" "$cmd")"
+    if [[ -z "$rows" ]]; then
+      pass "$shell leaves to the classifier: $cmd"
+    else
+      fail "$shell leaves to the classifier: $cmd" "allowed by: $rows"
+    fi
+  done
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
