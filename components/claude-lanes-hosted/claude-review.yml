@@ -81,7 +81,7 @@ jobs:
                              # reviewed-head marker comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@3a2c748fdef9cfb9ceec5a66289e21842189689f # v0.55.0
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c # v0.58.0
     with:
       runner: ubuntu-24.04
       # Bot senders this lane reviews, by numeric user id: the
