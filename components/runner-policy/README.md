@@ -1333,8 +1333,8 @@ and a new model-free `apply` job on GitHub-hosted `ubuntu-24.04` writes the
 labels and comment (ci-workflows#821), and the model sees only comments by
 trusted authors (ci-workflows#830). No secret, caller permission, or self-hosted routing
 changes.
-At the v0.56.0 tag `1bb8953644d16f21d10718962c6702f01ea3308a`, sign-off
-pending, `intake-triage` is a verbatim copy of its v0.55.0 entry and
+At the v0.56.0 tag `1bb8953644d16f21d10718962c6702f01ea3308a`, signed off by
+hand on 2026-10-21, `intake-triage` is a verbatim copy of its v0.55.0 entry and
 `intake-label-needs-triage` a verbatim copy of its v0.42.0 entry (`182aca3`).
 Each file's git blob at the tag equals the one at the SHA its copied entry
 reviewed; the release changes only pr-require-checks actions
