@@ -1353,8 +1353,8 @@ v0.55.0 entry. Its `workflow_call` inputs, secrets, top-level and job
 permissions and `runs-on` are unchanged; a new report step lists timeouts and
 accepted 429 and 5xx links in the job summary (ci-workflows#844). No input,
 secret, caller permission, or routing changes.
-At the v0.59.1 tag `8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b`, sign-off
-pending, `pr-review` and `pr-review-security` are verbatim copies of their
+At the v0.59.1 tag `8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b`, signed off by
+hand on 2026-10-21, `pr-review` and `pr-review-security` are verbatim copies of their
 v0.55.0 entries. Their `workflow_call` inputs, secrets, and job permissions
 and `runs-on` are unchanged. Both steps that receive `CLAUDE_CODE_OAUTH_TOKEN`
 move claude-code-action from v1.0.252 (`f27be6b`) to v1.0.253 (`5eb090f3`)
