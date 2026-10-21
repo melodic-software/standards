@@ -68,6 +68,24 @@
         "reviewed": "2026-10-18",
         "basis": ".github/actions/resolve-config/action.yml:159 installs this lockfile and :160 runs resolve-config.mjs, whose resolve.mjs:8 loads yaml to parse the lane config inside credentialed CI lanes; in pr-merge.yml:210-215 its output sets the permissions the lane token is minted with at :261, so a hijacked release can widen that token.",
         "control": "docs/conventions/pr-pipeline/README.md#review-only-dependencies"
+      },
+      {
+        "repository": "melodic-software/dotfiles",
+        "ecosystem": "npm",
+        "directory": "/",
+        "dependency": "lefthook",
+        "reviewed": "2026-10-21",
+        "basis": "No CI job installs the root lockfile; the exposure is the operator's machines. package-lock.json:500 marks lefthook with an install script that runs on npm ci or npm install, package.json:15 runs lefthook install as the prepare script, and the installed binary then runs hook code at every commit (.github/dependabot.yml:57-58) with the operator's local credentials.",
+        "control": ".github/workflows/pr-automerge-dependabot.yml"
+      },
+      {
+        "repository": "melodic-software/provisioning",
+        "ecosystem": "npm",
+        "directory": "/",
+        "dependency": "lefthook",
+        "reviewed": "2026-10-21",
+        "basis": "No CI job installs the root lockfile; the exposure is the operator's machines. package-lock.json:500 marks lefthook with an install script that runs on npm ci or npm install, package.json:15 runs lefthook install as the prepare script, and the installed binary then runs hook code at every commit with the operator's local credentials, on the repository that provisions machine state.",
+        "control": ".github/workflows/pr-automerge-dependabot.yml"
       }
     ],
     "excludeSemverMajor": true,
