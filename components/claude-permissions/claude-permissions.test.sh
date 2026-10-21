@@ -209,8 +209,7 @@ for pattern in "${forbidden_read_denies[@]}"; do
   fi
 done
 
-# Routine gh SDLC work (melodic-software/dotfiles#1227, #1249) is allowed in both
-# shells, while admin, merge-commit and rebase merges, bypass_rules, repository
+# Routine gh SDLC work is allowed in both shells, while admin, merge-commit and rebase merges, bypass_rules, repository
 # and gist deletion, and token disclosure stay denied. The allow rows must not
 # reach gh api writes, secrets, rulesets, workflow dispatch, reruns or releases.
 # `matching_rows <surface> <shell> <command>` prints every row of that surface
