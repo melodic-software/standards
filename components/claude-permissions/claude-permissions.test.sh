@@ -228,7 +228,11 @@ matching_rows() {
 }
 
 for shell in Bash PowerShell; do
-  for cmd in 'gh pr merge 1 -R melodic-software/x --squash --auto' 'gh pr close 1' 'gh pr ready 1' \
+  # `-R OWNER/REPO` must survive the short `-r` denies, which PowerShell
+  # matches case-insensitively.
+  for cmd in 'gh pr merge 1 -R melodic-software/x --squash --auto' 'gh pr merge -R melodic-software/x 1 --squash' \
+    'gh pr merge 1 --squash --auto -R melodic-software/x' 'gh pr merge 1 -R melodic-software/x -d --squash' \
+    'gh pr close 1' 'gh pr ready 1' \
     'gh pr reopen 1' 'gh pr update-branch 1' 'gh issue develop 1' 'gh run cancel 1' 'gh workflow view ci.yml'; do
     if [[ -n "$(matching_rows allow "$shell" "$cmd")" && -z "$(matching_rows deny "$shell" "$cmd")" ]]; then
       pass "$shell allows: $cmd"
@@ -237,8 +241,10 @@ for shell in Bash PowerShell; do
     fi
   done
   for cmd in 'gh pr merge 1 -R melodic-software/x --squash --admin' 'gh pr merge --admin 1' \
-    'gh pr merge 1 --merge' 'gh pr merge 1 --rebase' 'gh repo delete o/r --yes' 'gh gist delete 1' \
-    'gh auth token --hostname github.com' 'gh auth status --show-token' 'gh auth status -t' \
+    'gh pr merge 1 --merge' 'gh pr merge 1 --rebase' 'gh pr merge 1 -m' 'gh pr merge 1 -r' \
+    'gh pr merge 1 -m --auto' 'gh pr merge 1 -r --auto' 'gh pr merge -m 1' 'gh pr merge -r --auto 1' \
+    'gh pr merge 1 -R melodic-software/x -r --auto' 'gh repo delete o/r --yes' 'gh gist delete 1' \
+    'gh auth token' 'gh auth token --hostname github.com''gh auth status --show-token' 'gh auth status -t' \
     'gh api -X PUT repos/o/r/pulls/1/merge-async -f bypass_rules=true'; do
     if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
       pass "$shell denies: $cmd"

@@ -235,9 +235,16 @@ locally and in cloud sessions, with GitHub's rulesets and required checks as the
 cloud sessions read only this floor (see the cloud layer below; melodic-software/dotfiles#1239).
 
 `deny` keeps the parts that are not routine: `--admin` merges, which bypass those rulesets and stay
-the operator's break-glass (melodic-software/dotfiles#1249); `--merge` and `--rebase`, so merges
-stay squash-only; `gh api *bypass_rules*`; `gh repo delete`, `gh gist delete`; and `gh auth token`
-and the `gh auth status` token flags. `gh auth status` itself has no allow row, because a bundled
+the operator's break-glass (melodic-software/dotfiles#1249); `--merge`, `--rebase`, `-m` and `-r`,
+so merges stay squash-only; `gh api *bypass_rules*`; `gh repo delete`, `gh gist delete`; and
+`gh auth token` and the `gh auth status` token flags.
+
+PowerShell rules match case-insensitively, and `-R OWNER/REPO` is how a merge names its repository,
+so a PowerShell `-r *` row would deny every `-R` merge. The PowerShell `-r` rows instead match `-r`
+only at the end of the command or before another flag; an `OWNER/REPO` value never starts with `-`.
+Two spellings remain undenied: a PowerShell `gh pr merge -r <N>` with `-r` before a non-flag
+argument, and bundled short flags such as `-dm` in either shell. Each repository's allowed merge
+methods still stop them. `gh auth status` itself has no allow row, because a bundled
 `-at` prints the token. `gh api` writes, `gh secret set`, ruleset writes, `gh workflow run`,
 `gh run rerun` and `gh release create|edit|upload` get no allow row and stay with the classifier.
 `claude-permissions.test.sh` asserts all three groups.
