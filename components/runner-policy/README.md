@@ -72,7 +72,10 @@ structural reason the job does not exercise is a review-time inventory
 defect, not an admitted route. A hosted-only repository sets
 `selfHostedCi: false` and keeps `exceptions` empty: local routing is disabled,
 fixed approved hosted targets need no exception, and any unconsumed exception
-fails as `exception-inventory-drift`. Set `CI_REPOSITORY_VISIBILITY` from the
+fails as `exception-inventory-drift`. macOS labels are public-only: a private
+repository that names one in `runs-on`, a matrix or a reusable `with:` value
+gets `private-macos-runner`, whatever its `selfHostedCi` or exceptions, since
+macOS minutes bill on private repositories. Set `CI_REPOSITORY_VISIBILITY` from the
 event as shown so checked-in inventory cannot claim that a public repository is
 private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
 variable independently of the checked-out repository, so the owner-mismatch

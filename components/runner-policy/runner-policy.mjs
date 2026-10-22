@@ -3337,6 +3337,25 @@ export async function auditRepository({
         }
       }
 
+      // macOS runners are free only on a public repository and bill at the
+      // macOS rate on a private one, so no private repository may name one,
+      // whatever its enrollment, routing or exception inventory says. The
+      // visibility here is the event-checked inventory value.
+      if (config.visibility === "private") {
+        for (const runner of runnerStrings) {
+          if (runner.toLowerCase().includes("macos")) {
+            findings.push(
+              finding(
+                "private-macos-runner",
+                file,
+                jobId,
+                `${JSON.stringify(runner.trim())} is a macOS runner, which bills on a private repository; macOS labels are public-only`,
+              ),
+            );
+          }
+        }
+      }
+
       for (const runner of runnerStrings) {
         // The one skip is the label this job routes on, and only for that
         // exact string. It is conditioned on routingEnabled so a public or

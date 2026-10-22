@@ -7262,17 +7262,59 @@ test("hosted-only reusable contract rejects an alternate secret expression", asy
   assert.match(findings[0].message, /must be exactly/);
 });
 
+const macosJob = (label) => ({
+  "ci.yml": `jobs:\n  macos:\n    runs-on: ${label}\n    steps: []\n`,
+});
+
 test("public jobs may pin the approved macOS image but not a billed larger macOS runner", async () => {
-  const workflow = (label) => ({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: { "ci.yml": `jobs:\n  macos:\n    runs-on: ${label}\n    steps: []\n` },
-  });
-  assert.deepEqual(await audit(await repository(workflow("macos-26"))), []);
+  const repo = (label) =>
+    repository({ visibility: "public", selfHostedCi: false, workflows: macosJob(label) });
+  assert.deepEqual(await audit(await repo("macos-26")), []);
   assert.deepEqual(
-    (await audit(await repository(workflow("macos-26-xlarge")))).map(({ rule }) => rule),
+    (await audit(await repo("macos-26-xlarge"))).map(({ rule }) => rule),
     ["runner-target-contract"],
   );
+});
+
+test("a private hosted-only repository cannot run a macOS job", async () => {
+  const root = await repository({ selfHostedCi: false, workflows: macosJob("macos-26") });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["private-macos-runner"],
+  );
+});
+
+test("no exception reason admits a macOS job on an enrolled private repository", async () => {
+  const root = await repository({
+    exceptions: {
+      ".github/workflows/ci.yml#macos": {
+        reason: "windows",
+        justification: "Misdeclared to reach a billed macOS runner.",
+      },
+    },
+    workflows: macosJob("macos-26"),
+  });
+  assert.deepEqual(
+    (await audit(root)).map(({ rule }) => rule),
+    ["private-macos-runner"],
+  );
+});
+
+test("a private macOS matrix entry is refused too", async () => {
+  const root = await repository({
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    runs-on: \${{ matrix.os }}
+    steps: []
+`,
+    },
+  });
+  assert.ok((await audit(root)).some(({ rule }) => rule === "private-macos-runner"));
 });
 
 test("eligible private hosted job requires a machine-readable exception", async () => {
