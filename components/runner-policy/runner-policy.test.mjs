@@ -7262,6 +7262,19 @@ test("hosted-only reusable contract rejects an alternate secret expression", asy
   assert.match(findings[0].message, /must be exactly/);
 });
 
+test("public jobs may pin the approved macOS image but not a billed larger macOS runner", async () => {
+  const workflow = (label) => ({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": `jobs:\n  macos:\n    runs-on: ${label}\n    steps: []\n` },
+  });
+  assert.deepEqual(await audit(await repository(workflow("macos-26"))), []);
+  assert.deepEqual(
+    (await audit(await repository(workflow("macos-26-xlarge")))).map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+});
+
 test("eligible private hosted job requires a machine-readable exception", async () => {
   const root = await repository({
     workflows: { "ci.yml": "jobs:\n  windows:\n    runs-on: windows-2025\n    steps: []\n" },
