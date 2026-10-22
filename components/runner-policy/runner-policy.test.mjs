@@ -7317,6 +7317,40 @@ test("a private macOS matrix entry is refused too", async () => {
   assert.ok((await audit(root)).some(({ rule }) => rule === "private-macos-runner"));
 });
 
+test("a macOS label inside a JSON array, a list or quotes is refused on a private repository", async () => {
+  for (const value of [`'["macos-26"]'`, `"macos-26, ubuntu-24.04"`, `"'macos-latest'"`]) {
+    const root = await repository({
+      selfHostedCi: false,
+      workflows: {
+        "ci.yml": `permissions:
+  contents: read
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      runs-on: ${value}
+`,
+        "build.yml": `on:
+  workflow_call:
+    inputs:
+      runs-on:
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: \${{ fromJSON(inputs.runs-on) }}
+    steps: []
+`,
+      },
+    });
+    assert.ok(
+      (await audit(root)).some(({ rule }) => rule === "private-macos-runner"),
+      `${value} is not refused`,
+    );
+  }
+});
+
 test("a private job whose matrix or with: value only mentions macos is not a macOS runner", async () => {
   const root = await repository({
     selfHostedCi: false,
