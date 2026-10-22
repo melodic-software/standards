@@ -1362,6 +1362,17 @@ move claude-code-action from v1.0.252 (`f27be6b`) to v1.0.253 (`5eb090f3`)
 auto-approve, and the result step raises a findings count below the summary's
 `manifest <field>: flag` lines to that count (ci-workflows#848). No input,
 secret, caller permission, or routing changes.
+At the v0.60.0 tag `82ca5ca9be6e18a1addb7986eae15689339aedbc`, sign-off
+pending, `intake-triage` is a verbatim copy of its v0.58.0 entry and
+`pr-review` and `pr-review-security` are verbatim copies of their v0.59.1
+entries. The two review workflow files are byte-identical; `intake-triage`
+keeps its `workflow_call` inputs, secrets and job permissions, passes each
+comment's link to the model (ci-workflows#854) and its lane id to
+report-lane-outcome. The commit-relative actions change: report-lane-outcome
+writes the lane-outcome record (ci-workflows#853), and the sandbox probe errors
+in check-subprocess-sandbox and run-claude-cli name Docker's seccomp profile
+(ci-workflows#849), a commit-relative diff the gate cannot auto-approve. No
+input, secret, caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
