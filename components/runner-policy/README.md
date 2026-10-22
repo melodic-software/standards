@@ -1362,8 +1362,8 @@ move claude-code-action from v1.0.252 (`f27be6b`) to v1.0.253 (`5eb090f3`)
 auto-approve, and the result step raises a findings count below the summary's
 `manifest <field>: flag` lines to that count (ci-workflows#848). No input,
 secret, caller permission, or routing changes.
-At the v0.60.0 tag `82ca5ca9be6e18a1addb7986eae15689339aedbc`, sign-off
-pending, `intake-triage` is a verbatim copy of its v0.58.0 entry and
+At the v0.60.0 tag `82ca5ca9be6e18a1addb7986eae15689339aedbc`, signed off by
+hand on 2026-10-22, `intake-triage` is a verbatim copy of its v0.58.0 entry and
 `pr-review` and `pr-review-security` are verbatim copies of their v0.59.1
 entries. The two review workflow files are byte-identical; `intake-triage`
 keeps its `workflow_call` inputs, secrets and job permissions, passes each
