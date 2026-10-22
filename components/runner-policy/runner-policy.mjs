@@ -3340,10 +3340,12 @@ export async function auditRepository({
       // macOS runners are free only on a public repository and bill at the
       // macOS rate on a private one, so no private repository may name one,
       // whatever its enrollment, routing or exception inventory says. The
-      // visibility here is the event-checked inventory value.
+      // visibility here is the event-checked inventory value. Only a value
+      // shaped like a macOS label counts; an expression `runs-on` is left to
+      // runner-target-contract.
       if (config.visibility === "private") {
         for (const runner of runnerStrings) {
-          if (runner.toLowerCase().includes("macos")) {
+          if (/^macos(-|$)/i.test(runner.trim())) {
             findings.push(
               finding(
                 "private-macos-runner",

@@ -7317,6 +7317,44 @@ test("a private macOS matrix entry is refused too", async () => {
   assert.ok((await audit(root)).some(({ rule }) => rule === "private-macos-runner"));
 });
 
+test("a private job whose matrix or with: value only mentions macos is not a macOS runner", async () => {
+  const root = await repository({
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        name: [skip-macos-legs]
+    runs-on: ubuntu-24.04
+    steps: []
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      path: tools/macos/setup.sh
+`,
+      "build.yml": `on:
+  workflow_call:
+    inputs:
+      path:
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(root)).filter(({ rule }) => rule === "private-macos-runner"),
+    [],
+  );
+});
+
 test("eligible private hosted job requires a machine-readable exception", async () => {
   const root = await repository({
     workflows: { "ci.yml": "jobs:\n  windows:\n    runs-on: windows-2025\n    steps: []\n" },
