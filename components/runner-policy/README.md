@@ -1393,6 +1393,15 @@ report the first attempt's usage limit as its own record, a step that needs a
 fallback token no allowed caller can pass; ci-workflows#857 adds a test
 that every lane workflow emits the lane-outcome record. No allowed input, secret,
 caller permission, or routing changes.
+At the v0.62.0 tag `2fe38c031867900824c164e33a140a335ed9ecf0`, registered on
+2026-10-22, `intake-triage`, `pr-review` and `pr-review-security` are verbatim
+copies of their v0.61.0 entries. The three workflows keep their `workflow_call`
+inputs, secrets, job permissions, `runs-on` and action references; the only
+change is the subprocess isolation install step, which skips apt when bwrap and
+socat are present, bounds every apt-get call by one shared deadline inside the
+step limit, and fails when either tool is missing (ci-workflows#858). The
+commit-relative actions are unchanged from v0.61.0. No allowed input, secret,
+caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
