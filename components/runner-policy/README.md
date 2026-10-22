@@ -1373,6 +1373,23 @@ writes the lane-outcome record (ci-workflows#853), and the sandbox probe errors
 in check-subprocess-sandbox and run-claude-cli name Docker's seccomp profile
 (ci-workflows#849), a commit-relative diff the gate cannot auto-approve. No
 input, secret, caller permission, or routing changes.
+At the v0.61.0 tag `164c2809f6150429b6f24d4a2777bb377af953d9`, approved by the
+owner on 2026-10-22 on the condition that an independent security review of the
+v0.60.0 to v0.61.0 diff passed, which it did with no findings above
+informational, `intake-triage`, `pr-review` and `pr-review-security` are
+verbatim copies of their v0.60.0 entries. `intake-triage` keeps its
+`workflow_call` inputs, secrets and job permissions, and each leg writes its own
+lane record, a key handoff included, while the status line names the
+credential (ci-workflows#856). `pr-review` and `pr-review-security` each add two
+optional inputs, `credential-name` (default `CLAUDE_CODE_OAUTH_TOKEN`) and
+`fallback-credential-name` (default empty), which callers do not pass, so
+neither is allowed; their secrets, permissions and routing are unchanged. The
+commit-relative actions change: report-lane-outcome caps the legacy models
+token and writes handoff records (ci-workflows#856), and the review workflows
+report the first attempt's usage limit as its own record, a step that needs a
+fallback token no allowed caller can pass; ci-workflows#857 adds a test
+that every lane workflow emits the lane-outcome record. No allowed input, secret,
+caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

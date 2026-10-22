@@ -55,6 +55,7 @@ const REPINE_LANE_SHA_V0_58_0 = "5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c";
 const REPINE_LANE_SHA_V0_59_0 = "4aff99320ef484a7beac35ee3a7b7b854ec1e33f";
 const REPINE_LANE_SHA_V0_59_1 = "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b";
 const REPINE_LANE_SHA_V0_60_0 = "82ca5ca9be6e18a1addb7986eae15689339aedbc";
+const REPINE_LANE_SHA_V0_61_0 = "164c2809f6150429b6f24d4a2777bb377af953d9";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -9667,6 +9668,31 @@ test("the intake-triage and review contracts at the v0.60.0 tag copy their previ
   assert.equal(
     Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_60_0}`)).length,
     Object.keys(previousShas).length,
+  );
+});
+
+// v0.61.0 keeps the intake-triage and both review caller contracts:
+// intake-triage changes only steps and job outputs (ci-workflows#856), the
+// review workflows add two optional credential-name inputs callers do not
+// pass, and the commit-relative actions move (ci-workflows#856,
+// ci-workflows#857), so each entry carries its v0.60.0 contract forward
+// verbatim.
+test("the intake-triage and review contracts at the v0.61.0 tag copy their v0.60.0 entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const reusables = ["intake-triage", "pr-review", "pr-review-security"];
+  for (const reusable of reusables) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_60_0}`];
+    assert.ok(previous, `expected a v0.60.0 contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_61_0}`],
+      previous,
+      `${reusable} at the v0.61.0 tag is not a verbatim copy of its v0.60.0 entry`,
+    );
+  }
+  assert.equal(
+    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_61_0}`)).length,
+    reusables.length,
   );
 });
 
