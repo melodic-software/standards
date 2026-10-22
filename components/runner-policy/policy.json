@@ -993,7 +993,7 @@
       }
     }
   },
-  "approvedHostedRunnerLabels": ["ubuntu-24.04", "windows-2025"],
+  "approvedHostedRunnerLabels": ["ubuntu-24.04", "windows-2025", "macos-26"],
   "hostedMatrixExpressions": ["${{ matrix.os }}", "${{ matrix.runner }}"],
   "governedReusableRunnerInput": {
     "name": "runner",
