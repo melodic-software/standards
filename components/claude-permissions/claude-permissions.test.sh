@@ -244,7 +244,7 @@ for shell in Bash PowerShell; do
     'gh pr merge 1 --merge' 'gh pr merge 1 --rebase' 'gh pr merge 1 -m' 'gh pr merge 1 -r' \
     'gh pr merge 1 -m --auto' 'gh pr merge 1 -r --auto' 'gh pr merge -m 1' 'gh pr merge -r --auto 1' \
     'gh pr merge 1 -R melodic-software/x -r --auto' 'gh repo delete o/r --yes' 'gh gist delete 1' \
-    'gh auth token' 'gh auth token --hostname github.com''gh auth status --show-token' 'gh auth status -t' \
+    'gh auth token' 'gh auth token --hostname github.com' 'gh auth status --show-token' 'gh auth status -t' \
     'gh api -X PUT repos/o/r/pulls/1/merge-async -f bypass_rules=true'; do
     if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
       pass "$shell denies: $cmd"
