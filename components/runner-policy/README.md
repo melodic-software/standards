@@ -1402,6 +1402,14 @@ socat are present, bounds every apt-get call by one shared deadline inside the
 step limit, and fails when either tool is missing (ci-workflows#858). The
 commit-relative actions are unchanged from v0.61.0. No allowed input, secret,
 caller permission, or routing changes.
+At the v0.63.0 tag `8778094736e414233110f3e0d6d9948628ba77b5`, sign-off
+pending, `pr-review-cli` is a new hosted-only contract (ci-workflows#862): every
+job runs on `ubuntu-24.04`, and it admits the inputs `lane`, `publish`, `role`,
+`model-args`, `allowed-bot-sender-ids`, `allowed-author-ids`,
+`docs-only-paths`, `incremental-review` and `cli-version`, and only the reviews
+role's API key, as `CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}`. A
+caller that also passes the subscription token needs a contract of its own.
+Its first caller is claude-code-plugins' summary-mode shadow review.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
