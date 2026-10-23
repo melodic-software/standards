@@ -111,7 +111,7 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/shellcheck@594987abe8657a40bccc13d301f1f0d5cccb5348 # v0.39.8
         with:
           rcfile: .shellcheckrc
-          exclude: components/shellcheck/fixtures/bad
+          exclude: components/shellcheck/fixtures/bad .githooks/guardrails/
       - name: Install ShellCheck 0.11.0
         if: ${{ !cancelled() }}
         run: |
@@ -250,11 +250,11 @@ jobs:
       - name: Verify shebang files are executable
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/check-exec-bit@594987abe8657a40bccc13d301f1f0d5cccb5348 # v0.39.8
-      - name: Check for machine-specific paths (excludes the pattern source, which self-matches)
+      - name: Check for machine-specific paths (excludes the pattern sources, which self-match)
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/check-machine-paths@594987abe8657a40bccc13d301f1f0d5cccb5348 # v0.39.8
         with:
-          exclude: ':(exclude)components/path-detection/**'
+          exclude: ':(exclude)components/path-detection/** :(exclude).githooks/guardrails/**'
       - name: Path-detection contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
