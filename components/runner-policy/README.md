@@ -1416,6 +1416,12 @@ At the v0.63.1 tag `83b739f625b501ad40c65dee7168d836883195e1`, the `pr-review-cl
 forward verbatim: the release titles the completion notice and counts
 demoted CRITICAL findings in the summary (ci-workflows#865), with no input,
 secret, permission or routing change.
+At the v0.64.0 tag `4edeccd87cf60ef539ce5109b78454217d5f2049`, the
+`pr-review-cli` contract adds the optional inputs `hold-label` and
+`hold-paths` to the v0.63.1 entry (ci-workflows#864): in comments mode the
+status job adds the hold label and one marker comment through its existing
+`pull-requests: write` grant. Routing, `fixedRunsOn` and secrets are
+unchanged, and no caller permission is added.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
