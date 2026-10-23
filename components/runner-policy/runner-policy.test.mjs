@@ -9869,7 +9869,7 @@ test("the pr-review-cli contract at the v0.63.0 tag is hosted-only and admits on
         "incremental-review",
         "cli-version",
       ],
-      allowedSecrets: { CLAUDE_API_KEY: "${{ secrets.REVIEWS_CLAUDE_API_KEY }}" },
+      allowedSecrets: { CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}` },
     },
   );
   assert.equal(Object.keys(contracts).filter((key) => key.endsWith(`@${sha}`)).length, 1);
