@@ -72,6 +72,7 @@ const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
 const LITERAL_REF_COMPOSITE_RUN = await readFixture("check-contract-run-literal-ref.sh.txt");
 const BOUNDED_SCAN_COMPOSITE_RUN = await readFixture("check-contract-run-bounded-scan.sh.txt");
 const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
+const BOUNDED_SCAN_VALIDATOR = await readFixture("pr-linkage-validator-bounded-scan.sh.txt");
 
 const GOOD_COMPOSITE_ACTION = [
   "name: pr-contract",
@@ -451,6 +452,13 @@ test("a composite pin with the bounded negation scan passes", () => {
   );
 });
 
+test("a hook validator with the bounded negation scan passes", () => {
+  assert.deepEqual(
+    checkCopies(POLICY, { ...goodTexts(), hookValidator: BOUNDED_SCAN_VALIDATOR }),
+    [],
+  );
+});
+
 // Each static anchor of the ci-workflows#815 shape, mutated away, is drift.
 test("a bounded-scan composite that drifts from its static anchors is drift", () => {
   for (const [from, to, expected] of [
@@ -674,6 +682,7 @@ test("non-closing and negation parsers read the policy's values from both copies
   assert.deepEqual(parseCompositeNonClosing(GOOD_COMPOSITE_RUN, "gate").markers, expectedMarkers);
   const expectedNegation = negationData(POLICY.body.negatedClosers);
   assert.deepEqual(parseValidatorNegation(GOOD_VALIDATOR, "hook"), expectedNegation);
+  assert.deepEqual(parseValidatorNegation(BOUNDED_SCAN_VALIDATOR, "hook"), expectedNegation);
   assert.deepEqual(parseCompositeNegation(GOOD_COMPOSITE_RUN, "gate"), expectedNegation);
   assert.deepEqual(parseCompositeNegation(BOUNDED_SCAN_COMPOSITE_RUN, "gate"), expectedNegation);
 });
