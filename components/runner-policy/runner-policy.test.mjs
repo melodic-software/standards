@@ -9901,6 +9901,17 @@ test("the pr-review-cli contract at the v0.64.0 tag adds the hold inputs to its 
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.64.1 changes only pr-review-cli's extract and publish steps and its
+// continue-on-error wiring (ci-workflows#868), so its contract copies the
+// v0.64.0 entry forward verbatim.
+test("the pr-review-cli contract at the v0.64.1 tag copies its v0.64.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "9aca743c4ed9aaf7870288a36586c3994e9321e4";
+  assert.deepEqual(contracts[key(sha)], contracts[key("4edeccd87cf60ef539ce5109b78454217d5f2049")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on

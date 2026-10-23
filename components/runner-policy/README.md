@@ -1422,6 +1422,11 @@ At the v0.64.0 tag `4edeccd87cf60ef539ce5109b78454217d5f2049`, the
 status job adds the hold label and one marker comment through its existing
 `pull-requests: write` grant. Routing, `fixedRunsOn` and secrets are
 unchanged, and no caller permission is added.
+At the v0.64.1 tag `9aca743c4ed9aaf7870288a36586c3994e9321e4`, the
+`pr-review-cli` contract is copied forward verbatim from v0.64.0: the release
+keeps valid review comments past a malformed one and fails the status job in
+comments mode when no review happened (ci-workflows#868), with no input,
+secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
