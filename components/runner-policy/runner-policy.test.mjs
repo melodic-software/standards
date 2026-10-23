@@ -9846,6 +9846,37 @@ test("the intake-triage and review contracts at the v0.62.0 tag copy their v0.61
   );
 });
 
+// v0.63.0 adds pr-review-cli (ci-workflows#862), a review lane with no runner
+// input whose every job runs on ubuntu-24.04. Its one contract is hosted-only
+// and admits the reviews role's API key and subscription token.
+test("the pr-review-cli contract at the v0.63.0 tag is hosted-only and admits the reviews key and token", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const sha = "8778094736e414233110f3e0d6d9948628ba77b5";
+  assert.deepEqual(
+    contracts[`melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`],
+    {
+      routing: "hosted-only",
+      fixedRunsOn: ["ubuntu-24.04"],
+      allowedInputs: [
+        "lane",
+        "publish",
+        "role",
+        "model-args",
+        "allowed-bot-sender-ids",
+        "allowed-author-ids",
+        "docs-only-paths",
+        "incremental-review",
+        "cli-version",
+      ],
+      allowedSecrets: {
+        CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}`,
+        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}`,
+      },
+    },
+  );
+  assert.equal(Object.keys(contracts).filter((key) => key.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
