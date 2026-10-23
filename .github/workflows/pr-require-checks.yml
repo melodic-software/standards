@@ -254,7 +254,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/check-machine-paths@594987abe8657a40bccc13d301f1f0d5cccb5348 # v0.39.8
         with:
-          exclude: ':(exclude)components/path-detection/**' ':(exclude).githooks/guardrails/**'
+          exclude: ':(exclude)components/path-detection/** :(exclude).githooks/guardrails/**'
       - name: Path-detection contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/path-detection/machine-path-patterns.test.sh
