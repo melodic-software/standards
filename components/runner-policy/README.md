@@ -1412,6 +1412,10 @@ tried first, and
 `CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}`, used
 only after the key hands off. Its first caller is claude-code-plugins' security
 review lane.
+At the v0.63.1 tag `83b739f625b501ad40c65dee7168d836883195e1`, the `pr-review-cli` contract is copied
+forward verbatim: the release titles the completion notice and counts
+demoted CRITICAL findings in the summary (ci-workflows#865), with no input,
+secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

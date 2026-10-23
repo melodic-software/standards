@@ -9877,6 +9877,16 @@ test("the pr-review-cli contract at the v0.63.0 tag is hosted-only and admits th
   assert.equal(Object.keys(contracts).filter((key) => key.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.63.1 changes only pr-review-cli's publish step (ci-workflows#865), so its
+// contract copies the v0.63.0 entry forward verbatim.
+test("the pr-review-cli contract at the v0.63.1 tag copies its v0.63.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "83b739f625b501ad40c65dee7168d836883195e1";
+  assert.deepEqual(contracts[key(sha)], contracts[key("8778094736e414233110f3e0d6d9948628ba77b5")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
