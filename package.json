@@ -11,7 +11,7 @@
     "@biomejs/biome": "2.5.15",
     "jsonc-parser": "3.3.1",
     "lefthook": "2.2.2",
-    "markdownlint-cli2": "0.23.3",
+    "markdownlint-cli2": "0.24.0",
     "semver": "7.8.5",
     "yaml": "2.9.1"
   },
