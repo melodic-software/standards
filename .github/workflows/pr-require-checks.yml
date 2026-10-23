@@ -824,6 +824,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run lint:pr-convention-copies
+      # Reads the pinned check-contract action over the network, so it runs
+      # here rather than in a hermetic lane.
+      - name: Commit-convention contract test
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash harness/shell/run-tests.sh components/commit-convention/commit-convention.test.sh
 
   check-github-actions:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
