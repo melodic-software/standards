@@ -9923,6 +9923,26 @@ test("the pr-review-cli contract at the v0.64.2 tag copies its v0.64.1 entry for
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.0 changes only report-lane-outcome's classify.cjs, which adds the
+// optional costUsd field to the lane-outcome record (ci-workflows#872);
+// intake-triage.yml and pr-review-cli.yml reach it through $/ and are
+// unchanged, so both contracts copy forward verbatim.
+test("the intake-triage and pr-review-cli contracts at the v0.65.0 tag copy their prior entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (workflow, sha) =>
+    `melodic-software/ci-workflows/.github/workflows/${workflow}.yml@${sha}`;
+  const sha = "d02b8697e092705153f0996549b05f95a446bb52";
+  assert.deepEqual(
+    contracts[key("intake-triage", sha)],
+    contracts[key("intake-triage", "2fe38c031867900824c164e33a140a335ed9ecf0")],
+  );
+  assert.deepEqual(
+    contracts[key("pr-review-cli", sha)],
+    contracts[key("pr-review-cli", "6d6cb798e7cb7560a0f9327d8a22398961c23b31")],
+  );
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
