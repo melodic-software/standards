@@ -164,6 +164,14 @@ components:
   comment-hygiene-tools:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
+  # The org commit-subject convention at the well-known path the guardrails
+  # commit-msg hook and the source-control plugin read
+  # (components/commit-convention/README.md). Every target takes it.
+  # standards: manifest source, not a target — its copy is held
+  # byte-identical to the component by commit-convention.test.sh instead.
+  commit-convention:
+    files:
+      components/commit-convention/commit-convention.yml: docs/conventions/source-control/commit-convention.yml
   # The central Dependabot policy, read at the base by a target's Dependabot
   # merge classifiers (claude-code-plugins sends every update to a dependency
   # its `autoMerge.reviewOnly` lists to the review tier).
@@ -402,6 +410,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -419,6 +428,7 @@ targets:
     managed:
       - claude-review-caller
       - claude-security-review-caller
+      - commit-convention
       - lychee
       - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
@@ -432,6 +442,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -448,6 +459,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -469,6 +481,7 @@ targets:
       - actionlint
       - cloud-bootstrap
       - comment-hygiene-action
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -509,6 +522,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - dotnet-analysis
       - editorconfig-checker
       - engineering-standards
@@ -532,6 +546,7 @@ targets:
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
+      - commit-convention
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -611,6 +626,7 @@ targets:
       - claude-review-caller
       - claude-security-review-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - gitleaks
       - lefthook-base
@@ -641,6 +657,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -655,6 +672,7 @@ targets:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -673,6 +691,7 @@ targets:
       - claude-review-caller
       - claude-security-review-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -702,6 +721,7 @@ targets:
       - claude-security-review-caller
       - claude-settings-github-iac
       - cloud-bootstrap
+      - commit-convention
       - dotnet-analysis
       - editorconfig-checker
       - engineering-standards
@@ -738,6 +758,7 @@ targets:
       # policy convergence — medley's enforcement policy stays its own in the
       # wrapper.
       - comment-hygiene-tools
+      - commit-convention
       - engineering-standards
       - lychee
       - managed-files-guard-fleet-caller
@@ -803,6 +824,7 @@ targets:
       - claude-review-caller
       - claude-security-review-caller
       - cloud-bootstrap
+      - commit-convention
       - editorconfig-checker
       - engineering-standards
       - gitleaks

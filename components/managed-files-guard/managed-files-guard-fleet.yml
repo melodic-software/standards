@@ -77,6 +77,7 @@ on:
       - _typos.toml
       - docs/adr/README.md
       - docs/adr/adr-template.md
+      - docs/conventions/source-control/commit-convention.yml
       - docs/standards/README.md
       - docs/standards/bulk-mutation.md
       - docs/standards/concise-prose.md

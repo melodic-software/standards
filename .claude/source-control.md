@@ -30,7 +30,3 @@ c3-autonomous
 - Fix
 - Verification
 - Related
-
-## subject_pattern
-
-^((build|chore|ci|docs|feat|fix|perf|refactor|revert|security|style|test)(\(.+\))?!?: .+|Merge .+|Revert ".+)
