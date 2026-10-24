@@ -9964,6 +9964,17 @@ test("the intake-triage contract at b0ecc27 is the v0.65.0 entry on the intake r
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.1 changes only pr-review-cli.yml's internals: the review reaches the
+// status job as an artifact instead of a job output (ci-workflows#874). Its
+// inputs, secrets and runner are unchanged, so the contract copies forward.
+test("the pr-review-cli contract at the v0.65.1 tag copies its v0.65.0 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "b49ac366bb3426039363a6927c41512e44533808";
+  assert.deepEqual(contracts[key(sha)], contracts[key("d02b8697e092705153f0996549b05f95a446bb52")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
