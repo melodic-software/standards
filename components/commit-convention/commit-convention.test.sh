@@ -10,7 +10,8 @@
 #
 # Needs the pr-convention-policy dependencies (`npm ci --prefix
 # components/pr-convention-policy`) for the YAML parser, and network access to
-# read the pinned check-contract action. A failed fetch fails the suite.
+# read the pinned check-contract action and the guardrails plugin. A failed
+# fetch fails the suite.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -23,8 +24,18 @@ trap 'exit 143' TERM
 
 source_file="$root/components/commit-convention/commit-convention.yml"
 well_known="docs/conventions/source-control/commit-convention.yml"
-resolver="$root/.githooks/guardrails/resolve-convention-pattern.sh"
-hook="$root/.githooks/guardrails/commit-msg-convention.sh"
+# The hooks repositories run: the guardrails plugin at claude-code-plugins main,
+# the ref of the lefthook remote in lefthook.yml.
+plugins="$TEST_TMPDIR/claude-code-plugins"
+if git clone -q --depth 1 --filter=blob:none --sparse https://github.com/melodic-software/claude-code-plugins "$plugins" &&
+  git -C "$plugins" sparse-checkout set plugins/guardrails; then
+  pass 'fetched the guardrails plugin at claude-code-plugins main'
+else
+  fail 'fetched the guardrails plugin at claude-code-plugins main' 'fetch-error: git clone failed'
+  exit 1
+fi
+resolver="$plugins/plugins/guardrails/hooks/resolve-convention-pattern.sh"
+hook="$plugins/plugins/guardrails/git-hooks/commit-msg-convention.sh"
 policy="$root/components/pr-convention-policy/policy.json"
 yaml_package="$root/components/pr-convention-policy/package.json"
 
