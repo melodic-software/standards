@@ -14,13 +14,18 @@ extends:
   - components/lefthook-python/lefthook.yml
   - components/lefthook-typescript/lefthook.yml
 
+remotes:
+  - git_url: https://github.com/melodic-software/claude-code-plugins
+    ref: main
+    refetch_frequency: 24h
+    configs:
+      - plugins/guardrails/git-hooks/lefthook-remote.yml
+
 pre-commit:
   # Intentionally non-conforming fixtures are exercised by component contract
   # tests, not by the ordinary staged-file lanes.
   exclude:
     - "components/*/fixtures/bad/**"
-    # Plugin-owned copies the guardrails installer writes; linted upstream.
-    - ".githooks/guardrails/**"
   commands:
     # These two catalog-local adapters use source-slice paths. Consumers adopt
     # the reusable fragments at their managed destinations instead.
@@ -34,17 +39,3 @@ pre-commit:
       glob: "**/*.cs"
       run: node components/lefthook-dotnet/dotnet-format-staged.mjs {staged_files}
       fail_text: "Whitespace/layout drift in the .NET analysis fixture."
-  jobs:
-    - name: guardrails-pre-commit-content
-      run: bash .githooks/guardrails/pre-commit-content.sh
-
-commit-msg:
-  jobs:
-    - name: guardrails-commit-msg-convention
-      run: bash .githooks/guardrails/commit-msg-convention.sh {0}
-
-pre-push:
-  jobs:
-    - name: guardrails-reference-verify
-      run: bash .githooks/guardrails/reference-verify.sh {0}
-      use_stdin: true
