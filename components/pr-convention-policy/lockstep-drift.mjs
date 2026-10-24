@@ -496,7 +496,11 @@ export function assertCompositeVerdictReads(runShText, location) {
 const unquoteAwk = (text) => text.replaceAll(`'"'"'`, "'");
 
 export function parseValidatorNegation(shellText, location) {
-  const window = shellText.match(/\(\(n > (\d+)\)\) && first=\$\(\(n - (\d+)\)\)/);
+  // The last N words: a forward pass keeps them with `first = n - N`; the
+  // bounded scan walks backward until it holds N (`${#words[@]} < N`).
+  const window =
+    shellText.match(/\(\(n > (\d+)\)\) && first=\$\(\(n - (\d+)\)\)/) ??
+    shellText.match(/i >= 0 && \$\{#words\[@\]\} < (\d+);/);
   const affirmative = shellText.match(
     /\[\[ "\$lower" == (\w+) \]\] && \(\(i \+ 1 < n\)\) && \[\[ "\$\{words\[i \+ 1\],,\}" == (\w+) \]\] && continue/,
   );
