@@ -9943,6 +9943,27 @@ test("the intake-triage and pr-review-cli contracts at the v0.65.0 tag copy thei
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
 });
 
+// b0ecc27, one docs commit past v0.65.0 with no .github change, moves
+// intake-triage onto the intake funding role: the v0.65.0 entry with role
+// intake and INTAKE_* secrets. The v0.65.0 entry stays until
+// claude-code-plugins repins its caller.
+test("the intake-triage contract at b0ecc27 is the v0.65.0 entry on the intake role", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
+  const sha = "b0ecc273abe492d12f2efa98ee4741a84c219ed2";
+  const prior = contracts[key("d02b8697e092705153f0996549b05f95a446bb52")];
+  assert.equal(prior.role, "automations");
+  assert.deepEqual(contracts[key(sha)], {
+    ...prior,
+    role: "intake",
+    allowedSecrets: {
+      CLAUDE_API_KEY: `\${{ secrets.INTAKE_CLAUDE_API_KEY }}`,
+      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.INTAKE_CLAUDE_CODE_OAUTH_TOKEN }}`,
+    },
+  });
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
