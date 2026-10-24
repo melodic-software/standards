@@ -10032,6 +10032,19 @@ test("the pr-review-cli contract at the v0.65.6 tag copies its v0.65.5 entry for
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.7 changes only what the hold step and the prompt do with holds
+// (ci-workflows#880): hold-paths becomes extra security scrutiny in the
+// prompt, not a hold, and a cost hold needs a real charge. The hold-paths
+// input stays, and inputs, secrets and runner are unchanged, so the contract
+// copies forward.
+test("the pr-review-cli contract at the v0.65.7 tag copies its v0.65.6 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "4c531cea137f5cbb38d4c132dbfa6e38f76fba7d";
+  assert.deepEqual(contracts[key(sha)], contracts[key("914264587c35692c15e05c965103426eec18d1f0")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
