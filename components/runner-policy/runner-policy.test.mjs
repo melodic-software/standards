@@ -10045,6 +10045,19 @@ test("the pr-review-cli contract at the v0.65.7 tag copies its v0.65.6 entry for
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.8 adds the check-key-credit job (ci-workflows#882), which skips the
+// key job while the key's recent credit stop is inside key-credit-window-hours.
+// Callers pass no new input and grant actions: read on the calling job, which
+// the contract does not record; inputs, secrets and runner are unchanged, so
+// the contract copies forward.
+test("the pr-review-cli contract at the v0.65.8 tag copies its v0.65.7 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "4f79cc9244498ae856504cf74aeeb05dcc9c6b43";
+  assert.deepEqual(contracts[key(sha)], contracts[key("4c531cea137f5cbb38d4c132dbfa6e38f76fba7d")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
