@@ -10058,6 +10058,18 @@ test("the pr-review-cli contract at the v0.65.8 tag copies its v0.65.7 entry for
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.9 writes the full diff with git diff --text (ci-workflows#884), so a
+// head .gitattributes or a NUL byte cannot hide a file's text from the review
+// model. Inputs, secrets and runner are unchanged, so the contract copies
+// forward.
+test("the pr-review-cli contract at the v0.65.9 tag copies its v0.65.8 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "4fbceb4b75ffd568dfa5db31de0d0e753c0c64e6";
+  assert.deepEqual(contracts[key(sha)], contracts[key("4f79cc9244498ae856504cf74aeeb05dcc9c6b43")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
