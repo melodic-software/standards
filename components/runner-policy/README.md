@@ -1433,6 +1433,11 @@ entry at `b0ecc273abe492d12f2efa98ee4741a84c219ed2`: the apply job keeps an
 existing Issue Type, a permission denial on an otherwise clean triage applies
 nothing, and the new `triage-deferred` output reports that deferral
 (ci-workflows#887), with no input, secret, permission or routing change.
+At the v0.65.11 tag `e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8`, the
+`intake-triage` contract is copied forward verbatim from v0.65.10 and the
+`pr-review-cli` contract from v0.65.9: the lane-outcome record gains the
+leg's token usage and rate-limit windows (ci-workflows#889), with no input,
+secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

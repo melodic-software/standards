@@ -10082,6 +10082,24 @@ test("the intake-triage contract at the v0.65.10 tag copies its b0ecc27 entry fo
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.11 adds the leg's token usage and rate-limit windows to the
+// lane-outcome record (ci-workflows#889). Inputs, secrets and job permissions
+// are unchanged, so both lane contracts copy forward.
+test("the intake-triage and pr-review-cli contracts at the v0.65.11 tag copy their prior entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
+  const sha = "e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8";
+  assert.deepEqual(
+    contracts[key("intake-triage.yml", sha)],
+    contracts[key("intake-triage.yml", "215cec5c362f953f8b6196effb04451696c3f970")],
+  );
+  assert.deepEqual(
+    contracts[key("pr-review-cli.yml", sha)],
+    contracts[key("pr-review-cli.yml", "4fbceb4b75ffd568dfa5db31de0d0e753c0c64e6")],
+  );
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
