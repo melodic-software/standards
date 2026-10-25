@@ -1427,6 +1427,12 @@ At the v0.64.1 tag `9aca743c4ed9aaf7870288a36586c3994e9321e4`, the
 keeps valid review comments past a malformed one and fails the status job in
 comments mode when no review happened (ci-workflows#868), with no input,
 secret, permission or routing change.
+At the v0.65.10 tag `215cec5c362f953f8b6196effb04451696c3f970`, the
+`intake-triage` contract is copied forward verbatim from its `intake`-role
+entry at `b0ecc273abe492d12f2efa98ee4741a84c219ed2`: the apply job keeps an
+existing Issue Type, a permission denial on an otherwise clean triage applies
+nothing, and the new `triage-deferred` output reports that deferral
+(ci-workflows#887), with no input, secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

@@ -10070,6 +10070,18 @@ test("the pr-review-cli contract at the v0.65.9 tag copies its v0.65.8 entry for
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
 
+// v0.65.10 keeps an existing Issue Type, applies nothing on a permission
+// denial over an otherwise clean triage, and adds the triage-deferred output
+// (ci-workflows#887). Inputs, secrets and job permissions are unchanged, so
+// the intake-role contract at b0ecc27 copies forward.
+test("the intake-triage contract at the v0.65.10 tag copies its b0ecc27 entry forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
+  const sha = "215cec5c362f953f8b6196effb04451696c3f970";
+  assert.deepEqual(contracts[key(sha)], contracts[key("b0ecc273abe492d12f2efa98ee4741a84c219ed2")]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
