@@ -57,6 +57,7 @@ const REPINE_LANE_SHA_V0_59_1 = "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b";
 const REPINE_LANE_SHA_V0_60_0 = "82ca5ca9be6e18a1addb7986eae15689339aedbc";
 const REPINE_LANE_SHA_V0_61_0 = "164c2809f6150429b6f24d4a2777bb377af953d9";
 const REPINE_LANE_SHA_V0_62_0 = "2fe38c031867900824c164e33a140a335ed9ecf0";
+const REPINE_LANE_SHA_V0_65_14 = "3180217076b19bbdfccc43026c7f91c604da673d";
 const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
@@ -10340,7 +10341,29 @@ test("the pr-review-cli contract at the v0.65.14 tag copies its v0.65.13 entry u
   const previous = "ba7af78d291f10bd75651857a0db2357c23df0fe";
   assert.ok(contracts[key(previous)]);
   assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
+// At v0.65.14 the claude-lanes re-pin leaves v0.55.0. Both review workflows
+// differ from v0.62.0 only in the isolation install step's id and its
+// install-failed class; maintenance-sync-standards is byte-identical to
+// v0.55.0. No interface widens, so each entry is its newest predecessor verbatim.
+test("the claude-lanes contracts at the v0.65.14 tag copy their previous entries forward verbatim", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const previousShas = {
+    "pr-review": REPINE_LANE_SHA_V0_62_0,
+    "pr-review-security": REPINE_LANE_SHA_V0_62_0,
+    "maintenance-sync-standards": REPINE_LANE_SHA_V0_55_0,
+  };
+  for (const [reusable, previousSha] of Object.entries(previousShas)) {
+    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
+    const previous = contracts[`${workflowPath}@${previousSha}`];
+    assert.ok(previous, `expected a ${previousSha} contract for ${reusable}`);
+    assert.deepEqual(
+      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_65_14}`],
+      previous,
+      `${reusable} at the v0.65.14 tag is not a verbatim copy of its previous entry`,
+    );
+  }
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily
