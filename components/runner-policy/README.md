@@ -1457,6 +1457,10 @@ At the v0.65.13 tag `ba7af78d291f10bd75651857a0db2357c23df0fe`, both
 contracts copy their v0.65.12 entries forward unchanged: the release fixes
 the pr-review-cli status job's read of the counted token leg's job result
 (ci-workflows#892), with no input, secret, permission or routing change.
+At the v0.65.14 tag `3180217076b19bbdfccc43026c7f91c604da673d`, the pr-review-cli
+contract copies its v0.65.13 entry forward unchanged: the release reports a
+failed "Isolate the runner" install as install-failed (ci-workflows#893), with
+no input, secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

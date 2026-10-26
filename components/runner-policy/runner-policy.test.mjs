@@ -10275,6 +10275,19 @@ test("the intake-triage and pr-review-cli contracts at the v0.65.13 tag copy the
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
 });
 
+// v0.65.14 reports a failed "Isolate the runner" install as install-failed
+// (ci-workflows#893): no input, secret or permission changes, so the
+// pr-review-cli entry copies v0.65.13 forward unchanged.
+test("the pr-review-cli contract at the v0.65.14 tag copies its v0.65.13 entry unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "3180217076b19bbdfccc43026c7f91c604da673d";
+  const previous = "ba7af78d291f10bd75651857a0db2357c23df0fe";
+  assert.ok(contracts[key(previous)]);
+  assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
