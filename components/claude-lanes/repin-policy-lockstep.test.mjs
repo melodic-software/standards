@@ -13,6 +13,7 @@ import {
   manualPolicyNote,
   pairCallerPins,
   planLockstep,
+  policyHasContract,
   settleLockstep,
 } from "./repin-policy-lockstep.mjs";
 
@@ -285,6 +286,12 @@ const registered = (workflowPath, sha) => workflowPath === REVIEW_WORKFLOW && sh
 test("a pin whose surface changed but whose new-SHA contract is registered is satisfied", async () => {
   const plan = await planLockstep([samePathPin()], FRESH_SHA, changedSurface, registered);
   assert.deepEqual(plan, { reasons: [], copyForwards: [] });
+});
+
+test("policyHasContract finds a contract in a validated policy and not an absent one", async () => {
+  const policy = validatePolicy(await policyWithHistory());
+  assert.equal(policyHasContract(policy, REVIEW_WORKFLOW, CURRENT_REVIEW_SHA), true);
+  assert.equal(policyHasContract(policy, REVIEW_WORKFLOW, FRESH_SHA), false);
 });
 
 test("a pin whose surface changed and has no new-SHA contract is still declined", async () => {

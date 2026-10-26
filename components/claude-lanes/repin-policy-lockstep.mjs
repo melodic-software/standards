@@ -242,6 +242,11 @@ export function renamedPathReason(pin) {
   );
 }
 
+/** `policy` is a validatePolicy result, whose contracts are a Map. */
+export function policyHasContract(policy, workflowPath, sha) {
+  return policy.approvedReusableWorkflowContracts.has(`${workflowPath}@${sha}`);
+}
+
 /**
  * Splits re-pinned callers into contract copy-forwards and declines. A pin
  * whose path changed is always declined: a contract for a renamed path is
@@ -353,8 +358,6 @@ async function main() {
   // The workflow step exports GH_TOKEN for gh; runner-policy sends the token
   // only on its api.github.com tree requests.
   const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  const hasContract = (workflowPath, sha) =>
-    Boolean(policy.approvedReusableWorkflowContracts[`${workflowPath}@${sha}`]);
   const { reasons, copyForwards } = await planLockstep(
     pins,
     newSha,
@@ -376,7 +379,7 @@ async function main() {
         githubToken,
       });
     },
-    hasContract,
+    (workflowPath, sha) => policyHasContract(policy, workflowPath, sha),
   );
 
   await appendOutput(outputFile, await settleLockstep({ reasons, copyForwards }, tag));
