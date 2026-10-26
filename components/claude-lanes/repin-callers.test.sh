@@ -994,6 +994,27 @@ assert_eq 'selective: no compare repeats' "$(wc -l < "$STUB_CALL_LOG" | tr -d ' 
   "$(sort -u "$STUB_CALL_LOG" | wc -l | tr -d ' ')"
 unset STUB_CALL_LOG
 
+# A file the sync manifest manages in the consumer keeps its pin (the sync
+# owns it) and is named; an unmanaged file in the same release still moves.
+# The stub engine answers only for the origin's OWNER/REPO.
+repo="$scratch/repo-consumer-managed"
+consumer_repo "$repo"
+git -C "$repo" remote add origin https://github.com/melodic-software/consumer.git
+cat > "$scratch/sync-manifest-stub.sh" <<'STUB'
+#!/usr/bin/env bash
+[[ "$*" == 'dest-paths --target melodic-software/consumer' ]] && echo '.github/workflows/intake-triage.yml'
+exit 0
+STUB
+export STUB_COMPARE_FILES='.github/workflows/intake-triage.yml .github/workflows/pr-review-cli.yml'
+out_file="$scratch/out-consumer-managed"
+rc=0; out="$(SYNC_MANIFEST="$scratch/sync-manifest-stub.sh" run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'managed: a consumer repin exits 0' 0 "$rc"
+assert_contains 'managed: the managed file is named as skipped' "$out" \
+  'Skipping sync-managed file: .github/workflows/intake-triage.yml'
+assert_eq 'managed: only the unmanaged files move' \
+  $'.github/actions/lane/action.yml\n.github/workflows/pr-review-cli.yml' "$(git -C "$repo" diff --name-only)"
+unset STUB_COMPARE_FILES
+
 # The standards lane's own invocation (no --root) moves only the lane
 # caller whose reusable changed.
 repo="$scratch/repo-lane-selective"
