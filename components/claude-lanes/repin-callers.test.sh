@@ -59,12 +59,21 @@ not_found() { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
 # `--paginate`, which the release-list read passes ahead of the path.
 shift
 path=''
+silent=false
+skip_value=false
 for arg in "$@"; do
+  if [[ "$skip_value" == true ]]; then
+    skip_value=false
+    continue
+  fi
   case "$arg" in
+    -H) skip_value=true ;;
+    --silent) silent=true ;;
     -*) continue ;;
     *) path="$arg"; break ;;
   esac
 done
+[[ "$*" == *--silent* ]] && silent=true
 case "$path" in
   */releases)
     # The published-release LIST — the subject's source of truth. Answers 200
@@ -96,14 +105,31 @@ case "$path" in
     printf '%s\n' "${STUB_COMMIT_DATE-2026-01-15T09:30:00Z}"
     ;;
   */compare/*)
-    # apply's ancestry fence: GitHub compare status of release...pin.
-    # Tests set STUB_COMPARE_STATUS to a documented status (ahead / behind /
-    # identical / diverged) or STUB_COMPARE_STATUS=fail to force a lookup error.
+    # apply's one compare per pinned SHA: pin...release, whose status is the
+    # ancestry fence and whose files decide which pins move.
+    # STUB_COMPARE_STATUS names the PIN's relation to the release, the way
+    # compare release...pin reports it (ahead: the pin has commits the release
+    # lacks; behind: the release contains the pin), and the stub answers in
+    # the pin...release direction the subject asks in. Unset means contained.
+    # STUB_COMPARE_STATUS=fail forces a lookup error. STUB_COMPARE_FILES lists,
+    # space-separated, the files the release changed; unset is one shared
+    # non-test script, which moves every pin, the behavior before selective
+    # repins that the older cases assume. STUB_CALL_LOG, when set, records
+    # each compare route.
+    [[ -z "${STUB_CALL_LOG:-}" ]] || printf '%s\n' "$path" >> "$STUB_CALL_LOG"
     if [[ "${STUB_COMPARE_STATUS:-}" == 'fail' ]]; then
       echo 'gh: Not Found (HTTP 404)' >&2
       exit 1
     fi
-    printf '%s\n' "${STUB_COMPARE_STATUS:?stub gh: STUB_COMPARE_STATUS unset}"
+    case "${STUB_COMPARE_STATUS:-behind}" in
+      ahead) status=behind ;;
+      behind) status=ahead ;;
+      *) status="$STUB_COMPARE_STATUS" ;;
+    esac
+    files="${STUB_COMPARE_FILES-.github/scripts/shared.cjs}"
+    # shellcheck disable=SC2086  # one jq argument per space-separated file
+    jq -n --arg status "$status" '{status: $status, files: [$ARGS.positional[] | {filename: .}]}' \
+      --args $files
     ;;
   */contents/*)
     # apply's renamed-path probe. STUB_PRESENT_PATHS lists, space-separated,
@@ -118,6 +144,12 @@ case "$path" in
     probed="${probed%%\?*}"
     if [[ -n "${STUB_PRESENT_PATHS+x}" && " ${STUB_PRESENT_PATHS} " != *" ${probed} "* ]]; then
       not_found
+    fi
+    # A raw read of a source apply follows for commit-relative references.
+    # STUB_SOURCES_DIR holds upstream files by path; a path it lacks reads as
+    # an empty file, one that references nothing.
+    if [[ "$silent" == false && -n "${STUB_SOURCES_DIR:-}" && -f "${STUB_SOURCES_DIR}/${probed}" ]]; then
+      cat "${STUB_SOURCES_DIR}/${probed}"
     fi
     ;;
   repos/*/*)
@@ -799,5 +831,202 @@ assert_nonzero 'apply with a missing argument is a usage error' "$rc"
 rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2>&1)" || rc=$?
 assert_nonzero 'apply without the release date is a usage error' "$rc"
 assert_contains 'apply usage names the date argument' "$out" '<date>'
+
+# ------------------------------------------- apply: only the paths a release changed
+
+# consumer_repo <dir>: a consumer-shaped checkout (claude-code-plugins pins
+# these four at one SHA) whose callers live under .github/ alone, plus a
+# pin-shaped line outside .github/ that --root must never reach.
+consumer_repo() {
+  local dir="$1"
+  make_repo "$dir"
+  git -C "$dir" config core.autocrlf false
+  mkdir -p "$dir/.github/workflows" "$dir/.github/actions/lane" "$dir/docs"
+  cat > "$dir/.github/workflows/intake-triage.yml" <<YAML
+jobs:
+  triage:
+    uses: melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${old_sha} # v0.65.12
+YAML
+  cat > "$dir/.github/workflows/pr-review-cli.yml" <<YAML
+jobs:
+  review:
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${old_sha} # v0.65.12
+YAML
+  cat > "$dir/.github/actions/lane/action.yml" <<YAML
+runs:
+  using: composite
+  steps:
+    - uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@${old_sha} # v0.65.12
+    - uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${old_sha} # v0.65.12
+YAML
+  printf 'uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@%s # v0.65.12\n' \
+    "$old_sha" > "$dir/docs/example.yml"
+  git -C "$dir" add -A
+  git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'consumer callers'
+}
+
+# run_apply_root <dir> <outfile>: apply v0.65.13 against <dir> through --root,
+# from a working directory that is not <dir>, as a consumer runs it.
+run_apply_root() {
+  : > "$2"
+  (cd "$scratch" && PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$2" \
+    bash "$script" apply v0.65.13 "$new_sha" 2026-10-24 --root "$1" 2>&1)
+}
+
+moved_line() { printf 'uses: melodic-software/ci-workflows/%s@%s # v0.65.13' "$1" "$new_sha"; }
+kept_line() { printf 'uses: melodic-software/ci-workflows/%s@%s # v0.65.12' "$1" "$old_sha"; }
+
+# The v0.65.12...v0.65.13 compare changed exactly these two files. Only the
+# reusable whose file changed moves; the test file is inert, and every other
+# pin stays byte-identical. One distinct pinned SHA costs one compare call.
+repo="$scratch/repo-consumer-cli"
+consumer_repo "$repo"
+export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/scripts/pr-review-cli.test.cjs'
+export STUB_CALL_LOG="$scratch/calls-consumer-cli"
+: > "$STUB_CALL_LOG"
+out_file="$scratch/out-consumer-cli"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: a one-workflow release exits 0' 0 "$rc"
+assert_contains 'selective: a one-workflow release reports a change' "$(cat "$out_file")" 'changed=true'
+assert_contains 'selective: the changed reusable moves' \
+  "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(moved_line .github/workflows/pr-review-cli.yml)"
+assert_eq 'selective: only the changed reusable caller is modified' \
+  '.github/workflows/pr-review-cli.yml' "$(git -C "$repo" diff --name-only)"
+assert_contains 'selective: the unchanged reusable keeps its pin' \
+  "$(cat "$repo/.github/workflows/intake-triage.yml")" "$(kept_line .github/workflows/intake-triage.yml)"
+assert_contains 'selective: an unchanged composite keeps its pin' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/run-claude-cli)"
+assert_eq 'selective: one distinct pinned SHA costs one compare call' '1' \
+  "$(wc -l < "$STUB_CALL_LOG" | tr -d ' ')"
+assert_contains 'selective: the compare runs from the pin to the release' "$(cat "$STUB_CALL_LOG")" \
+  "compare/${old_sha}...${new_sha}"
+assert_contains 'selective: old-sha names the moved pin SHA' "$(cat "$out_file")" "old-sha=${old_sha}"
+# shellcheck disable=SC2016  # markdown code spans in the expected note
+assert_contains 'selective: the note names what stays' "$(cat "$out_file")" \
+  '`.github/workflows/intake-triage.yml`'
+
+# A shared non-test script no pinned path accounts for could feed any pin, so
+# the run fails closed to today's behavior: every pin moves.
+repo="$scratch/repo-consumer-shared"
+consumer_repo "$repo"
+export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/scripts/lane-outcome.cjs'
+out_file="$scratch/out-consumer-shared"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: a shared-script release exits 0' 0 "$rc"
+assert_eq 'selective: a shared-script change moves all four pins' '4' \
+  "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
+assert_not_contains 'selective: a shared-script change leaves no old pin under .github' \
+  "$(cat "$repo"/.github/workflows/*.yml "$repo/.github/actions/lane/action.yml")" "$old_sha"
+assert_contains '--root never touches a pin outside .github' \
+  "$(cat "$repo/docs/example.yml")" "@${old_sha} # v0.65.12"
+
+# A composite counts as changed when anything under its directory changed,
+# a test file included; with no reusable reaching it, only it moves.
+repo="$scratch/repo-consumer-composite"
+consumer_repo "$repo"
+export STUB_COMPARE_FILES='.github/actions/run-claude-cli/index.test.mjs'
+out_file="$scratch/out-consumer-composite"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: a composite-only release exits 0' 0 "$rc"
+assert_contains 'selective: the changed composite moves' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/run-claude-cli)"
+assert_contains 'selective: its sibling composite on the same file stays' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/report-lane-outcome)"
+assert_eq 'selective: a composite change modifies only its caller file' \
+  '.github/actions/lane/action.yml' "$(git -C "$repo" diff --name-only)"
+
+# A reusable runs `$/` composites and `./` nested workflows from its own
+# commit, so a change to one it reaches changes what the reusable runs.
+repo="$scratch/repo-consumer-reach"
+consumer_repo "$repo"
+sources="$scratch/sources-reach"
+mkdir -p "$sources/.github/workflows" "$sources/.github/actions/run-claude-cli"
+printf 'jobs:\n  t:\n    uses: ./.github/workflows/triage-core.yml\n' \
+  > "$sources/.github/workflows/intake-triage.yml"
+printf 'jobs:\n  c:\n    steps:\n      - uses: "$/.github/actions/run-claude-cli"\n' \
+  > "$sources/.github/workflows/triage-core.yml"
+export STUB_SOURCES_DIR="$sources" STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
+out_file="$scratch/out-consumer-reach"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: a reached composite change exits 0' 0 "$rc"
+assert_contains 'selective: a reusable reaching the composite through a nested workflow moves' \
+  "$(cat "$repo/.github/workflows/intake-triage.yml")" "$(moved_line .github/workflows/intake-triage.yml)"
+assert_contains 'selective: a reusable that reaches nothing changed stays' \
+  "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(kept_line .github/workflows/pr-review-cli.yml)"
+unset STUB_SOURCES_DIR
+
+# Tests, READMEs and docs/ change nothing a pin runs: no pin moves, nothing
+# is proposed, and the tree stays clean.
+repo="$scratch/repo-consumer-inert"
+consumer_repo "$repo"
+export STUB_COMPARE_FILES='.github/scripts/pr-review-cli.test.cjs README.md docs/lanes.md'
+out_file="$scratch/out-consumer-inert"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: an inert-only release exits 0' 0 "$rc"
+assert_contains 'selective: an inert-only release reports changed=false' "$(cat "$out_file")" 'changed=false'
+assert_silent 'selective: an inert-only release leaves the tree clean' "$(git -C "$repo" status --porcelain)"
+
+# Paired with the case above: the same inert files at the compare's 300-file
+# cap may hide a real change, so every pin moves.
+repo="$scratch/repo-consumer-cap"
+consumer_repo "$repo"
+STUB_COMPARE_FILES="$(for i in $(seq 1 300); do printf 'docs/page-%s.md ' "$i"; done)"
+export STUB_COMPARE_FILES
+out_file="$scratch/out-consumer-cap"
+rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+assert_exit 'selective: a capped file list exits 0' 0 "$rc"
+assert_eq 'selective: a capped file list moves all four pins' '4' \
+  "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
+
+# Two distinct pinned SHAs cost exactly two compare calls, however many
+# pins share them.
+repo="$scratch/repo-consumer-two-shas"
+consumer_repo "$repo"
+sed -i "s/${old_sha} # v0.65.12/${other_sha} # v0.65.11/" "$repo/.github/workflows/intake-triage.yml"
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'second pinned SHA'
+export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml'
+: > "$STUB_CALL_LOG"
+rc=0; out="$(run_apply_root "$repo" "$scratch/out-consumer-two-shas")" || rc=$?
+assert_exit 'selective: two pinned SHAs exit 0' 0 "$rc"
+assert_eq 'selective: two distinct pinned SHAs cost two compare calls' '2' \
+  "$(sort -u "$STUB_CALL_LOG" | wc -l | tr -d ' ')"
+assert_eq 'selective: no compare repeats' "$(wc -l < "$STUB_CALL_LOG" | tr -d ' ')" \
+  "$(sort -u "$STUB_CALL_LOG" | wc -l | tr -d ' ')"
+unset STUB_CALL_LOG
+
+# The standards lane's own invocation (no --root) moves only the lane
+# caller whose reusable changed.
+repo="$scratch/repo-lane-selective"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+export STUB_COMPARE_FILES='.github/workflows/claude-review.yml'
+out_file="$scratch/out-lane-selective"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'selective: the enumerated lane set exits 0' 0 "$rc"
+assert_eq 'selective: only the changed lane caller is modified' \
+  'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
+unset STUB_COMPARE_FILES
+
+# A fallback-form pin to the very commit the release tags is already on the
+# release SHA; it still takes the tag form, and nothing else moves.
+repo="$scratch/repo-lane-relabel"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+sed -i -E "s|claude-review.yml@${old_sha} # v0\.9\.1|claude-review.yml@${new_sha} # a1b2c3d 2026-08-21|" \
+  "$repo/components/claude-lanes/claude-review.yml"
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'fallback pin to the release commit'
+export STUB_COMPARE_FILES=''
+out_file="$scratch/out-lane-relabel"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'relabel: a fallback pin on the release SHA exits 0' 0 "$rc"
+assert_contains 'relabel: the fallback pin on the release SHA takes the tag form' \
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "claude-review.yml@${new_sha} # v0.9.2"
+assert_eq 'relabel: only that caller is modified' \
+  'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
+assert_eq 'relabel: a relabel-only run hands lockstep the release SHA, its no-op' \
+  "old-sha=${new_sha}" "$(grep '^old-sha=' "$out_file")"
+unset STUB_COMPARE_FILES
+
+# --root needs a directory.
+rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2026-10-24 --root 2>&1)" || rc=$?
+assert_nonzero 'apply with --root and no directory is a usage error' "$rc"
 
 [[ $FAILED -eq 0 ]] || exit 1

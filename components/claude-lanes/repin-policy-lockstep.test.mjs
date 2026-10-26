@@ -13,7 +13,6 @@ import {
   manualPolicyNote,
   pairCallerPins,
   planLockstep,
-  rewriteCallerFiles,
   settleLockstep,
 } from "./repin-policy-lockstep.mjs";
 
@@ -48,27 +47,6 @@ test("parseLockstepArgs rejects a missing argument as usage", () => {
   assert.deepEqual(parseLockstepArgs([oldA, next]), { error: "usage" });
 });
 
-test("rewriteCallerFiles keeps exactly one trailing newline on a rewritten caller", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "repin-lockstep-"));
-  temporaryRoots.push(root);
-  const rel = "components/claude-lanes/claude-review.yml";
-  const abs = path.join(root, rel);
-  await mkdir(path.dirname(abs), { recursive: true });
-  const source =
-    "jobs:\n" +
-    "  review:\n" +
-    `    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${oldA} # v0.16.0\n`;
-  await writeFile(abs, source);
-
-  const changed = await rewriteCallerFiles(next, "v0.17.0", root);
-
-  assert.equal(changed, true);
-  const rewritten = await readFile(abs, "utf8");
-  assert.ok(rewritten.includes(`@${next} # v0.17.0`), "pin line carries the new SHA and tag");
-  assert.ok(rewritten.endsWith("\n"), "rewritten caller ends with a final newline");
-  assert.ok(!rewritten.endsWith("\n\n"), "rewritten caller does not gain a duplicate newline");
-});
-
 // The selector target is gone; the assertion guards against putting that pin back.
 test("the shipped lane callers pin no selector, so the repin lane copies no selector contract", async () => {
   for (const name of ["claude-review.yml", "claude-security-review.yml"]) {
@@ -78,27 +56,6 @@ test("the shipped lane callers pin no selector, so the repin lane copies no sele
       `${name} must not pin the governed selector; it names the fleet label directly`,
     );
   }
-});
-
-test("rewriteCallerFiles repins a selector-less caller", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "repin-lockstep-"));
-  temporaryRoots.push(root);
-  const rel = "components/claude-lanes/claude-security-review.yml";
-  const abs = path.join(root, rel);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(
-    abs,
-    "jobs:\n" +
-      "  security-review:\n" +
-      `    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${oldA} # v0.16.0\n` +
-      "    with:\n" +
-      "      runner: melodic-review-ubuntu-24.04-x64\n",
-  );
-
-  assert.equal(await rewriteCallerFiles(next, "v0.17.0", root), true);
-  const rewritten = await readFile(abs, "utf8");
-  assert.ok(rewritten.includes(`@${next} # v0.17.0`));
-  assert.ok(rewritten.includes("runner: melodic-review-ubuntu-24.04-x64"));
 });
 
 const CURRENT_REVIEW_SHA = "91d06c94d733e5daa507e0afaa06a140bb46d337";
@@ -231,6 +188,16 @@ test("pairCallerPins keeps the path for a release cut before the rename", () => 
   ]);
 });
 
+test("pairCallerPins returns only the pins apply moved, never one it left on its SHA", () => {
+  const syncLine = `    uses: ${SYNC_WORKFLOW}@${oldB} # v0.33.0\n`;
+  const before = `${callerText(REVIEW_WORKFLOW, oldA, "v0.33.0")}${syncLine}`;
+  const after = `${callerText(REVIEW_WORKFLOW, next, "v0.34.0")}${syncLine}`;
+  assert.deepEqual(pairCallerPins(before, after), [
+    { oldWorkflowPath: REVIEW_WORKFLOW, oldSha: oldA, newWorkflowPath: REVIEW_WORKFLOW },
+  ]);
+  assert.deepEqual(pairCallerPins(before, before), [], "a caller apply left alone plans nothing");
+});
+
 test("pairCallerPins refuses a pin line that apply did not leave as a pin", () => {
   assert.throws(
     () => pairCallerPins(callerText(REVIEW_WORKFLOW, oldA, "v0.33.0"), "jobs:\n  review:\n"),
@@ -333,7 +300,6 @@ test("settleLockstep writes no policy.json when any pin was declined", async () 
   const { file, root, bytes } = await policyRoot();
   const output = await settleLockstep(
     { reasons: ["x"], copyForwards: [reviewCopyForward] },
-    FRESH_SHA,
     "v0.34.0",
     root,
   );
@@ -345,13 +311,22 @@ test("settleLockstep writes the copy-forward when nothing was declined", async (
   const { file, root } = await policyRoot();
   const output = await settleLockstep(
     { reasons: [], copyForwards: [reviewCopyForward] },
-    FRESH_SHA,
     "v0.34.0",
     root,
   );
   const written = JSON.parse(await readFile(file, "utf8"));
   assert.ok(written.approvedReusableWorkflowContracts[`${REVIEW_WORKFLOW}@${FRESH_SHA}`]);
   assert.deepEqual(output[0], ["lockstep", "applied"]);
+});
+
+test("settleLockstep leaves a pin apply did not move on its SHA", async () => {
+  const { root } = await policyRoot();
+  const rel = ".github/workflows/maintenance-sync-standards.yml";
+  const caller = `jobs:\n  sync:\n    uses: ${SYNC_WORKFLOW}@${oldB} # v0.33.0\n`;
+  await mkdir(path.join(root, path.dirname(rel)), { recursive: true });
+  await writeFile(path.join(root, rel), caller);
+  await settleLockstep({ reasons: [], copyForwards: [reviewCopyForward] }, "v0.34.0", root);
+  assert.equal(await readFile(path.join(root, rel), "utf8"), caller);
 });
 
 test("a selector copy-forward throws and adds no selector key", async () => {
