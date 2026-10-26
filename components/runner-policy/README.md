@@ -1438,6 +1438,12 @@ At the v0.65.11 tag `e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8`, the
 `pr-review-cli` contract from v0.65.9: the lane-outcome record gains the
 leg's token usage and rate-limit windows (ci-workflows#889), with no input,
 secret, permission or routing change.
+At the v0.65.12 tag `78ee7a2609a84b0073c5e09dfe3bc59613e689dc`, both
+contracts copy their v0.65.11 entries forward and add one secret,
+`FALLBACK_CLAUDE_CODE_OAUTH_TOKEN` mapped to the org secret of that name: a
+third job triages or reviews on the central fallback subscription after the
+subscription job hands off (ci-workflows#890), with no input, permission or
+routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
