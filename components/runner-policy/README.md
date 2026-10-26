@@ -1471,6 +1471,10 @@ The `credential-name` and `fallback-credential-name` inputs (v0.61.0) stay
 unallowed because no caller passes them. `maintenance-sync-standards` copies
 its v0.55.0 entry forward verbatim; its file is byte-identical at both tags.
 No input, secret, caller permission, or routing changes.
+At the v0.65.15 tag `30b251532b2e9f7e0c4215e1dee5be0d3c688743`, the intake-triage
+contract copies its v0.65.13 entry forward unchanged: the release makes priority
+labels exclusive in the triage apply step (ci-workflows#896), with no input,
+secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

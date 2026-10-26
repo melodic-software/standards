@@ -10366,6 +10366,19 @@ test("the claude-lanes contracts at the v0.65.14 tag copy their previous entries
   }
 });
 
+// v0.65.15 makes priority labels exclusive in the intake-triage apply step
+// (ci-workflows#896): no input, secret or permission changes, so the
+// intake-triage entry copies v0.65.13 forward unchanged.
+test("the intake-triage contract at the v0.65.15 tag copies its v0.65.13 entry unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
+  const sha = "30b251532b2e9f7e0c4215e1dee5be0d3c688743";
+  const previous = "ba7af78d291f10bd75651857a0db2357c23df0fe";
+  assert.ok(contracts[key(previous)]);
+  assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on ci-workflows releases,
 // and a test naming one revision would go red by construction on each of its
