@@ -5879,6 +5879,61 @@ test("Dependabot SHA bump auto-approves a $/ action step whose tree is unchanged
   assert.deepEqual(findings, []);
 });
 
+test("Dependabot SHA bump decline names the newest basis when only a commit-relative object differs", async () => {
+  const contract = {
+    routing: "runner-input",
+    runnerInput: "runner",
+    allowedInputs: ["runner"],
+    allowedSecrets: {},
+  };
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [REUSABLE_REFERENCE]: contract,
+        [ALTERNATE_REUSABLE_REFERENCE]: { ...contract },
+      },
+    },
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  // SHA sorts first and differs in security surface; ALTERNATE_REVIEWED_SHA sorts
+  // last, matches the candidate's surface, and differs only in the scan-setup tree.
+  const findings = await audit(root, {
+    fetchImpl: commitRelativeFetchImpl({
+      workflows: {
+        [SHA]: REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE,
+        [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
+      },
+      trees: {
+        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [ALTERNATE_REVIEWED_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
+        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_CHANGED_TREE_SHA),
+      },
+      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
+    }),
+  });
+  const message = contractFindingMessage(findings);
+  assert.match(
+    message,
+    new RegExp(
+      `auto-approval declined: commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`,
+    ),
+  );
+  assert.doesNotMatch(
+    message,
+    new RegExp(`changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`),
+  );
+});
+
 test("Dependabot SHA bump declines a $/ action step whose tree changed", async () => {
   const root = await dependabotBumpRepository();
   const findings = await audit(root, {
