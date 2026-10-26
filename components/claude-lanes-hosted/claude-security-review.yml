@@ -74,16 +74,21 @@ jobs:
                              # the lane's reviewed-head marker comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@3180217076b19bbdfccc43026c7f91c604da673d # v0.65.14
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@b26e355fe98c372f02a13d74c10a785ad8c9ce2d # v0.65.16
     with:
+      # Names (never the value) the fallback secret in the lane-outcome record.
+      fallback-credential-name: FALLBACK_CLAUDE_CODE_OAUTH_TOKEN
       runner: ubuntu-24.04
       # Bot senders this lane reviews, by numeric user id: the
       # automation-lanes App, so a commit it pushes to a pull request is
       # reviewed. Where the repository does not set this variable the value is
       # empty and the reusable reviews no bot.
       allowed-bot-sender-ids: ${{ vars.AUTOMATION_LANES_APP_SENDER_ID }}
-    # Pass only the one named secret (least privilege) rather than
+    # Pass only the named secrets (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
     # called workflow.
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      # The central fallback subscription: the review retries once on it after
+      # a usage limit on the token above.
+      FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}
