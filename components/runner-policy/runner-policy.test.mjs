@@ -10122,6 +10122,21 @@ test("the intake-triage and pr-review-cli contracts at the v0.65.12 tag add only
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
 });
 
+// v0.65.13 fixes the pr-review-cli status job's token-leg result output
+// (ci-workflows#892): no input, secret or permission changes, so both
+// entries copy v0.65.12 forward unchanged.
+test("the intake-triage and pr-review-cli contracts at the v0.65.13 tag copy their v0.65.12 entries unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
+  const sha = "ba7af78d291f10bd75651857a0db2357c23df0fe";
+  const previous = "78ee7a2609a84b0073c5e09dfe3bc59613e689dc";
+  for (const wf of ["intake-triage.yml", "pr-review-cli.yml"]) {
+    assert.ok(contracts[key(wf, previous)], wf);
+    assert.deepEqual(contracts[key(wf, sha)], contracts[key(wf, previous)], wf);
+  }
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
