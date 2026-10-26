@@ -10276,30 +10276,33 @@ test("the intake-triage and pr-review-cli contracts at the v0.65.13 tag copy the
 });
 
 // Convergence as a property, never as a hardcoded SHA. The daily
-// claude-lanes-repin lane rewrites these components on every ci-workflows
-// release, and a test naming one revision would go red by construction on
-// each of its pull requests while nothing was actually wrong. Assert instead
-// that the lane callers agree with each other on one revision, which is what
-// convergence means; whether that revision has a reviewed contract is already
-// proved by the registration tests above that audit these same bytes against
-// the real policy.json.
-test("the claude lane caller components all pin one ci-workflows revision", async () => {
-  const pins = new Set();
+// claude-lanes-repin lane rewrites these components on ci-workflows releases,
+// and a test naming one revision would go red by construction on each of its
+// pull requests while nothing was actually wrong. The lane moves a pin only
+// when the release changed its path, so the code-review and security-review
+// callers may sit on different revisions; what convergence means is that
+// every caller of one upstream path agrees on its revision. Whether that
+// revision has a reviewed contract is already proved by the registration tests
+// above that audit these same bytes against the real policy.json.
+test("the claude lane caller components pin each ci-workflows path at one revision", async () => {
+  const pinsByPath = new Map();
   for (const { source, body } of [
     ...(await claudeLaneCallerComponents()),
     ...(await claudeLaneCallerComponents(HOSTED_LANE_DIR)),
   ]) {
-    const found = [
-      ...body.matchAll(/melodic-software\/ci-workflows\/[^@\s]+@([0-9a-f]{40})/gu),
-    ].map(([, sha]) => sha);
+    const found = [...body.matchAll(/melodic-software\/ci-workflows\/([^@\s]+)@([0-9a-f]{40})/gu)];
     assert.ok(found.length > 0, `${source} carries no ci-workflows pin`);
-    for (const sha of found) pins.add(sha);
+    for (const [, workflowPath, sha] of found) {
+      pinsByPath.set(workflowPath, (pinsByPath.get(workflowPath) ?? new Set()).add(sha));
+    }
   }
-  assert.equal(
-    pins.size,
-    1,
-    `the claude lane caller components disagree on their ci-workflows pin: ${[...pins].join(", ")}`,
-  );
+  for (const [workflowPath, shas] of pinsByPath) {
+    assert.equal(
+      shas.size,
+      1,
+      `the claude lane caller components disagree on their ${workflowPath} pin: ${[...shas].join(", ")}`,
+    );
+  }
 });
 
 // The managed-files-guard caller is the hosted-only counterpart: a fixed

@@ -616,7 +616,14 @@ repin::apply() {
     decided+="${path}"$'\t'"${pin_sha}"$'\t'"${decision}"$'\n'
   done < <(cut -f2,3 <<< "$refs" | sort -u)
 
-  moved="$(awk -F'\t' '$3 == "move" { print $1 "\t" $2 }' <<< "$decided")"
+  # A pin already on the release still takes the tag form when its comment
+  # is not `# <tag>`, as a fallback-form pin to the release commit is.
+  moved="$(
+    {
+      awk -F'\t' '$3 == "move" { print $1 "\t" $2 }' <<< "$decided"
+      awk -F'\t' -v s="$sha" -v t="$tag" '$3 == s && $4 != t { print $2 "\t" $3 }' <<< "$refs"
+    } | awk '$0 != "" && !seen[$0]++'
+  )"
 
   ahead=()
   while IFS=$'\t' read -r file pin_sha; do
@@ -645,12 +652,16 @@ repin::apply() {
     return 0
   fi
 
-  # Count every moved occurrence, then require exactly that many new
-  # `@<sha> # <tag>` pins after the rewrite.
-  expected="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m)' \
+  # Count every moved occurrence not already `@<sha> # <tag>`, then require
+  # exactly that many new such pins after the rewrite.
+  expected="$(awk -F'\t' -v s="$sha" -v t="$tag" 'NR == FNR { if ($0 != "") m[$0] = 1; next }
+    (($2 "\t" $3) in m) && !($3 == s && $4 == t)' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | wc -l)"
   before="$(grep -hoE "uses: ${UPSTREAM_REPO}/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
-  old_sha="$(cut -f2 <<< "$moved" | sort -u | paste -sd, -)"
+  # A run that only relabels pins already on the release hands lockstep the
+  # release SHA itself, which it treats as a no-op.
+  old_sha="$(cut -f2 <<< "$moved" | { grep -vxF -- "$sha" || true; } | sort -u | paste -sd, -)"
+  old_sha="${old_sha:-$sha}"
   old_tags="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m) && $4 ~ /^v/ { print $4 }' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | sort -u | paste -sd, - || true)"
 

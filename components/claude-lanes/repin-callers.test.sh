@@ -1006,6 +1006,25 @@ assert_eq 'selective: only the changed lane caller is modified' \
   'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
 unset STUB_COMPARE_FILES
 
+# A fallback-form pin to the very commit the release tags is already on the
+# release SHA; it still takes the tag form, and nothing else moves.
+repo="$scratch/repo-lane-relabel"
+lane_repo "$repo" "$old_sha" 'v0.9.1'
+sed -i -E "s|claude-review.yml@${old_sha} # v0\.9\.1|claude-review.yml@${new_sha} # a1b2c3d 2026-08-21|" \
+  "$repo/components/claude-lanes/claude-review.yml"
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'fallback pin to the release commit'
+export STUB_COMPARE_FILES=''
+out_file="$scratch/out-lane-relabel"
+rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+assert_exit 'relabel: a fallback pin on the release SHA exits 0' 0 "$rc"
+assert_contains 'relabel: the fallback pin on the release SHA takes the tag form' \
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "claude-review.yml@${new_sha} # v0.9.2"
+assert_eq 'relabel: only that caller is modified' \
+  'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
+assert_eq 'relabel: a relabel-only run hands lockstep the release SHA, its no-op' \
+  "old-sha=${new_sha}" "$(grep '^old-sha=' "$out_file")"
+unset STUB_COMPARE_FILES
+
 # --root needs a directory.
 rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2026-10-24 --root 2>&1)" || rc=$?
 assert_nonzero 'apply with --root and no directory is a usage error' "$rc"
