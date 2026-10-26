@@ -13,7 +13,9 @@
 # repin::decide); every other pin stays byte-identical. Without --root it
 # rewrites this repository's enumerated lane callers. With --root it rewrites
 # every git-tracked .github/ YAML file of the repository at <dir> that pins
-# ci-workflows, which is how a consumer checkout repins with this same tool.
+# ci-workflows, except the files the sync manifest manages in that repository
+# (the sync owns their pins), which is how a consumer checkout repins with
+# this same tool.
 #
 # Both report through GITHUB_OUTPUT (`key=value`, the Actions convention), so
 # a test sets that variable to a scratch file and reads the result the same
@@ -61,6 +63,10 @@ readonly UPSTREAM_REPO='melodic-software/ci-workflows'
 # reads the same map.
 RENAME_MAP="$(cd "$(dirname "${BASH_SOURCE[0]}")/../github-actions-conventions" && pwd)/rename-map.json"
 readonly RENAME_MAP
+# The sync engine, resolved beside this script like RENAME_MAP. --root mode
+# asks it which files the standards sync manages in the consumer.
+SYNC_MANIFEST="${SYNC_MANIFEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../distribution" && pwd)/sync-manifest.sh}"
+readonly SYNC_MANIFEST
 readonly UPSTREAM_PATH_RE='^[A-Za-z0-9._/-]+$'
 # The two `uses:` forms that run upstream code from the pinning commit itself:
 # a step-level `$/<dir>` action and a job-level `./.github/workflows/<file>`
@@ -518,13 +524,25 @@ repin::path_map() {
 # repository root apply has changed into. Without <dir>: LANE_DIR's callers
 # plus EXTRA_CALLER_FILES, enumerated, never discovered. With <dir>: every
 # git-tracked .github/ YAML file that pins ci-workflows, which in a consumer
-# checkout is the whole caller set.
+# checkout is the whole caller set, except the files the sync manifest maps
+# into the consumer's origin repository: the sync owns those pins, and the
+# consumer's managed-files guard rejects a PR that edits them. Skipped files
+# are named on stderr.
 repin::targets() {
-  local file extra_present=0 extra_missing=0
+  local file extra_present=0 extra_missing=0 repo managed=''
   local -a found
   if [[ "$#" -eq 1 ]]; then
+    repo="$(git remote get-url origin 2>/dev/null || true)"
+    repo="$(sed -E 's#^.*github\.com[:/]##; s#\.git$##' <<<"$repo")"
+    if [[ -n "$repo" ]]; then
+      managed="$(bash "$SYNC_MANIFEST" dest-paths --target "$repo")"
+    fi
     git ls-files -- '.github/*.yml' '.github/*.yaml' | while IFS= read -r file; do
-      if grep -qE "$PIN_RE" -- "$file"; then
+      if ! grep -qE "$PIN_RE" -- "$file"; then
+        continue
+      elif grep -qxF -- "$file" <<<"$managed"; then
+        echo "Skipping sync-managed file: ${file}" >&2
+      else
         printf '%s\n' "$file"
       fi
     done
