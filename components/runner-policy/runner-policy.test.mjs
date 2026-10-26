@@ -219,15 +219,59 @@ function audit(root, options = {}) {
   });
 }
 
+// Serves the tag refs and release-by-tag reads of the release check: each
+// `tags` entry is [tag name, ref object], and every tag's release has the
+// GitHub release fields in `release` (immutable and published by default).
+// Annotated tag objects resolve through `tagObjects` (tag object SHA -> object).
+function releaseFetchImpl(inner, tags, { release = {}, tagObjects = {} } = {}) {
+  return async (url, init) => {
+    if (url.endsWith("/git/matching-refs/tags/")) {
+      return {
+        ok: true,
+        json: async () => tags.map(([name, object]) => ({ ref: `refs/tags/${name}`, object })),
+      };
+    }
+    const tagObject = /\/git\/tags\/([0-9a-f]{40})$/.exec(url);
+    if (tagObject && tagObjects[tagObject[1]]) {
+      return { ok: true, json: async () => ({ object: tagObjects[tagObject[1]] }) };
+    }
+    const releaseTag = /\/releases\/tags\/([^/]+)$/.exec(url);
+    if (releaseTag && release === null) {
+      return { ok: false, status: 404, statusText: "Not Found" };
+    }
+    if (releaseTag) {
+      return {
+        ok: true,
+        json: async () => ({
+          tag_name: releaseTag[1],
+          draft: false,
+          prerelease: false,
+          immutable: true,
+          ...release,
+        }),
+      };
+    }
+    return inner(url, init);
+  };
+}
+
+// Every SHA in `shas` is the commit of its own lightweight release tag.
+function releasedShas(inner, shas) {
+  return releaseFetchImpl(
+    inner,
+    shas.map((sha, index) => [`v0.0.${index}`, { type: "commit", sha }]),
+  );
+}
+
 function fetchImplFor(sourcesBySha) {
-  return async (url) => {
+  return releasedShas(async (url) => {
     for (const [sha, body] of Object.entries(sourcesBySha)) {
       if (url.includes(`/${sha}/`)) {
         return { ok: true, text: async () => body };
       }
     }
     return { ok: false, status: 404, statusText: "Not Found" };
-  };
+  }, Object.keys(sourcesBySha));
 }
 
 const REUSABLE_WORKFLOW_BASIS_SOURCE = `name: osv-scanner
@@ -4306,6 +4350,100 @@ test("Dependabot SHA bump with an identical security surface is auto-approved", 
   assert.deepEqual(findings, []);
 });
 
+const RELEASE_TAG_OBJECT_SHA = "fedcba9876543210fedcba9876543210fedcba98";
+const NOT_A_RELEASE_COMMIT = `${DEPENDABOT_BUMP_REFERENCE} is not the commit of an immutable, published, non-prerelease release tag of melodic-software/ci-workflows, so auto-approval is declined`;
+
+async function releaseCheckFindings(wrap) {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  return audit(root, {
+    fetchImpl: wrap(
+      fetchImplFor({
+        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
+        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
+      }),
+    ),
+  });
+}
+
+for (const [label, tags, options, expected] of [
+  [
+    "approves a lightweight release-tag commit",
+    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
+    {},
+    null,
+  ],
+  [
+    "peels an annotated release tag to its commit",
+    [["v0.65.13", { type: "tag", sha: RELEASE_TAG_OBJECT_SHA }]],
+    { tagObjects: { [RELEASE_TAG_OBJECT_SHA]: { type: "commit", sha: DEPENDABOT_BUMP_SHA } } },
+    null,
+  ],
+  [
+    "declines an annotated release tag that peels to another commit",
+    [["v0.65.12", { type: "tag", sha: RELEASE_TAG_OBJECT_SHA }]],
+    { tagObjects: { [RELEASE_TAG_OBJECT_SHA]: { type: "commit", sha: SHA } } },
+    NOT_A_RELEASE_COMMIT,
+  ],
+  [
+    "declines a non-release SHA with an identical surface",
+    [["v0.65.12", { type: "commit", sha: SHA }]],
+    {},
+    NOT_A_RELEASE_COMMIT,
+  ],
+  [
+    "declines a tag without a release",
+    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
+    { release: null },
+    NOT_A_RELEASE_COMMIT,
+  ],
+  ...[{ draft: true }, { prerelease: true }, { immutable: false }].map((release) => [
+    `declines a release with ${JSON.stringify(release)}`,
+    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
+    { release },
+    NOT_A_RELEASE_COMMIT,
+  ]),
+]) {
+  test(`Dependabot SHA bump release check ${label}`, async () => {
+    const findings = await releaseCheckFindings((inner) => releaseFetchImpl(inner, tags, options));
+    if (expected === null) {
+      assert.deepEqual(findings, []);
+    } else {
+      assert.ok(
+        contractFindingMessage(findings).includes(expected),
+        contractFindingMessage(findings),
+      );
+    }
+  });
+}
+
+for (const failing of ["/git/matching-refs/tags/", "/releases/tags/v0.0.1"]) {
+  test(`Dependabot SHA bump release check declines when ${failing} errors`, async () => {
+    const findings = await releaseCheckFindings(
+      (inner) => async (url, init) =>
+        url.endsWith(failing)
+          ? { ok: false, status: 500, statusText: "Internal Server Error" }
+          : inner(url, init),
+    );
+    assert.ok(
+      contractFindingMessage(findings).includes(
+        `${DEPENDABOT_BUMP_REFERENCE} could not be checked against the release tags of melodic-software/ci-workflows: 500 Internal Server Error, so auto-approval is declined`,
+      ),
+      contractFindingMessage(findings),
+    );
+  });
+}
+
 test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts independent of insertion order", async () => {
   const runnerContract = ({
     runnerInput = "runner",
@@ -5678,7 +5816,7 @@ function scanSetupTree(treeSha, { actionSource = SCAN_SETUP_ACTION_BLOB_SHA, ext
 // (raw.githubusercontent.com). `files` maps "<sha>:<path>" or "<path>" to
 // content; every other request is a 404.
 function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = false }) {
-  return async (url) => {
+  return releasedShas(async (url) => {
     const treeMatch = COMMIT_RELATIVE_TREE_URL.exec(url);
     if (treeMatch) {
       const tree = trees[treeMatch[1]];
@@ -5699,7 +5837,7 @@ function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = fal
       }
     }
     return { ok: false, status: 404, statusText: "Not Found" };
-  };
+  }, Object.keys(workflows));
 }
 
 async function dependabotBumpRepository() {

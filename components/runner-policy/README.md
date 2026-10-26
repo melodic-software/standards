@@ -305,6 +305,15 @@ repository. Changes outside that bounded runner-contract surface may be
 auto-approved; any change to the surface itself requires a human to add a new
 contract entry.
 
+A surface match is not enough on its own: GitHub resolves a commit SHA from
+anywhere in a repository's fork network, so a fork-only or unreleased commit
+could carry a matching surface around malicious steps. The candidate is
+approved only when a tag of its source repository points at it (annotated tags
+peeled) and that tag's release is immutable, published, and not a prerelease
+(`GET /repos/{owner}/{repo}/git/matching-refs/tags/`, then
+`GET /repos/{owner}/{repo}/releases/tags/{tag}`, sent with `GITHUB_TOKEN` when
+set). Any other answer, or a failed request, declines.
+
 Several shapes are excluded from this diff-based extension entirely, because
 no structural surface comparison can prove them unchanged. First, a job whose
 routing-relevant fields (`runs-on`, `strategy`, the reusable-call
