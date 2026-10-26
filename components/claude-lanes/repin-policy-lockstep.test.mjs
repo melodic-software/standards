@@ -13,6 +13,7 @@ import {
   manualPolicyNote,
   pairCallerPins,
   planLockstep,
+  policyHasContract,
   settleLockstep,
 } from "./repin-policy-lockstep.mjs";
 
@@ -277,6 +278,36 @@ test("a same-path pin whose surface changed is declined, not copied forward", as
   );
   assert.deepEqual(plan.copyForwards, []);
   assert.deepEqual(plan.reasons, [`${REVIEW_WORKFLOW} x (from 91d06c9)`]);
+});
+
+const changedSurface = () => ({ unchanged: false, reason: "x" });
+const registered = (workflowPath, sha) => workflowPath === REVIEW_WORKFLOW && sha === FRESH_SHA;
+
+test("a pin whose surface changed but whose new-SHA contract is registered is satisfied", async () => {
+  const plan = await planLockstep([samePathPin()], FRESH_SHA, changedSurface, registered);
+  assert.deepEqual(plan, { reasons: [], copyForwards: [] });
+});
+
+test("policyHasContract finds a contract in a validated policy and not an absent one", async () => {
+  const policy = validatePolicy(await policyWithHistory());
+  assert.equal(policyHasContract(policy, REVIEW_WORKFLOW, CURRENT_REVIEW_SHA), true);
+  assert.equal(policyHasContract(policy, REVIEW_WORKFLOW, FRESH_SHA), false);
+});
+
+test("a pin whose surface changed and has no new-SHA contract is still declined", async () => {
+  const plan = await planLockstep([samePathPin()], FRESH_SHA, changedSurface, () => false);
+  assert.deepEqual(plan.reasons, [`${REVIEW_WORKFLOW} x (from 91d06c9)`]);
+});
+
+test("a renamed pin is declined even when a contract exists at the new path", async () => {
+  const plan = await planLockstep(
+    [{ ...samePathPin(), newWorkflowPath: RENAMED_REVIEW_WORKFLOW }],
+    FRESH_SHA,
+    () => ({ unchanged: true }),
+    (workflowPath, sha) => workflowPath === RENAMED_REVIEW_WORKFLOW && sha === FRESH_SHA,
+  );
+  assert.equal(plan.reasons.length, 1);
+  assert.deepEqual(plan.copyForwards, []);
 });
 
 async function policyRoot() {
