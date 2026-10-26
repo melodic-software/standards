@@ -1461,6 +1461,16 @@ At the v0.65.14 tag `3180217076b19bbdfccc43026c7f91c604da673d`, the pr-review-cl
 contract copies its v0.65.13 entry forward unchanged: the release reports a
 failed "Isolate the runner" install as install-failed (ci-workflows#893), with
 no input, secret, permission or routing change.
+At the same tag, the claude-lanes re-pin moves `pr-review`,
+`pr-review-security` and `maintenance-sync-standards` off v0.55.0.
+`pr-review` and `pr-review-security` copy their v0.62.0 entries forward
+verbatim: since v0.62.0 each only gives the isolation install step an id and
+classifies its failure as `install-failed`, and their `workflow_call` inputs,
+secrets, outputs, workflow and job permissions and triggers are unchanged.
+The `credential-name` and `fallback-credential-name` inputs (v0.61.0) stay
+unallowed because no caller passes them. `maintenance-sync-standards` copies
+its v0.55.0 entry forward verbatim; its file is byte-identical at both tags.
+No input, secret, caller permission, or routing changes.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
