@@ -10100,6 +10100,28 @@ test("the intake-triage and pr-review-cli contracts at the v0.65.11 tag copy the
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
 });
 
+// v0.65.12 adds the optional FALLBACK_CLAUDE_CODE_OAUTH_TOKEN workflow_call
+// secret to both lanes (ci-workflows#890): the central fallback subscription's
+// org secret, mapped under its own name for every role. Inputs and job
+// permissions are unchanged.
+test("the intake-triage and pr-review-cli contracts at the v0.65.12 tag add only the fallback secret to their v0.65.11 entries", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
+  const sha = "78ee7a2609a84b0073c5e09dfe3bc59613e689dc";
+  const previous = "e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8";
+  for (const wf of ["intake-triage.yml", "pr-review-cli.yml"]) {
+    const prior = contracts[key(wf, previous)];
+    assert.deepEqual(contracts[key(wf, sha)], {
+      ...prior,
+      allowedSecrets: {
+        ...prior.allowedSecrets,
+        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
+      },
+    });
+  }
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
+});
+
 // Convergence as a property, never as a hardcoded SHA. The daily
 // claude-lanes-repin lane rewrites these components on every ci-workflows
 // release, and a test naming one revision would go red by construction on
