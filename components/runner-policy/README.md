@@ -1475,6 +1475,14 @@ At the v0.65.15 tag `30b251532b2e9f7e0c4215e1dee5be0d3c688743`, the intake-triag
 contract copies its v0.65.13 entry forward unchanged: the release makes priority
 labels exclusive in the triage apply step (ci-workflows#896), with no input,
 secret, permission or routing change.
+At the v0.65.16 tag `b26e355fe98c372f02a13d74c10a785ad8c9ce2d`, the
+`pr-review` and `pr-review-security` contracts copy their v0.65.14 entries
+forward and add the `FALLBACK_CLAUDE_CODE_OAUTH_TOKEN` secret, mapped to the
+org secret of that name, and the `fallback-credential-name` input: the release
+renames the review lanes' fallback secret slot from
+`fallback-claude-code-oauth-token` to that name (ci-workflows#897), so a
+caller maps the central fallback subscription under its own name. The lane
+retries once on it after a usage limit only. No permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
