@@ -170,8 +170,8 @@ the guard executes); do not pin it in this hop.
 
 The action pin rides the existing `maintenance-repin-ci-workflows` cascade
 (`.github/workflows/maintenance-repin-ci-workflows.yml`, daily), which resolves the
-newest full-SemVer ci-workflows release and rewrites every enumerated caller
-to its SHA with a `# vX.Y.Z` comment. Both files are enumerated in
+newest full-SemVer ci-workflows release and rewrites each enumerated caller
+pin whose path that release changed to its SHA with a `# vX.Y.Z` comment. Both files are enumerated in
 `components/claude-lanes/repin-callers.sh`'s `EXTRA_CALLER_FILES`, and the
 workflow's `add-paths` covers the whole `components/managed-files-guard`
 directory, so the same reviewed pull request that re-pins the
@@ -181,9 +181,10 @@ Two properties of that ride are deliberate:
 
 - **A pin ahead of the release is left alone.** `apply` asks GitHub's
   compare API whether the pinned SHA is an ancestor of the release SHA
-  ([compare two commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits)).
-  Status `ahead` or `diverged` leaves the file untouched; `behind` or
-  `identical` lets the rewrite proceed. Day-level pin-comment dates are not
+  ([compare two commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits)),
+  comparing the pin to the release. Status `behind` or `diverged` leaves the
+  pin untouched; `ahead` lets the rewrite proceed when the release changed
+  the composite. Day-level pin-comment dates are not
   consulted: a pin landed later on the same UTC day as the release, or on
   another line of history, cannot be proven contained by a `YYYY-MM-DD`
   string. Without that fence the very next scheduled run would have proposed
@@ -191,8 +192,8 @@ Two properties of that ride are deliberate:
   (2026-08-30) back to v0.17.2 (2026-08-21),
   behind the fail-open fix. The pin advances to the tag form on the first
   release that contains it, and the file now sits on that tag form, so the
-  fence has released it and it re-pins with the lane callers on every later
-  release. A failed compare is a hard failure, not a rewrite.
+  fence has released it and it re-pins on every later release that changes
+  the composite. A failed compare is a hard failure, not a rewrite.
 - **Not in `repin-policy-lockstep.mjs`'s `REPIN_TARGETS`.** Every `kind` that
   table expresses and that still has a contract to copy (`lane`, `reusable`)
   copies a `components/runner-policy/policy.json` contract forward from the old

@@ -6,14 +6,23 @@
 #
 # Two subcommands, matching the workflow's two steps:
 #
-#   repin-callers.sh resolve <owner/repo>       newest release -> tag, SHA, date
-#   repin-callers.sh apply <tag> <sha> <date>   rewrite the caller pins
+#   repin-callers.sh resolve <owner/repo>                      newest release -> tag, SHA, date
+#   repin-callers.sh apply <tag> <sha> <date> [--root <dir>]   rewrite the pins the release changed
+#
+# apply moves a pin only when the release changed the path it pins (see
+# repin::decide); every other pin stays byte-identical. Without --root it
+# rewrites this repository's enumerated lane callers. With --root it rewrites
+# every git-tracked .github/ YAML file of the repository at <dir> that pins
+# ci-workflows, which is how a consumer checkout repins with this same tool.
 #
 # Both report through GITHUB_OUTPUT (`key=value`, the Actions convention), so
 # a test sets that variable to a scratch file and reads the result the same
 # way the workflow does. Progress and diagnostics go to stdout/stderr as
 # Actions workflow commands; every failure path exits non-zero.
 set -euo pipefail
+# A failing function inside `$(...)` must fail the assignment that called it,
+# so planning errors cannot be read as an empty answer.
+shopt -s inherit_errexit
 
 # The directory holding the lane callers, relative to the repository root.
 # ENUMERATED, never discovered: a repository-wide search for ci-workflows pins
@@ -44,25 +53,35 @@ readonly -a EXTRA_CALLER_FILES=(
 # Any `uses:` reference to a ci-workflows reusable workflow or composite action
 # pinned by 40-character commit SHA.
 readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
-# The pin-comment convention's fallback form (`# <short-sha> <YYYY-MM-DD>`),
-# which a pin to an as-yet-unreleased commit carries. The date is provenance
-# for humans; apply decides "ahead of the release" from GitHub compare
-# ancestry against the release SHA, not from that date.
-readonly FALLBACK_PIN_RE="${PIN_RE}[[:space:]]+# [0-9a-f]{7,40} [0-9]{4}-[0-9]{2}-[0-9]{2}"
 readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 readonly UPSTREAM_REPO='melodic-software/ci-workflows'
 # Old -> new upstream paths. Its `repo: ci-workflows` entries with a path
 # `to` are the only renames apply follows; it keeps no copy of its own.
-readonly RENAME_MAP='components/github-actions-conventions/rename-map.json'
+# Resolved beside this script, so a run against another repository root
+# reads the same map.
+RENAME_MAP="$(cd "$(dirname "${BASH_SOURCE[0]}")/../github-actions-conventions" && pwd)/rename-map.json"
+readonly RENAME_MAP
 readonly UPSTREAM_PATH_RE='^[A-Za-z0-9._/-]+$'
+# The two `uses:` forms that run upstream code from the pinning commit itself:
+# a step-level `$/<dir>` action and a job-level `./.github/workflows/<file>`
+# nested workflow, the commit-relative forms runner-policy diffs
+# (components/runner-policy/runner-policy.mjs). The optional character admits
+# a quoted value.
+readonly COMMIT_RELATIVE_RE='uses:[[:space:]]*.?(\$/[A-Za-z0-9_./-]+|\./\.github/workflows/[A-Za-z0-9_.-]+\.ya?ml)'
+# GitHub's compare response lists at most 300 files
+# (https://docs.github.com/en/rest/commits/commits#compare-two-commits); a list
+# that long may be cut short, so it cannot prove any path unchanged.
+readonly COMPARE_FILE_CAP=300
 
 usage() {
   cat >&2 <<'USAGE'
 usage:
-  repin-callers.sh resolve <owner/repo>       resolve the newest release to tag, SHA, and commit date
-  repin-callers.sh apply <tag> <sha> <date>   re-pin the callers to tag/SHA; <date> is that commit's YYYY-MM-DD
+  repin-callers.sh resolve <owner/repo>                      resolve the newest release to tag, SHA, and commit date
+  repin-callers.sh apply <tag> <sha> <date> [--root <dir>]   re-pin the pins the release changed to tag/SHA;
+                                                             <date> is that commit's YYYY-MM-DD; --root repins
+                                                             the .github/ callers of the repository at <dir>
 
-Requires GITHUB_OUTPUT to name a writable file; `resolve` also requires gh.
+Requires GITHUB_OUTPUT to name a writable file, and gh.
 USAGE
 }
 
@@ -186,58 +205,245 @@ repin::resolve() {
   } >> "$GITHUB_OUTPUT"
 }
 
-# repin::compare_status <release-sha> <pin-sha>
+# repin::compare <current-sha> <release-sha>
 #
-# Prints GitHub's compare `status` of <release-sha>... <pin-sha> on the
-# upstream repo (https://docs.github.com/en/rest/commits/commits#compare-two-commits):
-#   ahead     — pin has commits the release does not; rewriting would downgrade
-#   diverged  — neither is an ancestor of the other; same downgrade risk
-#   behind    — pin is an ancestor of the release; the release contains it
-#   identical — pin *is* the release
-# A failed lookup is fatal: guessing "not ahead" would rewrite, which is the
-# downgrade this fence exists to prevent.
-repin::compare_status() {
-  local release_sha="$1" pin_sha="$2" status err
-  err="$(mktemp)"
-  # shellcheck disable=SC2064
-  trap "rm -f '$err'" RETURN
-  if ! status="$(gh api "repos/${UPSTREAM_REPO}/compare/${release_sha}...${pin_sha}" \
-    --jq .status 2>"$err")"; then
-    echo "::error::Could not compare ${release_sha}...${pin_sha} on ${UPSTREAM_REPO}." >&2
-    cat "$err" >&2
-    return 1
+# Prints GitHub's compare `status` of <current-sha>...<release-sha>
+# (https://docs.github.com/en/rest/commits/commits#compare-two-commits), read
+# from the release's side:
+#   ahead     — the release contains the pin; `files` is what it changed since
+#   identical — the pin is the release
+#   behind    — the pin has commits the release does not; moving would downgrade
+#   diverged  — neither contains the other; same downgrade risk
+# One call per distinct current SHA: the response is cached in REPIN_CACHE for
+# the rest of the run, where repin::changed_files reads its file list. A failed
+# lookup is fatal: guessing would either downgrade a pin or skip a change.
+repin::compare() {
+  local current="$1" release="$2" cached="${REPIN_CACHE}/compare-$1.json" status
+  if [[ ! -f "$cached" ]]; then
+    if ! gh api "repos/${UPSTREAM_REPO}/compare/${current}...${release}" \
+      > "${cached}.part" 2> "${cached}.err"; then
+      echo "::error::Could not compare ${current}...${release} on ${UPSTREAM_REPO}." >&2
+      cat "${cached}.err" >&2
+      return 1
+    fi
+    mv "${cached}.part" "$cached"
   fi
-  printf '%s\n' "$status"
+  status="$(jq -r '.status' "$cached")" || return 1
+  case "$status" in
+    ahead | identical | behind | diverged) printf '%s\n' "$status" ;;
+    *)
+      echo "::error::compare ${current}...${release} returned '${status}', not a documented status." >&2
+      return 1
+      ;;
+  esac
 }
 
-# repin::ahead_of <file> <release-sha>
+# repin::changed_files <current-sha>
 #
-# Prints the SHA of a fallback-form pin in <file> that is not an ancestor of
-# <release-sha> (compare status `ahead` or `diverged`), or nothing. Tag-form
-# pins never match: a release is the newest of its line by construction of
-# `resolve`. Day-level pin-comment dates are not consulted — same-day pins
-# and cross-branch timestamps cannot prove containment.
-repin::ahead_of() {
-  local file="$1" release_sha="$2" pin_line pin_sha status
-  while IFS= read -r pin_line; do
-    [[ -n "$pin_line" ]] || continue
-    pin_sha="$(sed -nE 's/.*@([0-9a-fA-F]{40}).*/\1/p' <<<"$pin_line" | head -n1)"
-    [[ -n "$pin_sha" ]] || continue
-    # Not `|| return 1`: that form is SC2310 (set -e suppressed in ||).
-    # compare_status already failed-loud; with set -e the assignment exits.
-    status="$(repin::compare_status "$release_sha" "$pin_sha")"
-    case "$status" in
-      ahead | diverged)
-        echo "$pin_sha"
+# Prints every path the cached compare of <current-sha> touched, a renamed file
+# under both its names, or the single line `*` when the list cannot be trusted
+# as complete: absent, or at the documented cap.
+repin::changed_files() {
+  jq -r --argjson cap "$COMPARE_FILE_CAP" \
+    'if (.files | type) != "array" or (.files | length) >= $cap then "*"
+     else .files[] | .filename, (.previous_filename // empty) end' \
+    "${REPIN_CACHE}/compare-$1.json"
+}
+
+# repin::source <path> <sha>
+#
+# Prints the upstream file at <sha>, or nothing when the path does not exist
+# there: a path the release removed or renamed is in its compare file list, so
+# that list, not this read, moves its pin. Any failure but a 404 is fatal.
+repin::source() {
+  local path="$1" sha="$2" err="${REPIN_CACHE}/source.err"
+  if gh api -H 'Accept: application/vnd.github.raw' \
+    "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" 2> "$err"; then
+    return 0
+  fi
+  if grep -q 'HTTP 404' "$err"; then
+    return 0
+  fi
+  echo "::error::Could not read ${path} at ${sha} on ${UPSTREAM_REPO}." >&2
+  cat "$err" >&2
+  return 1
+}
+
+# repin::refs_in <path> <release-sha>
+#
+# Prints the upstream paths <path> runs through a commit-relative `uses:`
+# (COMMIT_RELATIVE_RE), read from its source at the release, a composite
+# through its action.yml or action.yaml. Cached per path: several pins can
+# reach one composite.
+repin::refs_in() {
+  local path="$1" sha="$2" cached text
+  cached="${REPIN_CACHE}/refs-${path//\//__}"
+  if [[ ! -f "$cached" ]]; then
+    if [[ "$path" =~ \.ya?ml$ ]]; then
+      text="$(repin::source "$path" "$sha")"
+    else
+      text="$(repin::source "${path}/action.yml" "$sha")"
+      if [[ -z "$text" ]]; then
+        text="$(repin::source "${path}/action.yaml" "$sha")"
+      fi
+    fi
+    { grep -oE "$COMMIT_RELATIVE_RE" <<< "$text" || true; } \
+      | sed -E 's|^uses:[[:space:]]*.?[$.]/||; s|/+$||' | sort -u > "$cached"
+  fi
+  cat "$cached"
+}
+
+# repin::reach <path> <release-sha>
+#
+# Prints <path> and every path it reaches through commit-relative references,
+# transitively. A pin runs all of them from its own commit, so a change to any
+# of them changes what the pin runs.
+repin::reach() {
+  local next refs ref seen=$'\n'"$1"$'\n'
+  local -a queue=("$1")
+  while [[ "${#queue[@]}" -gt 0 ]]; do
+    next="${queue[0]}"
+    queue=("${queue[@]:1}")
+    refs="$(repin::refs_in "$next" "$2")"
+    while IFS= read -r ref; do
+      [[ -n "$ref" && "$seen" != *$'\n'"${ref}"$'\n'* ]] || continue
+      seen+="${ref}"$'\n'
+      queue+=("$ref")
+    done <<< "$refs"
+  done
+  printf '%s' "${seen#$'\n'}"
+}
+
+# repin::touches <changed-files> <reach>
+#
+# True when a changed file is one of the reached paths or lies beneath one: a
+# reusable workflow is one file, a composite action its whole directory.
+repin::touches() {
+  local file path
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    while IFS= read -r path; do
+      [[ -n "$path" ]] || continue
+      if [[ "$file" == "$path" || "$file" == "$path"/* ]]; then
         return 0
-        ;;
-      behind | identical) ;;
-      *)
-        echo "::error::compare ${release_sha}...${pin_sha} returned '${status}', not a documented status." >&2
-        return 1
-        ;;
+      fi
+    done <<< "$2"
+  done <<< "$1"
+  return 1
+}
+
+# repin::inert <file>
+#
+# True for a file no pin executes: a test (*.test.*), a README.md, or docs/.
+repin::inert() {
+  local base="${1##*/}"
+  [[ "$base" == *.test.* || "$base" == README.md || "$1" == docs/* ]]
+}
+
+# repin::decide <path> <sha> <release-sha> <fenced-shas> <pinned-paths>
+#
+# Prints `move` when the release changed what the pin <path>@<sha> runs,
+# `keep` when it did not, `ahead` when <sha> is fenced (not contained by the
+# release), and `current` when the pin already is the release. Fails closed to
+# `move` when the compare's file list is incomplete, or when it changed a file
+# that is not inert and that no pinned path reaches (a shared script, a schema):
+# nothing then proves which pins depend on it.
+repin::decide() {
+  local path="$1" sha="$2" release="$3" fenced="$4" pinned="$5"
+  local status files reach file other covered
+  if [[ "$sha" == "$release" ]]; then
+    echo current
+    return 0
+  fi
+  if grep -qxF -- "$sha" <<< "$fenced"; then
+    echo ahead
+    return 0
+  fi
+  status="$(repin::compare "$sha" "$release")"
+  if [[ "$status" == identical ]]; then
+    echo current
+    return 0
+  fi
+  files="$(repin::changed_files "$sha")"
+  if [[ -z "$files" ]]; then
+    echo keep
+    return 0
+  fi
+  if [[ "$files" == '*' ]]; then
+    echo move
+    return 0
+  fi
+  reach="$(repin::reach "$path" "$release")"
+  # shellcheck disable=SC2310  # a pure predicate: nothing in it needs errexit
+  if repin::touches "$files" "$reach"; then
+    echo move
+    return 0
+  fi
+  while IFS= read -r file; do
+    # shellcheck disable=SC2310  # a pure predicate: nothing in it needs errexit
+    if [[ -z "$file" ]] || repin::inert "$file"; then
+      continue
+    fi
+    covered=false
+    while IFS= read -r other; do
+      reach="$(repin::reach "$other" "$release")"
+      # shellcheck disable=SC2310  # a pure predicate: nothing in it needs errexit
+      if repin::touches "$file" "$reach"; then
+        covered=true
+        break
+      fi
+    done <<< "$pinned"
+    if [[ "$covered" == false ]]; then
+      echo move
+      return 0
+    fi
+  done <<< "$files"
+  echo keep
+}
+
+# repin::refs <file>...
+#
+# Prints one `file<TAB>path<TAB>sha<TAB>comment` line per pin occurrence, the
+# SHA lowercased and the comment `vX.Y.Z` (the tag form), `fallback` (the
+# pin-comment convention's `# <short-sha> <YYYY-MM-DD>` form, which a pin to
+# an as-yet-unreleased commit carries), or empty.
+repin::refs() {
+  local file match path sha comment
+  for file in "$@"; do
+    while IFS= read -r match; do
+      path="${match#uses: melodic-software/ci-workflows/}"
+      path="${path%%@*}"
+      sha="${match#*@}"
+      sha="${sha:0:40}"
+      comment=''
+      if [[ "$match" =~ \#\ (v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+        comment="${BASH_REMATCH[1]}"
+      elif [[ "$match" =~ \#\ [0-9a-f]{7,40}\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        comment=fallback
+      fi
+      printf '%s\t%s\t%s\t%s\n' "$file" "$path" "${sha,,}" "$comment"
+    done < <(grep -oE "${PIN_RE}([[:space:]]+# [^[:space:]]+( [0-9]{4}-[0-9]{2}-[0-9]{2})?)?" "$file" || true)
+  done
+}
+
+# repin::fenced <refs> <release-sha>
+#
+# Prints each SHA a fallback-form pin names that the release does not contain
+# (compare `behind` or `diverged`). Every pin at such a SHA is left as is:
+# moving it would go backwards. Tag-form pins are not fenced, since a release
+# is the newest of its line by construction of `resolve`. Day-level pin-comment
+# dates are not consulted: same-day pins and cross-branch timestamps cannot
+# prove containment.
+repin::fenced() {
+  local sha status
+  while IFS= read -r sha; do
+    [[ -n "$sha" && "$sha" != "$2" ]] || continue
+    status="$(repin::compare "$sha" "$2")"
+    case "$status" in
+      behind | diverged) echo "$sha" ;;
+      *) ;;
     esac
-  done < <(grep -hE "$FALLBACK_PIN_RE" "$file" || true)
+  done < <(awk -F'\t' '$4 == "fallback" { print $3 }' <<< "$1" | sort -u)
 }
 
 # repin::path_state <path> <sha>
@@ -262,9 +468,9 @@ repin::path_state() {
   fi
 }
 
-# repin::path_map <sha> <file>...
+# repin::path_map <sha> <path>...
 #
-# Prints `from<TAB>to` for each upstream path pinned in <file>... that
+# Prints `from<TAB>to` for each upstream <path>... that
 # RENAME_MAP renames and that <sha> carries only under its new name. A
 # release cut before the rename still has the old path, so it maps nothing.
 # A pinned path absent under both names is fatal: no rewrite could be right.
@@ -279,7 +485,7 @@ repin::path_map() {
   # failure below returns explicitly.
   entries="$(jq -r '.[] | select(.repo == "ci-workflows" and (.to | startswith(".github/")))
     | [.from, .to] | @tsv' "$RENAME_MAP")" || return 1
-  pinned="$(grep -hoE "$PIN_RE" "$@" | sed -E 's|^uses: [^/]+/[^/]+/||; s|@.*||' | sort -u)"
+  pinned="$(printf '%s\n' "$@" | sort -u)"
   while IFS=$'\t' read -r from to; do
     if [[ -z "$from" ]] || ! grep -qxF -- "$from" <<<"$pinned"; then
       continue
@@ -306,33 +512,29 @@ repin::path_map() {
   done <<<"$entries"
 }
 
-# repin::apply <tag> <sha> <date>
+# repin::targets [<dir>]
 #
-# Emits changed=false and exits 0 when the callers already carry <sha>/<tag>;
-# emits changed=true plus old-tags and version-note otherwise, leaving the
-# rewritten files in the working tree for the caller to commit. A file whose
-# fallback-form pin is not an ancestor of <sha> is ahead of the release and
-# is left untouched (see repin::ahead_of); it is reported, never rewritten.
-repin::apply() {
-  local tag="$1" sha="$2" release_date="$3"
-  local root expected rewritten old_sha old_tags new_major old_major old_tag note ahead_sha ahead_list delim
-  local path_map from to renamed
-  local -a targets rewrite ahead excludes sed_args
-
-  if [[ ! "$release_date" =~ $DATE_RE ]]; then
-    echo "::error::Release date '${release_date}' is not YYYY-MM-DD." >&2
-    return 2
-  fi
-
-  root="$(git rev-parse --show-toplevel)"
-  cd "$root"
-
-  targets=("$LANE_DIR"/*.yml)
+# Prints the caller files apply may rewrite, one per line, relative to the
+# repository root apply has changed into. Without <dir>: LANE_DIR's callers
+# plus EXTRA_CALLER_FILES, enumerated, never discovered. With <dir>: every
+# git-tracked .github/ YAML file that pins ci-workflows, which in a consumer
+# checkout is the whole caller set.
+repin::targets() {
   local file extra_present=0 extra_missing=0
+  local -a found
+  if [[ "$#" -eq 1 ]]; then
+    git ls-files -- '.github/*.yml' '.github/*.yaml' | while IFS= read -r file; do
+      if grep -qE "$PIN_RE" -- "$file"; then
+        printf '%s\n' "$file"
+      fi
+    done
+    return 0
+  fi
+  found=("$LANE_DIR"/*.yml)
   for file in "${EXTRA_CALLER_FILES[@]}"; do
     if [[ -f "$file" ]]; then
       extra_present=1
-      targets+=("$file")
+      found+=("$file")
     else
       extra_missing=1
     fi
@@ -348,77 +550,146 @@ repin::apply() {
     done
     return 1
   fi
-  for file in "${targets[@]}"; do
+  for file in "${found[@]}"; do
     if [[ ! -f "$file" ]]; then
       echo "::error::Expected enumerated caller '${file}' does not exist." >&2
       return 1
     fi
   done
+  printf '%s\n' "${found[@]}"
+}
 
-  # Split the enumerated set into files this release may advance and files
-  # already ahead of it. The split is per file: every enumerated caller pins
-  # one ci-workflows revision, so a file is either behind the release or not.
-  rewrite=()
-  ahead=()
-  for file in "${targets[@]}"; do
-    ahead_sha="$(repin::ahead_of "$file" "$sha")"
-    if [[ -n "$ahead_sha" ]]; then
-      echo "::notice::${file} pins ${ahead_sha}, not an ancestor of ${tag} (${sha}); left as is."
-      ahead+=("$file")
-    else
-      rewrite+=("$file")
+# repin::apply <tag> <sha> <date> [<dir>]
+#
+# Moves each pin the release changed (repin::decide) to <sha> with a `# <tag>`
+# comment and leaves every other pin byte-identical. Emits changed=false and
+# exits 0 when no pin moves; emits changed=true plus old-sha, old-tags and
+# version-note otherwise, leaving the rewritten files in the working tree for
+# the caller to commit. A fallback-form pin the release does not contain is
+# ahead of it and is reported, never rewritten (repin::fenced).
+repin::apply() {
+  local tag="$1" sha="$2" release_date="$3" dir="${4:-}"
+  local root found refs fenced pinned decided moved file path pin_sha decision
+  local expected before after old_sha old_tags new_major old_major old_tag note ahead_list kept_list delim
+  local path_map from to renamed moved_paths
+  local -a targets ahead excludes sed_args
+
+  if [[ ! "$release_date" =~ $DATE_RE ]]; then
+    echo "::error::Release date '${release_date}' is not YYYY-MM-DD." >&2
+    return 2
+  fi
+
+  if [[ -n "$dir" ]]; then
+    root="$(git -C "$dir" rev-parse --show-toplevel)"
+  else
+    root="$(git rev-parse --show-toplevel)"
+  fi
+  cd "$root"
+
+  if [[ -n "$dir" ]]; then
+    found="$(repin::targets "$dir")"
+  else
+    found="$(repin::targets)"
+  fi
+  if [[ -z "$found" ]]; then
+    echo "::error::No file under ${root}/.github pins ${UPSTREAM_REPO}." >&2
+    return 1
+  fi
+  mapfile -t targets <<< "$found"
+
+  refs="$(repin::refs "${targets[@]}")"
+  if [[ -z "$refs" ]]; then
+    echo "::error::The caller files carry no ${UPSTREAM_REPO} pin to re-pin." >&2
+    return 1
+  fi
+  fenced="$(repin::fenced "$refs" "$sha")"
+  pinned="$(cut -f2 <<< "$refs" | sort -u)"
+
+  # One decision per distinct path@sha; every occurrence of it shares it.
+  decided=''
+  while IFS=$'\t' read -r path pin_sha; do
+    if [[ ! "$path" =~ $UPSTREAM_PATH_RE ]]; then
+      echo "::error::Pinned path '${path}' is not a plain repository path." >&2
+      return 1
     fi
-  done
-  if [[ "${#rewrite[@]}" -eq 0 ]]; then
-    echo "::notice::Every enumerated caller is ahead of ${tag}; nothing to propose."
+    decision="$(repin::decide "$path" "$pin_sha" "$sha" "$fenced" "$pinned")"
+    decided+="${path}"$'\t'"${pin_sha}"$'\t'"${decision}"$'\n'
+  done < <(cut -f2,3 <<< "$refs" | sort -u)
+
+  moved="$(awk -F'\t' '$3 == "move" { print $1 "\t" $2 }' <<< "$decided")"
+
+  ahead=()
+  while IFS=$'\t' read -r file pin_sha; do
+    [[ -n "$file" ]] || continue
+    echo "::notice::${file} pins ${pin_sha}, not an ancestor of ${tag} (${sha}); left as is."
+    if [[ " ${ahead[*]} " != *" ${file} "* ]]; then
+      ahead+=("$file")
+    fi
+  done < <(awk -F'\t' 'NR == FNR { if ($0 != "") fenced[$0] = 1; next } ($3 in fenced) { print $1 "\t" $3 }' \
+    <(printf '%s\n' "$fenced") <(printf '%s\n' "$refs") | awk '!seen[$0]++')
+
+  kept_list=''
+  while IFS=$'\t' read -r path pin_sha; do
+    [[ -n "$path" ]] || continue
+    echo "::notice::${tag} changes nothing ${path}@${pin_sha:0:7} runs; that pin stays."
+    kept_list+="\`${path}\`, "
+  done < <(awk -F'\t' '$3 == "keep" { print $1 "\t" $2 }' <<< "$decided")
+
+  if [[ -z "$moved" ]]; then
+    if ! awk -F'\t' '$3 != "ahead" && $3 != "" { found = 1 } END { exit !found }' <<< "$decided"; then
+      echo "::notice::Every enumerated caller is ahead of ${tag}; nothing to propose."
+    else
+      echo "::notice::No pin needs ${tag}; nothing to propose."
+    fi
     echo 'changed=false' >> "$GITHUB_OUTPUT"
     return 0
   fi
 
-  # grep exits 1 on no match, which pipefail would turn into a failed
-  # assignment under errexit; `|| true` keeps the count (0) and drops the exit.
-  expected="$(grep -hoE "$PIN_RE" "${rewrite[@]}" | wc -l || true)"
-  # Unique old SHAs across every rewritten file — do not collapse to the
-  # first pin. The workflow passes this unique-set to lockstep, which accepts
-  # one SHA or a comma-separated list and still reads each caller file.
-  old_sha="$(grep -hoE "$PIN_RE" "${rewrite[@]}" \
-    | grep -oE '[0-9a-fA-F]{40}$' | tr '[:upper:]' '[:lower:]' | sort -u | paste -sd, - || true)"
-  old_tags="$(grep -hoE "${PIN_RE}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+" "${rewrite[@]}" \
-    | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | paste -sd, - || true)"
+  # Count every moved occurrence, then require exactly that many new
+  # `@<sha> # <tag>` pins after the rewrite.
+  expected="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m)' \
+    <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | wc -l)"
+  before="$(grep -hoE "uses: ${UPSTREAM_REPO}/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  old_sha="$(cut -f2 <<< "$moved" | sort -u | paste -sd, -)"
+  old_tags="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m) && $4 ~ /^v/ { print $4 }' \
+    <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | sort -u | paste -sd, - || true)"
 
-  path_map="$(repin::path_map "$sha" "${rewrite[@]}")"
-  sed_args=()
+  moved_paths="$(cut -f1 <<< "$moved" | sort -u)"
+  # shellcheck disable=SC2086  # one argument per moved path, none with whitespace
+  path_map="$(repin::path_map "$sha" $moved_paths)"
   renamed=''
   while IFS=$'\t' read -r from to; do
     [[ -n "$from" ]] || continue
     echo "::notice::${tag} carries ${from} as ${to}; the pins follow the rename."
-    sed_args+=(-e "s|(uses: melodic-software/ci-workflows/)${from//./\\.}@|\1${to}@|")
     renamed+="\`${from}\` to \`${to}\`, "
-  done <<<"$path_map"
-  sed_args+=(-e "s|(uses: melodic-software/ci-workflows/[^@[:space:]]+)@[0-9a-fA-F]{40}.*|\1@${sha} # ${tag}|")
-  sed -i -E "${sed_args[@]}" "${rewrite[@]}"
+  done <<< "$path_map"
+  sed_args=()
+  while IFS=$'\t' read -r path pin_sha; do
+    to="$(awk -F'\t' -v p="$path" '$1 == p { print $2 }' <<< "$path_map")"
+    sed_args+=(-e "s|(uses: ${UPSTREAM_REPO}/)${path//./\\.}@${pin_sha}([^0-9a-fA-F].*)?\$|\1${to:-$path}@${sha} # ${tag}|I")
+  done <<< "$moved"
+  sed -i -E "${sed_args[@]}" "${targets[@]}"
 
-  rewritten="$(grep -hoE "${PIN_RE}[[:space:]]+# ${tag}\$" "${rewrite[@]}" | wc -l || true)"
-  if [[ "$expected" -eq 0 || "$expected" -ne "$rewritten" ]]; then
-    echo "::error::Expected ${expected} ci-workflows pins to carry '@${sha} # ${tag}'; ${rewritten} do." >&2
+  after="$(grep -hoE "uses: ${UPSTREAM_REPO}/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  if [[ "$expected" -eq 0 || "$((after - before))" -ne "$expected" ]]; then
+    echo "::error::Expected ${expected} ci-workflows pins to newly carry '@${sha} # ${tag}'; $((after - before)) do." >&2
     return 1
   fi
 
-  # Runtime companion to the enumerated set: prove the rewrite reached
-  # nothing else, whatever the regex did. Extra callers live outside
-  # LANE_DIR; they are allowlisted, not a hard-fail.
-  excludes=(":(exclude)$LANE_DIR/")
-  for file in "${EXTRA_CALLER_FILES[@]}"; do
+  # Runtime companion to the target set: prove the rewrite reached nothing
+  # else, whatever the regex did.
+  excludes=()
+  for file in "${targets[@]}"; do
     excludes+=(":(exclude)$file")
   done
   if ! git diff --quiet -- . "${excludes[@]}"; then
-    echo "::error::The re-pin modified files outside the enumerated caller set:" >&2
+    echo "::error::The re-pin modified files outside the caller set:" >&2
     git diff --name-only -- . "${excludes[@]}" >&2
     return 1
   fi
 
-  if git diff --quiet -- "${rewrite[@]}"; then
-    echo "::notice::Enumerated callers already pin ${tag}; nothing to propose."
+  if git diff --quiet -- "${targets[@]}"; then
+    echo "::notice::The callers already pin ${tag}; nothing to propose."
     echo 'changed=false' >> "$GITHUB_OUTPUT"
     return 0
   fi
@@ -437,6 +708,15 @@ repin::apply() {
 > **Major-version jump** from \`${old_tags}\` to \`${tag}\`. This is not a drop-in bump: read the upstream release notes for breaking changes to the lane callers' inputs, secrets, and required check names before merging."
   else
     note="Same major version as the pin it replaces (\`${old_tags}\` to \`${tag}\`)."
+  fi
+  # shellcheck disable=SC2016  # markdown code spans, not shell expansions
+  note+="
+
+Moved because ${tag} changed what they run: $(cut -f1 <<< "$moved" | sort -u | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')."
+  if [[ -n "$kept_list" ]]; then
+    note+="
+
+Left where they are because ${tag} changes nothing they run: ${kept_list%, }."
   fi
   if [[ -n "$renamed" ]]; then
     note+="
@@ -472,9 +752,17 @@ main() {
       repin::resolve "$2"
       ;;
     apply)
-      [[ $# -eq 4 ]] || { usage; exit 2; }
+      if [[ $# -eq 6 && "$5" == '--root' && -n "$6" ]]; then
+        set -- "$1" "$2" "$3" "$4" "$6"
+      elif [[ $# -ne 4 ]]; then
+        usage
+        exit 2
+      fi
       require_output_file
-      repin::apply "$2" "$3" "$4"
+      REPIN_CACHE="$(mktemp -d)"
+      # shellcheck disable=SC2064  # expand now: the path must survive the function
+      trap "rm -rf -- '${REPIN_CACHE}'" EXIT
+      repin::apply "${@:2}"
       ;;
     *)
       usage

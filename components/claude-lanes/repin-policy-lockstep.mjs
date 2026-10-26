@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Runner-policy lockstep for claude-lanes re-pins. When every pinned
- * reusable workflow's security surface is unchanged between the old and new
- * ci-workflows SHAs, copy-forward its approvedReusableWorkflowContracts
- * entry and refresh the repo-local caller pin. Otherwise write nothing and
- * emit the human checklist. schemaVersion 4 has no selector key; this
+ * Runner-policy lockstep for claude-lanes re-pins. When every reusable
+ * workflow pin that repin-callers.sh apply moved has an unchanged security
+ * surface between its old and new ci-workflows SHAs, copy-forward its
+ * approvedReusableWorkflowContracts entry. A pin apply left in place keeps
+ * the contract it already has and needs no copy. Otherwise write nothing and
+ * emit the human checklist. apply is the only caller rewriter. schemaVersion 4 has no selector key; this
  * script does not read or write one.
  *
  * Invoked from .github/workflows/maintenance-repin-ci-workflows.yml after repin-callers.sh
@@ -175,7 +176,7 @@ export function manualPolicyNote(reasons, tag, unchangedPaths = []) {
 export function appliedPolicyNote(tag) {
   return (
     "Runner-policy lockstep applied automatically: every pinned reusable workflow's security surface is unchanged, " +
-    "so each matching `approvedReusableWorkflowContracts` entry in `components/runner-policy/policy.json` was copy-forwarded and the repo-local caller pins were rewritten. " +
+    "so each matching `approvedReusableWorkflowContracts` entry in `components/runner-policy/policy.json` was copy-forwarded. " +
     "**Operator:** before merging, add the rollout record in `components/runner-policy/README.md` and " +
     `\`${constantNameForTag(tag)}\` plus a verbatim copy-forward assertion in ` +
     "`components/runner-policy/runner-policy.test.mjs` " +
@@ -183,17 +184,12 @@ export function appliedPolicyNote(tag) {
   );
 }
 
-function rewritePinLine(line, newSha, tag) {
-  return line.replace(
-    /(@[0-9a-fA-F]{40})(?:\s+# v[0-9]+\.[0-9]+\.[0-9]+)?/u,
-    `@${newSha} # ${tag}`,
-  );
-}
-
 /**
  * Pairs each pin in a caller's committed text with the same line after
- * repin-callers.sh apply rewrote it in place. The rewritten line names the
- * path the new SHA's contract is keyed under, renamed or not.
+ * repin-callers.sh apply rewrote it in place, and returns the pairs apply
+ * moved. The rewritten line names the path the new SHA's contract is keyed
+ * under, renamed or not. A pin apply left on its SHA (the release changed
+ * nothing it runs) is not returned: it keeps its existing contract.
  */
 export function pairCallerPins(headText, worktreeText) {
   const after = worktreeText.split("\n");
@@ -205,6 +201,7 @@ export function pairCallerPins(headText, worktreeText) {
     if (!rewritten) {
       throw new Error(`line ${index + 1} no longer carries a ci-workflows pin after apply`);
     }
+    if (rewritten[2].toLowerCase() === before[2].toLowerCase()) return;
     pairs.push({
       oldWorkflowPath: before[1],
       oldSha: before[2].toLowerCase(),
@@ -236,35 +233,6 @@ async function readCallerPins(callerFiles) {
     found.push(...pairCallerPins(text, await readFile(path.join(ROOT, rel), "utf8")));
   }
   return found;
-}
-
-export async function rewriteCallerFiles(newSha, tag, root = ROOT) {
-  const uniqueFiles = [...new Set(REPIN_TARGETS.flatMap((target) => target.callerFiles))];
-  let anyChanged = false;
-  for (const rel of uniqueFiles) {
-    const abs = path.join(root, rel);
-    let text;
-    try {
-      text = await readFile(abs, "utf8");
-    } catch (error) {
-      if (error && error.code === "ENOENT") continue;
-      throw error;
-    }
-    const lines = text.split("\n");
-    let changed = false;
-    const next = lines.map((line) => {
-      if (!line.includes("melodic-software/ci-workflows/")) return line;
-      const updated = rewritePinLine(line, newSha, tag);
-      if (updated !== line) changed = true;
-      return updated;
-    });
-    if (!changed) continue;
-    // split preserved any trailing newline as an empty element, so trim
-    // trailing newlines before re-adding exactly one final newline.
-    await writeFile(abs, `${next.join("\n").replace(/\n+$/u, "")}\n`);
-    anyChanged = true;
-  }
-  return anyChanged;
 }
 
 export function renamedPathReason(pin) {
@@ -401,7 +369,7 @@ async function main() {
     });
   });
 
-  await appendOutput(outputFile, await settleLockstep({ reasons, copyForwards }, newSha, tag));
+  await appendOutput(outputFile, await settleLockstep({ reasons, copyForwards }, tag));
 }
 
 /**
@@ -409,7 +377,7 @@ async function main() {
  * the callers stay as they are and only the human checklist is returned.
  * Returns the GITHUB_OUTPUT pairs.
  */
-export async function settleLockstep({ reasons, copyForwards }, newSha, tag, root = ROOT) {
+export async function settleLockstep({ reasons, copyForwards }, tag, root = ROOT) {
   if (reasons.length > 0) {
     const unchangedPaths = [...new Set(copyForwards.map((item) => item.workflowPath))];
     emitNotice(`::warning::${reasons.join("; ")} — policy lockstep deferred to a human.`);
@@ -420,8 +388,7 @@ export async function settleLockstep({ reasons, copyForwards }, newSha, tag, roo
   }
 
   const policyChanged = await updatePolicyJson(copyForwards, root);
-  const callerChanged = await rewriteCallerFiles(newSha, tag, root);
-  emitNotice(`Policy lockstep applied (policy=${policyChanged}, caller=${callerChanged}).`);
+  emitNotice(`Policy lockstep applied (policy=${policyChanged}).`);
   return [
     ["lockstep", "applied"],
     ["policy-note", appliedPolicyNote(tag)],

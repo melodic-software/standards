@@ -99,6 +99,9 @@ jobs:
         id: repin
         if: steps.release.outputs.resolved == 'true'
         env:
+          # apply compares each pinned SHA to the release and reads the
+          # sources a pin reaches, so it calls gh.
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
           SHA: ${{ steps.release.outputs.sha }}
           # Still required by apply's argv (malformed dates fail closed).
@@ -216,9 +219,10 @@ jobs:
 
             ## Summary
 
-            Re-pins every `melodic-software/ci-workflows` reference under
+            Re-pins each `melodic-software/ci-workflows` reference under
             `components/claude-lanes/` and `components/claude-lanes-hosted/`,
-            the `managed-files-guard` caller components, and this repository's own sync-family callers from
+            the `managed-files-guard` caller components, and this repository's own sync-family callers
+            whose pinned path the release changed, from
             `${{ steps.repin.outputs.old-tags }}`
             to `${{ steps.release.outputs.tag }}`
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
