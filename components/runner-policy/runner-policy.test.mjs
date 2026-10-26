@@ -10531,3 +10531,26 @@ test("every online link-check caller audits clean on every target that manages i
     }
   }
 });
+
+// v0.65.16 renames the review lanes' fallback secret slot to
+// FALLBACK_CLAUDE_CODE_OAUTH_TOKEN (ci-workflows#897): both review contracts
+// add only that secret, mapped to the org secret of its own name, and the
+// fallback-credential-name input. Job permissions and routing are unchanged.
+test("the pr-review and pr-review-security contracts at the v0.65.16 tag add only the fallback secret and its name input to their v0.65.14 entries", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
+  const sha = "b26e355fe98c372f02a13d74c10a785ad8c9ce2d";
+  for (const wf of ["pr-review.yml", "pr-review-security.yml"]) {
+    const prior = contracts[key(wf, REPINE_LANE_SHA_V0_65_14)];
+    assert.ok(prior, wf);
+    assert.deepEqual(contracts[key(wf, sha)], {
+      ...prior,
+      allowedInputs: [...prior.allowedInputs, "fallback-credential-name"],
+      allowedSecrets: {
+        ...prior.allowedSecrets,
+        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
+      },
+    });
+  }
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
+});
