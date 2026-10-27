@@ -11,6 +11,7 @@ Agent-agnostic engineering standards that no linter can decide for you: the auth
 | [azure-naming.md](azure-naming.md) | Azure resource names and tags: token values, per-type patterns, the isolation-class, nonsecret-placement and fleet rules |
 | [simpler-code.md](simpler-code.md) | the line-count-versus-clarity tradeoff and its named failure modes |
 | [concise-prose.md](concise-prose.md) | removing prose overhead without losing meaning, force, or clarity |
+| [design-for-change.md](design-for-change.md) | diff-checkable rules for change impact: hiding volatile decisions, local reversals, slices, injection, configuration, and when each GoF pattern fits |
 | [code-organization.md](code-organization.md) | sharing at the second consumer, contract-versus-private surfaces, breaking-change discipline |
 | [shareable-artifact-design.md](shareable-artifact-design.md) | consumer-agnostic behavior, externalized configuration, consumer tiers, explicit adoption for anything built to be shared |
 | [documentation-existence.md](documentation-existence.md) | whether a tracked page may exist at all: the admission test upstream of the documentation family |

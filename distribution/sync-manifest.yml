@@ -202,6 +202,7 @@ components:
       components/engineering-standards/standards-index.md: docs/standards/README.md
       conventions/engineering/bulk-mutation.md: docs/standards/bulk-mutation.md
       conventions/engineering/concise-prose.md: docs/standards/concise-prose.md
+      conventions/engineering/design-for-change.md: docs/standards/design-for-change.md
       conventions/engineering/deterministic-work-execution.md: docs/standards/deterministic-work-execution.md
       conventions/engineering/documentation-and-citations.md: docs/standards/documentation-and-citations.md
       conventions/engineering/reference-dont-duplicate.md: docs/standards/reference-dont-duplicate.md
