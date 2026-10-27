@@ -51,7 +51,7 @@ Structure code so meaningful tests are possible without heroic setup. Keep compl
 
 ## Use design patterns when they solve a real problem
 
-A pattern earns its place by solving a problem the code actually has. Before introducing one, ask whether the code has the specific problem the pattern addresses; "not yet, but it might" is YAGNI. Patterns are a vocabulary for problems you have, not a default for every class.
+A pattern earns its place by solving a problem the code actually has. Before introducing one, ask whether the code has the specific problem the pattern addresses; "not yet, but it might" is YAGNI. Patterns are a vocabulary for problems you have, not a default for every class. When each common pattern fits, and when it is over-engineering, is in [design-for-change.md](design-for-change.md#pattern-fit), which also holds the diff-checkable rules for change impact.
 
 ## Sources
 
