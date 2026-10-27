@@ -42,4 +42,4 @@ Each rule gives the check, why it holds, and its source.
 
 ## Related
 
-- Related: the SSOT section in claude-code-plugins on the stop rule and factory floor (link pending).
+- When work stops for the owner, the stop rule and factory floor: [claude-code-plugins loop-lane convention](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/conventions/loop-lane/README.md#when-work-stops-for-the-owner).
