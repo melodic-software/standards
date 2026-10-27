@@ -1,6 +1,6 @@
 # Engineering standards
 
-The team layer of the standards contract: seven `conventions/engineering/`
+The team layer of the standards contract: eight `conventions/engineering/`
 files, plus the index in [`standards-index.md`](standards-index.md), synced into
 `docs/standards/` of each target. Planning and review skills in
 `melodic-software/claude-code-plugins` resolve that directory through the
@@ -8,7 +8,7 @@ contract (`docs/conventions/standards/` there, version 1.0.2) and load only the
 files whose `Applies when` row matches the task, so work is built to the same
 criteria it is reviewed against.
 
-The seven files stay in `conventions/engineering/`, their canonical location;
+The eight files stay in `conventions/engineering/`, their canonical location;
 this directory holds only the index and this record. The file list is the
 `engineering-standards` entry in
 [`sync-manifest.yml`](../../distribution/sync-manifest.yml), and its targets are
