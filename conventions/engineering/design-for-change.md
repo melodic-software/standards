@@ -7,7 +7,9 @@ A design is judged by what a change of direction costs: how many files it touche
 The owner's direction, verbatim (2026-10-27):
 
 <!-- spellchecker:off -->
-> Changing directions later shouldn't result in cascading breakages, and require changes to more than a handful of files (impact), refactoring pain. We need to ensure things are configurable/extensibile and minimize that risk (our designs should accommodate for this).
+> Also ensure we're aligned with SOLID, and DRY/SSOT principles. Changing directions later shouldn't result in cascading breakages, and require changes to more than a handful of files (impact), refactoring pain. We need to ensure things are configurable/extensibile and minimize that risk (our designs should accommodate for this).
+>
+> ...
 >
 > As far as designs - lets try and apply the tenants of vertical slice/feature slice architecture (where it makes sense). Feel free to use the common Gang of Four design patterns, like strategy, factory, builder, decorator, mediator, etc - along with the tenants/principles of dependency injection, externalized config, DRY/SSOT, clean code (Robert C Martin), and general modern software best practices.
 <!-- spellchecker:on -->
@@ -31,12 +33,12 @@ Each rule gives the check, why it holds, and its source.
 | Pattern | Fits when | Over-engineering when |
 |---|---|---|
 | [Strategy](https://refactoring.guru/design-patterns/strategy) | several variants of one algorithm are chosen at run time, or a conditional switches between them | there are a couple of variants that rarely change; a function value does the same job without new types |
-| [Factory Method / Abstract Factory](https://refactoring.guru/design-patterns/factory-method) | the caller cannot know the concrete type or its dependencies ahead of time, or families must be created consistently | one concrete type is ever built; constructor injection already supplies it |
+| [Factory Method / Abstract Factory](https://refactoring.guru/design-patterns/factory-method) | the caller cannot know the concrete type or its dependencies ahead of time, or a [family of related objects](https://refactoring.guru/design-patterns/abstract-factory) must be created together | one concrete type is ever built; constructor injection already supplies it |
 | [Builder](https://refactoring.guru/design-patterns/builder) | an object needs many optional parts (a telescoping constructor), or several representations from one construction process | the object has a few required fields; named arguments or an options record do it |
 | [Decorator](https://refactoring.guru/design-patterns/decorator) | a cross-cutting behavior (logging, retry, caching, authorization) wraps a contract without the wrapped type knowing | the stack's order matters but is not stated, or the framework's middleware or pipeline already offers the hook |
 | [Mediator](https://refactoring.guru/design-patterns/mediator) | many components would otherwise reference each other directly and cannot change or be reused apart | each request has one handler and the mediator only adds a hop; the mediator grows into a god object; a handler dispatches another command, which [architecture-and-design.md](https://github.com/melodic-software/standards/blob/main/conventions/engineering/architecture-and-design.md#command-orchestration-and-consistency-boundaries) forbids |
 
-"Fits when" follows each pattern's applicability and "Over-engineering when" its listed costs, plus the linked bars of this catalog. Against an in-process mediator library in particular: "everything is done in-process" ([Comartin, "Why use MediatR? 3 reasons why and 1 reason not", 2020](https://codeopinion.com/why-use-mediatr-3-reasons-why-and-1-reason-not/)).
+"Fits when" follows each pattern's applicability on the linked page. "Over-engineering when" follows its listed costs where that page states one; the rest of that column (Factory's constructor injection, Decorator's framework hook, Mediator's single-handler hop) is this catalog's judgment, bounded by the linked bars. Against an in-process mediator library in particular: "everything is done in-process" ([Comartin, "Why use MediatR? 3 reasons why and 1 reason not", 2020](https://codeopinion.com/why-use-mediatr-3-reasons-why-and-1-reason-not/)).
 
 ## Related
 
