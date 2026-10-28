@@ -10554,3 +10554,18 @@ test("the pr-review and pr-review-security contracts at the v0.65.16 tag add onl
   }
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
 });
+
+// v0.66.1 adds actions: read and checks: read to the pr-review-cli status job
+// (ci-workflows#904). The hosted-only contract records no job permissions, so
+// the entry copies its v0.65.14 entry forward unchanged.
+test("the pr-review-cli contract at the v0.66.1 tag copies its v0.65.14 entry forward unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "20a822d73b6e2d7e21d48e609a01b427e0e161e7";
+  const prior = contracts[key(REPINE_LANE_SHA_V0_65_14)];
+  assert.ok(prior);
+  assert.deepEqual(contracts[key(sha)], prior);
+  assert.equal(contracts[key(sha)].routing, "hosted-only");
+  assert.equal(contracts[key(sha)].allowedCallerPermissions, undefined);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
