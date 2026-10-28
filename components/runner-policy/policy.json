@@ -495,7 +495,10 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -508,7 +511,10 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -521,7 +527,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@a92020292976c2e9b50f7adc922693a45a6c1226": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -534,7 +544,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@a621ef8112677a519b662ec5d2547475c0101f7e": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -547,7 +561,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@4cfd14e8b6f8b740f5f0af27f80139a0d40a596d": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -560,7 +578,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@a623e29085a3be885718cf9c0c0eca85bb53dd97": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -573,7 +595,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -586,7 +612,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@bc02e0504d83df70a2c95fcf3651d0f1eac3e252": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -599,7 +629,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@3c8a4b2aeff5871cf72d35a686692bc6f0d44815": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -612,7 +647,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@96b50d451c4483c476f2f963674e0a3ba9d50fe3": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -625,7 +665,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review.yml@7b362428c76085a160e28656cd2c75c3147a69ff": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -773,7 +818,10 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -786,7 +834,10 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -799,7 +850,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@a92020292976c2e9b50f7adc922693a45a6c1226": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -812,7 +867,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@a621ef8112677a519b662ec5d2547475c0101f7e": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -825,7 +884,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@4cfd14e8b6f8b740f5f0af27f80139a0d40a596d": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -838,7 +901,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@a623e29085a3be885718cf9c0c0eca85bb53dd97": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -851,7 +918,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -864,7 +935,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@bc02e0504d83df70a2c95fcf3651d0f1eac3e252": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -877,7 +952,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@3c8a4b2aeff5871cf72d35a686692bc6f0d44815": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -890,7 +970,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@96b50d451c4483c476f2f963674e0a3ba9d50fe3": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -903,7 +988,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@7b362428c76085a160e28656cd2c75c3147a69ff": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -916,7 +1006,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@3a2c748fdef9cfb9ceec5a66289e21842189689f": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -929,7 +1024,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -942,7 +1042,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@82ca5ca9be6e18a1addb7986eae15689339aedbc": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -955,7 +1060,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@164c2809f6150429b6f24d4a2777bb377af953d9": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -968,7 +1078,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@2fe38c031867900824c164e33a140a335ed9ecf0": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -981,7 +1096,12 @@
     "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@3180217076b19bbdfccc43026c7f91c604da673d": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "incremental-review", "allowed-bot-sender-ids", "model-args"],
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args"
+      ],
       "allowedSecrets": {
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
       },
@@ -1013,7 +1133,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@8778094736e414233110f3e0d6d9948628ba77b5": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1032,7 +1154,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@83b739f625b501ad40c65dee7168d836883195e1": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1051,7 +1175,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@4edeccd87cf60ef539ce5109b78454217d5f2049": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1072,7 +1198,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@9aca743c4ed9aaf7870288a36586c3994e9321e4": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1093,7 +1221,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@6d6cb798e7cb7560a0f9327d8a22398961c23b31": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1114,7 +1244,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@d02b8697e092705153f0996549b05f95a446bb52": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1135,7 +1267,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@b49ac366bb3426039363a6927c41512e44533808": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1156,7 +1290,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@e7f935fc799fc9c78f1dc52646e8bbd54823502a": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1177,7 +1313,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@f133c6651f866845e18595d26cf59d4043b5b642": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1198,7 +1336,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@31b44f3ffc7f208fb281dd2b64decce67c53d316": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1219,7 +1359,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@f1096608192c54cfb3dc252e36670e6f86700b9b": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1240,7 +1382,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@914264587c35692c15e05c965103426eec18d1f0": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1261,7 +1405,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@4c531cea137f5cbb38d4c132dbfa6e38f76fba7d": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1282,7 +1428,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@4f79cc9244498ae856504cf74aeeb05dcc9c6b43": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1303,7 +1451,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@4fbceb4b75ffd568dfa5db31de0d0e753c0c64e6": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1324,7 +1474,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1345,7 +1497,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@78ee7a2609a84b0073c5e09dfe3bc59613e689dc": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1367,7 +1521,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@ba7af78d291f10bd75651857a0db2357c23df0fe": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1389,7 +1545,9 @@
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@3180217076b19bbdfccc43026c7f91c604da673d": {
       "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "fixedRunsOn": [
+        "ubuntu-24.04"
+      ],
       "allowedInputs": [
         "lane",
         "publish",
@@ -1412,7 +1570,11 @@
     "melodic-software/ci-workflows/.github/workflows/intake-label-needs-triage.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "label", "label-prefix"],
+      "allowedInputs": [
+        "runner",
+        "label",
+        "label-prefix"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "issues": "write"
@@ -1421,7 +1583,11 @@
     "melodic-software/ci-workflows/.github/workflows/intake-label-needs-triage.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "label", "label-prefix"],
+      "allowedInputs": [
+        "runner",
+        "label",
+        "label-prefix"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "issues": "write"
@@ -1430,7 +1596,12 @@
     "melodic-software/ci-workflows/.github/workflows/intake-label-needs-triage.yml@182aca3ad32b79fd002def94e58eb498ac49e7af": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "label", "label-prefix", "human-label"],
+      "allowedInputs": [
+        "runner",
+        "label",
+        "label-prefix",
+        "human-label"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "issues": "write"
@@ -1439,7 +1610,12 @@
     "melodic-software/ci-workflows/.github/workflows/intake-label-needs-triage.yml@1bb8953644d16f21d10718962c6702f01ea3308a": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "label", "label-prefix", "human-label"],
+      "allowedInputs": [
+        "runner",
+        "label",
+        "label-prefix",
+        "human-label"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "issues": "write"
@@ -1448,7 +1624,12 @@
     "melodic-software/ci-workflows/.github/workflows/intake-label-needs-triage.yml@5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "label", "label-prefix", "human-label"],
+      "allowedInputs": [
+        "runner",
+        "label",
+        "label-prefix",
+        "human-label"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "issues": "write"
@@ -1457,7 +1638,9 @@
     "melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner"],
+      "allowedInputs": [
+        "runner"
+      ],
       "allowedSecrets": {},
       "minimumCallerPermissions": {
         "contents": "read"
@@ -1466,7 +1649,9 @@
     "melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner"],
+      "allowedInputs": [
+        "runner"
+      ],
       "allowedSecrets": {},
       "minimumCallerPermissions": {
         "contents": "read"
@@ -1475,7 +1660,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1484,7 +1676,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1493,7 +1692,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@a621ef8112677a519b662ec5d2547475c0101f7e": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1502,7 +1708,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@4cfd14e8b6f8b740f5f0af27f80139a0d40a596d": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1511,7 +1724,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1520,7 +1740,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@bc02e0504d83df70a2c95fcf3651d0f1eac3e252": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1529,7 +1756,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@3c8a4b2aeff5871cf72d35a686692bc6f0d44815": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1538,7 +1772,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@96b50d451c4483c476f2f963674e0a3ba9d50fe3": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1547,7 +1788,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@7b362428c76085a160e28656cd2c75c3147a69ff": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1556,7 +1804,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@3a2c748fdef9cfb9ceec5a66289e21842189689f": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1565,7 +1820,14 @@
     "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@3180217076b19bbdfccc43026c7f91c604da673d": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "manifest", "standards-ref", "dry-run", "targets", "environment"],
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
       "allowedSecrets": {
         "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
         "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
@@ -1574,7 +1836,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "paths", "fail-on-severity"],
+      "allowedInputs": [
+        "runner",
+        "paths",
+        "fail-on-severity"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "contents": "read",
@@ -1584,7 +1850,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "paths", "fail-on-severity"],
+      "allowedInputs": [
+        "runner",
+        "paths",
+        "fail-on-severity"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "contents": "read",
@@ -1594,7 +1864,9 @@
     "melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@ab83b01273026ab5c23c6f3b40e946d97a863fa2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner"],
+      "allowedInputs": [
+        "runner"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "contents": "write",
@@ -1604,7 +1876,9 @@
     "melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@594987abe8657a40bccc13d301f1f0d5cccb5348": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner"],
+      "allowedInputs": [
+        "runner"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "contents": "write",
@@ -1614,7 +1888,11 @@
     "melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@d223a6446680fb261e264d1dea9efba46f20ead2": {
       "routing": "runner-input",
       "runnerInput": "runner",
-      "allowedInputs": ["runner", "package-auto-merge", "review-only-dependencies"],
+      "allowedInputs": [
+        "runner",
+        "package-auto-merge",
+        "review-only-dependencies"
+      ],
       "allowedSecrets": {},
       "allowedCallerPermissions": {
         "contents": "write",
@@ -1714,10 +1992,74 @@
       "minimumCallerPermissions": {
         "contents": "read"
       }
+    },
+    "melodic-software/ci-workflows/.github/workflows/pr-review.yml@9a886d552706ad0a626e64da0dc27be2f2d0b437": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args",
+        "allowed-author-ids",
+        "fallback-credential-name"
+      ],
+      "allowedSecrets": {
+        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
+        "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
+      },
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "pull-requests": "write",
+        "id-token": "write"
+      }
+    },
+    "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@9a886d552706ad0a626e64da0dc27be2f2d0b437": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": [
+        "runner",
+        "incremental-review",
+        "allowed-bot-sender-ids",
+        "model-args",
+        "fallback-credential-name"
+      ],
+      "allowedSecrets": {
+        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
+        "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
+      },
+      "allowedCallerPermissions": {
+        "contents": "read",
+        "pull-requests": "write",
+        "id-token": "write"
+      }
+    },
+    "melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@9a886d552706ad0a626e64da0dc27be2f2d0b437": {
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "allowedInputs": [
+        "runner",
+        "manifest",
+        "standards-ref",
+        "dry-run",
+        "targets",
+        "environment"
+      ],
+      "allowedSecrets": {
+        "STANDARDS_SYNC_APP_CLIENT_ID": "${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}",
+        "STANDARDS_SYNC_APP_PRIVATE_KEY": "${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"
+      }
     }
   },
-  "approvedHostedRunnerLabels": ["ubuntu-24.04", "windows-2025", "macos-26"],
-  "hostedMatrixExpressions": ["${{ matrix.os }}", "${{ matrix.runner }}"],
+  "approvedHostedRunnerLabels": [
+    "ubuntu-24.04",
+    "windows-2025",
+    "macos-26"
+  ],
+  "hostedMatrixExpressions": [
+    "${{ matrix.os }}",
+    "${{ matrix.runner }}"
+  ],
   "governedReusableRunnerInput": {
     "name": "runner",
     "expression": "${{ inputs.runner }}",
@@ -1725,12 +2067,22 @@
     "failureSentinel": "ubuntu-24.04",
     "failureSentinelMarker": "ci-runner-selection-failed"
   },
-  "fallbackLabelAllowlist": ["ubuntu-24.04", "melodic-ubuntu-24.04-x64"],
-  "forbiddenHostedRunnerLabels": ["macos-latest", "ubuntu-latest", "windows-latest"],
+  "fallbackLabelAllowlist": [
+    "ubuntu-24.04",
+    "melodic-ubuntu-24.04-x64"
+  ],
+  "forbiddenHostedRunnerLabels": [
+    "macos-latest",
+    "ubuntu-latest",
+    "windows-latest"
+  ],
   "managedLabelPatterns": [
     "(?:^|[^a-z0-9-])(?:melodic|kyle)-(?:[a-z0-9]+-)*ubuntu-24\\.04-x64(?:-[a-z0-9-]+)?(?:$|[^a-z0-9-])"
   ],
-  "approvedManagedRunnerLabels": ["melodic-ubuntu-24.04-x64", "melodic-review-ubuntu-24.04-x64"],
+  "approvedManagedRunnerLabels": [
+    "melodic-ubuntu-24.04-x64",
+    "melodic-review-ubuntu-24.04-x64"
+  ],
   "hostedExceptionReasons": [
     "dependabot",
     "docker-socket",
@@ -1740,5 +2092,7 @@
     "service-container",
     "windows"
   ],
-  "localCredentialActions": ["actions/create-github-app-token"]
+  "localCredentialActions": [
+    "actions/create-github-app-token"
+  ]
 }
