@@ -1461,7 +1461,13 @@ At the v0.65.14 tag `3180217076b19bbdfccc43026c7f91c604da673d`, the pr-review-cl
 contract copies its v0.65.13 entry forward unchanged: the release reports a
 failed "Isolate the runner" install as install-failed (ci-workflows#893), with
 no input, secret, permission or routing change.
-At the same tag, the claude-lanes re-pin moves `pr-review`,
+At the v0.66.1 tag `20a822d73b6e2d7e21d48e609a01b427e0e161e7`, the pr-review-cli
+contract copies its v0.65.14 entry forward unchanged. The one surface change is
+reviewed here: since ci-workflows#904 the status job's `permissions:` block adds
+`actions: read` and `checks: read` to read its earlier runs' cost hold notices.
+Both are read-only scopes its callers already grant, and a hosted-only contract
+records no caller permissions. Inputs, secrets and routing are unchanged.
+At the v0.65.14 tag, the claude-lanes re-pin moves `pr-review`,
 `pr-review-security` and `maintenance-sync-standards` off v0.55.0.
 `pr-review` and `pr-review-security` copy their v0.62.0 entries forward
 verbatim: since v0.62.0 each only gives the isolation install step an id and
