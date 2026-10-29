@@ -10581,3 +10581,20 @@ test("the pr-review-cli contract at the v0.66.1 tag copies its v0.65.14 entry fo
   assert.equal(contracts[key(sha)].allowedCallerPermissions, undefined);
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
+
+// v0.67.2 reads the trust-path config at the default branch's last commit
+// (ci-workflows#909) and activity in capped, fail-closed pages (ci-workflows#911).
+// The workflow's inputs, job permissions and secrets are unchanged, so the
+// entry copies its v0.67.1 entry forward unchanged.
+test("the pr-require-checks-trust-paths contract at the v0.67.2 tag copies its v0.67.1 entry forward unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) =>
+    `melodic-software/ci-workflows/.github/workflows/pr-require-checks-trust-paths.yml@${sha}`;
+  const sha = "2097e798cf050506383e1df8d8c0d8c436d9b44c";
+  const prior = contracts[key("4ad14b4f1b4868aa5362590299c93d9117b629f1")];
+  assert.ok(prior);
+  assert.deepEqual(contracts[key(sha)], prior);
+  assert.equal(contracts[key(sha)].routing, "runner-input");
+  assert.deepEqual(contracts[key(sha)].allowedInputs, ["runner", "config-path"]);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});

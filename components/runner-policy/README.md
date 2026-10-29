@@ -1498,6 +1498,13 @@ permissions add `actions: read` and `checks: read` and its hold step takes a
 permissions, and a hosted-only contract checks no caller permissions, so the
 callers' read grants need no entry. No input, secret, write permission or
 routing change.
+At the v0.67.2 tag `2097e798cf050506383e1df8d8c0d8c436d9b44c`, the
+pr-require-checks-trust-paths contract copies its v0.67.1 entry forward
+unchanged: the release has the composite action read the config at the default
+branch's last commit (ci-workflows#909) and read activity in capped,
+fail-closed pages (ci-workflows#911). The workflow's inputs, job permissions
+and secrets are unchanged; only descriptions and comments differ. No input,
+secret, permission or routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
