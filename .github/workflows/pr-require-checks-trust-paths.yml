@@ -1,5 +1,5 @@
 name: pr-require-checks-trust-paths
-on:
+on: # zizmor: ignore[dangerous-triggers] base-branch code and config only; nothing from the head is checked out or run, and the token holds read scopes plus statuses: write
   pull_request_target:
     types: [opened, synchronize, reopened, edited]
 concurrency:
