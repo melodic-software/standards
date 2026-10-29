@@ -1461,7 +1461,13 @@ At the v0.65.14 tag `3180217076b19bbdfccc43026c7f91c604da673d`, the pr-review-cl
 contract copies its v0.65.13 entry forward unchanged: the release reports a
 failed "Isolate the runner" install as install-failed (ci-workflows#893), with
 no input, secret, permission or routing change.
-At the same tag, the claude-lanes re-pin moves `pr-review`,
+At the v0.66.1 tag `20a822d73b6e2d7e21d48e609a01b427e0e161e7`, the pr-review-cli
+contract copies its v0.65.14 entry forward unchanged. The one surface change is
+reviewed here: since ci-workflows#904 the status job's `permissions:` block adds
+`actions: read` and `checks: read` to read its earlier runs' cost hold notices.
+Both are read-only scopes its callers already grant, and a hosted-only contract
+records no caller permissions. Inputs, secrets and routing are unchanged.
+At the v0.65.14 tag, the claude-lanes re-pin moves `pr-review`,
 `pr-review-security` and `maintenance-sync-standards` off v0.55.0.
 `pr-review` and `pr-review-security` copy their v0.62.0 entries forward
 verbatim: since v0.62.0 each only gives the isolation install step an id and
@@ -1483,6 +1489,15 @@ renames the review lanes' fallback secret slot from
 `fallback-claude-code-oauth-token` to that name (ci-workflows#897), so a
 caller maps the central fallback subscription under its own name. The lane
 retries once on it after a usage limit only. No permission or routing change.
+At the v0.66.1 tag `20a822d73b6e2d7e21d48e609a01b427e0e161e7`, the
+pr-review-cli contract copies its v0.65.14 entry forward unchanged: the
+release has the status job take a cost decision's decided head from this
+lane's earlier check-run notices (ci-workflows#904), so that job's
+permissions add `actions: read` and `checks: read` and its hold step takes a
+`STATUS_JOB` env built from the `lane` input. The contract records no job
+permissions, and a hosted-only contract checks no caller permissions, so the
+callers' read grants need no entry. No input, secret, write permission or
+routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet
