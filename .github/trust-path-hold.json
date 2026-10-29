@@ -2,9 +2,7 @@
   "paths": [
     ".github/**",
     ".claude/**",
-    ".cursor/**",
     ".mcp.json",
-    "AGENTS.md",
     "CLAUDE.md",
     "package.json",
     "package-lock.json",
