@@ -142,6 +142,16 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: node components/claude-lanes/repin-policy-lockstep.mjs "$OLD_SHA" "$NEW_SHA" "$TAG"
 
+      # The lockstep writes JSON.stringify output, which check-typescript's Biome
+      # format check rejects. Format it with the Biome the root lockfile pins,
+      # the same exact version and config check-typescript runs.
+      - name: Format runner-policy with Biome
+        if: steps.repin.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          node_modules/.bin/biome format --write --config-path=components/biome/biome.json components/runner-policy/policy.json
+
       - name: Report the missing re-pin credential
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
         env:
