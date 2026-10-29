@@ -4722,6 +4722,86 @@ test("Dependabot SHA bump that adds a workflow_call input is declined with a spe
   );
 });
 
+function describedReusableWorkflowSource({
+  inputDescription = "Runner label.",
+  secretDescription = "Scanner token.",
+  inputType = "string",
+  inputRequired = false,
+  inputDefault = "ubuntu-24.04",
+  extraInput = "",
+} = {}) {
+  return `name: osv-scanner
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: ${JSON.stringify(inputDescription)}
+        required: ${inputRequired}
+        type: ${inputType}
+        default: ${inputDefault}
+${extraInput}    secrets:
+      token:
+        description: ${JSON.stringify(secretDescription)}
+        required: false
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`;
+}
+
+async function auditDescribedReusableBump(candidateOverrides) {
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `jobs:
+  scan:
+    uses: ${DEPENDABOT_BUMP_REFERENCE}
+    with:
+      runner: ubuntu-24.04
+`,
+    },
+  });
+  return audit(root, {
+    fetchImpl: fetchImplFor({
+      [SHA]: describedReusableWorkflowSource(),
+      [DEPENDABOT_BUMP_SHA]: describedReusableWorkflowSource(candidateOverrides),
+    }),
+  });
+}
+
+test("Dependabot SHA bump that only rewords input and secret descriptions is auto-approved", async () => {
+  assert.deepEqual(
+    await auditDescribedReusableBump({
+      inputDescription: "Runner label the scan job runs on.",
+      secretDescription: "Token the scanner uses to read advisories.",
+    }),
+    [],
+  );
+});
+
+test("Dependabot SHA bump that changes an input's behavior is declined despite the description exclusion", async () => {
+  const cases = [
+    ["type", { inputType: "number" }],
+    ["default", { inputDefault: "ubuntu-22.04" }],
+    ["required", { inputRequired: true }],
+    ["new input name", { extraInput: "      extra:\n        type: string\n" }],
+  ];
+  for (const [name, overrides] of cases) {
+    const findings = await auditDescribedReusableBump(overrides);
+    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
+    assert.ok(contractFinding, name);
+    assert.match(
+      contractFinding.message,
+      new RegExp(`auto-approval declined: inputs changed since the previously reviewed .*@${SHA}`),
+      name,
+    );
+  }
+});
+
 test("Dependabot SHA bump that adds a job-level permissions grant is declined with a specific diagnostic", async () => {
   const root = await repository({
     visibility: "public",

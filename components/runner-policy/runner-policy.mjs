@@ -1053,9 +1053,32 @@ function normalizeDeclarationSurface(declaration) {
   return { declaration: "mapping", value: normalizeStructuralValue(declaration) };
 }
 
+// A workflow_call input's or secret's `description` documents it for callers
+// and has no runtime effect, so it is dropped before comparison: a re-pin that
+// only rewords a description keeps the reviewed contract. Every other key
+// (type, required, default) and the set of names stay compared.
+function workflowCallEntriesSurface(declaration) {
+  const surface = normalizeDeclarationSurface(declaration);
+  if (surface.declaration !== "mapping") {
+    return surface;
+  }
+  return {
+    declaration: "mapping",
+    value: Object.fromEntries(
+      Object.entries(surface.value).map(([name, entry]) => [
+        name,
+        isMapping(entry)
+          ? Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "description"))
+          : entry,
+      ]),
+    ),
+  };
+}
+
 // The security-relevant surface of a reusable workflow: whether it remains
 // callable, the GITHUB_TOKEN permissions it requests, the workflow_call
-// inputs/secrets contract it exposes to callers, its job routing, whether
+// inputs/secrets contract it exposes to callers (less each entry's
+// description, see workflowCallEntriesSurface), its job routing, whether
 // any job trips the same privileged-control-plane credential detection
 // already enforced against every directly declared or repository-local job,
 // and the exact credential-bearing values (not just that category) each job
@@ -1321,8 +1344,8 @@ function reusableWorkflowSecuritySurface(workflow, policy) {
   return {
     workflowCall: workflowCallSurface(workflow),
     permissions: normalizePermissionsSurface(workflow.permissions),
-    inputs: normalizeDeclarationSurface(declaration.inputs),
-    secrets: normalizeDeclarationSurface(declaration.secrets),
+    inputs: workflowCallEntriesSurface(declaration.inputs),
+    secrets: workflowCallEntriesSurface(declaration.secrets),
     defaults: declaredValueSurface(workflow, "defaults"),
     jobPermissions: jobPermissionsSurface(workflow),
     routing: jobRoutingSurface(workflow),

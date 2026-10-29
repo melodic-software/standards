@@ -260,7 +260,9 @@ the per-job checks run, the policy fetches both the previously reviewed
 revision and the candidate revision from the source repository and
 structurally diffs their security-relevant surface: the presence and validity
 of `on.workflow_call`, workflow- and effective job-level `permissions`,
-`on.workflow_call.inputs` and `on.workflow_call.secrets`, plus each job's
+`on.workflow_call.inputs` and `on.workflow_call.secrets` (names, `type`,
+`required` and `default`; each entry's `description` is excluded because it has
+no runtime effect), plus each job's
 runner-routing declarations (`runs-on`, `strategy`, and nested reusable calls),
 execution boundaries (`container`, `services`, `environment`, and workflow-
 and job-level run `defaults`, whose shell and working-directory change how
