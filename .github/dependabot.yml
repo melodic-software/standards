@@ -1,11 +1,8 @@
 version: 2
 updates:
-  # Keep SHA-pinned actions current — including the cross-repo ci-workflows
-  # composite actions referenced from .github/workflows/pr-require-checks.yml. Merge lanes per
+  # Keep SHA-pinned third-party actions current. Merge lanes per
   # components/dependabot-policy: the vendor-actions group (non-major only) may
-  # auto-merge once ci-status passes; every other PR is reviewed by hand. Bumping
-  # the pin to the private ci-workflows repo requires the org-level "Grant
-  # Dependabot access to private repositories" setting to include ci-workflows.
+  # auto-merge once ci-status passes; every other PR is reviewed by hand.
   # Delay version bumps so a compromised or yanked release is caught before we
   # adopt it; security updates bypass cooldown. Defense-in-depth for the
   # SHA-rewrite supply-chain risk that motivates SHA-pinning.
@@ -30,9 +27,7 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # Every fleet consumer ignores ci-workflows pins (see the header of
-    # maintenance-repin-ci-workflows.yml, which re-pins the caller components
-    # on each release); this repository's own pins move by hand.
+    # First-party ci-workflows refs float on `main`; there is nothing to bump.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
   # Keep the npm dev-dependencies current — the root devDependency pins

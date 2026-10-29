@@ -81,7 +81,7 @@ jobs:
                              # reviewed-head marker comment
       id-token: write        # OIDC, mints the Claude GitHub App token (required
                              # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@9a886d552706ad0a626e64da0dc27be2f2d0b437 # v0.66.0
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@main
     with:
       # Names (never the value) the fallback secret in the lane-outcome record.
       fallback-credential-name: FALLBACK_CLAUDE_CODE_OAUTH_TOKEN

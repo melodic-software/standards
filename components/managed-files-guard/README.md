@@ -122,12 +122,9 @@ the consumer's caller still carries the old list.
 
 ## The two pins
 
-**The action pin** is a full 40-character commit SHA of ci-workflows `main`,
-under the `pin-comment-convention` (`components/pin-comment-convention/`).
-Both files pin `.github/actions/check-managed-files` at
-`ab83b01273026ab5c23c6f3b40e946d97a863fa2` (v0.39.3) today. v0.34.0
-(`7446b51`) gave the action that path; the pins below name its old path,
-`.github/actions/managed-files-guard`. The pin moves with each ci-workflows release through the cascade below.
+**The action ref** is first-party, so it floats on ci-workflows `main`
+(`.github/actions/check-managed-files@main`): a guard fix reaches every
+caller on its next run with no repin.
 The earlier pins are recorded because of what they fixed:
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
 `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
@@ -161,53 +158,9 @@ manifest that is live for the calling repository: a fixed standards SHA would
 stop tracking target-roster and component changes the moment it landed, and
 every sync after it would move destinations the guard no longer knew about.
 `standards-ref` is a workflow input naming a ref of a different repository,
-not a `uses:` reference, so the ci-workflows pin-comment convention does not
-apply to it. Moving it to a SHA is a post-soak decision that then needs its
+not a `uses:` reference. Moving it to a SHA is a post-soak decision that then needs its
 own advance path (the sync engine's `dest-paths` contract at that SHA is what
 the guard executes); do not pin it in this hop.
-
-## Pin-advance path
-
-The action pin rides the existing `maintenance-repin-ci-workflows` cascade
-(`.github/workflows/maintenance-repin-ci-workflows.yml`, daily), which resolves the
-newest full-SemVer ci-workflows release and rewrites each enumerated caller
-pin whose path that release changed to its SHA with a `# vX.Y.Z` comment. Both files are enumerated in
-`components/claude-lanes/repin-callers.sh`'s `EXTRA_CALLER_FILES`, and the
-workflow's `add-paths` covers the whole `components/managed-files-guard`
-directory, so the same reviewed pull request that re-pins the
-lane callers re-pins the guard and the sync fans it out.
-
-Two properties of that ride are deliberate:
-
-- **A pin ahead of the release is left alone.** `apply` asks GitHub's
-  compare API whether the pinned SHA is an ancestor of the release SHA
-  ([compare two commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits)),
-  comparing the pin to the release. Status `behind` or `diverged` leaves the
-  pin untouched; `ahead` lets the rewrite proceed when the release changed
-  the composite. Day-level pin-comment dates are not
-  consulted: a pin landed later on the same UTC day as the release, or on
-  another line of history, cannot be proven contained by a `YYYY-MM-DD`
-  string. Without that fence the very next scheduled run would have proposed
-  moving this file from `3b2f4eab5b4bb58a150e400613350ede37742ee8`
-  (2026-08-30) back to v0.17.2 (2026-08-21),
-  behind the fail-open fix. The pin advances to the tag form on the first
-  release that contains it, and the file now sits on that tag form, so the
-  fence has released it and it re-pins on every later release that changes
-  the composite. A failed compare is a hard failure, not a rewrite.
-- **Not in `repin-policy-lockstep.mjs`'s `REPIN_TARGETS`.** Every `kind` that
-  table expresses and that still has a contract to copy (`lane`, `reusable`)
-  copies a `components/runner-policy/policy.json` contract forward from the old
-  SHA to the new one and diffs the reusable workflow's `workflow_call` surface.
-  Composite actions are not SHA-allowlisted by runner-policy
-  (`components/runner-policy/README.md`), so there is no contract to copy and
-  no `workflow_call` surface to diff; an entry would either invent a kind the
-  policy does not have or force the lockstep to `manual` on every release.
-  The guard caller therefore takes the pin rewrite only, which is the whole
-  of what it needs. runner-policy governs the caller as an ordinary hosted
-  job (fixed approved label, read-only token, full-SHA action pin), not
-  through `approvedReusableWorkflowContracts`; a bogus reusable-workflow
-  contract for a composite action would be exactly the misuse that README
-  warns against.
 
 ## Ownership and operation
 
@@ -260,12 +213,9 @@ grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; a
 full-history, credential-free checkout pinned like the sibling workflows; the
-action pinned by full SHA with a comment the `pin-comment-convention` library
-accepts; and `standards-ref: main`. It asserts the two files carry the same
-action pin and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
+action at `@main`; and `standards-ref: main`. It asserts the two files carry the same
+action ref and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
 manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
 accounted for) and materializes each managing target through the real engine, asserting byte-identity at the
 destination and, when `actionlint` is on PATH, a clean lint there.
-`components/claude-lanes/repin-callers.test.sh` covers the cascade half,
-including the ahead-of-release fence.

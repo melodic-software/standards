@@ -1,0 +1,7 @@
+rules:
+  # First-party refs float on `main`; third-party actions stay SHA-pinned.
+  unpinned-uses:
+    config:
+      policies:
+        "melodic-software/*": ref-pin
+        "*": hash-pin

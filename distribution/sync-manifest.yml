@@ -33,10 +33,9 @@ components:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
   # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
   # 3a): thin sync-managed callers for the ci-workflows reusable review lanes.
-  # The live pin is recorded in the component caller files themselves and in
-  # components/runner-policy/policy.json (approvedReusableWorkflowContracts) —
-  # this comment deliberately names no version: pins move via the repin lane
-  # and a version literal here goes stale. Managed — a recorded exception to
+  # The callers reference the reusables at `@main`; their contracts are in
+  # components/runner-policy/policy.json (approvedReusableWorkflowContracts),
+  # keyed by path. Managed — a recorded exception to
   # the workflow-caller exclusion in README.md — because hand-written lane
   # callers empirically drifted: medley's missing `reopened` trigger,
   # divergent skip-actors lists, and pin skew across targets.
@@ -117,7 +116,7 @@ components:
   # (1) the runner choice to move inside the ci-workflows reusable, so the
   # caller names no label, AND a new cross-repo reusable routing kind in
   # runner-policy to admit that call (schema, analyzer, tests, schemaVersion,
-  # contract entries, fleet re-pin); `internal-routing` today is
+  # contract entries); `internal-routing` today is
   # repository-local only;
   # (2) narrow `runner-policy.test.mjs`'s blanket
   # "every managed target of a claude lane caller admits that caller" rule,

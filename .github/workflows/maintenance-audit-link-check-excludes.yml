@@ -19,8 +19,7 @@ name: maintenance-audit-link-check-excludes
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1` and
-    # maintenance-repin-ci-workflows's `41 14 * * *`.
+    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`.
     - cron: "23 15 * * *"
 
 permissions:
@@ -42,7 +41,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # A boolean, never the credential (same shape as maintenance-repin-ci-workflows).
+      # A boolean, never the credential.
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}

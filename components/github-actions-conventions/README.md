@@ -156,9 +156,8 @@ repository where it applies to one.
 
 | Rule | Owner |
 | --- | --- |
-| Runner labels and reusable workflow approval by `path@SHA` | [runner-policy](../runner-policy/README.md) |
+| Runner labels and reusable workflow approval by path | [runner-policy](../runner-policy/README.md) |
 | The top-level `concurrency` block of pull-request workflows | [concurrency-policy](../concurrency-policy/README.md) |
-| The `# vX.Y.Z` comment on SHA-pinned `uses:` lines | [pin-comment-convention](../pin-comment-convention/README.md) |
 | Dependabot configuration for Actions and package roots | [dependabot-policy](../dependabot-policy/README.md) |
 | The `## Code Review Rules` section in `AGENTS.md` | [code-review-rules](../code-review-rules/README.md) |
 | Synced Claude review lane callers | [claude-lanes](../claude-lanes/claude-review.yml), [claude-lanes-hosted](../claude-lanes-hosted/claude-review.yml) |
