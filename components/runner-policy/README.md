@@ -167,8 +167,14 @@ workflow must have an entry in `policy.json`'s
 `approvedReusableWorkflowContracts`, keyed by its bare path
 (`owner/repo/.github/workflows/<file>.yml`, no `@ref`). A call matches that
 contract at `@main` when the owner is `melodic-software`, or at a full
-40-character commit SHA for any owner; a tag, another branch, or `@main` on a
-third-party workflow is refused. A first-party call at `@main` runs the
+40-character commit SHA listed in that contract's `approvedShas`; an unlisted
+SHA, a tag, another branch, or `@main` on a third-party workflow is refused.
+`approvedShas` holds the SHAs earlier policy versions approved for the path,
+so callers still SHA-pinned pass while they move to `@main`. It is migration
+data: delete a path's list once no consumer pins that path to a SHA, and add
+no SHA a reviewer has not traced to the workflow repository's main branch,
+because GitHub serves a commit pushed to any fork under the parent
+repository's path. A first-party call at `@main` runs the
 workflow's current main, so the contract holds for whatever main declares and
 a ci-workflows change needs no standards sync unless it changes the contract
 surface (see [Contract revision lockstep](#contract-revision-lockstep)). Its contract names the
@@ -334,8 +340,8 @@ next event. A change to that surface is ordered so no caller is refused:
 4. A new reusable path gets its own contract entry before its first caller
    lands.
 
-A caller still pinned to a full SHA is checked against the same path contract,
-so it too must send the current secret map and caller permissions.
+A caller still pinned to an approved SHA is checked against the same path
+contract, so it too must send the current secret map and caller permissions.
 
 A production fleet relabel is the same class of event plus its own sites:
 `approvedManagedRunnerLabels` and `managedLabelPatterns` in `policy.json`,

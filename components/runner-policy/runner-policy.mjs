@@ -289,6 +289,7 @@ export function validatePolicy(value) {
           }
         : {}),
       ...(contract.fixedRunsOn ? { fixedRunsOn: new Set(contract.fixedRunsOn) } : {}),
+      approvedShas: new Set(contract.approvedShas ?? []),
     });
   }
 
@@ -477,8 +478,10 @@ function parseReusableWorkflowReference(value) {
 }
 
 // Contracts key on the workflow path. A first-party (melodic-software) caller
-// may float on @main; any caller may pin a full 40-character SHA. Every other
-// ref (a tag or another branch) is not approved.
+// may float on @main; any caller may pin a SHA the contract lists in
+// approvedShas. An unlisted SHA is refused because GitHub serves a commit
+// pushed to any fork under the parent repository path. Every other ref (a tag
+// or another branch) is not approved.
 function reusableWorkflowContract(uses, policy) {
   const parsed = parseReusableWorkflowReference(uses);
   const contract = parsed && policy.approvedReusableWorkflowContracts.get(parsed.workflow);
@@ -486,11 +489,19 @@ function reusableWorkflowContract(uses, policy) {
     return { reason: "the reusable workflow path has no reviewed runner-input contract" };
   }
   const firstParty = parsed.workflow.startsWith(`${FIRST_PARTY_OWNER}/`);
-  if (FULL_SHA.test(parsed.revision) || (firstParty && parsed.revision === "main")) {
+  if (firstParty && parsed.revision === "main") {
     return { contract };
   }
+  if (FULL_SHA.test(parsed.revision)) {
+    if (contract.approvedShas.has(parsed.revision.toLowerCase())) {
+      return { contract };
+    }
+    return {
+      reason: `the reusable workflow ref @${parsed.revision} is not an approved commit for ${parsed.workflow}; use ${firstParty ? "@main" : "a SHA listed in its approvedShas"}`,
+    };
+  }
   return {
-    reason: `the reusable workflow ref @${parsed.revision} is not approved; use ${firstParty ? "@main or " : ""}a full 40-character commit SHA`,
+    reason: `the reusable workflow ref @${parsed.revision} is not approved; use ${firstParty ? "@main or " : ""}an approved full commit SHA`,
   };
 }
 

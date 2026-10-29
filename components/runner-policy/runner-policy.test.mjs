@@ -53,13 +53,37 @@ const pathOf = (reference) => reference.slice(0, reference.lastIndexOf("@"));
 const HISTORICAL_CONTRACTS = JSON.parse(
   await readFile(new URL("./fixtures/historical-contracts.json", import.meta.url), "utf8"),
 ).approvedReusableWorkflowContracts;
+// Every commit a fixture references; a test contract that names no
+// approvedShas is approved at these. An unlisted SHA stays refused.
+const FIXTURE_SHAS = [
+  ...new Set([
+    SHA,
+    PRODUCTION_SHA,
+    FLEET_CLAUDE_REVIEW_SHA,
+    SYNC_RUNNER_INPUT_SHA,
+    ...Object.keys(HISTORICAL_CONTRACTS).map((reference) =>
+      reference.slice(reference.lastIndexOf("@") + 1),
+    ),
+  ]),
+];
+const withFixtureShas = (contracts) =>
+  Object.fromEntries(
+    Object.entries(contracts).map(([key, contract]) => [
+      key,
+      Object.hasOwn(contract, "approvedShas")
+        ? contract
+        : { ...contract, approvedShas: FIXTURE_SHAS },
+    ]),
+  );
 const HOSTED_ONLY_POLICY = {
   ...BASE_POLICY,
-  approvedReusableWorkflowContracts: Object.fromEntries(
-    [HOSTED_REUSABLE_REFERENCE, SECRET_REUSABLE_REFERENCE].map((reference) => [
-      pathOf(reference),
-      HISTORICAL_CONTRACTS[reference],
-    ]),
+  approvedReusableWorkflowContracts: withFixtureShas(
+    Object.fromEntries(
+      [HOSTED_REUSABLE_REFERENCE, SECRET_REUSABLE_REFERENCE].map((reference) => [
+        pathOf(reference),
+        HISTORICAL_CONTRACTS[reference],
+      ]),
+    ),
   ),
 };
 const temporaryRoots = [];
@@ -124,9 +148,17 @@ async function repository({
             runnerInput: "runner",
             allowedInputs: ["runner"],
             allowedSecrets: {},
+            approvedShas: [SHA],
           },
         },
         ...policyOverrides,
+        ...(policyOverrides.approvedReusableWorkflowContracts
+          ? {
+              approvedReusableWorkflowContracts: withFixtureShas(
+                policyOverrides.approvedReusableWorkflowContracts,
+              ),
+            }
+          : {}),
       },
       null,
       2,
@@ -3280,14 +3312,61 @@ function publicReusableCaller(uses) {
   return `jobs:\n  scan:\n    uses: ${uses}\n    with:\n      runner: ubuntu-24.04\n`;
 }
 
-test("a first-party reusable call matches its path contract at @main or any full commit SHA", async () => {
-  for (const ref of ["main", "fedcba9876543210fedcba9876543210fedcba98", SHA]) {
+test("a first-party reusable call matches its path contract at @main or an approved commit SHA", async () => {
+  for (const ref of ["main", SHA, SHA.toUpperCase()]) {
     const root = await repository({
       visibility: "public",
       selfHostedCi: false,
       workflows: { "ci.yml": publicReusableCaller(`${REUSABLE_PATH}@${ref}`) },
     });
     assert.deepEqual(await audit(root), [], ref);
+  }
+});
+
+test("a full commit SHA the contract does not list is refused", async () => {
+  // Any fork of a public repository can push a commit that GitHub serves under
+  // the parent path, so an unlisted 40-hex SHA proves nothing about review.
+  const unlisted = "fedcba9876543210fedcba9876543210fedcba98";
+  const root = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": publicReusableCaller(`${REUSABLE_PATH}@${unlisted}`) },
+  });
+  const findings = await audit(root);
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["runner-target-contract"],
+  );
+  assert.equal(
+    findings[0].message,
+    `the reusable workflow ref @${unlisted} is not an approved commit for ${REUSABLE_PATH}; use @main`,
+  );
+});
+
+test("the live policy admits a previously approved SHA and refuses an unlisted one", async () => {
+  const workflow = "melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml";
+  const approved = BASE_POLICY.approvedReusableWorkflowContracts[workflow].approvedShas[0];
+  assert.match(approved, /^[0-9a-f]{40}$/u);
+  const caller = (ref) =>
+    `permissions:\n  contents: read\n  pull-requests: read\njobs:\n  checks:\n    uses: ${workflow}@${ref}\n    with:\n      runner: ubuntu-24.04\n`;
+  for (const [ref, expected] of [
+    [approved, []],
+    ["main", []],
+    [SHA, ["runner-target-contract"]],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: BASE_POLICY.approvedReusableWorkflowContracts,
+      },
+      workflows: { "ci.yml": caller(ref) },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      expected,
+      ref,
+    );
   }
 });
 
@@ -3306,12 +3385,12 @@ test("a reusable call at a tag or another branch is not approved", async () => {
     );
     assert.equal(
       findings[0].message,
-      `the reusable workflow ref @${ref} is not approved; use @main or a full 40-character commit SHA`,
+      `the reusable workflow ref @${ref} is not approved; use @main or an approved full commit SHA`,
     );
   }
 });
 
-test("a third-party reusable call must pin a full commit SHA, never @main", async () => {
+test("a third-party reusable call must pin an approved commit SHA, never @main", async () => {
   const thirdParty = "other-owner/workflows/.github/workflows/scan.yml";
   const policyOverrides = {
     approvedReusableWorkflowContracts: {
@@ -3320,6 +3399,7 @@ test("a third-party reusable call must pin a full commit SHA, never @main", asyn
         runnerInput: "runner",
         allowedInputs: ["runner"],
         allowedSecrets: {},
+        approvedShas: [SHA],
       },
     },
   };
@@ -3338,7 +3418,7 @@ test("a third-party reusable call must pin a full commit SHA, never @main", asyn
   });
   assert.deepEqual(
     (await audit(floating)).map(({ message }) => message),
-    ["the reusable workflow ref @main is not approved; use a full 40-character commit SHA"],
+    ["the reusable workflow ref @main is not approved; use an approved full commit SHA"],
   );
 });
 
