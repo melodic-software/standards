@@ -387,6 +387,17 @@ components:
   typos:
     files:
       _typos.toml: _typos.toml
+  # zizmor audit policy (components/zizmor/README.md): the org 3-day
+  # Dependabot cooldown floor, and `melodic-software/*` refs `ref-pin` with
+  # every other ref `hash-pin`, so the `@main` ci-workflows callers audit
+  # clean. Both rules only relax zizmor's defaults. Targets: every repository
+  # that runs zizmor. The source doubles as this repository's own live config
+  # (standards is manifest source, not a target). Deliberate exclusion:
+  # - ci-workflows: `locally-owned` — its copy adds a repo-specific
+  #   `self-repository` ignore a whole-file sync would clobber.
+  zizmor:
+    files:
+      .github/zizmor.yml: .github/zizmor.yml
 
 # Automerge is restored: the watchdog's tracking-issue
 # create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
@@ -471,6 +482,7 @@ targets:
       - repository-text
       - shellcheck
       - typos
+      - zizmor
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
@@ -502,6 +514,10 @@ targets:
     # ci-workflows retiring its in-repo job in favor of the synced caller.
     locally-owned:
       - managed-files-guard-caller
+      # Its .github/zizmor.yml carries the component's two rules plus a
+      # repo-specific `self-repository` ignore. Removal trigger: that ignore
+      # retiring (rhysd/actionlint#732).
+      - zizmor
   # Renamed from account-rotation on 2026-09-07 (github-iac aliases the old name).
   # Adopted 2026-09-05 at repository creation (github-iac governs it; the
   # Pulumi entry and this target land in the same window). A public .NET tool
@@ -566,6 +582,7 @@ targets:
       - shellcheck
       - trusted-actors
       - typos
+      - zizmor
     # The hosted lane pair is locally owned here, so this repository's copies
     # can resolve their models through its own resolve-config action and pass
     # them as `model-args` (ci-workflows v0.45.0). No other target has that
@@ -640,6 +657,7 @@ targets:
       - pyright
       - repository-text
       - typos
+      - zizmor
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
@@ -713,6 +731,7 @@ targets:
       - ruff
       - runner-policy
       - typos
+      - zizmor
     locally-owned:
       - shellcheck
   melodic-software/github-iac:
@@ -738,6 +757,7 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+      - zizmor
     locally-owned:
       - actionlint
   melodic-software/medley:
@@ -770,6 +790,7 @@ targets:
       - path-detection-tools
       - pr-body-contract-rule
       - runner-policy
+      - zizmor
     locally-owned:
       - actionlint
       # Repo-specific toolchain steps live inside the bootstrap itself (plus a
@@ -842,3 +863,4 @@ targets:
       - runner-policy
       - shellcheck
       - typos
+      - zizmor

@@ -1,4 +1,8 @@
 rules:
+  # The org Dependabot cooldown floor is 3 days (standards dependabot-policy).
+  dependabot-cooldown:
+    config:
+      days: 3
   # First-party refs float on `main`; third-party actions stay SHA-pinned.
   unpinned-uses:
     config:
