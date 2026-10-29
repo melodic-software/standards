@@ -1,0 +1,33 @@
+{
+  "paths": [
+    ".github/**",
+    ".claude/**",
+    ".cursor/**",
+    ".mcp.json",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "package.json",
+    "package-lock.json",
+    "lefthook.yml",
+    ".lefthook/**",
+    "components/**",
+    "distribution/**",
+    "conventions/engineering/**",
+    "docs/adr/README.md",
+    "docs/adr/adr-template.md",
+    "REVIEW.md",
+    ".editorconfig",
+    ".editorconfig-checker.json",
+    ".gitattributes",
+    ".gitleaks.toml",
+    ".golangci.yml",
+    ".markdownlint-cli2.jsonc",
+    ".node-version",
+    ".shellcheckrc",
+    "PSScriptAnalyzerSettings.psd1",
+    "_typos.toml",
+    "lychee.toml",
+    "ruff.toml"
+  ],
+  "apps": ["melodic-agent[bot]"]
+}
