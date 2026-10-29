@@ -1,0 +1,17 @@
+name: pr-require-checks-trust-paths
+on: # zizmor: ignore[dangerous-triggers] base-branch code and config only; nothing from the head is checked out or run, and the token holds read scopes plus statuses: write
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+permissions: {}
+jobs:
+  pr-require-checks-trust-paths:
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    uses: melodic-software/ci-workflows/.github/workflows/pr-require-checks-trust-paths.yml@f31f7f9a133d17dab5c64da2602f8d107cf2204b # v0.67.0
+    with:
+      runner: ubuntu-24.04
