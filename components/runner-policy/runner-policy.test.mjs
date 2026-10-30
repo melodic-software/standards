@@ -5998,17 +5998,22 @@ test("no target manages both the fleet and the hosted caller of one lane", async
   }
 });
 
-// First-party refs float on main; the registration tests above audit these
-// same bytes against the real policy.json.
-test("the claude lane caller components call every ci-workflows path at @main", async () => {
+// First-party reusable workflows float on main; first-party actions take a
+// full SHA, which the org requires of every action. The registration tests
+// above audit these same bytes against the real policy.json.
+test("the claude lane caller components call ci-workflows reusables at @main and actions at a SHA", async () => {
   for (const { source, body } of [
     ...(await claudeLaneCallerComponents()),
     ...(await claudeLaneCallerComponents(HOSTED_LANE_DIR)),
   ]) {
     const found = [...body.matchAll(/melodic-software\/ci-workflows\/([^@\s]+)@(\S+)/gu)];
     assert.ok(found.length > 0, `${source} calls no ci-workflows path`);
-    for (const [, workflowPath, ref] of found) {
-      assert.equal(ref, "main", `${source} calls ${workflowPath} at @${ref}, not @main`);
+    for (const [, path, ref] of found) {
+      if (path.startsWith(".github/workflows/")) {
+        assert.equal(ref, "main", `${source} calls ${path} at @${ref}, not @main`);
+      } else {
+        assert.match(ref, /^[0-9a-f]{40}$/u, `${source} calls ${path} at @${ref}, not a full SHA`);
+      }
     }
   }
 });

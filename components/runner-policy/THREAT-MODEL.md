@@ -108,7 +108,7 @@ not duplicate those changing inventories.
   caller with no standards review, under the permissions and secrets its
   contract already admits. ci-workflows review and branch protection are the
   control for that content, accepted by the owner's decision to float
-  first-party refs.
+  first-party reusable workflows.
 - `approvedShas` is migration-only: it keeps callers pinned to a previously
   approved SHA passing while they move to `@main`, and each path's list is
   deleted once no consumer pins that path to a SHA. An approved SHA is judged

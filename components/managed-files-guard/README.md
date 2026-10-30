@@ -122,9 +122,11 @@ the consumer's caller still carries the old list.
 
 ## The two pins
 
-**The action ref** is first-party, so it floats on ci-workflows `main`
-(`.github/actions/check-managed-files@main`): a guard fix reaches every
-caller on its next run with no repin.
+**The action pin** is a full 40-character commit SHA of ci-workflows `main`,
+because the org requires every action, first-party included, to be pinned to
+a full SHA; only reusable workflows may float on `main`. No automation moves
+this pin: a guard fix reaches callers when the pin in both files is advanced
+by hand and synced.
 The earlier pins are recorded because of what they fixed:
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
 `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
@@ -213,8 +215,8 @@ grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; a
 full-history, credential-free checkout pinned like the sibling workflows; the
-action at `@main`; and `standards-ref: main`. It asserts the two files carry the same
-action ref and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
+action pinned to a full 40-character SHA; and `standards-ref: main`. It asserts the two files carry the same
+action pin and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
 manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
 accounted for) and materializes each managing target through the real engine, asserting byte-identity at the

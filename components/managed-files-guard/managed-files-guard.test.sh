@@ -9,8 +9,8 @@
 #      trigger filtered to the union of the managed destinations of every
 #      target that receives that file,
 #      read-only token, the canonical concurrency block, one job on
-#      its approved label, a full-history checkout, and the first-party composite
-#      action at `@main` with
+#      its approved label, a full-history checkout, and the composite action
+#      pinned to a full 40-character SHA (org policy) with
 #      `standards-ref: main` for the soak, and a workflow name equal to the
 #      destination stem. The two files differ only in `runs-on`, the workflow
 #      name, the `paths` entries and comments.
@@ -138,7 +138,11 @@ check_shape() {
 
   guard_uses="$(q '.jobs["pr-check-managed-files"].steps[1].uses')"
   assert_contains "$p second step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
-  assert_eq "$p the first-party guard action floats on main" "${action_path}@main" "$guard_uses"
+  if [[ "$guard_uses" =~ ^${action_path}@[0-9a-f]{40}$ ]]; then
+    pass "$p guard action is pinned to a full 40-character SHA (org policy)"
+  else
+    fail "$p guard action is pinned to a full 40-character SHA (org policy)" "got $guard_uses"
+  fi
   assert_eq "$p guard action pin line is unique in the file" '1' \
     "$(grep -c "uses: ${action_path}@" "$source")"
   assert_eq "$p standards-ref is main for the soak" 'main' \
@@ -151,10 +155,10 @@ check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destina
 check_shape "$fleet_source" "$fleet_component" 'melodic-ubuntu-24.04-x64' "$fleet_destination"
 
 # Beyond comments, the workflow name, the `paths` entries (checked per file
-# above) and `runs-on`, the siblings are the same bytes, so one review covers
-# both.
-pin_of() { grep -oE "${action_path}@[^[:space:]]+" "$1"; }
-assert_eq 'the fleet sibling references the guard action at the same ref as the hosted caller' \
+# above) and `runs-on`, the siblings are the same bytes, so one pin advance and
+# one review cover both.
+pin_of() { grep -oE "${action_path}@[0-9a-f]{40}" "$1"; }
+assert_eq 'the fleet sibling pins the same guard action SHA as the hosted caller' \
   "$(pin_of "$hosted_source")" "$(pin_of "$fleet_source")"
 strip() { grep -vE '^([[:space:]]*(#|runs-on:)|name:|      - [^[:space:]]+$)' "$1"; }
 if diff <(strip "$hosted_source") <(strip "$fleet_source") >/dev/null; then

@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: melodic-software/ci-workflows/.github/actions/gitleaks@main
+      - uses: melodic-software/ci-workflows/.github/actions/gitleaks@2476d5dde8979eab34374150b7e4b0a2b99f4e88 # 2476d5d 2026-10-29

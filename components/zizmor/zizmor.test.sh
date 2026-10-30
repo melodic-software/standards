@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Tests the zizmor component: with the root-canonical config, first-party
-# `melodic-software/*` refs on `@main` and a 3-day Dependabot cooldown audit
-# clean, a third-party tag still fails unpinned-uses, and a configless control
-# run flags both first-party refs and the cooldown. Skips when zizmor is absent.
+# Tests the zizmor component: with the root-canonical config, a first-party
+# reusable on `@main`, a SHA-pinned first-party action and a 3-day Dependabot
+# cooldown audit clean, a third-party tag still fails unpinned-uses, and a
+# configless control run flags the first-party reusable and the cooldown.
+# Skips when zizmor is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
