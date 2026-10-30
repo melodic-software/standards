@@ -186,6 +186,8 @@ assert_row_count 'x.com profile is excluded' "$dump_out" 0 '^https://x\.com/Exam
 assert_not_contains 'x.com article is excluded' "$dump_out" \
   'https://x.com/ExampleHandle/article/1'
 assert_not_contains 'x.com i/ article is excluded' "$dump_out" 'https://x.com/i/article/1'
+assert_not_contains 'GitHub REST API endpoint is excluded' "$dump_out" \
+  'https://api.github.com/repos/melodic-software/standards'
 # Each URL below passed a GitHub-runner retest, so its exclude was dropped.
 for checked in \
   'https://isdown.app/status/anthropic' \

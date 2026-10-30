@@ -33,6 +33,7 @@ The exact current public URLs that reject automated link checkers are excluded:
 - <https://x.com/ExampleHandle>
 - <https://x.com/ExampleHandle/article/1>
 - <https://x.com/i/article/1>
+- <https://api.github.com/repos/melodic-software/standards>
 
 Pages that passed a GitHub-runner retest and are checked again:
 
