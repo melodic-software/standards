@@ -27,5 +27,5 @@
     "lychee.toml",
     "ruff.toml"
   ],
-  "apps": ["melodic-agent[bot]"]
+  "apps": ["trust-path-hold-off[bot]"]
 }
