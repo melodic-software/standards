@@ -21,6 +21,7 @@
     "melodic-software/ci-workflows/.github/workflows/intake-triage.yml": {
       "routing": "runner-input",
       "runnerInput": "runner",
+      "fixedRunsOn": ["ubuntu-24.04"],
       "role": "intake",
       "allowedInputs": [
         "runner",
