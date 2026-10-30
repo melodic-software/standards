@@ -108,9 +108,9 @@ renaming, find each of these and change it in the same rollout:
    reports no pending check, and the only API signal is
    `mergeStateStatus: BLOCKED`. Keeping `ci-status` the single required check
    makes file and lane renames safe; never rename `ci-status`.
-2. **Runner policy.** The runner-policy contract approves reusable workflows by
-   `path@SHA` and fails closed on an unknown path. A renamed reusable needs its
-   new path approved before any consumer pins it.
+2. **Runner policy.** The runner-policy contract is keyed by the reusable
+   workflow's bare path and fails closed on an unknown path. A renamed reusable
+   needs a contract under its new path before any consumer calls it.
 3. **Synced files.** The standards sync never deletes a file. When a synced
    destination moves, the sync change for each target also deletes the old
    path, or both copies run.

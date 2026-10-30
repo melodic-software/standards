@@ -764,8 +764,8 @@ jobs:
       - name: Enforce dependabot policy on standards
         if: ${{ !cancelled() }}
         run: npm run lint:dependabot-policy
-      # Reads the public ci-workflows reusable at an immutable pinned SHA, so
-      # the only non-hermetic input is the fetch itself. Blocking from
+      # Reads the public ci-workflows reusable at main, where first-party
+      # callers run it; a change on main can fail this check. Blocking from
       # admission: see components/dependabot-policy/README.md "Merge lanes".
       - name: Enforce the auto-merge allowlist lockstep with ci-workflows
         if: ${{ !cancelled() }}
