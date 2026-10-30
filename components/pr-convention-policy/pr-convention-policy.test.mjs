@@ -59,6 +59,10 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
       );
     }
   }
+  // The lockstep matrix builds samples proportional to the window, so the
+  // schema bounds it.
+  const wide = { ...POLICY.body, negatedClosers: { ...negatedClosers, wordWindow: 51 } };
+  assert.throws(() => validatePolicy({ ...POLICY, body: wide }), /wordWindow must be <= 50/);
 });
 
 test("canonical requiredSections mirror the enforced pr-issue-linkage contract", () => {
