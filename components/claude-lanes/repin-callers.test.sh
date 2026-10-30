@@ -22,7 +22,7 @@ root="$(git rev-parse --show-toplevel)"
 source "$root/harness/shell/lib.sh"
 
 script="$root/components/claude-lanes/repin-callers.sh"
-fixture_corpus="$root/components/pin-comment-convention/fixtures"
+fixture_corpus="$root/components/zizmor/fixtures"
 rename_map="$root/components/github-actions-conventions/rename-map.json"
 upstream='melodic-software/ci-workflows'
 old_sha='c136b27f404dd32ce3873f39a6f3443891d1c16e'
@@ -111,6 +111,8 @@ case "$path" in
     # compare release...pin reports it (ahead: the pin has commits the release
     # lacks; behind: the release contains the pin), and the stub answers in
     # the pin...release direction the subject asks in. Unset means contained.
+    # STUB_COMPARE_STATUS_FOR, space-separated `<pin-sha>=<status>` entries,
+    # overrides STUB_COMPARE_STATUS for those pins only.
     # STUB_COMPARE_STATUS=fail forces a lookup error. STUB_COMPARE_FILES lists,
     # space-separated, the files the release changed; unset is one shared
     # non-test script, which moves every pin, the behavior before selective
@@ -121,10 +123,15 @@ case "$path" in
       echo 'gh: Not Found (HTTP 404)' >&2
       exit 1
     fi
-    case "${STUB_COMPARE_STATUS:-behind}" in
+    relation="${STUB_COMPARE_STATUS:-behind}"
+    compared="${path##*/compare/}"
+    for entry in ${STUB_COMPARE_STATUS_FOR:-}; do
+      [[ "$entry" != "${compared%%...*}="* ]] || relation="${entry#*=}"
+    done
+    case "$relation" in
       ahead) status=behind ;;
       behind) status=ahead ;;
-      *) status="$STUB_COMPARE_STATUS" ;;
+      *) status="$relation" ;;
     esac
     files="${STUB_COMPARE_FILES-.github/scripts/shared.cjs}"
     # shellcheck disable=SC2086  # one jq argument per space-separated file
@@ -311,7 +318,7 @@ assert_not_contains 'resolve: releases 404 with a readable repo emits no resolve
 export STUB_RELEASES_STATUS=200
 
 # A tag outside full SemVer has no pin-comment form, so re-pinning would author
-# a comment this repository's own pin-comment lane then rejects.
+# a comment repin::refs cannot read back.
 out_file="$scratch/out-bad-tag"
 export STUB_RELEASES_STATUS=200 STUB_TAG_NAME='v1.4' STUB_REF_TYPE='commit' STUB_REF_SHA="$new_sha"
 rc=0; out="$(run_resolve "$out_file")" || rc=$?
@@ -335,9 +342,11 @@ assert_nonzero 'resolve: missing GITHUB_OUTPUT fails' "$rc"
 # ------------------------------------------------------------- apply: fixtures
 
 # lane_repo <dir> <pinned-sha> <pinned-tag> — a scratch repository carrying two
-# lane callers AND this repository's REAL pin-comment fixture corpus, so the
-# scope assertions run against the actual deliberately-malformed pins a
-# repository-wide rewrite would corrupt, not a convenient stand-in.
+# callers that each pin one ci-workflows action AND this repository's REAL
+# zizmor fixture corpus, whose first-party action pin a repository-wide rewrite
+# would move, so the scope assertions run against an actual stand-in. Every
+# CALLER_DIRS directory exists, as in production. The two action paths are
+# rename-map.json `from` entries, so the rename cases reuse this fixture.
 lane_repo() {
   local dir="$1" pin_sha="$2" pin_tag="$3"
   make_repo "$dir"
@@ -345,28 +354,27 @@ lane_repo() {
   # rewrite between checkout and comparison would be indistinguishable from
   # the rewrite under test.
   git -C "$dir" config core.autocrlf false
-  mkdir -p "$dir/components/claude-lanes" "$dir/components/pin-comment-convention" \
-    "$dir/components/github-actions-conventions"
-  cp -R "$fixture_corpus" "$dir/components/pin-comment-convention/fixtures"
+  mkdir -p "$dir/components/claude-lanes" "$dir/components/zizmor" \
+    "$dir/components/claude-lanes-hosted" "$dir/components/lychee-online/targets" \
+    "$dir/components/managed-files-guard" "$dir/components/github-actions-conventions"
+  cp -R "$fixture_corpus" "$dir/components/zizmor/fixtures"
   cp "$rename_map" "$dir/components/github-actions-conventions/rename-map.json"
 
   cat > "$dir/components/claude-lanes/claude-review.yml" <<YAML
 name: claude-review
 on: pull_request
 jobs:
-  review:
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${pin_sha} # ${pin_tag}
-    with:
-      runner: melodic-review-ubuntu-24.04-x64
+  contract:
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/pr-contract@${pin_sha} # ${pin_tag}
 YAML
   cat > "$dir/components/claude-lanes/claude-security-review.yml" <<YAML
 name: claude-security-review
 on: pull_request
 jobs:
-  security:
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${pin_sha} # ${pin_tag}
-    with:
-      runner: melodic-review-ubuntu-24.04-x64
+  outcome:
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/claude-lane-outcome@${pin_sha} # ${pin_tag}
 YAML
   git -C "$dir" add -A
   git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'lane callers'
@@ -411,17 +419,15 @@ assert_eq 'apply: every lane pin is rewritten' '2' "$lane_pins"
 assert_not_contains 'apply: no stale pin survives' \
   "$(cat "$repo"/components/claude-lanes/*.yml)" "$old_sha"
 
-# THE SCOPE FENCE. The fixture corpus holds ci-workflows pins that are
-# deliberately malformed — a missing comment, prose, a partial SemVer, a
-# reversed fallback. A discovery-based rewrite would normalize every one of
-# them into valid form and leave the bad-fixture suite passing with nothing
-# left to detect. Byte-compare against the pristine originals.
+# THE SCOPE FENCE. The zizmor fixture corpus holds a first-party action pin
+# that is test data, not a caller. A discovery-based rewrite would move it.
+# Byte-compare against the pristine originals.
 fixture_drift=0
 while IFS= read -r original; do
-  copy="$repo/components/pin-comment-convention/fixtures/${original#"$fixture_corpus/"}"
+  copy="$repo/components/zizmor/fixtures/${original#"$fixture_corpus/"}"
   cmp -s "$original" "$copy" || fixture_drift=$((fixture_drift + 1))
 done < <(find "$fixture_corpus" -type f | sort)
-assert_eq 'apply: the pin-comment fixture corpus is byte-identical afterwards' '0' "$fixture_drift"
+assert_eq 'apply: the zizmor fixture corpus is byte-identical afterwards' '0' "$fixture_drift"
 
 # The same claim from git's side, which also catches a file the loop above
 # never enumerated.
@@ -430,9 +436,9 @@ assert_eq 'apply: only the lane callers are modified' \
   'components/claude-lanes/claude-review.yml,components/claude-lanes/claude-security-review.yml' \
   "$changed_paths"
 
-# Extra callers live outside LANE_DIR and may already pin a different SHA.
+# Callers outside components/claude-lanes may already pin a different SHA.
 # apply must rewrite each file from its own pin and must not hard-fail just
-# because the diff left LANE_DIR.
+# because the diff left one directory.
 repo="$scratch/repo-mixed"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 other_sha='b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5'
@@ -442,21 +448,24 @@ name: sync
 on: workflow_dispatch
 jobs:
   sync:
-    uses: melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${other_sha} # v0.8.0
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/standards-sync@${other_sha} # v0.8.0
 YAML
 cat > "$repo/.github/workflows/pr-review.yml" <<YAML
 name: local-review
 on: pull_request
 jobs:
   review:
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/claude-review@${old_sha} # v0.9.1
 YAML
 cat > "$repo/.github/workflows/pr-review-security.yml" <<YAML
 name: local-security-review
 on: pull_request
 jobs:
   security-review:
-    uses: melodic-software/ci-workflows/.github/workflows/claude-security-review.yml@${old_sha} # v0.9.1
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/claude-security-review@${old_sha} # v0.9.1
 YAML
 # The guard caller pins a composite ACTION at a step, in the convention's
 # fallback comment form, dated before the release under test — so this
@@ -484,12 +493,7 @@ out_file="$scratch/out-apply-mixed"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
 assert_contains 'apply: mixed-SHA extras report a change' "$(cat "$out_file")" 'changed=true'
-assert_contains 'apply: mixed-SHA extras record both old SHAs' "$(cat "$out_file")" "$old_sha"
-assert_contains 'apply: mixed-SHA extras record the sync-family SHA' "$(cat "$out_file")" "$other_sha"
-assert_contains 'apply: mixed-SHA extras record the guard action SHA' "$(cat "$out_file")" "$guard_sha"
-mixed_old="$(grep '^old-sha=' "$out_file" | cut -d= -f2-)"
-assert_contains 'apply: mixed-SHA old-sha is a comma-separated unique set' "$mixed_old" ','
-assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside LANE_DIR' "$out" 'outside'
+assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside the lane directory' "$out" 'outside'
 assert_not_contains 'apply: a fallback pin dated before the release is not reported as ahead' "$out" 'left as is'
 mixed_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/components/claude-lanes-hosted/*.yml \
@@ -515,21 +519,22 @@ unset STUB_COMPARE_STATUS
 
 # THE DOWNGRADE FENCE. A fallback-form pin names a commit the GitHub compare
 # API reports as `ahead` or `diverged` of the release SHA: rewriting it would
-# move the pin BACKWARDS. Day-level pin-comment dates are not consulted —
+# move the pin BACKWARDS. Day-level pin comment dates are not consulted —
 # same-day pins and cross-branch timestamps cannot prove containment.
 # The lane callers still advance; the ahead file is reported and left
 # byte-identical.
-export STUB_COMPARE_STATUS=ahead
+export STUB_COMPARE_STATUS_FOR="${guard_sha}=ahead"
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
+for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
   cat > "$repo/.github/workflows/${extra%%:*}" <<YAML
 name: extra
 on: pull_request
 jobs:
   job:
-    uses: melodic-software/ci-workflows/.github/workflows/${extra#*:}@${old_sha} # v0.9.1
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/${extra#*:}@${old_sha} # v0.9.1
 YAML
 done
 cat > "$repo/$guard_caller" <<YAML
@@ -554,10 +559,8 @@ assert_contains 'apply: the ahead file keeps its SHA' "$(cat "$repo/$guard_calle
 assert_not_contains 'apply: the ahead file is never moved to the release' "$(cat "$repo/$guard_caller")" "$new_sha"
 assert_eq 'apply: the ahead file stays byte-identical' \
   "$(git -C "$repo" diff --name-only -- "$guard_caller")" ''
-assert_not_contains 'apply: the ahead SHA is not handed to lockstep as an old SHA' \
-  "$(grep '^old-sha=' "$out_file")" "$guard_sha"
 assert_contains 'apply: the version note names the file left untouched' "$(cat "$out_file")" \
-  "(${new_sha}): \`${guard_caller}\`, \`${guard_fleet_caller}\`. Those pins advance"
+  "(${new_sha}): \`${guard_fleet_caller}\`, \`${guard_caller}\`. Those pins advance"
 ahead_pins="$(grep -hoE "$new_sha # v0.9.2" \
   "$repo"/components/claude-lanes/*.yml "$repo"/components/claude-lanes-hosted/*.yml "$repo"/.github/workflows/*.yml | wc -l | tr -d ' ')"
 assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
@@ -567,8 +570,8 @@ assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 repo="$scratch/repo-same-day-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
-  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
+  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
     "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
@@ -577,20 +580,20 @@ cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
-export STUB_COMPARE_STATUS=ahead
 out_file="$scratch/out-apply-same-day-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: a same-day ahead pin exits 0' 0 "$rc"
 assert_contains 'apply: a same-day ahead pin is left as is' "$out" 'left as is'
 assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
+unset STUB_COMPARE_STATUS_FOR
 
 # When compare says the release contains the pin (`behind`), same-day is
 # irrelevant and the pin advances to the tag form.
 repo="$scratch/repo-same-day-behind"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
-  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
+  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
     "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
@@ -611,8 +614,8 @@ assert_contains 'apply: a same-day contained pin advances to the tag form' \
 repo="$scratch/repo-compare-fail"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:sync.yml pr-review.yml:claude-review.yml pr-review-security.yml:claude-security-review.yml; do
-  printf 'jobs:\n  job:\n    uses: melodic-software/ci-workflows/.github/workflows/%s@%s # v0.9.1\n' \
+for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
+  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
     "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
 done
 printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
@@ -645,6 +648,23 @@ assert_contains 'apply: every caller ahead is a notice' "$out" 'ahead of v0.9.2;
 assert_silent 'apply: every caller ahead leaves the tree clean' "$(git -C "$repo" status --porcelain)"
 unset STUB_COMPARE_STATUS
 
+# The fence holds whatever the comment form: a tag-form pin the release does
+# not contain (compare `ahead` or `diverged` from the pin's side) is never
+# moved, since moving it would go backwards.
+for relation in ahead diverged; do
+  repo="$scratch/repo-tag-form-${relation}"
+  lane_repo "$repo" "$old_sha" 'v0.9.1'
+  export STUB_COMPARE_STATUS="$relation"
+  out_file="$scratch/out-apply-tag-form-${relation}"
+  rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+  assert_exit "apply: a tag-form ${relation} pin exits 0" 0 "$rc"
+  assert_contains "apply: a tag-form ${relation} pin reports changed=false" "$(cat "$out_file")" 'changed=false'
+  assert_contains "apply: a tag-form ${relation} pin is reported as left as is" "$out" \
+    "pins ${old_sha}, not an ancestor of v0.9.2 (${new_sha}); left as is."
+  assert_silent "apply: a tag-form ${relation} pin leaves the tree clean" "$(git -C "$repo" status --porcelain)"
+  unset STUB_COMPARE_STATUS
+done
+
 # The date is the comparison's whole basis, so a missing or malformed one is
 # refused before any file is touched.
 repo="$scratch/repo-bad-date"
@@ -654,45 +674,47 @@ assert_nonzero 'apply: a malformed release date is refused' "$rc"
 assert_contains 'apply: a malformed release date is named' "$out" '21/08/2026'
 assert_silent 'apply: a malformed release date touches nothing' "$(git -C "$repo" status --porcelain)"
 
-# A production-shaped repo that drops one extra must not silently skip it.
-repo="$scratch/repo-partial-extras"
+# A renamed or deleted caller directory must fail, not silently drop its
+# callers from the target set.
+repo="$scratch/repo-missing-dir"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-mkdir -p "$repo/.github/workflows"
-cat > "$repo/.github/workflows/pr-review.yml" <<YAML
-name: local-review
-on: pull_request
-jobs:
-  review:
-    uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${old_sha} # v0.9.1
-YAML
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'partial extras'
-out_file="$scratch/out-apply-partial-extras"
+rmdir "$repo/components/lychee-online/targets"
+out_file="$scratch/out-apply-missing-dir"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
-assert_nonzero 'apply: a partial extra-caller set is a hard failure' "$rc"
-assert_contains 'apply: missing extra caller is named' "$out" 'maintenance-sync-standards.yml'
+assert_nonzero 'apply: a missing caller directory is a hard failure' "$rc"
+assert_contains 'apply: the missing caller directory is named' "$out" 'components/lychee-online/targets'
 
-# A file that is not in the enumerated set must still fail if the rewrite
-# somehow touches it — the extra-caller allowlist is not a blanket LANE_DIR
-# exemption.
-repo="$scratch/repo-stray"
+# THE NARROWING. Reusable workflows float on @main; a reusable still pinned by
+# SHA is its owner's to float, never this job's to move. A workflow carrying an
+# action pin beside both reusable forms moves the action pin alone.
+repo="$scratch/repo-reusable"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows"
-printf 'uses: melodic-software/ci-workflows/.github/workflows/zizmor.yml@%s # v0.9.1\n' \
-  "$old_sha" > "$repo/.github/workflows/zizmor.yml"
+cat > "$repo/.github/workflows/zizmor.yml" <<YAML
+jobs:
+  audit:
+    uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@${old_sha} # v0.9.1
+  scan:
+    uses: melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@main
+  secrets:
+    steps:
+      - uses: melodic-software/ci-workflows/.github/actions/gitleaks@${old_sha} # v0.9.1
+YAML
+printf 'jobs:\n  only:\n    uses: melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml@%s # v0.9.1\n' \
+  "$old_sha" > "$repo/components/claude-lanes-hosted/reusable-only.yml"
 git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'stray pin'
-# Force a stray diff the subject did not intend by rewriting the file after
-# the commit so git sees an outside change if the guard is too wide. The
-# subject itself must not touch this file; the guard assertion is that a
-# non-enumerated path stays unmodified.
-out_file="$scratch/out-apply-stray"
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'reusable refs beside an action pin'
+out_file="$scratch/out-apply-reusable"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
-assert_exit 'apply: a stray non-enumerated workflow is left alone and apply exits 0' 0 "$rc"
-assert_not_contains 'apply: a stray zizmor caller is not rewritten' \
-  "$(cat "$repo/.github/workflows/zizmor.yml")" "$new_sha"
-assert_eq 'apply: the stray workflow stays byte-identical' \
-  "$(git -C "$repo" diff --name-only -- .github/workflows/zizmor.yml)" ''
+assert_exit 'narrowing: a release run beside reusable refs exits 0' 0 "$rc"
+assert_contains 'narrowing: the action pin moves' "$(cat "$repo/.github/workflows/zizmor.yml")" \
+  "uses: melodic-software/ci-workflows/.github/actions/gitleaks@${new_sha} # v0.9.2"
+assert_contains 'narrowing: a SHA-pinned reusable keeps its pin' "$(cat "$repo/.github/workflows/zizmor.yml")" \
+  "uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@${old_sha} # v0.9.1"
+assert_contains 'narrowing: an @main reusable is untouched' "$(cat "$repo/.github/workflows/zizmor.yml")" \
+  'uses: melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@main'
+assert_eq 'narrowing: a caller with only a SHA-pinned reusable stays byte-identical' \
+  "$(git -C "$repo" diff --name-only -- components/claude-lanes-hosted/reusable-only.yml)" ''
 
 # ------------------------------------------------- apply: same major, no diff
 
@@ -719,41 +741,41 @@ assert_silent 'apply: no-diff run leaves the tree clean' "$(git -C "$repo" statu
 
 # ------------------------------------------------- apply: renamed upstream paths
 
-# A release that renamed a pinned reusable no longer carries the old path, so
+# A release that renamed a pinned action no longer carries the old path, so
 # rewriting the SHA alone would pin a path that does not exist at it. The
-# expected new paths are the ci-workflows entries of rename-map.json.
-renamed_paths='.github/workflows/pr-review.yml .github/workflows/pr-review-security.yml'
+# expected new paths are the ci-workflows action entries of rename-map.json.
+renamed_paths='.github/actions/pr-require-checks/check-contract .github/actions/report-lane-outcome'
 repo="$scratch/repo-renamed"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 export STUB_PRESENT_PATHS="$renamed_paths"
 out_file="$scratch/out-apply-renamed"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'apply: a renamed upstream path exits 0' 0 "$rc"
-assert_contains 'apply: the review caller moves to the renamed path' \
+assert_contains 'apply: the contract caller moves to the renamed path' \
   "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@${new_sha} # v0.9.2"
-assert_contains 'apply: the security caller moves to the renamed path' \
+  "uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@${new_sha} # v0.9.2"
+assert_contains 'apply: the outcome caller moves to the renamed path' \
   "$(cat "$repo/components/claude-lanes/claude-security-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@${new_sha} # v0.9.2"
+  "uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${new_sha} # v0.9.2"
 assert_not_contains 'apply: no caller keeps an old path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'claude-review.yml@'
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'pr-contract@'
 # shellcheck disable=SC2016  # markdown code spans in the expected note, not shell expansions
 assert_contains 'apply: the version note names the rename' "$(cat "$out_file")" \
-  '`.github/workflows/claude-review.yml` to `.github/workflows/pr-review.yml`'
+  '`.github/actions/pr-contract` to `.github/actions/pr-require-checks/check-contract`'
 
 # A release cut before the rename still carries the old path: the SHA moves,
 # the path stays.
 repo="$scratch/repo-pre-rename"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS='.github/workflows/claude-review.yml .github/workflows/claude-security-review.yml'
+export STUB_PRESENT_PATHS='.github/actions/pr-contract .github/actions/claude-lane-outcome'
 out_file="$scratch/out-apply-pre-rename"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'apply: a pre-rename release exits 0' 0 "$rc"
-assert_contains 'apply: a pre-rename release keeps the review path' \
+assert_contains 'apply: a pre-rename release keeps the contract path' \
   "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/workflows/claude-review.yml@${new_sha} # v0.9.2"
+  "uses: melodic-software/ci-workflows/.github/actions/pr-contract@${new_sha} # v0.9.2"
 assert_not_contains 'apply: a pre-rename release maps no path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'pr-review'
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'check-contract'
 
 # Neither path at the release: no pin can be right, so nothing is rewritten.
 repo="$scratch/repo-path-gone"
@@ -761,7 +783,7 @@ lane_repo "$repo" "$old_sha" 'v0.9.1'
 export STUB_PRESENT_PATHS=''
 rc=0; out="$(run_apply "$repo" "$scratch/out-apply-path-gone" 'v0.9.2' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a pinned path absent under both names fails' "$rc"
-assert_contains 'apply: the absent path is named' "$out" '.github/workflows/claude-review.yml'
+assert_contains 'apply: the absent path is named' "$out" '.github/actions/pr-contract'
 assert_silent 'apply: an absent path touches nothing' "$(git -C "$repo" status --porcelain)"
 
 # A probe that fails for any reason but 404 proves nothing about the path.
@@ -779,7 +801,8 @@ unset STUB_PRESENT_PATHS STUB_CONTENTS_STATUS
 # — silently re-pinning nothing is how this job would rot after a rename.
 repo="$scratch/repo-empty"
 make_repo "$repo"
-mkdir -p "$repo/components/claude-lanes"
+mkdir -p "$repo/components/claude-lanes" "$repo/components/claude-lanes-hosted" \
+  "$repo/components/lychee-online/targets" "$repo/components/managed-files-guard"
 out_file="$scratch/out-apply-empty"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a repository with no lane callers fails' "$rc"
@@ -790,21 +813,19 @@ assert_not_contains 'apply: a repository with no lane callers reports no change'
 # pull request that re-pins some of the fleet and silently leaves the rest.
 # The divergence here is two pins on one line: the counting pass matches per
 # occurrence, while the substitution is per line and its trailing `.*` absorbs
-# the second — so the guard sees 5 pins in and 4 rewritten. Synthetic (real
+# the second — so the guard sees 4 pins in and 3 rewritten. Synthetic (real
 # callers put one `uses:` per line), and that is the point: it proves the
 # count assertion is live rather than decorative.
 #
 # It also records a real property of a line-oriented rewrite — `uses:`-shaped
 # text is matched wherever it appears on a line, including inside a YAML
-# comment. That is why the file set is enumerated rather than discovered; the
-# pin-comment component reaches for yq precisely to avoid this class of
-# imprecision, and this subject does not need to because its inputs are two
-# files this repository authors.
+# comment. That is why the file set is enumerated rather than discovered: its
+# inputs are files this repository authors.
 repo="$scratch/repo-partial"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 printf '    # %s %s\n' \
-  "uses: melodic-software/ci-workflows/.github/workflows/a.yml@$old_sha" \
-  "uses: melodic-software/ci-workflows/.github/workflows/b.yml@$old_sha" \
+  "uses: melodic-software/ci-workflows/.github/actions/a@$old_sha" \
+  "uses: melodic-software/ci-workflows/.github/actions/b@$old_sha" \
   >> "$repo/components/claude-lanes/claude-review.yml"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'two pins on one line'
@@ -834,9 +855,10 @@ assert_contains 'apply usage names the date argument' "$out" '<date>'
 
 # ------------------------------------------- apply: only the paths a release changed
 
-# consumer_repo <dir>: a consumer-shaped checkout (claude-code-plugins pins
-# these four at one SHA) whose callers live under .github/ alone, plus a
-# pin-shaped line outside .github/ that --root must never reach.
+# consumer_repo <dir>: a consumer-shaped checkout whose callers live under
+# .github/ alone: two reusable workflows still SHA-pinned (never moved; they
+# float on @main), one composite carrying two action pins, plus a pin-shaped
+# line outside .github/ that --root must never reach.
 consumer_repo() {
   local dir="$1"
   make_repo "$dir"
@@ -859,7 +881,7 @@ runs:
     - uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@${old_sha} # v0.65.12
     - uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${old_sha} # v0.65.12
 YAML
-  printf 'uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@%s # v0.65.12\n' \
+  printf 'uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
     "$old_sha" > "$dir/docs/example.yml"
   git -C "$dir" add -A
   git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'consumer callers'
@@ -876,90 +898,88 @@ run_apply_root() {
 moved_line() { printf 'uses: melodic-software/ci-workflows/%s@%s # v0.65.13' "$1" "$new_sha"; }
 kept_line() { printf 'uses: melodic-software/ci-workflows/%s@%s # v0.65.12' "$1" "$old_sha"; }
 
-# The v0.65.12...v0.65.13 compare changed exactly these two files. Only the
-# reusable whose file changed moves; the test file is inert, and every other
-# pin stays byte-identical. One distinct pinned SHA costs one compare call.
+# The release changed a reusable workflow and one composite's code. Only that
+# composite's pin moves: the reusable change is inert to action pins, and the
+# SHA-pinned reusable callers are not targets at all. One distinct pinned SHA
+# costs one compare call.
 repo="$scratch/repo-consumer-cli"
 consumer_repo "$repo"
-export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/scripts/pr-review-cli.test.cjs'
+export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/actions/run-claude-cli/index.mjs'
 export STUB_CALL_LOG="$scratch/calls-consumer-cli"
 : > "$STUB_CALL_LOG"
 out_file="$scratch/out-consumer-cli"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
-assert_exit 'selective: a one-workflow release exits 0' 0 "$rc"
-assert_contains 'selective: a one-workflow release reports a change' "$(cat "$out_file")" 'changed=true'
-assert_contains 'selective: the changed reusable moves' \
-  "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(moved_line .github/workflows/pr-review-cli.yml)"
-assert_eq 'selective: only the changed reusable caller is modified' \
-  '.github/workflows/pr-review-cli.yml' "$(git -C "$repo" diff --name-only)"
-assert_contains 'selective: the unchanged reusable keeps its pin' \
-  "$(cat "$repo/.github/workflows/intake-triage.yml")" "$(kept_line .github/workflows/intake-triage.yml)"
-assert_contains 'selective: an unchanged composite keeps its pin' \
-  "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/run-claude-cli)"
+assert_exit 'selective: a one-composite release exits 0' 0 "$rc"
+assert_contains 'selective: a one-composite release reports a change' "$(cat "$out_file")" 'changed=true'
+assert_contains 'selective: the changed composite moves' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/run-claude-cli)"
+assert_contains 'selective: its unchanged sibling composite keeps its pin' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/report-lane-outcome)"
+assert_eq 'selective: only the composite caller is modified' \
+  '.github/actions/lane/action.yml' "$(git -C "$repo" diff --name-only)"
+assert_contains 'narrowing: a SHA-pinned reusable under --root keeps its pin' \
+  "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(kept_line .github/workflows/pr-review-cli.yml)"
 assert_eq 'selective: one distinct pinned SHA costs one compare call' '1' \
   "$(wc -l < "$STUB_CALL_LOG" | tr -d ' ')"
 assert_contains 'selective: the compare runs from the pin to the release' "$(cat "$STUB_CALL_LOG")" \
   "compare/${old_sha}...${new_sha}"
-assert_contains 'selective: old-sha names the moved pin SHA' "$(cat "$out_file")" "old-sha=${old_sha}"
 # shellcheck disable=SC2016  # markdown code spans in the expected note
 assert_contains 'selective: the note names what stays' "$(cat "$out_file")" \
-  '`.github/workflows/intake-triage.yml`'
+  '`.github/actions/report-lane-outcome`'
 
 # A shared non-test script no pinned path accounts for could feed any pin, so
-# the run fails closed to today's behavior: every pin moves.
+# the run fails closed: every action pin moves, and no reusable does.
 repo="$scratch/repo-consumer-shared"
 consumer_repo "$repo"
-export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/scripts/lane-outcome.cjs'
+export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml .github/scripts/lane-outcome.cjs'
 out_file="$scratch/out-consumer-shared"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a shared-script release exits 0' 0 "$rc"
-assert_eq 'selective: a shared-script change moves all four pins' '4' \
+assert_eq 'selective: a shared-script change moves both action pins' '2' \
   "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
-assert_not_contains 'selective: a shared-script change leaves no old pin under .github' \
-  "$(cat "$repo"/.github/workflows/*.yml "$repo/.github/actions/lane/action.yml")" "$old_sha"
+assert_not_contains 'selective: a shared-script change leaves no old action pin' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$old_sha"
+assert_eq 'narrowing: a shared-script change moves no reusable' \
+  "$(git -C "$repo" diff --name-only -- .github/workflows)" ''
 assert_contains '--root never touches a pin outside .github' \
   "$(cat "$repo/docs/example.yml")" "@${old_sha} # v0.65.12"
 
 # A composite counts as changed when anything under its directory changed,
-# a test file included; with no reusable reaching it, only it moves.
+# a test file included; only it moves.
 repo="$scratch/repo-consumer-composite"
 consumer_repo "$repo"
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/index.test.mjs'
 out_file="$scratch/out-consumer-composite"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
-assert_exit 'selective: a composite-only release exits 0' 0 "$rc"
+assert_exit 'selective: a composite test-only release exits 0' 0 "$rc"
 assert_contains 'selective: the changed composite moves' \
   "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/run-claude-cli)"
 assert_contains 'selective: its sibling composite on the same file stays' \
   "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/report-lane-outcome)"
-assert_eq 'selective: a composite change modifies only its caller file' \
-  '.github/actions/lane/action.yml' "$(git -C "$repo" diff --name-only)"
 
-# A reusable runs `$/` composites and `./` nested workflows from its own
-# commit, so a change to one it reaches changes what the reusable runs.
+# A composite runs `$/` composites from its own commit, so a change to one it
+# reaches changes what the pinned composite runs.
 repo="$scratch/repo-consumer-reach"
 consumer_repo "$repo"
 sources="$scratch/sources-reach"
-mkdir -p "$sources/.github/workflows" "$sources/.github/actions/run-claude-cli"
-printf 'jobs:\n  t:\n    uses: ./.github/workflows/triage-core.yml\n' \
-  > "$sources/.github/workflows/intake-triage.yml"
-printf 'jobs:\n  c:\n    steps:\n      - uses: "$/.github/actions/run-claude-cli"\n' \
-  > "$sources/.github/workflows/triage-core.yml"
-export STUB_SOURCES_DIR="$sources" STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
+mkdir -p "$sources/.github/actions/report-lane-outcome"
+printf 'runs:\n  steps:\n    - uses: "$/.github/actions/lane-core"\n' \
+  > "$sources/.github/actions/report-lane-outcome/action.yml"
+export STUB_SOURCES_DIR="$sources" STUB_COMPARE_FILES='.github/actions/lane-core/action.yml'
 out_file="$scratch/out-consumer-reach"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a reached composite change exits 0' 0 "$rc"
-assert_contains 'selective: a reusable reaching the composite through a nested workflow moves' \
-  "$(cat "$repo/.github/workflows/intake-triage.yml")" "$(moved_line .github/workflows/intake-triage.yml)"
-assert_contains 'selective: a reusable that reaches nothing changed stays' \
-  "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(kept_line .github/workflows/pr-review-cli.yml)"
+assert_contains 'selective: a composite reaching the changed one moves' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/report-lane-outcome)"
+assert_contains 'selective: a composite that reaches nothing changed stays' \
+  "$(cat "$repo/.github/actions/lane/action.yml")" "$(kept_line .github/actions/run-claude-cli)"
 unset STUB_SOURCES_DIR
 
-# Tests, READMEs and docs/ change nothing a pin runs: no pin moves, nothing
-# is proposed, and the tree stays clean.
+# Tests, READMEs, docs/ and reusable workflows change nothing an action pin
+# runs: no pin moves, nothing is proposed, and the tree stays clean.
 repo="$scratch/repo-consumer-inert"
 consumer_repo "$repo"
-export STUB_COMPARE_FILES='.github/scripts/pr-review-cli.test.cjs README.md docs/lanes.md'
+export STUB_COMPARE_FILES='.github/scripts/pr-review-cli.test.cjs README.md docs/lanes.md .github/workflows/pr-review-cli.yml'
 out_file="$scratch/out-consumer-inert"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: an inert-only release exits 0' 0 "$rc"
@@ -967,7 +987,7 @@ assert_contains 'selective: an inert-only release reports changed=false' "$(cat 
 assert_silent 'selective: an inert-only release leaves the tree clean' "$(git -C "$repo" status --porcelain)"
 
 # Paired with the case above: the same inert files at the compare's 300-file
-# cap may hide a real change, so every pin moves.
+# cap may hide a real change, so every action pin moves.
 repo="$scratch/repo-consumer-cap"
 consumer_repo "$repo"
 STUB_COMPARE_FILES="$(for i in $(seq 1 300); do printf 'docs/page-%s.md ' "$i"; done)"
@@ -975,16 +995,17 @@ export STUB_COMPARE_FILES
 out_file="$scratch/out-consumer-cap"
 rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a capped file list exits 0' 0 "$rc"
-assert_eq 'selective: a capped file list moves all four pins' '4' \
+assert_eq 'selective: a capped file list moves both action pins' '2' \
   "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
 
 # Two distinct pinned SHAs cost exactly two compare calls, however many
 # pins share them.
 repo="$scratch/repo-consumer-two-shas"
 consumer_repo "$repo"
-sed -i "s/${old_sha} # v0.65.12/${other_sha} # v0.65.11/" "$repo/.github/workflows/intake-triage.yml"
+sed -i "s/report-lane-outcome@${old_sha} # v0.65.12/report-lane-outcome@${other_sha} # v0.65.11/" \
+  "$repo/.github/actions/lane/action.yml"
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'second pinned SHA'
-export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml'
+export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
 : > "$STUB_CALL_LOG"
 rc=0; out="$(run_apply_root "$repo" "$scratch/out-consumer-two-shas")" || rc=$?
 assert_exit 'selective: two pinned SHAs exit 0' 0 "$rc"
@@ -999,27 +1020,31 @@ unset STUB_CALL_LOG
 # The stub engine answers only for the origin's OWNER/REPO.
 repo="$scratch/repo-consumer-managed"
 consumer_repo "$repo"
+printf 'jobs:\n  s:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
+  "$old_sha" > "$repo/.github/workflows/steps.yml"
+git -C "$repo" add -A
+git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'unmanaged step caller'
 git -C "$repo" remote add origin https://github.com/melodic-software/consumer.git
 cat > "$scratch/sync-manifest-stub.sh" <<'STUB'
 #!/usr/bin/env bash
-[[ "$*" == 'dest-paths --target melodic-software/consumer' ]] && echo '.github/workflows/intake-triage.yml'
+[[ "$*" == 'dest-paths --target melodic-software/consumer' ]] && echo '.github/actions/lane/action.yml'
 exit 0
 STUB
-export STUB_COMPARE_FILES='.github/workflows/intake-triage.yml .github/workflows/pr-review-cli.yml'
+export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
 out_file="$scratch/out-consumer-managed"
 rc=0; out="$(SYNC_MANIFEST="$scratch/sync-manifest-stub.sh" run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'managed: a consumer repin exits 0' 0 "$rc"
 assert_contains 'managed: the managed file is named as skipped' "$out" \
-  'Skipping sync-managed file: .github/workflows/intake-triage.yml'
-assert_eq 'managed: only the unmanaged files move' \
-  $'.github/actions/lane/action.yml\n.github/workflows/pr-review-cli.yml' "$(git -C "$repo" diff --name-only)"
+  'Skipping sync-managed file: .github/actions/lane/action.yml'
+assert_eq 'managed: only the unmanaged file moves' \
+  '.github/workflows/steps.yml' "$(git -C "$repo" diff --name-only)"
 unset STUB_COMPARE_FILES
 
-# The standards lane's own invocation (no --root) moves only the lane
-# caller whose reusable changed.
+# The standards lane's own invocation (no --root) moves only the caller whose
+# action changed.
 repo="$scratch/repo-lane-selective"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_COMPARE_FILES='.github/workflows/claude-review.yml'
+export STUB_COMPARE_FILES='.github/actions/pr-contract/action.yml'
 out_file="$scratch/out-lane-selective"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'selective: the enumerated lane set exits 0' 0 "$rc"
@@ -1031,7 +1056,7 @@ unset STUB_COMPARE_FILES
 # release SHA; it still takes the tag form, and nothing else moves.
 repo="$scratch/repo-lane-relabel"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-sed -i -E "s|claude-review.yml@${old_sha} # v0\.9\.1|claude-review.yml@${new_sha} # a1b2c3d 2026-08-21|" \
+sed -i -E "s|pr-contract@${old_sha} # v0\.9\.1|pr-contract@${new_sha} # a1b2c3d 2026-08-21|" \
   "$repo/components/claude-lanes/claude-review.yml"
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'fallback pin to the release commit'
 export STUB_COMPARE_FILES=''
@@ -1039,11 +1064,9 @@ out_file="$scratch/out-lane-relabel"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'relabel: a fallback pin on the release SHA exits 0' 0 "$rc"
 assert_contains 'relabel: the fallback pin on the release SHA takes the tag form' \
-  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "claude-review.yml@${new_sha} # v0.9.2"
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "pr-contract@${new_sha} # v0.9.2"
 assert_eq 'relabel: only that caller is modified' \
   'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
-assert_eq 'relabel: a relabel-only run hands lockstep the release SHA, its no-op' \
-  "old-sha=${new_sha}" "$(grep '^old-sha=' "$out_file")"
 unset STUB_COMPARE_FILES
 
 # --root needs a directory.

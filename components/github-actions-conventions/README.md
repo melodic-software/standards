@@ -108,9 +108,9 @@ renaming, find each of these and change it in the same rollout:
    reports no pending check, and the only API signal is
    `mergeStateStatus: BLOCKED`. Keeping `ci-status` the single required check
    makes file and lane renames safe; never rename `ci-status`.
-2. **Runner policy.** The runner-policy contract approves reusable workflows by
-   `path@SHA` and fails closed on an unknown path. A renamed reusable needs its
-   new path approved before any consumer pins it.
+2. **Runner policy.** The runner-policy contract is keyed by the reusable
+   workflow's bare path and fails closed on an unknown path. A renamed reusable
+   needs a contract under its new path before any consumer calls it.
 3. **Synced files.** The standards sync never deletes a file. When a synced
    destination moves, the sync change for each target also deletes the old
    path, or both copies run.
@@ -156,9 +156,8 @@ repository where it applies to one.
 
 | Rule | Owner |
 | --- | --- |
-| Runner labels and reusable workflow approval by `path@SHA` | [runner-policy](../runner-policy/README.md) |
+| Runner labels and reusable workflow approval by path | [runner-policy](../runner-policy/README.md) |
 | The top-level `concurrency` block of pull-request workflows | [concurrency-policy](../concurrency-policy/README.md) |
-| The `# vX.Y.Z` comment on SHA-pinned `uses:` lines | [pin-comment-convention](../pin-comment-convention/README.md) |
 | Dependabot configuration for Actions and package roots | [dependabot-policy](../dependabot-policy/README.md) |
 | The `## Code Review Rules` section in `AGENTS.md` | [code-review-rules](../code-review-rules/README.md) |
 | Synced Claude review lane callers | [claude-lanes](../claude-lanes/claude-review.yml), [claude-lanes-hosted](../claude-lanes-hosted/claude-review.yml) |

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Re-pin the Claude lane caller components to a melodic-software/ci-workflows
-# release. Extracted from .github/workflows/maintenance-repin-ci-workflows.yml so the
+# Re-pin first-party ACTION pins (melodic-software/ci-workflows/.github/actions/...)
+# to a melodic-software/ci-workflows release. Reusable-workflow refs float on
+# @main and are never matched (PIN_RE), even where one is still SHA-pinned.
+# Extracted from .github/workflows/maintenance-repin-ci-workflows.yml so the
 # branching, the API-failure handling, and the file transformation are
 # executable outside GitHub Actions and covered by repin-callers.test.sh.
 #
@@ -11,9 +13,10 @@
 #
 # apply moves a pin only when the release changed the path it pins (see
 # repin::decide); every other pin stays byte-identical. Without --root it
-# rewrites this repository's enumerated lane callers. With --root it rewrites
-# every git-tracked .github/ YAML file of the repository at <dir> that pins
-# ci-workflows, except the files the sync manifest manages in that repository
+# rewrites this repository's .github/workflows/ files and the distributed
+# caller components in CALLER_DIRS, which Dependabot cannot see. With --root it
+# rewrites every git-tracked .github/ YAML file of the repository at <dir> that
+# pins a ci-workflows action, except the files the sync manifest manages in that repository
 # (the sync owns their pins), which is how a consumer checkout repins with
 # this same tool.
 #
@@ -26,35 +29,23 @@ set -euo pipefail
 # so planning errors cannot be read as an empty answer.
 shopt -s inherit_errexit
 
-# The directory holding the lane callers, relative to the repository root.
-# ENUMERATED, never discovered: a repository-wide search for ci-workflows pins
-# also matches components/pin-comment-convention/fixtures/, whose deliberately
-# malformed pins are that component's test corpus, and the test script that
-# asserts against them.
-readonly LANE_DIR='components/claude-lanes'
-
-# Sync-family and repo-local callers, the hosted lane caller components, and
-# the two managed-files-guard caller components (hosted and fleet-routed),
-# live outside LANE_DIR. They may
-# already pin a different SHA than the lane components; apply reads each
-# file's own pin rather than assuming one fleet-wide old SHA. The
-# managed-files-guard callers pin a composite ACTION rather than a reusable
-# workflow: they ride this cascade for the pin rewrite alone and have no
-# runner-policy contract for the lockstep half to copy forward
-# (components/managed-files-guard/README.md).
-readonly -a EXTRA_CALLER_FILES=(
-  '.github/workflows/pr-review.yml'
-  '.github/workflows/pr-review-security.yml'
-  '.github/workflows/maintenance-sync-standards.yml'
-  'components/claude-lanes-hosted/claude-review.yml'
-  'components/claude-lanes-hosted/claude-security-review.yml'
-  'components/managed-files-guard/managed-files-guard.yml'
-  'components/managed-files-guard/managed-files-guard-fleet.yml'
+# The distributed caller components: workflow bytes the sync writes into
+# consumers' .github/workflows/, invisible to Dependabot and to every lane that
+# discovers workflows by location. ENUMERATED, never discovered: a
+# repository-wide search for ci-workflows pins also matches deliberate test
+# corpora such as components/zizmor/fixtures/. Each directory must exist, so a
+# rename fails loudly instead of silently dropping its callers.
+readonly -a CALLER_DIRS=(
+  'components/claude-lanes'
+  'components/claude-lanes-hosted'
+  'components/lychee-online/targets'
+  'components/managed-files-guard'
 )
 
-# Any `uses:` reference to a ci-workflows reusable workflow or composite action
-# pinned by 40-character commit SHA.
-readonly PIN_RE='uses: melodic-software/ci-workflows/[^@[:space:]]+@[0-9a-fA-F]{40}'
+# A `uses:` reference to a ci-workflows composite ACTION pinned by 40-character
+# commit SHA. Reusable workflows (.github/workflows/) float on @main by owner
+# decision, so a SHA-pinned one is left for its owner to float, never moved.
+readonly PIN_RE='uses: melodic-software/ci-workflows/\.github/actions/[^@[:space:]]+@[0-9a-fA-F]{40}'
 readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 readonly UPSTREAM_REPO='melodic-software/ci-workflows'
 # Old -> new upstream paths. Its `repo: ci-workflows` entries with a path
@@ -154,16 +145,15 @@ repin::resolve() {
     return 0
   fi
 
-  # The pin-comment convention's primary form accepts full SemVer only
-  # (components/pin-comment-convention/README.md), so a tag outside that shape
-  # would have this job author a comment this repository's own CI then rejects
-  # on the pull request it just opened. Selecting the highest FULL-SemVer
+  # apply writes the `# vX.Y.Z` pin comment and repin::refs reads only that
+  # tag form or the `# <short-sha> <YYYY-MM-DD>` form, so a tag outside full
+  # SemVer would leave a pin comment this script cannot read back. Selecting the highest FULL-SemVer
   # release means a stray non-SemVer release no longer decides the pin — but a
   # published set containing nothing else still fails loudly below rather than
   # silently re-pinning to an older version.
   tag="$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' <<< "$releases" | sort -V | tail -n1 || true)"
   if [[ -z "$tag" ]]; then
-    echo "::error::No ${upstream} release carries a full-SemVer (vX.Y.Z) tag; the pin-comment convention has no form for any of them:" >&2
+    echo "::error::No ${upstream} release carries a full-SemVer (vX.Y.Z) tag; the pin comment has no form for any of them:" >&2
     printf '%s\n' "$releases" >&2
     return 1
   fi
@@ -340,17 +330,20 @@ repin::touches() {
 
 # repin::inert <file>
 #
-# True for a file no pin executes: a test (*.test.*), a README.md, or docs/.
+# True for a file no action pin executes: a test (*.test.*), a README.md,
+# docs/, or a workflow under .github/workflows/, which a composite action cannot
+# run (reusable workflows float on @main and are not repinned here).
 repin::inert() {
   local base="${1##*/}"
-  [[ "$base" == *.test.* || "$base" == README.md || "$1" == docs/* ]]
+  [[ "$base" == *.test.* || "$base" == README.md || "$1" == docs/* || "$1" == .github/workflows/* ]]
 }
 
 # repin::decide <path> <sha> <release-sha> <fenced-shas> <pinned-paths>
 #
 # Prints `move` when the release changed what the pin <path>@<sha> runs,
-# `keep` when it did not, `ahead` when <sha> is fenced (not contained by the
-# release), and `current` when the pin already is the release. Fails closed to
+# `keep` when it did not, `ahead` when <sha> is fenced or the compare reports
+# it `behind` or `diverged` (not contained by the release, whatever its comment
+# form), and `current` when the pin already is the release. Fails closed to
 # `move` when the compare's file list is incomplete, or when it changed a file
 # that is not inert and that no pinned path reaches (a shared script, a schema):
 # nothing then proves which pins depend on it.
@@ -366,10 +359,17 @@ repin::decide() {
     return 0
   fi
   status="$(repin::compare "$sha" "$release")"
-  if [[ "$status" == identical ]]; then
-    echo current
-    return 0
-  fi
+  case "$status" in
+    identical)
+      echo current
+      return 0
+      ;;
+    behind | diverged)
+      echo ahead
+      return 0
+      ;;
+    *) ;;
+  esac
   files="$(repin::changed_files "$sha")"
   if [[ -z "$files" ]]; then
     echo keep
@@ -411,7 +411,7 @@ repin::decide() {
 #
 # Prints one `file<TAB>path<TAB>sha<TAB>comment` line per pin occurrence, the
 # SHA lowercased and the comment `vX.Y.Z` (the tag form), `fallback` (the
-# pin-comment convention's `# <short-sha> <YYYY-MM-DD>` form, which a pin to
+# `# <short-sha> <YYYY-MM-DD>` form, which a pin to
 # an as-yet-unreleased commit carries), or empty.
 repin::refs() {
   local file match path sha comment
@@ -434,12 +434,11 @@ repin::refs() {
 
 # repin::fenced <refs> <release-sha>
 #
-# Prints each SHA a fallback-form pin names that the release does not contain
-# (compare `behind` or `diverged`). Every pin at such a SHA is left as is:
-# moving it would go backwards. Tag-form pins are not fenced, since a release
-# is the newest of its line by construction of `resolve`. Day-level pin-comment
-# dates are not consulted: same-day pins and cross-branch timestamps cannot
-# prove containment.
+# Prints each pinned SHA the release does not contain (compare `behind` or
+# `diverged`), whatever the pin's comment form. Every pin at such a SHA is left
+# as is: moving it would go backwards. Day-level pin comment dates are not
+# consulted: same-day pins and cross-branch timestamps cannot prove
+# containment.
 repin::fenced() {
   local sha status
   while IFS= read -r sha; do
@@ -449,7 +448,7 @@ repin::fenced() {
       behind | diverged) echo "$sha" ;;
       *) ;;
     esac
-  done < <(awk -F'\t' '$4 == "fallback" { print $3 }' <<< "$1" | sort -u)
+  done < <(cut -f3 <<< "$1" | sort -u)
 }
 
 # repin::path_state <path> <sha>
@@ -489,7 +488,7 @@ repin::path_map() {
   fi
   # Called through command substitution, where bash clears errexit: every
   # failure below returns explicitly.
-  entries="$(jq -r '.[] | select(.repo == "ci-workflows" and (.to | startswith(".github/")))
+  entries="$(jq -r '.[] | select(.repo == "ci-workflows" and (.to | startswith(".github/actions/")))
     | [.from, .to] | @tsv' "$RENAME_MAP")" || return 1
   pinned="$(printf '%s\n' "$@" | sort -u)"
   while IFS=$'\t' read -r from to; do
@@ -521,74 +520,55 @@ repin::path_map() {
 # repin::targets [<dir>]
 #
 # Prints the caller files apply may rewrite, one per line, relative to the
-# repository root apply has changed into. Without <dir>: LANE_DIR's callers
-# plus EXTRA_CALLER_FILES, enumerated, never discovered. With <dir>: every
-# git-tracked .github/ YAML file that pins ci-workflows, which in a consumer
-# checkout is the whole caller set, except the files the sync manifest maps
-# into the consumer's origin repository: the sync owns those pins, and the
-# consumer's managed-files guard rejects a PR that edits them. Skipped files
-# are named on stderr.
+# repository root apply has changed into: every git-tracked file that carries
+# a ci-workflows action pin. Without <dir>: .github/workflows/ plus the
+# CALLER_DIRS components. With <dir>: every .github/ YAML file, except the
+# files the sync manifest maps into the consumer's origin repository: the sync
+# owns those pins, and the consumer's managed-files guard rejects a PR that
+# edits them. Skipped files are named on stderr.
 repin::targets() {
-  local file extra_present=0 extra_missing=0 repo managed=''
-  local -a found
+  local file dir repo managed=''
+  local -a specs
   if [[ "$#" -eq 1 ]]; then
     repo="$(git remote get-url origin 2>/dev/null || true)"
     repo="$(sed -E 's#^.*github\.com[:/]##; s#\.git$##' <<<"$repo")"
     if [[ -n "$repo" ]]; then
       managed="$(bash "$SYNC_MANIFEST" dest-paths --target "$repo")"
     fi
-    git ls-files -- '.github/*.yml' '.github/*.yaml' | while IFS= read -r file; do
-      if ! grep -qE "$PIN_RE" -- "$file"; then
-        continue
-      elif grep -qxF -- "$file" <<<"$managed"; then
-        echo "Skipping sync-managed file: ${file}" >&2
-      else
-        printf '%s\n' "$file"
+    specs=('.github/*.yml' '.github/*.yaml')
+  else
+    specs=('.github/workflows/*.yml' '.github/workflows/*.yaml')
+    for dir in "${CALLER_DIRS[@]}"; do
+      if [[ ! -d "$dir" ]]; then
+        echo "::error::Expected caller directory '${dir}' does not exist." >&2
+        return 1
       fi
+      specs+=("${dir}/*.yml")
     done
-    return 0
   fi
-  found=("$LANE_DIR"/*.yml)
-  for file in "${EXTRA_CALLER_FILES[@]}"; do
-    if [[ -f "$file" ]]; then
-      extra_present=1
-      found+=("$file")
+  git ls-files -- "${specs[@]}" | while IFS= read -r file; do
+    if ! grep -qE "$PIN_RE" -- "$file"; then
+      continue
+    elif grep -qxF -- "$file" <<<"$managed"; then
+      echo "Skipping sync-managed file: ${file}" >&2
     else
-      extra_missing=1
+      printf '%s\n' "$file"
     fi
   done
-  # Scratch fixtures may omit every extra. Production has the full set. A
-  # partial set means a required extra was renamed or deleted — fail loud.
-  if [[ "$extra_present" -eq 1 && "$extra_missing" -eq 1 ]]; then
-    echo "::error::Enumerated extra callers must be all present or all absent." >&2
-    for file in "${EXTRA_CALLER_FILES[@]}"; do
-      if [[ ! -f "$file" ]]; then
-        echo "::error::Expected enumerated caller '${file}' does not exist." >&2
-      fi
-    done
-    return 1
-  fi
-  for file in "${found[@]}"; do
-    if [[ ! -f "$file" ]]; then
-      echo "::error::Expected enumerated caller '${file}' does not exist." >&2
-      return 1
-    fi
-  done
-  printf '%s\n' "${found[@]}"
 }
 
 # repin::apply <tag> <sha> <date> [<dir>]
 #
 # Moves each pin the release changed (repin::decide) to <sha> with a `# <tag>`
 # comment and leaves every other pin byte-identical. Emits changed=false and
-# exits 0 when no pin moves; emits changed=true plus old-sha, old-tags and
+# exits 0 when no pin moves; emits changed=true plus old-tags and
 # version-note otherwise, leaving the rewritten files in the working tree for
-# the caller to commit. A fallback-form pin the release does not contain is
-# ahead of it and is reported, never rewritten (repin::fenced).
+# the caller to commit. A pin the release does not contain, whatever its
+# comment form, is ahead of it and is reported, never rewritten (repin::fenced).
 repin::apply() {
   local tag="$1" sha="$2" release_date="$3" dir="${4:-}"
   local root found refs fenced pinned decided moved file path pin_sha decision
-  local expected before after old_sha old_tags new_major old_major old_tag note ahead_list kept_list delim
+  local expected before after old_tags new_major old_major old_tag note ahead_list kept_list delim
   local path_map from to renamed moved_paths
   local -a targets ahead excludes sed_args
 
@@ -610,14 +590,14 @@ repin::apply() {
     found="$(repin::targets)"
   fi
   if [[ -z "$found" ]]; then
-    echo "::error::No file under ${root}/.github pins ${UPSTREAM_REPO}." >&2
+    echo "::error::No caller file under ${root} pins a ${UPSTREAM_REPO} action." >&2
     return 1
   fi
   mapfile -t targets <<< "$found"
 
   refs="$(repin::refs "${targets[@]}")"
   if [[ -z "$refs" ]]; then
-    echo "::error::The caller files carry no ${UPSTREAM_REPO} pin to re-pin." >&2
+    echo "::error::The caller files carry no ${UPSTREAM_REPO} action pin to re-pin." >&2
     return 1
   fi
   fenced="$(repin::fenced "$refs" "$sha")"
@@ -675,11 +655,7 @@ repin::apply() {
   expected="$(awk -F'\t' -v s="$sha" -v t="$tag" 'NR == FNR { if ($0 != "") m[$0] = 1; next }
     (($2 "\t" $3) in m) && !($3 == s && $4 == t)' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | wc -l)"
-  before="$(grep -hoE "uses: ${UPSTREAM_REPO}/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
-  # A run that only relabels pins already on the release hands lockstep the
-  # release SHA itself, which it treats as a no-op.
-  old_sha="$(cut -f2 <<< "$moved" | { grep -vxF -- "$sha" || true; } | sort -u | paste -sd, -)"
-  old_sha="${old_sha:-$sha}"
+  before="$(grep -hoE "uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
   old_tags="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m) && $4 ~ /^v/ { print $4 }' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | sort -u | paste -sd, - || true)"
 
@@ -699,7 +675,7 @@ repin::apply() {
   done <<< "$moved"
   sed -i -E "${sed_args[@]}" "${targets[@]}"
 
-  after="$(grep -hoE "uses: ${UPSTREAM_REPO}/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  after="$(grep -hoE "uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
   if [[ "$expected" -eq 0 || "$((after - before))" -ne "$expected" ]]; then
     echo "::error::Expected ${expected} ci-workflows pins to newly carry '@${sha} # ${tag}'; $((after - before)) do." >&2
     return 1
@@ -765,7 +741,6 @@ Left untouched because their pinned commit is not an ancestor of ${tag} (${sha})
   delim="NOTE_${RANDOM}${RANDOM}${RANDOM}"
   {
     echo 'changed=true'
-    echo "old-sha=${old_sha}"
     echo "old-tags=${old_tags}"
     echo "version-note<<${delim}"
     echo "$note"

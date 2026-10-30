@@ -10,7 +10,7 @@
 #      target that receives that file,
 #      read-only token, the canonical concurrency block, one job on
 #      its approved label, a full-history checkout, and the composite action
-#      pinned by full SHA under the pin-comment convention with
+#      pinned to a full 40-character SHA (org policy) with
 #      `standards-ref: main` for the soak, and a workflow name equal to the
 #      destination stem. The two files differ only in `runs-on`, the workflow
 #      name, the `paths` entries and comments.
@@ -22,8 +22,7 @@
 #      byte-identical, and (when actionlint is present) they lint clean there.
 #
 # yq v4 parses the YAML so the assertions are about the tree, not about text
-# a comment could imitate; the pin-comment check reuses the convention's own
-# library rather than re-deriving its grammar.
+# a comment could imitate.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -46,9 +45,6 @@ actionlint_config='.github/actionlint.yaml'
 action_path='melodic-software/ci-workflows/.github/actions/check-managed-files'
 # shellcheck disable=SC2016  # a GitHub Actions expression, compared literally
 canonical_group='${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}'
-
-# shellcheck source=components/pin-comment-convention/pin-comment-patterns.sh
-source "$root/components/pin-comment-convention/pin-comment-patterns.sh"
 
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
@@ -73,8 +69,7 @@ managed_union() {
   done | LC_ALL=C sort -u
 }
 
-sibling_checkout="$(yq -r '.jobs.repin.steps[] | select(.uses | test("^actions/checkout@")) | .uses' \
-  .github/workflows/maintenance-repin-ci-workflows.yml)"
+sibling_checkout="$(grep -m1 -oE 'actions/checkout@[0-9a-f]{40}' .github/workflows/pr-require-checks.yml)"
 
 # ------------------------------------------------------------------ 1. shape
 
@@ -127,7 +122,7 @@ check_shape() {
 
   assert_eq "$p two steps: checkout, then the guard" '2' "$(q '.jobs["pr-check-managed-files"].steps | length')"
 
-  local checkout_uses guard_uses guard_sha rc out
+  local checkout_uses guard_uses
   checkout_uses="$(q '.jobs["pr-check-managed-files"].steps[0].uses')"
   assert_contains "$p first step is actions/checkout" "$checkout_uses" 'actions/checkout@'
   assert_eq "$p checkout is pinned to the same SHA as the sibling workflows" "$sibling_checkout" "$checkout_uses"
@@ -143,11 +138,10 @@ check_shape() {
 
   guard_uses="$(q '.jobs["pr-check-managed-files"].steps[1].uses')"
   assert_contains "$p second step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
-  guard_sha="${guard_uses##*@}"
-  if [[ "$guard_sha" =~ ^[0-9a-f]{40}$ ]]; then
-    pass "$p guard action pin is a full lowercase 40-character SHA"
+  if [[ "$guard_uses" =~ ^${action_path}@[0-9a-f]{40}$ ]]; then
+    pass "$p guard action is pinned to a full 40-character SHA (org policy)"
   else
-    fail "$p guard action pin is a full lowercase 40-character SHA" "got $guard_sha"
+    fail "$p guard action is pinned to a full 40-character SHA (org policy)" "got $guard_uses"
   fi
   assert_eq "$p guard action pin line is unique in the file" '1' \
     "$(grep -c "uses: ${action_path}@" "$source")"
@@ -155,14 +149,6 @@ check_shape() {
     "$(q '.jobs["pr-check-managed-files"].steps[1].with["standards-ref"]')"
   assert_eq "$p the guard step passes standards-ref and nothing else" 'standards-ref' \
     "$(q '.jobs["pr-check-managed-files"].steps[1].with | keys | join(",")')"
-
-  # The pin comment: exactly one of the convention's two forms, checked by the
-  # convention's own library. A bare SHA, prose, or a fallback short-sha that
-  # does not prefix the pin all fail here.
-  rc=0
-  out="$(pcc::scan_text "$(<"$source")")" || rc=$?
-  assert_exit "$p the ci-workflows pin carries a convention-conforming comment" 0 "$rc"
-  assert_silent "$p the pin-comment scan reports no violation" "$out"
 }
 
 check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"

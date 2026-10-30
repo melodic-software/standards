@@ -1477,11 +1477,22 @@ test("a consumer pinned to the renamed check-contract composite is detected at i
   });
 });
 
+test("a consumer on the composite at main is detected at main, read from ci-workflows", () => {
+  const step =
+    "      - uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@main";
+  assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${step}\n`), {
+    kind: "composite",
+    sha: "main",
+    directory: RENAMED_DIRECTORY,
+  });
+});
+
 test("a local reference to the renamed composite resolves to main", () => {
   assert.deepEqual(detectArtifactPin(`        uses: ./${RENAMED_DIRECTORY}\n`), {
     kind: "composite",
     sha: "main",
     directory: RENAMED_DIRECTORY,
+    local: true,
   });
 });
 
@@ -1504,7 +1515,7 @@ test("the composite wins when a repository carries both mid-transition", () => {
 test("a local composite reference resolves to main, and a bare path does not", () => {
   assert.deepEqual(
     detectArtifactPin("      - name: Contract\n        uses: ./.github/actions/pr-contract\n"),
-    { kind: "composite", sha: "main", directory: LEGACY_DIRECTORY },
+    { kind: "composite", sha: "main", directory: LEGACY_DIRECTORY, local: true },
   );
   assert.equal(
     detectArtifactPin(
@@ -1551,7 +1562,12 @@ test("a composite called from pr-require-checks.yml is found on the first read",
     },
     async () => Object.keys(files),
   );
-  assert.deepEqual(found, { kind: "composite", sha: "main", directory: RENAMED_DIRECTORY });
+  assert.deepEqual(found, {
+    kind: "composite",
+    sha: "main",
+    directory: RENAMED_DIRECTORY,
+    local: true,
+  });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 
@@ -1570,7 +1586,12 @@ test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", a
     },
     async () => Object.keys(files),
   );
-  assert.deepEqual(found, { kind: "composite", sha: "main", directory: RENAMED_DIRECTORY });
+  assert.deepEqual(found, {
+    kind: "composite",
+    sha: "main",
+    directory: RENAMED_DIRECTORY,
+    local: true,
+  });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 

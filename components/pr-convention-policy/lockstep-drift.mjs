@@ -589,9 +589,9 @@ const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
 const COMPOSITE_DIRECTORY_GROUP = `(${COMPOSITE_DIRECTORIES.map((directory) =>
   directory.replaceAll(".", "\\."),
 ).join("|")})`;
-// A `uses:` of the composite, pinned to a 40-hex ci-workflows SHA.
+// A `uses:` of the composite at `main` or a 40-hex ci-workflows SHA.
 const COMPOSITE_PIN_PATTERN = new RegExp(
-  `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_GROUP}@([0-9a-f]{40})`,
+  `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_GROUP}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
   "m",
 );
 // ci-workflows dogfoods its own composite through a local `./` reference,
@@ -615,7 +615,7 @@ export function detectArtifactPin(workflowText) {
   }
   const local = workflowText.match(COMPOSITE_LOCAL_PATTERN);
   if (local) {
-    return { kind: "composite", sha: "main", directory: local[1] };
+    return { kind: "composite", sha: "main", directory: local[1], local: true };
   }
   const reusable = workflowText.match(REUSABLE_PIN_PATTERN);
   if (reusable) {
@@ -1011,7 +1011,7 @@ export function checkCopies(policy, texts) {
 }
 
 function pinLabel(sha) {
-  return sha === "main" ? "local at main" : `pin ${sha.slice(0, 7)}`;
+  return sha === "main" ? "at main" : `pin ${sha.slice(0, 7)}`;
 }
 
 // Validates the full contract at the pin — sections AND the executable
@@ -1297,9 +1297,8 @@ export async function runPinScan(env = process.env) {
         continue;
       }
       if (found.kind === "composite") {
-        // `main` means a local `./` reference: the artifact is that
-        // repository's own tree.
-        const source = found.sha === "main" ? repo : "ci-workflows";
+        // A local `./` reference reads that repository's own tree.
+        const source = found.local ? repo : "ci-workflows";
         const ref = found.sha;
         resolutions.set(repo, {
           kind: "composite",

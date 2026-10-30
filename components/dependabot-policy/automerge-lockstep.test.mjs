@@ -5,13 +5,10 @@ import {
   checkLockstep,
   extractPublisherAllowlist,
   LockstepError,
-  resolveApprovedShas,
+  requireContract,
 } from "./automerge-lockstep.mjs";
 
-const SHA_A = "a".repeat(40);
-const SHA_B = "b".repeat(40);
-const contractKey = (sha) =>
-  `melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@${sha}`;
+const CONTRACT_KEY = "melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml";
 
 const policy = (tiers) => ({
   autoMerge: {
@@ -122,23 +119,23 @@ test("a PUBLISHER_ALLOWLIST that is not JSON fails", () => {
   throwsLockstep(() => extractPublisherAllowlist(workflow("actions/*")), /not valid JSON/u);
 });
 
-test("the SHAs come from the reusable's runner-policy contract keys only", () => {
+test("the reusable's path-keyed runner-policy contract satisfies the check", () => {
+  const runnerPolicy = { approvedReusableWorkflowContracts: { [CONTRACT_KEY]: {} } };
+  assert.doesNotThrow(() => requireContract(runnerPolicy));
+});
+
+test("no contract for the reusable fails, even with another reusable's contract present", () => {
   const runnerPolicy = {
     approvedReusableWorkflowContracts: {
-      [contractKey(SHA_A)]: {},
-      "melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml@cccc": {},
+      "melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml": {},
     },
   };
-  assert.deepEqual(resolveApprovedShas(runnerPolicy), [SHA_A]);
+  throwsLockstep(() => requireContract(runnerPolicy), /found none/u);
 });
 
-test("no contract key for the reusable fails", () => {
-  throwsLockstep(() => resolveApprovedShas({ approvedReusableWorkflowContracts: {} }), /found 0/u);
-});
-
-test("every contract key for the reusable is returned for checking", () => {
+test("a path@SHA key no longer counts as the reusable's contract", () => {
   const runnerPolicy = {
-    approvedReusableWorkflowContracts: { [contractKey(SHA_A)]: {}, [contractKey(SHA_B)]: {} },
+    approvedReusableWorkflowContracts: { [`${CONTRACT_KEY}@${"a".repeat(40)}`]: {} },
   };
-  assert.deepEqual(resolveApprovedShas(runnerPolicy), [SHA_A, SHA_B]);
+  throwsLockstep(() => requireContract(runnerPolicy), /found none/u);
 });

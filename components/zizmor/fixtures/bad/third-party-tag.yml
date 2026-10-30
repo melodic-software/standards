@@ -1,0 +1,8 @@
+name: third-party-tag
+on: push
+permissions: {}
+jobs:
+  tagged:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-node@v4
