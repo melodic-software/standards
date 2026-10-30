@@ -1505,6 +1505,14 @@ branch's last commit (ci-workflows#909) and read activity in capped,
 fail-closed pages (ci-workflows#911). The workflow's inputs, job permissions
 and secrets are unchanged; only descriptions and comments differ. No input,
 secret, permission or routing change.
+At the v0.68.0 tag `0691df79a6c0de7f1e49df618ac7b321605563f9`, the pr-review-cli
+contract copies its v0.66.1 entry forward unchanged: the release gives each
+model leg the pull request's settled review threads through a new
+`$/.github/actions/collect-settled-threads` step (ci-workflows#921), which
+reads threads with the job's existing token and writes a file the model reads,
+and adds two minutes to each model leg's timeout. Surface-diff auto-approval
+declines it only because that action is new. No input, secret, permission or
+routing change.
 The Zizmor contract at `de50a08b6093d231519ee7a4c9371db76c0a7e1e`
 uses its reviewed `runner` input and checksum-verified native Linux binary, so
 enrolled consumers may route that advisory lane onto the managed fleet

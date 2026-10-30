@@ -10598,3 +10598,18 @@ test("the pr-require-checks-trust-paths contract at the v0.67.2 tag copies its v
   assert.deepEqual(contracts[key(sha)].allowedInputs, ["runner", "config-path"]);
   assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
 });
+
+// v0.68.0 adds a $/ settled-threads step to each pr-review-cli model leg
+// (ci-workflows#921). Inputs, secrets, permissions and routing are unchanged,
+// so the entry copies its v0.66.1 entry forward unchanged.
+test("the pr-review-cli contract at the v0.68.0 tag copies its v0.66.1 entry forward unchanged", () => {
+  const contracts = BASE_POLICY.approvedReusableWorkflowContracts;
+  const key = (sha) => `melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${sha}`;
+  const sha = "0691df79a6c0de7f1e49df618ac7b321605563f9";
+  const prior = contracts[key("20a822d73b6e2d7e21d48e609a01b427e0e161e7")];
+  assert.ok(prior);
+  assert.deepEqual(contracts[key(sha)], prior);
+  assert.equal(contracts[key(sha)].routing, "hosted-only");
+  assert.equal(contracts[key(sha)].allowedCallerPermissions, undefined);
+  assert.equal(Object.keys(contracts).filter((k) => k.endsWith(`@${sha}`)).length, 1);
+});
