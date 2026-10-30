@@ -5415,6 +5415,27 @@ test("a hosted exception admits a fleet-routed call to a reusable with fixed hos
   assert.deepEqual(await audit(root), []);
 });
 
+test("a fleet-routed write caller of a reusable with fixed hosted jobs needs the privileged category", async () => {
+  const findings = await audit(
+    await fixedHostedLaneRepository({
+      exceptions: {
+        ".github/workflows/claude-review.yml#review": {
+          reason: "windows",
+          justification: "The reusable's write job runs on a fixed GitHub-hosted runner.",
+        },
+      },
+    }),
+  );
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not windows/u,
+  );
+});
+
 test("a public repository's hosted call to a reusable with fixed hosted jobs needs no exception", async () => {
   const root = await fixedHostedLaneRepository({
     visibility: "public",

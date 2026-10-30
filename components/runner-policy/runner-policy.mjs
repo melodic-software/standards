@@ -2311,15 +2311,43 @@ export async function auditRepository({
       // input and spend GitHub-hosted minutes, so the call needs an exception.
       if (target.kind === "managed-literal" && target.approved) {
         const fixedRunsOn = reusable.approved ? reusable.contract.fixedRunsOn : undefined;
-        if (exception && fixedRunsOn) {
-          consumedExceptions.add(key);
-        } else if (fixedRunsOn && !hostedRequirement) {
+        if (!fixedRunsOn || hostedRequirement) {
+          if (fixedRunsOn && exception) {
+            consumedExceptions.add(key);
+          }
+          continue;
+        }
+        if (!exception) {
           findings.push(
             finding(
               "hosted-exception-required",
               file,
               jobId,
               `${job.uses} runs jobs on GitHub-hosted ${[...fixedRunsOn].join(", ")} whatever runner it is given; declare ${key} in .github/runner-policy.json`,
+            ),
+          );
+          continue;
+        }
+        consumedExceptions.add(key);
+        // The fixed jobs run hosted, so the exception takes the category the
+        // same call would need with a hosted runner input.
+        const hostedCall = privilegedHostedRequirement(
+          workflow,
+          job,
+          { kind: "hosted-reusable" },
+          policy,
+        );
+        const requiredReason =
+          hostedCall?.reason === "publication"
+            ? (structuralHosted ?? hostedCall).reason
+            : (hostedCall ?? structuralHosted)?.reason;
+        if (requiredReason && exception.reason !== requiredReason) {
+          findings.push(
+            finding(
+              "hosted-exception-category",
+              file,
+              jobId,
+              `${job.uses} runs jobs on GitHub-hosted ${[...fixedRunsOn].join(", ")} and requires exception reason ${requiredReason}, not ${exception.reason}`,
             ),
           );
         }
