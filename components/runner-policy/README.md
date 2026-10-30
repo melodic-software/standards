@@ -253,7 +253,8 @@ unknown secret names, and alternate expressions:
   records the GitHub-hosted labels those jobs use in `fixedRunsOn`. On an
   enrolled private repository a call that passes the fleet label then still
   spends hosted minutes, so it needs a hosted exception keyed to the calling
-  job, as a `hosted-only` call does.
+  job, as a `hosted-only` call does; a write-capable caller such as
+  intake-triage's (`issues: write`) declares `privileged-control-plane`.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the called workflow and rejects any caller-added input that was
   not part of the review.
