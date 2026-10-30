@@ -165,7 +165,8 @@ components:
       components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
   # The org commit-subject convention at the well-known path the guardrails
   # commit-msg hook and the source-control plugin read
-  # (components/commit-convention/README.md). Every target takes it.
+  # (components/commit-convention/README.md). Every target takes it except
+  # claude-code-plugins, which owns its convention locally.
   # standards: manifest source, not a target — its copy is held
   # byte-identical to the component by commit-convention.test.sh instead.
   commit-convention:
