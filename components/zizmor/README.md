@@ -13,7 +13,8 @@ repository's own live config. It sets two rules:
   `@main`, and keeps every other ref SHA-pinned (`hash-pin`, zizmor's
   default). First-party actions stay SHA-pinned anyway, because the org
   requires actions pinned to a full commit SHA; a SHA pin also satisfies
-  `ref-pin`.
+  `ref-pin`. `maintenance-repin-ci-workflows` moves those pins on each
+  ci-workflows release.
 
 Both rules only relax zizmor's defaults, so adopting the file cannot add a
 finding to a target.

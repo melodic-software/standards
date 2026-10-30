@@ -355,7 +355,9 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 (mixed hex digits and letters, or a full 40-character SHA), it must be a
 prefix of the pinned commit. Version tags, prose, dates, and hex-only English
 words are not treated as SHA claims. Update the comment in the same change as
-the pin. A `@main` reference carries no pin and no such comment.
+the pin. A `@main` reference carries no pin and no such comment. The
+`maintenance-repin-ci-workflows` job writes the `# vX.Y.Z` form when it moves
+a first-party action pin, which this check accepts.
 
 For a reusable workflow call, name the target through its canonical `runner`
 input:

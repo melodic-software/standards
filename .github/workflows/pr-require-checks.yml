@@ -896,6 +896,9 @@ jobs:
       - name: Test the managed-files-guard caller component
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/managed-files-guard/managed-files-guard.test.sh
+      - name: Test the ci-workflows action re-pin script
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
       - name: Test naming conventions
         if: ${{ !cancelled() }}
         run: npm run test:github-actions-conventions

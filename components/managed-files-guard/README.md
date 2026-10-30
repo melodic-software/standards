@@ -124,9 +124,16 @@ the consumer's caller still carries the old list.
 
 **The action pin** is a full 40-character commit SHA of ci-workflows `main`,
 because the org requires every action, first-party included, to be pinned to
-a full SHA; only reusable workflows may float on `main`. No automation moves
-this pin: a guard fix reaches callers when the pin in both files is advanced
-by hand and synced.
+a full SHA; only reusable workflows may float on `main`. The pin advances
+through `.github/workflows/maintenance-repin-ci-workflows.yml` (daily), which
+resolves the newest full-SemVer ci-workflows release and, when that release
+changed the action, rewrites the pin in both files to its SHA with a
+`# vX.Y.Z` comment in one reviewed, never auto-merged pull request; the sync
+then fans it out. A pin to a commit the release does not contain (the
+`# <short-sha> <date>` form) is left alone until a release contains it, so the
+job never moves a pin backwards. It moves action pins only, never a
+reusable-workflow ref (`components/claude-lanes/repin-callers.sh`, covered by
+`repin-callers.test.sh`).
 The earlier pins are recorded because of what they fixed:
 `2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
 `5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn

@@ -28,7 +28,8 @@ updates:
         patterns:
           - "*"
     # Reusable ci-workflows workflows float on `main`. ci-workflows actions are
-    # SHA-pinned (org policy) and, while this ignore stands, move by hand.
+    # SHA-pinned (org policy) and move through maintenance-repin-ci-workflows,
+    # which also covers the caller components under components/.
     ignore:
       - dependency-name: "melodic-software/ci-workflows/*"
   # Keep the npm dev-dependencies current — the root devDependency pins
