@@ -111,6 +111,8 @@ case "$path" in
     # compare release...pin reports it (ahead: the pin has commits the release
     # lacks; behind: the release contains the pin), and the stub answers in
     # the pin...release direction the subject asks in. Unset means contained.
+    # STUB_COMPARE_STATUS_FOR, space-separated `<pin-sha>=<status>` entries,
+    # overrides STUB_COMPARE_STATUS for those pins only.
     # STUB_COMPARE_STATUS=fail forces a lookup error. STUB_COMPARE_FILES lists,
     # space-separated, the files the release changed; unset is one shared
     # non-test script, which moves every pin, the behavior before selective
@@ -121,10 +123,15 @@ case "$path" in
       echo 'gh: Not Found (HTTP 404)' >&2
       exit 1
     fi
-    case "${STUB_COMPARE_STATUS:-behind}" in
+    relation="${STUB_COMPARE_STATUS:-behind}"
+    compared="${path##*/compare/}"
+    for entry in ${STUB_COMPARE_STATUS_FOR:-}; do
+      [[ "$entry" != "${compared%%...*}="* ]] || relation="${entry#*=}"
+    done
+    case "$relation" in
       ahead) status=behind ;;
       behind) status=ahead ;;
-      *) status="$STUB_COMPARE_STATUS" ;;
+      *) status="$relation" ;;
     esac
     files="${STUB_COMPARE_FILES-.github/scripts/shared.cjs}"
     # shellcheck disable=SC2086  # one jq argument per space-separated file
@@ -516,7 +523,7 @@ unset STUB_COMPARE_STATUS
 # same-day pins and cross-branch timestamps cannot prove containment.
 # The lane callers still advance; the ahead file is reported and left
 # byte-identical.
-export STUB_COMPARE_STATUS=ahead
+export STUB_COMPARE_STATUS_FOR="${guard_sha}=ahead"
 repo="$scratch/repo-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
@@ -573,12 +580,12 @@ cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 seed_hosted_lanes "$repo"
 git -C "$repo" add -A
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
-export STUB_COMPARE_STATUS=ahead
 out_file="$scratch/out-apply-same-day-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: a same-day ahead pin exits 0' 0 "$rc"
 assert_contains 'apply: a same-day ahead pin is left as is' "$out" 'left as is'
 assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
+unset STUB_COMPARE_STATUS_FOR
 
 # When compare says the release contains the pin (`behind`), same-day is
 # irrelevant and the pin advances to the tag form.
@@ -640,6 +647,23 @@ assert_contains 'apply: every caller ahead reports changed=false' "$(cat "$out_f
 assert_contains 'apply: every caller ahead is a notice' "$out" 'ahead of v0.9.2; nothing to propose'
 assert_silent 'apply: every caller ahead leaves the tree clean' "$(git -C "$repo" status --porcelain)"
 unset STUB_COMPARE_STATUS
+
+# The fence holds whatever the comment form: a tag-form pin the release does
+# not contain (compare `ahead` or `diverged` from the pin's side) is never
+# moved, since moving it would go backwards.
+for relation in ahead diverged; do
+  repo="$scratch/repo-tag-form-${relation}"
+  lane_repo "$repo" "$old_sha" 'v0.9.1'
+  export STUB_COMPARE_STATUS="$relation"
+  out_file="$scratch/out-apply-tag-form-${relation}"
+  rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+  assert_exit "apply: a tag-form ${relation} pin exits 0" 0 "$rc"
+  assert_contains "apply: a tag-form ${relation} pin reports changed=false" "$(cat "$out_file")" 'changed=false'
+  assert_contains "apply: a tag-form ${relation} pin is reported as left as is" "$out" \
+    "pins ${old_sha}, not an ancestor of v0.9.2 (${new_sha}); left as is."
+  assert_silent "apply: a tag-form ${relation} pin leaves the tree clean" "$(git -C "$repo" status --porcelain)"
+  unset STUB_COMPARE_STATUS
+done
 
 # The date is the comparison's whole basis, so a missing or malformed one is
 # refused before any file is touched.

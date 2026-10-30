@@ -3422,6 +3422,38 @@ test("a third-party reusable call must pin an approved commit SHA, never @main",
   );
 });
 
+test("only ci-workflows reusables float on @main; another melodic-software repository must pin an approved SHA", async () => {
+  const otherRepo = "melodic-software/other-repo/.github/workflows/scan.yml";
+  const policyOverrides = {
+    approvedReusableWorkflowContracts: {
+      [otherRepo]: {
+        routing: "runner-input",
+        runnerInput: "runner",
+        allowedInputs: ["runner"],
+        allowedSecrets: {},
+        approvedShas: [SHA],
+      },
+    },
+  };
+  const pinned = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides,
+    workflows: { "ci.yml": publicReusableCaller(`${otherRepo}@${SHA}`) },
+  });
+  assert.deepEqual(await audit(pinned), []);
+  const floating = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    policyOverrides,
+    workflows: { "ci.yml": publicReusableCaller(`${otherRepo}@main`) },
+  });
+  assert.deepEqual(
+    (await audit(floating)).map(({ message }) => message),
+    ["the reusable workflow ref @main is not approved; use an approved full commit SHA"],
+  );
+});
+
 test("a policy contract key carrying an @ref is rejected", async () => {
   const root = await repository({
     policyOverrides: {

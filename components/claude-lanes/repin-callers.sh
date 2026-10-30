@@ -341,8 +341,9 @@ repin::inert() {
 # repin::decide <path> <sha> <release-sha> <fenced-shas> <pinned-paths>
 #
 # Prints `move` when the release changed what the pin <path>@<sha> runs,
-# `keep` when it did not, `ahead` when <sha> is fenced (not contained by the
-# release), and `current` when the pin already is the release. Fails closed to
+# `keep` when it did not, `ahead` when <sha> is fenced or the compare reports
+# it `behind` or `diverged` (not contained by the release, whatever its comment
+# form), and `current` when the pin already is the release. Fails closed to
 # `move` when the compare's file list is incomplete, or when it changed a file
 # that is not inert and that no pinned path reaches (a shared script, a schema):
 # nothing then proves which pins depend on it.
@@ -358,10 +359,17 @@ repin::decide() {
     return 0
   fi
   status="$(repin::compare "$sha" "$release")"
-  if [[ "$status" == identical ]]; then
-    echo current
-    return 0
-  fi
+  case "$status" in
+    identical)
+      echo current
+      return 0
+      ;;
+    behind | diverged)
+      echo ahead
+      return 0
+      ;;
+    *) ;;
+  esac
   files="$(repin::changed_files "$sha")"
   if [[ -z "$files" ]]; then
     echo keep
@@ -426,12 +434,11 @@ repin::refs() {
 
 # repin::fenced <refs> <release-sha>
 #
-# Prints each SHA a fallback-form pin names that the release does not contain
-# (compare `behind` or `diverged`). Every pin at such a SHA is left as is:
-# moving it would go backwards. Tag-form pins are not fenced, since a release
-# is the newest of its line by construction of `resolve`. Day-level pin comment
-# dates are not consulted: same-day pins and cross-branch timestamps cannot
-# prove containment.
+# Prints each pinned SHA the release does not contain (compare `behind` or
+# `diverged`), whatever the pin's comment form. Every pin at such a SHA is left
+# as is: moving it would go backwards. Day-level pin comment dates are not
+# consulted: same-day pins and cross-branch timestamps cannot prove
+# containment.
 repin::fenced() {
   local sha status
   while IFS= read -r sha; do
@@ -441,7 +448,7 @@ repin::fenced() {
       behind | diverged) echo "$sha" ;;
       *) ;;
     esac
-  done < <(awk -F'\t' '$4 == "fallback" { print $3 }' <<< "$1" | sort -u)
+  done < <(cut -f3 <<< "$1" | sort -u)
 }
 
 # repin::path_state <path> <sha>
@@ -556,8 +563,8 @@ repin::targets() {
 # comment and leaves every other pin byte-identical. Emits changed=false and
 # exits 0 when no pin moves; emits changed=true plus old-tags and
 # version-note otherwise, leaving the rewritten files in the working tree for
-# the caller to commit. A fallback-form pin the release does not contain is
-# ahead of it and is reported, never rewritten (repin::fenced).
+# the caller to commit. A pin the release does not contain, whatever its
+# comment form, is ahead of it and is reported, never rewritten (repin::fenced).
 repin::apply() {
   local tag="$1" sha="$2" release_date="$3" dir="${4:-}"
   local root found refs fenced pinned decided moved file path pin_sha decision

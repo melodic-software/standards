@@ -166,11 +166,13 @@ Reusable calls are not opaque exceptions. Every cross-repository reusable
 workflow must have an entry in `policy.json`'s
 `approvedReusableWorkflowContracts`, keyed by its bare path
 (`owner/repo/.github/workflows/<file>.yml`, no `@ref`). A call matches that
-contract at `@main` when the owner is `melodic-software`, or at a full
-40-character commit SHA listed in that contract's `approvedShas`; an unlisted
-SHA, a tag, another branch, or `@main` on a third-party workflow is refused.
-`approvedShas` holds the SHAs earlier policy versions approved for the path,
-so callers still SHA-pinned pass while they move to `@main`. It is migration
+contract at `@main` when the path is under `melodic-software/ci-workflows/`,
+or at a full 40-character commit SHA listed in that contract's `approvedShas`;
+an unlisted SHA, a tag, another branch, or `@main` on any other repository's
+workflow is refused. `approvedShas` holds the SHAs earlier policy versions
+approved for the path, plus the release-commit SHAs that removed automatic
+release approval had added, so callers still SHA-pinned pass while they move
+to `@main`. It is migration
 data: delete a path's list once no consumer pins that path to a SHA, and add
 no SHA a reviewer has not traced to the workflow repository's main branch,
 because GitHub serves a commit pushed to any fork under the parent

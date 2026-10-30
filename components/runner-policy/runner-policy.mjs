@@ -65,7 +65,7 @@ const validatePolicyStructure = SCHEMA_VALIDATOR.compile(POLICY_SCHEMA);
 const validateRepositoryPolicyStructure = SCHEMA_VALIDATOR.compile(REPOSITORY_POLICY_SCHEMA);
 const MATRIX_OUTPUT = /^\$\{\{ matrix\.([A-Za-z0-9_-]+) }}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
-const FIRST_PARTY_OWNER = "melodic-software";
+const MAIN_FLOAT_PREFIX = "melodic-software/ci-workflows/";
 const LOCAL_REUSABLE_WORKFLOW = /^\.\/\.github\/workflows\/([A-Za-z0-9_.-]+\.ya?ml)$/;
 const GITHUB_REPOSITORY = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\/[A-Za-z0-9_.-]+$/;
 const EXACT_GITHUB_TOKEN_EXPRESSIONS = new Set([
@@ -477,8 +477,8 @@ function parseReusableWorkflowReference(value) {
   return { workflow: value.slice(0, separator), revision: value.slice(separator + 1) };
 }
 
-// Contracts key on the workflow path. A first-party (melodic-software) caller
-// may float on @main; any caller may pin a SHA the contract lists in
+// Contracts key on the workflow path. A melodic-software/ci-workflows reusable
+// may be called at @main; any caller may pin a SHA the contract lists in
 // approvedShas. An unlisted SHA is refused because GitHub serves a commit
 // pushed to any fork under the parent repository path. Every other ref (a tag
 // or another branch) is not approved.
@@ -488,8 +488,8 @@ function reusableWorkflowContract(uses, policy) {
   if (!contract) {
     return { reason: "the reusable workflow path has no reviewed runner-input contract" };
   }
-  const firstParty = parsed.workflow.startsWith(`${FIRST_PARTY_OWNER}/`);
-  if (firstParty && parsed.revision === "main") {
+  const floats = parsed.workflow.startsWith(MAIN_FLOAT_PREFIX);
+  if (floats && parsed.revision === "main") {
     return { contract };
   }
   if (FULL_SHA.test(parsed.revision)) {
@@ -497,11 +497,11 @@ function reusableWorkflowContract(uses, policy) {
       return { contract };
     }
     return {
-      reason: `the reusable workflow ref @${parsed.revision} is not an approved commit for ${parsed.workflow}; use ${firstParty ? "@main" : "a SHA listed in its approvedShas"}`,
+      reason: `the reusable workflow ref @${parsed.revision} is not an approved commit for ${parsed.workflow}; use ${floats ? "@main" : "a SHA listed in its approvedShas"}`,
     };
   }
   return {
-    reason: `the reusable workflow ref @${parsed.revision} is not approved; use ${firstParty ? "@main or " : ""}an approved full commit SHA`,
+    reason: `the reusable workflow ref @${parsed.revision} is not approved; use ${floats ? "@main or " : ""}an approved full commit SHA`,
   };
 }
 
