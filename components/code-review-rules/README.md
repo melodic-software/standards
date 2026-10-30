@@ -59,9 +59,10 @@ That pointer line is the `managed` case. Any other case replaces it:
   - Org-wide criteria: [`REVIEW.md`](REVIEW.md), the canonical source the standards sync distributes.
   ```
 
-The absent case links the canonical file by URL. The probe covered in-repository
-links only, so whether the Codex reviewer fetches that URL is unverified;
-adopting `review-instructions` gives such a repository the in-repository form.
+The absent case links the canonical file by URL, for a repository outside the
+sync targets. No audited target uses it. The probe covered in-repository links
+only, so whether the Codex reviewer fetches that URL is unverified; adopting
+`review-instructions` gives a repository the in-repository form.
 
 `standards` owns no other org-wide review rule that belongs in the block:
 `REVIEW.md` already points into [`conventions/review/`](../../conventions/review/README.md),

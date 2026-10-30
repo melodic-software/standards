@@ -430,6 +430,7 @@ targets:
       - markdownlint
       - pr-body-contract-rule
       - repository-text
+      - review-instructions
       - typos
   # Link-check config plus the managed-files guard every target carries: its
   # pr-require-checks lane turns lychee-offline on once this delivers
@@ -460,6 +461,7 @@ targets:
       - managed-files-guard-caller
       - markdownlint
       - repository-text
+      - review-instructions
       - typos
     # Armed as of 2026-09-04: agent-plugins#11 landed ci.yml plus the three
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
@@ -480,6 +482,7 @@ targets:
       - markdownlint
       - pr-body-contract-rule
       - repository-text
+      - review-instructions
       - shellcheck
       - typos
       - zizmor
@@ -656,6 +659,7 @@ targets:
       - psscriptanalyzer
       - pyright
       - repository-text
+      - review-instructions
       - typos
       - zizmor
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
@@ -684,6 +688,7 @@ targets:
       - markdownlint
       - pr-body-contract-rule
       - repository-text
+      - review-instructions
       - typos
   melodic-software/cursor-plugins:
     managed:
@@ -697,6 +702,7 @@ targets:
       - managed-files-guard-caller
       - markdownlint
       - repository-text
+      - review-instructions
       - typos
     # Armed as of 2026-09-04: cursor-plugins#24 landed a ci-status aggregate
     # plus the three metadata callers, probe PR cursor-plugins#25 showed all
