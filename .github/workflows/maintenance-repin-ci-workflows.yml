@@ -1,11 +1,14 @@
 name: maintenance-repin-ci-workflows
 
-# Fleet action-currency for the Claude review lanes. Every consumer's
-# Dependabot config `ignore`s `melodic-software/ci-workflows/*`, so a new
-# ci-workflows release reaches the fleet only along
-# release tag -> caller-component re-pin -> standards-sync cascade. This job
-# automates the middle hop; `maintenance-sync-standards.yml` already carries it the rest of the way.
-# Approved 2026-07-26 in melodic-software/ci-workflows.
+# Action currency for first-party ci-workflows composite ACTIONS. The org
+# Actions policy requires every action pinned to a full commit SHA, while
+# reusable workflows float on @main and are never moved here. Dependabot
+# `ignore`s `melodic-software/ci-workflows/*` and cannot see components/, so a
+# new ci-workflows release reaches the action pins in .github/workflows/ and
+# the distributed caller components (managed-files-guard and the rest of
+# components/claude-lanes/repin-callers.sh's CALLER_DIRS) only along
+# release tag -> action re-pin -> standards-sync cascade. This job automates
+# the middle hop; `maintenance-sync-standards.yml` carries it the rest of the way.
 #
 # It only ever proposes: the pull request it opens is reviewed and merged by a
 # human like any other, and nothing here arms auto-merge.
@@ -95,7 +98,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash components/claude-lanes/repin-callers.sh resolve melodic-software/ci-workflows
 
-      - name: Re-pin the lane caller components
+      - name: Re-pin the ci-workflows action pins
         id: repin
         if: steps.release.outputs.resolved == 'true'
         env:
@@ -110,48 +113,6 @@ jobs:
           DATE: ${{ steps.release.outputs.date }}
         run: bash components/claude-lanes/repin-callers.sh apply "$TAG" "$SHA" "$DATE"
 
-      # repin-policy-lockstep.mjs imports components/runner-policy/runner-policy.mjs,
-      # which imports `ajv` and `yaml` from that component's own package.json.
-      # Both of these steps are gated on the same condition as the lockstep step
-      # below: a scheduled run that resolves the pin it already carries does no
-      # work, and must not pay for a toolchain it will not use.
-      #
-      # This gap stayed latent from the day the lockstep step landed until
-      # ci-workflows v0.14.0, because `changed` is only ever true on a run that
-      # actually moves the pin — and no ci-workflows release was cut in between.
-      # Every green run in the log is a run that short-circuited before here.
-      - name: Set up Node
-        if: steps.repin.outputs.changed == 'true'
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: components/runner-policy/package-lock.json
-
-      - name: Install runner-policy dependencies
-        if: steps.repin.outputs.changed == 'true'
-        run: npm ci --prefix components/runner-policy
-
-      - name: Apply runner-policy lockstep when contracts are unchanged
-        id: policy-lockstep
-        if: steps.repin.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OLD_SHA: ${{ steps.repin.outputs.old-sha }}
-          NEW_SHA: ${{ steps.release.outputs.sha }}
-          TAG: ${{ steps.release.outputs.tag }}
-        run: node components/claude-lanes/repin-policy-lockstep.mjs "$OLD_SHA" "$NEW_SHA" "$TAG"
-
-      # The lockstep writes JSON.stringify output, which check-typescript's Biome
-      # format check rejects. Format it with the Biome the root lockfile pins,
-      # the same exact version and config check-typescript runs.
-      - name: Format runner-policy with Biome
-        if: steps.repin.outputs.changed == 'true'
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts --no-audit --no-fund
-          node_modules/.bin/biome format --write --config-path=components/biome/biome.json components/runner-policy/policy.json
-
       - name: Report the missing re-pin credential
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL != 'true'
         env:
@@ -162,7 +123,7 @@ jobs:
           # for want of a credential is a permanently red cron nobody reads —
           # the exact failure mode of melodic-software/standards#274. The
           # detection half still runs and still reports every day.
-          echo "::warning::components/claude-lanes/ is behind ci-workflows ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY in the claude-lanes-repin environment for a GitHub App installed on this repository with contents:write, pull-requests:write, and workflows:write, then re-run. Until then, re-pin by hand."
+          echo "::warning::A ci-workflows action pin is behind ${TAG}, but no re-pin App credential is configured, so no pull request was opened. Provision CLAUDE_LANES_REPIN_APP_CLIENT_ID and CLAUDE_LANES_REPIN_APP_PRIVATE_KEY in the claude-lanes-repin environment for a GitHub App installed on this repository with contents:write, pull-requests:write, and workflows:write, then re-run. Until then, re-pin by hand."
 
       # When these secrets are missing from the environment, the job degrades
       # to a warning (see the step above). They deliberately do NOT reuse
@@ -211,57 +172,48 @@ jobs:
           # checkout cannot silently retarget this privileged pull request.
           base: ${{ steps.default-branch.outputs.name }}
           add-paths: |
+            .github/workflows
             components/claude-lanes
             components/claude-lanes-hosted
+            components/lychee-online/targets
             components/managed-files-guard
-            components/runner-policy/policy.json
-            components/runner-policy/runner-policy.test.mjs
-            .github/workflows/pr-review.yml
-            .github/workflows/pr-review-security.yml
-            .github/workflows/maintenance-sync-standards.yml
           commit-message: |
-            chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}
+            chore(claude-lanes): re-pin ci-workflows actions to ${{ steps.release.outputs.tag }}
 
             Co-Authored-By: claude-lanes-repin <noreply@github.com>
-          title: "chore(claude-lanes): re-pin callers to ci-workflows ${{ steps.release.outputs.tag }}"
+          title: "chore(claude-lanes): re-pin ci-workflows actions to ${{ steps.release.outputs.tag }}"
           body: |
             No related issue: automated re-pin to the newest ci-workflows release
 
             ## Summary
 
-            Re-pins each `melodic-software/ci-workflows` reference under
-            `components/claude-lanes/` and `components/claude-lanes-hosted/`,
-            the `managed-files-guard` caller components, and this repository's own sync-family callers
-            whose pinned path the release changed, from
+            Re-pins each `melodic-software/ci-workflows/.github/actions/...`
+            pin in `.github/workflows/` and the distributed caller components
+            whose action the release changed, from
             `${{ steps.repin.outputs.old-tags }}`
             to `${{ steps.release.outputs.tag }}`
             (`${{ steps.release.outputs.sha }}`), the newest ci-workflows
-            release. Opened by `.github/workflows/maintenance-repin-ci-workflows.yml`.
+            release. Reusable-workflow refs float on `@main` and are not
+            touched. Opened by `.github/workflows/maintenance-repin-ci-workflows.yml`.
 
             ## Fix
 
             ${{ steps.repin.outputs.version-note }}
 
-            ${{ steps.policy-lockstep.outputs.policy-note }}
-
-            Merging this cascades: `maintenance-sync-standards.yml` re-materializes the callers
-            into every target `distribution/sync-manifest.yml` marks a lane
-            caller (fleet or hosted) or a `managed-files-guard` caller
-            managed for, as a reviewed pull
+            Merging this cascades: `maintenance-sync-standards.yml` re-materializes
+            each changed caller component into every target
+            `distribution/sync-manifest.yml` manages it for, as a reviewed pull
             request per target. This pull request is never auto-merged.
 
             ## Verification
 
-            - `pin-comment-convention` covers `components/claude-lanes/*.yml`
-              and validates the rewritten pin comments' form.
-            - `claude-lanes` component tests materialize and lint the callers.
-            - `runner-policy` lints and tests pass when lockstep applied
-              (`policy-lockstep=${{ steps.policy-lockstep.outputs.lockstep }}`).
+            - `components/claude-lanes/repin-callers.test.sh` covers the
+              rewrite; the `managed-files-guard` and `claude-lanes` component
+              tests materialize and lint the callers.
             - Post-merge: the per-target sync pull requests are the real
               acceptance signal.
 
             ## Related
 
-            - Phase 3g of the `melodic-software/ci-workflows` review-lanes plan.
             - Upstream release:
               https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}

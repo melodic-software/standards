@@ -3,8 +3,8 @@
 // Lockstep check: the ci-workflows `pr-automerge-dependabot.yml` reusable
 // carries its own copy of the `tier: auto` keys of `autoMerge.publishers` as
 // the PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at
-// every SHA runner-policy approves for it and fails when that constant differs
-// from those keys at any of them. The pure checks are exported for automerge-lockstep.test.mjs.
+// `main`, the ref every caller runs, and fails when that constant differs from
+// those keys. The pure checks are exported for automerge-lockstep.test.mjs.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 export const REUSABLE_PATH = ".github/workflows/pr-automerge-dependabot.yml";
-const CONTRACT_PREFIX = `melodic-software/ci-workflows/${REUSABLE_PATH}@`;
+const CONTRACT_KEY = `melodic-software/ci-workflows/${REUSABLE_PATH}`;
 
 export class LockstepError extends Error {
   constructor(message) {
@@ -23,16 +23,12 @@ export class LockstepError extends Error {
   }
 }
 
-export function resolveApprovedShas(runnerPolicy) {
-  const pins = Object.keys(runnerPolicy.approvedReusableWorkflowContracts ?? {})
-    .filter((key) => key.startsWith(CONTRACT_PREFIX))
-    .map((key) => key.slice(CONTRACT_PREFIX.length));
-  if (pins.length === 0) {
+export function requireContract(runnerPolicy) {
+  if (!Object.hasOwn(runnerPolicy.approvedReusableWorkflowContracts ?? {}, CONTRACT_KEY)) {
     throw new LockstepError(
-      `lockstep: expected a runner-policy contract for ${REUSABLE_PATH}, found 0; this check reads its SHAs from those keys`,
+      `lockstep: expected a runner-policy contract for ${CONTRACT_KEY}, found none`,
     );
   }
-  return pins;
 }
 
 export function extractPublisherAllowlist(workflowText) {
@@ -99,22 +95,18 @@ async function fetchText(url) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const readJson = async (...segments) =>
     JSON.parse(await readFile(path.join(import.meta.dirname, ...segments), "utf8"));
-  let sha;
   try {
     const dependabotPolicy = await readJson("policy.json");
-    for (sha of resolveApprovedShas(await readJson("..", "runner-policy", "policy.json"))) {
-      const workflowText = await fetchText(
-        `https://api.github.com/repos/melodic-software/ci-workflows/contents/${REUSABLE_PATH}?ref=${sha}`,
-      );
-      checkLockstep(dependabotPolicy, workflowText);
-      // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
-      console.log(
-        `dependabot automerge lockstep: PUBLISHER_ALLOWLIST at ${sha.slice(0, 7)} matches policy.json`,
-      );
-    }
+    requireContract(await readJson("..", "runner-policy", "policy.json"));
+    const workflowText = await fetchText(
+      `https://api.github.com/repos/melodic-software/ci-workflows/contents/${REUSABLE_PATH}?ref=main`,
+    );
+    checkLockstep(dependabotPolicy, workflowText);
+    // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
+    console.log("dependabot automerge lockstep: PUBLISHER_ALLOWLIST at main matches policy.json");
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
-    console.error(sha ? `${error.message} (checked at ${sha})` : error.message);
+    console.error(error.message);
     process.exit(1);
   }
 }

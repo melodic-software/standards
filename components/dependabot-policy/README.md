@@ -185,11 +185,11 @@ review lane, its review-tier pull requests stay open.
 
 The reusable's `PUBLISHER_ALLOWLIST` constant copies the `tier: auto` keys
 of `autoMerge.publishers`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
-fetches that reusable at every SHA its `runner-policy` contracts approve and
-fails when the constant and those keys differ at any of them. It blocks from admission, with no report-only
-period: it compares two files at fixed revisions, so a run either matches or
-names the differing lists, and the admitting change's run against the pinned
-reusable matched.
+fetches that reusable at `main`, where first-party callers run it, and fails
+when the constant and those keys differ. It does not check the SHAs a
+`runner-policy` contract still lists in `approvedShas` for callers mid-move to
+`@main`. It blocks from admission, with no report-only period: a run either
+matches or names the differing lists.
 
 ## What it checks
 
