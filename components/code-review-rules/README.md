@@ -113,8 +113,7 @@ verbatim.
   private listing through it.
 
 Drift fails the fleet run with one error annotation per nonconforming
-repository, as `maintenance-audit-link-check-excludes` does, and opens no
-issue. It blocks from admission without a report-only period: the run gates
+repository, and opens no issue. It blocks from admission without a report-only period: the run gates
 no pull request, and the observation run on 2026-10-03 (all 17 non-archived
 repositories) found exactly the expected baseline, the pilot passing and every
 other repository missing the section, so its failures stay red only until the

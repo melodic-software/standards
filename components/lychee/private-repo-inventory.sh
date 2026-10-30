@@ -11,7 +11,6 @@
 #   private-repo-inventory.sh list     [--config FILE]
 #   private-repo-inventory.sh check    [--config FILE] [--org OWNER]
 #                                      [--public-list FILE]
-#                                      [--installation-list FILE]
 #                                      [--private-list FILE]
 #   private-repo-inventory.sh generate [--config FILE] [--org OWNER]
 #                                      [--private-list FILE] [--write]
@@ -21,12 +20,6 @@
 #                             (default: GET /orgs/OWNER/repos?type=public —
 #                             readable with any token, including a public
 #                             repository's GITHUB_TOKEN)
-#   --installation-list FILE  `name<TAB>true|false` (private flag) per line for
-#                             every repository an App installation can see
-#                             (default: none; pass `--installation-list -`
-#                             to read GET /installation/repositories through
-#                             the GH_TOKEN in the environment, which must be an
-#                             App installation token)
 #   --private-list FILE       one private repository name per line — the
 #                             complete truth (default for `generate`:
 #                             `gh repo list OWNER --visibility private`, which
@@ -42,7 +35,6 @@ set -euo pipefail
 org='melodic-software'
 config='lychee.toml'
 public_list=''
-installation_list=''
 private_list=''
 write=false
 
@@ -70,7 +62,6 @@ while [[ $# -gt 0 ]]; do
     --config) config="${2:?--config needs a path}"; shift 2 ;;
     --org) org="${2:?--org needs an owner}"; shift 2 ;;
     --public-list) public_list="${2:?--public-list needs a path}"; shift 2 ;;
-    --installation-list) installation_list="${2:?--installation-list needs a path}"; shift 2 ;;
     --private-list) private_list="${2:?--private-list needs a path}"; shift 2 ;;
     --write) write=true; shift ;;
     -h | --help) usage; exit 0 ;;
@@ -130,12 +121,6 @@ read_list() {
 query_public() {
   gh api --paginate "orgs/${org}/repos?type=public&per_page=100" --jq '.[].name' \
     || die "could not list public repositories of ${org}"
-}
-
-query_installation() {
-  gh api --paginate 'installation/repositories?per_page=100' \
-    --jq '.repositories[] | "\(.name)\t\(.private)"' \
-    || die 'could not list the App installation repositories (GH_TOKEN must be an installation token)'
 }
 
 query_private() {
@@ -198,7 +183,6 @@ if [[ "$github_group" != "$expected_group" ]]; then
 fi
 
 inventory="$(inventory_lines | LC_ALL=C sort -u)"
-verified=''
 missing=''
 wrongly_excluded=''
 
@@ -228,35 +212,10 @@ if [[ -n "$private_list" ]]; then
     [[ " ${wrongly_excluded//$'\n'/ } " == *" ${name} "* ]] && continue
     problem "${name} is excluded but is not a private repository of ${org} (renamed, transferred, or deleted?)"
   done
-  verified="$private"
-fi
-
-# 3. Partial private truth (an App installation's repository set, e.g. the
-#    standards-sync App, which sees every sync target): each private member
-#    must be excluded. Non-members stay unverified, and are reported as such.
-if [[ -n "$installation_list" ]]; then
-  if [[ "$installation_list" == - ]]; then
-    installation="$(query_installation)"
-  else
-    installation="$(read_list "$installation_list")"
-  fi
-  inst_private="$(printf '%s\n' "$installation" | awk -F '\t' '$2 == "true" { print $1 }' | LC_ALL=C sort -u)"
-  inst_public="$(printf '%s\n' "$installation" | awk -F '\t' '$2 == "false" { print $1 }' | LC_ALL=C sort -u)"
-  for name in $(LC_ALL=C comm -13 <(printf '%s\n' "$inventory") <(printf '%s\n' "$inst_private")); do
-    problem "${name} is private (per the App installation) but not excluded"
-    missing="${missing}${missing:+$'\n'}${name}"
-  done
-  for name in $(LC_ALL=C comm -12 <(printf '%s\n' "$inventory") <(printf '%s\n' "$inst_public")); do
-    [[ " ${wrongly_excluded//$'\n'/ } " == *" ${name} "* ]] && continue
-    problem "${name} is public (per the App installation) but excluded as private"
-    wrongly_excluded="${wrongly_excluded}${wrongly_excluded:+$'\n'}${name}"
-  done
-  verified="${verified}${verified:+$'\n'}${inst_private}"
 fi
 
 if [[ -z "$private_list" ]]; then
-  unverified="$(LC_ALL=C comm -23 <(printf '%s\n' "$inventory") <(printf '%s\n' "$verified" | LC_ALL=C sort -u | sed '/^$/d'))"
-  unverified="$(printf '%s\n' "$unverified" | LC_ALL=C comm -23 - <(printf '%s\n' "$wrongly_excluded" | LC_ALL=C sort -u | sed '/^$/d'))"
+  unverified="$(LC_ALL=C comm -23 <(printf '%s\n' "$inventory") <(printf '%s\n' "$wrongly_excluded" | LC_ALL=C sort -u | sed '/^$/d'))"
   if [[ -n "$unverified" ]]; then
     printf 'NOTE: not verifiable with the credentials given (assumed still private): %s\n' \
       "$(printf '%s' "$unverified" | tr '\n' ' ')"

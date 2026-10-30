@@ -64,18 +64,6 @@ assert_exit 'check fails when an excluded repo is public' 1 $?
 assert_contains 'the wrongly excluded repo is named' "$out" 'beta is public but excluded as private'
 assert_contains 'the regenerated entry drops it' "$out" '/(alpha|gamma)(\.git)?'
 
-# --- check: App installation list (partial truth) --------------------------
-printf 'alpha\ttrue\nbeta\ttrue\ndelta\ttrue\npublic-one\tfalse\n' >"$work/installation.tsv"
-out="$(bash "$script" check --config "$config" --public-list "$work/public.txt" --installation-list "$work/installation.tsv" 2>&1)"
-assert_exit 'check fails when an installation-visible private repo is missing' 1 $?
-assert_contains 'the installation-detected gap is named' "$out" 'delta is private (per the App installation) but not excluded'
-assert_contains 'entries the installation cannot see stay reported as unverified' "$out" 'assumed still private): gamma'
-
-printf 'alpha\ttrue\nbeta\ttrue\ngamma\ttrue\n' >"$work/installation-ok.tsv"
-out="$(bash "$script" check --config "$config" --public-list "$work/public.txt" --installation-list "$work/installation-ok.tsv" 2>&1)"
-assert_exit 'check passes when the installation confirms every entry' 0 $?
-assert_not_contains 'nothing is left unverified' "$out" 'not verifiable'
-
 # --- check: structural invariants ------------------------------------------
 write_config "$work/unsorted.toml" 'gamma|alpha|beta' 'gamma|alpha|beta'
 out="$(bash "$script" check --config "$work/unsorted.toml" --public-list "$work/public.txt" 2>&1)"

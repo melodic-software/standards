@@ -17,9 +17,8 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Off-minute weekly poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`,
-    # maintenance-audit-link-check-excludes's
-    # `23 15 * * *` and maintenance-audit-code-review-rules's `47 15 * * *`.
+    # Off-minute weekly poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`
+    # and maintenance-audit-code-review-rules's `47 15 * * *`.
     - cron: "29 7 * * 3"
 
 permissions:
