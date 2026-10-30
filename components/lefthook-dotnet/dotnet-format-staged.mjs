@@ -108,7 +108,7 @@ export function loadDotnetFormatConfig({ root = process.cwd() } = {}) {
   const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.has(key));
   if (unknownKeys.length > 0) {
     throw new Error(
-      `${DEFAULT_CONFIG_PATH} contains unknown keys: ${unknownKeys.sort().join(", ")}`,
+      `${DEFAULT_CONFIG_PATH} contains unknown keys: ${unknownKeys.sort((left, right) => left.localeCompare(right)).join(", ")}`,
     );
   }
   const missingKeys = [...allowedKeys].filter((key) => !Object.hasOwn(value, key));
