@@ -249,6 +249,12 @@ unknown secret names, and alternate expressions:
   `role:` as that exact literal. Role-named secrets let several funding roles
   share one repository; the role stays a reviewed literal, never an
   expression, and every other rename is still refused.
+  A runner-input reusable whose jobs do not all run on its runner input
+  records the GitHub-hosted labels those jobs use in `fixedRunsOn`. On an
+  enrolled private repository a call that passes the fleet label then still
+  spends hosted minutes, so it needs a hosted exception keyed to the calling
+  job, as a `hosted-only` call does; a write-capable caller such as
+  intake-triage's (`issues: write`) declares `privileged-control-plane`.
 - `hosted-only` has no runner input. It records the GitHub-hosted labels found
   in the called workflow and rejects any caller-added input that was
   not part of the review.
@@ -327,7 +333,7 @@ simultaneously enabling it for public ones.
 
 A ci-workflows change that leaves a reusable's caller-facing surface alone
 (`on.workflow_call` inputs and secrets, the permissions a caller must grant,
-routing) needs no change here: first-party callers at `@main` run it on their
+routing, including which jobs ignore the runner input) needs no change here: first-party callers at `@main` run it on their
 next event. A change to that surface is ordered so no caller is refused:
 
 1. A new input: add it to the path's contract in `policy.json` and distribute

@@ -5354,6 +5354,117 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
+// A runner-input reusable whose contract records fixedRunsOn runs some jobs on
+// those hosted labels whatever runner it is given, so a fleet-routed call on an
+// enrolled private repository still needs a hosted exception.
+async function fixedHostedLaneRepository({
+  visibility,
+  selfHostedCi,
+  exceptions,
+  runner = FLEET_LABEL,
+} = {}) {
+  return repository({
+    visibility,
+    selfHostedCi,
+    exceptions,
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
+          ...FLEET_LANE_CONTRACT,
+          fixedRunsOn: ["ubuntu-24.04"],
+        },
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ${runner}
+      pr-number: \${{ inputs.pr-number }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+`,
+    },
+  });
+}
+
+test("a fleet-routed call to a reusable with fixed hosted jobs needs a hosted exception", async () => {
+  const findings = await audit(await fixedHostedLaneRepository());
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-required"],
+  );
+  assert.match(findings[0].message, /GitHub-hosted ubuntu-24\.04 whatever runner it is given/u);
+});
+
+test("a hosted exception admits a fleet-routed call to a reusable with fixed hosted jobs", async () => {
+  const root = await fixedHostedLaneRepository({
+    exceptions: {
+      ".github/workflows/claude-review.yml#review": {
+        reason: "privileged-control-plane",
+        justification: "The reusable's write job runs on a fixed GitHub-hosted runner.",
+      },
+    },
+  });
+  assert.deepEqual(await audit(root), []);
+});
+
+test("a fleet-routed write caller of a reusable with fixed hosted jobs needs the privileged category", async () => {
+  const findings = await audit(
+    await fixedHostedLaneRepository({
+      exceptions: {
+        ".github/workflows/claude-review.yml#review": {
+          reason: "windows",
+          justification: "The reusable's write job runs on a fixed GitHub-hosted runner.",
+        },
+      },
+    }),
+  );
+  assert.deepEqual(
+    findings.map(({ rule }) => rule),
+    ["hosted-exception-category"],
+  );
+  assert.match(
+    findings[0].message,
+    /requires exception reason privileged-control-plane, not windows/u,
+  );
+});
+
+test("a public repository's hosted call to a reusable with fixed hosted jobs needs no exception", async () => {
+  const root = await fixedHostedLaneRepository({
+    visibility: "public",
+    selfHostedCi: false,
+    runner: "ubuntu-24.04",
+  });
+  assert.deepEqual(await audit(root, { repositoryVisibility: "public" }), []);
+});
+
+test("a runner-input contract's fixedRunsOn must name known GitHub-hosted labels", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
+          ...FLEET_LANE_CONTRACT,
+          fixedRunsOn: ["melodic-ubuntu-24.04-x64"],
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    audit(root),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("runner-input reusable workflow contract") &&
+      error.message.includes("unrecognized GitHub-hosted label melodic-ubuntu-24.04-x64"),
+  );
+});
+
 // ---------------------------------------------------------------------------
 // The ci-workflows `checks` consolidation reusable. One job, one runner, every
 // content-agnostic hygiene composite as a step: the lane the CI performance
