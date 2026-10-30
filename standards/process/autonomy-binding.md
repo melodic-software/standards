@@ -26,7 +26,7 @@ exists because no automation compares the pinned version at setup time yet.
 ## Consumption
 
 This document is org binding DATA the autonomy setup capability reads at setup/bind time,
-not a prose standard fetched at build or review time, so the `conventions/` copy-or-pointer
+not a prose standard fetched at build or review time, so the `standards/` copy-or-pointer
 consumption model is preserved. A repo-local or user-global `org_policy_home` pointer names
 this repository; setup fetches the document once per run (host CLI, the consumer's own
 authentication) and PERSISTS the resolved values into the consuming repository's own tracked

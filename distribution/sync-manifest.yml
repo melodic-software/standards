@@ -189,7 +189,7 @@ components:
       .editorconfig-checker.json: .editorconfig-checker.json
   # Team-layer engineering standards (standards contract 1.0.2, defined in
   # melodic-software/claude-code-plugins docs/conventions/standards/): the
-  # conventions/engineering/ files that govern day-to-day agent and human work,
+  # standards/engineering/ files that govern day-to-day agent and human work,
   # plus a thin index, at docs/standards/ where planning and review skills load
   # only the files whose index rows match the task. Targets: every
   # pr-body-contract-rule target. Links inside the synced files are absolute
@@ -200,14 +200,14 @@ components:
   engineering-standards:
     files:
       components/engineering-standards/standards-index.md: docs/standards/README.md
-      conventions/engineering/bulk-mutation.md: docs/standards/bulk-mutation.md
-      conventions/engineering/concise-prose.md: docs/standards/concise-prose.md
-      conventions/engineering/design-for-change.md: docs/standards/design-for-change.md
-      conventions/engineering/deterministic-work-execution.md: docs/standards/deterministic-work-execution.md
-      conventions/engineering/documentation-and-citations.md: docs/standards/documentation-and-citations.md
-      conventions/engineering/reference-dont-duplicate.md: docs/standards/reference-dont-duplicate.md
-      conventions/engineering/simpler-code.md: docs/standards/simpler-code.md
-      conventions/engineering/source-authority-tiers.md: docs/standards/source-authority-tiers.md
+      standards/engineering/bulk-mutation.md: docs/standards/bulk-mutation.md
+      standards/engineering/concise-prose.md: docs/standards/concise-prose.md
+      standards/engineering/design-for-change.md: docs/standards/design-for-change.md
+      standards/engineering/deterministic-work-execution.md: docs/standards/deterministic-work-execution.md
+      standards/engineering/documentation-and-citations.md: docs/standards/documentation-and-citations.md
+      standards/engineering/reference-dont-duplicate.md: docs/standards/reference-dont-duplicate.md
+      standards/engineering/simpler-code.md: docs/standards/simpler-code.md
+      standards/engineering/source-authority-tiers.md: docs/standards/source-authority-tiers.md
   github-actions-conventions:
     files:
       components/github-actions-conventions/vocabulary.json: .github/standards/github-actions-conventions/vocabulary.json

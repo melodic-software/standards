@@ -1,6 +1,6 @@
 # Enforceability tiers
 
-Some conventions a tool can decide alone; some need a tool to flag candidates and a human to judge; some are pure judgment no tool can make. Classifying a convention by which tier it belongs to is what keeps this catalog honest: a rule a tool *can* own should move into a component config and stop reaching reviewers, while a rule that is irreducibly judgment should stay in prose and not pretend to be automatable. Tool-enforceable rules belong to `components/` (or their root-canonical payload); reasoning-only rules live here in `conventions/`.
+Some conventions a tool can decide alone; some need a tool to flag candidates and a human to judge; some are pure judgment no tool can make. Classifying a convention by which tier it belongs to is what keeps this catalog honest: a rule a tool *can* own should move into a component config and stop reaching reviewers, while a rule that is irreducibly judgment should stay in prose and not pretend to be automatable. Tool-enforceable rules belong to `components/` (or their root-canonical payload); reasoning-only rules live here in `standards/`.
 
 ## The three tiers
 

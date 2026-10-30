@@ -26,7 +26,7 @@ one-time PRs per the distribution Retire lifecycle.
 `components/pr-convention-policy/` itself stays in this repository as the
 standards-internal record and self-test of the PR convention: `policy.json`
 remains the machine-readable convention source
-(`conventions/process/issue-tracker.md` cites it), and the analyzer still runs
+(`standards/process/issue-tracker.md` cites it), and the analyzer still runs
 against its fixtures in this repository's CI. Enforcement remains where it
 already lives: the ci-workflows reusable that consumers pin.
 

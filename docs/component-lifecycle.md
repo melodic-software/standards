@@ -47,7 +47,7 @@ evidence means the component remains a consumer-local experiment.
   identifier or expression, compatibility with the organization's applicable
   policy, artifact provenance and integrity mechanism, dependency and network
   boundary, and the review required by
-  [security criteria](../conventions/review/security.md).
+  [security criteria](../standards/review/security.md).
 - **Update path**: enable the repository's supported dependency updater for
   every independent dependency root. If automation cannot cover a tool, record
   the owner, exact upstream release source, review procedure, and recurring
@@ -90,7 +90,7 @@ aligned with the supported release line. Re-run the admission assessment when:
 - a security advisory, integrity failure, material false-positive increase, or
   platform incompatibility challenges the accepted boundary;
 - the abandonment signals in the
-  [security criteria](../conventions/review/security.md) appear;
+  [security criteria](../standards/review/security.md) appear;
 - the delivery mechanism, privilege, credential, network, or data boundary
   changes; or
 - the recurring review owned by the component comes due.

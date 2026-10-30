@@ -10,7 +10,7 @@
     ".lefthook/**",
     "components/**",
     "distribution/**",
-    "conventions/engineering/**",
+    "standards/engineering/**",
     "docs/adr/README.md",
     "docs/adr/adr-template.md",
     "REVIEW.md",

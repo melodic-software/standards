@@ -16,7 +16,7 @@ scope, and explicit local exceptions.
   owns **agnostic audit tooling**: surfaces any consumer could adopt
   unchanged, whose defaults yield to that consumer's own declared policy where
   one exists. It ships by marketplace version bump, not by sync PR.
-  [`conventions/README.md`](conventions/README.md) records how the `review`
+  [`standards/README.md`](standards/README.md) records how the `review`
   plugin resolves this repository's criteria.
 - [`melodic-software/ci-workflows`](https://github.com/melodic-software/ci-workflows)
   owns reusable GitHub Actions execution.
@@ -38,7 +38,7 @@ which names the agnostic-audit-tooling owner.
 - root tool configs: canonical files for tools that require or naturally
   discover a repository-root path. They exist exactly once; the corresponding
   component slice documents and tests them.
-- `conventions/`: reasoning-only engineering, review, and process standards
+- `standards/`: reasoning-only engineering, review, and process standards
   that cannot be reduced honestly to deterministic tooling.
 - `distribution/`: explicit mappings for exact-file synchronization when no
   native reference mechanism fits.

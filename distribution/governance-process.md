@@ -7,7 +7,7 @@ internally consistent as it changes.
 
 ## Copy-adoption integrity
 
-[`conventions/README.md`](../conventions/README.md) documents two adoption
+[`standards/README.md`](../standards/README.md) documents two adoption
 paths for reasoning-only prose: a consumer either copies the files it adopts
 into its own tree, or points its contributor and review guides at this
 repository. The copy path stays available: prose has no runtime coupling to
@@ -20,7 +20,7 @@ requirements close that gap:
   canonical source: repository and path, and, where the destination format
   honors comments, an inline header. That lets a reader find the original
   and confirm currency. This follows the stable-anchor citation discipline in
-  [`../conventions/engineering/reference-dont-duplicate.md`](../conventions/engineering/reference-dont-duplicate.md);
+  [`../standards/engineering/reference-dont-duplicate.md`](../standards/engineering/reference-dont-duplicate.md);
   a copy is the "Expose" role that file describes, and exposure still requires
   adjacent prose pointing back to the source.
 - **Drift-check.** The adopting repository owns a periodic check that diffs
@@ -28,7 +28,7 @@ requirements close that gap:
   scheduled workflow, a recurring task, or an equivalent recurring review. The
   check's cadence is the adopting repository's choice, but its owner and
   trigger must be named at the copy site, the same recheck-trigger discipline
-  [`../conventions/engineering/documentation-and-citations.md`](../conventions/engineering/documentation-and-citations.md)
+  [`../standards/engineering/documentation-and-citations.md`](../standards/engineering/documentation-and-citations.md)
   already requires for a time-bound external claim: a copy with no recheck
   trigger is drift waiting to happen.
 
@@ -45,11 +45,11 @@ carry its own drift-check.
 
 ## Cross-doc reconciliation before a normative-doc change merges
 
-A normative doc is any file in `conventions/`, or elsewhere in this
+A normative doc is any file in `standards/`, or elsewhere in this
 repository, that states a rule another doc cites or assumes:
-[`naming.md`](../conventions/engineering/naming.md),
-[`process/issue-tracker.md`](../conventions/process/issue-tracker.md), and
-[`review/code-quality.md`](../conventions/review/code-quality.md) are
+[`naming.md`](../standards/engineering/naming.md),
+[`process/issue-tracker.md`](../standards/process/issue-tracker.md), and
+[`review/code-quality.md`](../standards/review/code-quality.md) are
 representative examples, not an exhaustive list.
 
 Before a change to a normative doc merges, a cross-reference check confirms no
@@ -62,7 +62,7 @@ normative docs stating related rules without a cross-link between them.
 Closing that specific gap is tracked separately. A change that narrows or
 restates a rule without this check risks the exact silent-contradiction
 failure mode
-[`reference-dont-duplicate.md`](../conventions/engineering/reference-dont-duplicate.md)
+[`reference-dont-duplicate.md`](../standards/engineering/reference-dont-duplicate.md)
 names as a duplication smell.
 
 **Ownership.** This organization keeps `required_approving_review_count` at
@@ -84,11 +84,11 @@ decision, not an unaddressed one.
 
 ## Review-criterion graduation and retirement
 
-[`../conventions/engineering/enforceability-tiers.md`](../conventions/engineering/enforceability-tiers.md)
+[`../standards/engineering/enforceability-tiers.md`](../standards/engineering/enforceability-tiers.md)
 already says a finding climbs from reasoning-only prose toward mechanical
 enforcement as far as its nature allows. This section is the missing other
 half: what happens to the *prose bullet itself*, in `REVIEW.md` or a
-`conventions/review/` criterion, once the mechanization it describes
+`standards/review/` criterion, once the mechanization it describes
 actually exists downstream.
 
 Retiring the prose line is a **self-review checklist item the author
@@ -129,7 +129,7 @@ existing at all is a live signal that a criterion is (or isn't) worth its
 prose: managed Code Review's own reaction counts and the self-hosted
 `bughunter-severity` check-run JSON both carry a real per-finding usefulness
 signal today, but nothing routes either back into revising `REVIEW.md` or a
-`conventions/review/` criterion. A criterion that fires constantly as a
+`standards/review/` criterion. A criterion that fires constantly as a
 false positive, or one that never fires at all, currently gets no different
 treatment than one earning its keep. Closing this loop is itself gated on
 the same per-criterion tag/ID scheme above (the signal has to attach to a
@@ -140,10 +140,10 @@ precondition, not built.
 
 - [`README.md`](README.md): the managed/locally-owned ownership model and
   lifecycle this copy path deliberately sits outside of.
-- [`../conventions/README.md`](../conventions/README.md): the copy-or-pointer
+- [`../standards/README.md`](../standards/README.md): the copy-or-pointer
   adoption model this document adds requirements to.
 - [`../docs/component-lifecycle.md`](../docs/component-lifecycle.md): the
   admission evidence a copy needs before it can graduate to a managed
   component.
-- [`../conventions/engineering/enforceability-tiers.md`](../conventions/engineering/enforceability-tiers.md):
+- [`../standards/engineering/enforceability-tiers.md`](../standards/engineering/enforceability-tiers.md):
   the climb this section's retirement half completes.
