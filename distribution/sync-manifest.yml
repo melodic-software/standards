@@ -260,9 +260,14 @@ components:
   # non-targets:
   # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
   #   code or authored docs, like claude-lane-sandbox; not a sync target.
-  # - knowledge-corpus: its markdown is mostly scraped third-party material
-  #   whose links this org does not author or repair, and it is deferred from
-  #   the sync roster (see the Phase 4 note near `targets:`).
+  # - songwriting (github-iac ADR-0006), azure-iac (a trust root the sync App
+  #   must not write to), architecture and knowledge-corpus (not sync targets)
+  #   run the offline lane with no copy of this file: the ci-workflows
+  #   lychee-offline composite falls back to the canonical copy ci-workflows
+  #   carries as a target here when the caller has none. knowledge-corpus
+  #   excludes its captured docs text through pr-run-checks'
+  #   lychee-offline-exclude; the lane is deterministic and feeds no agent,
+  #   so its review-lane deferral does not apply.
   # - standards: manifest source, not a target.
   lychee:
     files:

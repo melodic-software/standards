@@ -307,7 +307,8 @@
         "check-jsonschema-files",
         "check-jsonschema-builtin-schema",
         "machine-specific-paths-exclude",
-        "comment-hygiene-exclude"
+        "comment-hygiene-exclude",
+        "lychee-offline-exclude"
       ],
       "allowedSecrets": {},
       "minimumCallerPermissions": {

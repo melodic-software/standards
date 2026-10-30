@@ -11,6 +11,12 @@ network health is inherently transient.
 Managed consumers do not edit the config. `fixtures/` and `lychee.test.sh`
 prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 
+A repository outside the sync keeps no copy: when the caller has no root
+`lychee.toml`, the `lychee-offline` composite uses the canonical copy that
+ci-workflows, a sync target, carries. The non-targets that rely on this are
+listed with their reasons beside the `lychee` component in
+[`sync-manifest.yml`](../../distribution/sync-manifest.yml).
+
 Manual online runs exclude explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes an unauthenticated request receive
 a 404. The inventory itself lives in the two `melodic-software/` alternations in
