@@ -27,7 +27,34 @@ permissions:
   contents: read
 
 jobs:
+  # A burst of merges would otherwise start one full sync (and refresh every
+  # target PR, re-running its CI) per push. A push waits out a quiet window
+  # first; a newer push cancels the older run's wait before any mutation, so a
+  # burst yields one sync per target. Schedule and dispatch skip the wait.
+  # Tune the window with the STANDARDS_SYNC_SETTLE_SECONDS repo variable
+  # (integer seconds, 0-3600; default 600).
+  collect-merge-burst:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions: {}
+    concurrency:
+      group: standards-sync-settle
+      cancel-in-progress: true
+    steps:
+      - name: Wait for the push burst to settle
+        env:
+          SETTLE_SECONDS: ${{ vars.STANDARDS_SYNC_SETTLE_SECONDS || 600 }}
+        run: |
+          if ! [[ "$SETTLE_SECONDS" =~ ^[0-9]+$ ]] || (( ${#SETTLE_SECONDS} > 4 || 10#$SETTLE_SECONDS > 3600 )); then
+            echo "::error::STANDARDS_SYNC_SETTLE_SECONDS must be an integer from 0 to 3600, got '$SETTLE_SECONDS'"
+            exit 1
+          fi
+          sleep "$((10#$SETTLE_SECONDS))"
+
   maintenance-sync-standards:
+    needs: collect-merge-burst
+    if: ${{ !cancelled() && (needs.collect-merge-burst.result == 'success' || needs.collect-merge-burst.result == 'skipped') }}
     # Real runs attest App access for the complete unfiltered manifest before
     # mutation; `targets` limits reconciliation only, never attestation.
     uses: melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@main
