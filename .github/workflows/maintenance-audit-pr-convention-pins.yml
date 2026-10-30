@@ -60,7 +60,7 @@ jobs:
           cache-dependency-path: components/pr-convention-policy/package-lock.json
 
       - name: Install pr-convention-policy dependencies
-        run: npm ci --prefix components/pr-convention-policy
+        run: npm ci --prefix components/pr-convention-policy --ignore-scripts
 
       # The scan runs each pinned composite's awk analyzer under
       # `gawk --sandbox`, and the runner image's awk is not guaranteed to be

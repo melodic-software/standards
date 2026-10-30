@@ -735,10 +735,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           npm ci
-          npm ci --prefix components/runner-policy
-          npm ci --prefix components/concurrency-policy
-          npm ci --prefix components/dependabot-policy
-          npm ci --prefix components/pr-convention-policy
+          npm ci --prefix components/runner-policy --ignore-scripts
+          npm ci --prefix components/concurrency-policy --ignore-scripts
+          npm ci --prefix components/dependabot-policy --ignore-scripts
+          npm ci --prefix components/pr-convention-policy --ignore-scripts
       - name: Test package lifecycle
         if: ${{ !cancelled() }}
         run: npm run test:packages
@@ -808,7 +808,7 @@ jobs:
           cache: npm
           cache-dependency-path: components/pr-convention-policy/package-lock.json
       - name: Install pr-convention-policy dependencies
-        run: npm ci --prefix components/pr-convention-policy
+        run: npm ci --prefix components/pr-convention-policy --ignore-scripts
       # The lockstep check runs the composite's awk analyzer under
       # `gawk --sandbox` (system(), pipes and redirection disabled), and the
       # runner image's awk is not guaranteed to be gawk. Missing gawk fails the
@@ -883,9 +883,9 @@ jobs:
       - name: Install distribution, runner-policy and naming-lint dependencies
         if: ${{ !cancelled() }}
         run: |
-          npm ci --prefix distribution
-          npm ci --prefix components/runner-policy
-          npm ci --prefix components/github-actions-conventions
+          npm ci --prefix distribution --ignore-scripts
+          npm ci --prefix components/runner-policy --ignore-scripts
+          npm ci --prefix components/github-actions-conventions --ignore-scripts
       # The lint above covers .github/workflows only, so the lane caller
       # components — workflow bytes that live outside it until a sync
       # materializes them — need the consumer entrypoint run over them here,
@@ -1010,7 +1010,7 @@ jobs:
           cache: npm
           cache-dependency-path: distribution/package-lock.json
       - name: Install distribution dependencies
-        run: npm ci --prefix distribution
+        run: npm ci --prefix distribution --ignore-scripts
       - name: Install yq 4.53.3
         run: |
           set -euo pipefail

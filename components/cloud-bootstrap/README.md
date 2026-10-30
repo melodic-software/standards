@@ -28,7 +28,10 @@ pinned versions:
   build) so every session reports which environment build it booted from;
 - Node from `.node-version` (via the VM's nvm), `npm ci` from the root
   `package-lock.json`, and the .NET SDK exactly as `global.json` pins,
-  repo-local, each skipped when the manifest is absent or already satisfied;
+  repo-local, each skipped when the manifest is absent or already satisfied.
+  When the repo's `.npmrc` sets `ignore-scripts=true`, a successful `npm ci`
+  is followed by `npm run prepare --if-present` to install the git hooks,
+  skipped like Lefthook's postinstall when `CI` is set and `LEFTHOOK` is not;
 - repairs the shallow single-branch cloud clone (unshallow + make
   `origin/main` resolve) so base-ref diffs work;
 - sets the global git `author.name`/`author.email` from the GitHub account

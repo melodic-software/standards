@@ -80,10 +80,11 @@ a reusable change flows upstream first.
 
 CI dogfoods every root policy, runs each component's contract tests, validates
 the composed Lefthook adapter, and aggregates blocking lanes into `ci-status`.
-Locally, install all three pinned Node dependency roots, then run:
+Locally, install all three pinned Node dependency roots and the Lefthook git
+hooks (`.npmrc` sets `ignore-scripts=true`, so `npm ci` installs no hooks):
 
 ```bash
-npm ci
+npm ci && npm run prepare
 npm ci --prefix components/runner-policy
 npm ci --prefix distribution
 ```

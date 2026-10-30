@@ -124,8 +124,20 @@ for lock in package-lock.json components/*/package-lock.json distribution/packag
   [[ -f "$lock" ]] || continue
   dir="$(dirname -- "$lock")"
   log "npm ci in $dir"
-  npm ci --no-audit --no-fund --prefix "$dir"
+  npm ci --no-audit --no-fund --ignore-scripts --prefix "$dir"
 done
+
+# Install scripts are off (root .npmrc and --ignore-scripts), so install the
+# Lefthook hooks through `prepare`, skipped under the same condition as
+# Lefthook's postinstall: CI set and LEFTHOOK unset ("", 0 or false).
+hooks_skipped=false
+case "${CI:-}" in
+  '' | 0 | false) ;;
+  *) case "${LEFTHOOK:-}" in '' | 0 | false) hooks_skipped=true ;; *) ;; esac ;;
+esac
+if [[ "$hooks_skipped" == false ]]; then
+  npm run prepare || log 'npm run prepare failed; git hooks are not installed'
+fi
 
 # --- Always-on hygiene engines (Lefthook pre-commit) ------------------------
 bin_dir=/usr/local/bin
