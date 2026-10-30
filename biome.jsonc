@@ -1,8 +1,9 @@
 {
   // Standards-specific adapter, not the reusable ruleset. The package and
   // policy source is components/biome/biome.json (root: false). This root file
-  // provides only this repository's scope and local auto-discovery. Keep the
-  // schema in lockstep with the component when Biome changes.
+  // provides only this repository's scope and local auto-discovery. The schema
+  // follows this repository's Biome CLI; the component's stays at its oldest
+  // supported version.
   //
   // This is .jsonc, not .json, on purpose: Biome silently ignores a biome.json
   // that contains comments (no error — it just falls back to defaults), so a
