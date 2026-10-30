@@ -18,17 +18,14 @@ a 404. The inventory itself lives in the two `melodic-software/` alternations in
 from a copy here. It is generated, not hand-edited:
 [`private-repo-inventory.sh`](private-repo-inventory.sh) derives it from actual
 repository visibility (`generate --write`, using the maintainer's `gh`
-credential) and `check` fails when the two disagree, in the `lychee-fixtures`
-CI lane for the direction a public token can see (an excluded repository that
-went public; the alternations sorted and identical) and in the scheduled
-`maintenance-audit-link-check-excludes` workflow for the direction it cannot (a new private
-sync target missing from the list, read from the standards-sync App
-installation). Private repositories outside the sync roster are the residual
-the check reports as unverified, and no check catches one missing from the
-list, so run `generate --write` whenever the org gains a private repository.
-A new private sync target fails that scheduled workflow within a day; fix it at
-this source, never in a consumer's synced copy, which the next sync overwrites. Public
-siblings and stale pre-transfer owner URLs remain checked. Public bot-blocking
+credential). `check`, in the `pr-require-checks` markdown-and-links job, fails
+when an excluded repository went public and holds the two alternations sorted
+and identical. A private repository missing from the list has no check: it
+shows up as a 404 in the next online run, which names the repository. Run
+`generate --write` when the org gains a private repository, or when an online
+run reports one. Fix it at this source, never in a consumer's synced copy,
+which the next sync overwrites. Public siblings and stale pre-transfer owner
+URLs remain checked. Public bot-blocking
 exceptions are scoped to the exact URL, not the host: every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside
 the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`

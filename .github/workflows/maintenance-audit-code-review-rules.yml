@@ -12,8 +12,7 @@ name: maintenance-audit-code-review-rules
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1` and
-    # maintenance-audit-link-check-excludes's `23 15 * * *`.
+    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`.
     - cron: "47 15 * * *"
 
 permissions:

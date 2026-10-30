@@ -198,12 +198,11 @@ jobs:
       - name: Private-repo inventory contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/lychee/private-repo-inventory.test.sh
-      # The credential-free half of the inventory check: a public repository's
-      # token lists the org's public repositories, so an excluded repository
-      # that went public fails here, and the two alternations are held sorted
-      # and identical. The other direction (a new private repository missing
-      # from the list) needs the App installation's view and runs in the
-      # scheduled maintenance-audit-link-check-excludes workflow.
+      # A public repository's token lists the org's public repositories, so an
+      # excluded repository that went public fails here, and the two
+      # alternations are held sorted and identical. A new private repository
+      # missing from the list shows up as a 404 in the next online run, and
+      # `generate --write` fixes it (components/lychee/README.md).
       - name: Private-repo inventory agrees with public visibility
         if: ${{ !cancelled() }}
         env:
