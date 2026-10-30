@@ -520,7 +520,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/biome@2476d5dde8979eab34374150b7e4b0a2b99f4e88 # 2476d5d 2026-10-29
         with:
-          config: components/biome/biome.json
+          config: biome.jsonc
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
       - name: Set up Node
         if: ${{ !cancelled() }}
