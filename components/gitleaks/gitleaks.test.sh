@@ -71,6 +71,15 @@ assert_not_contains 'stateless token is redacted in output' "$out" "$app_token"
 assert_not_contains 'stateless token is redacted in the report' \
   "$(<"$tmp/reports/stateless.json")" "$app_token"
 
+# Words that end in "ghs" followed by a long snake_case tail are not tokens.
+mkdir -p "$tmp/words"
+printf 'label = highs_and_lows_of_the_market_over_the_year\nmood = laughs_out_loud_at_the_whole_long_meeting_today\n' \
+  >"$tmp/words/words.txt"
+gitleaks dir "$tmp/words" --config "$config" --no-banner --redact \
+  -i "$tmp/words" >/dev/null 2>&1
+rc=$?
+assert_exit 'words ending in ghs_ are not flagged (exit 0)' 0 "$rc"
+
 # The same token silenced with the native gitleaks:allow pragma is ignored.
 printf 'EXAMPLE_TOKEN=%s # gitleaks:allow\n' "$gh_token" >"$tmp/allow/ok.env"
 gitleaks dir "$tmp/allow" --config "$config" --no-banner --redact \
