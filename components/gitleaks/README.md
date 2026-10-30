@@ -2,8 +2,9 @@
 
 Secret scanning with [Gitleaks](https://github.com/gitleaks/gitleaks). The
 exported payload is the root-canonical [`.gitleaks.toml`](../../.gitleaks.toml),
-which inherits Gitleaks' maintained default ruleset and adds no repo-specific
-allowlist.
+which inherits Gitleaks' maintained default ruleset and adds one rule for
+GitHub App installation tokens in the classic and stateless formats, but no
+repo-specific allowlist.
 
 Managed consumers do not edit the config. Use an inline `gitleaks:allow` pragma
 for a reviewed one-line false positive or a repository-owned `.gitleaksignore`

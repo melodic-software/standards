@@ -19,10 +19,10 @@ pre-commit:
       glob: "**/*.{ts,tsx,cts,mts,js,jsx,cjs,mjs,json,jsonc}"
       # NuGet lock files are exempt via each consumer's root Biome config, not
       # the shared ruleset (file scope is per-repo policy; the typescript module
-      # explains the split), and Biome exits non-zero when every path it is
-      # handed is ignored — so a commit staging only packages.lock.json would
-      # fail spuriously without this lane-level exclude.
+      # explains the split). The lane-level exclude keeps these files out of
+      # the run; `--no-errors-on-unmatched` below covers any other staged set
+      # the consumer's Biome config ignores entirely.
       exclude:
         - "**/packages.lock.json"
-      run: npx --no-install @biomejs/biome check {staged_files}
+      run: npx --no-install @biomejs/biome check --no-errors-on-unmatched {staged_files}
       fail_text: "Biome findings. Run: npx --no-install @biomejs/biome check --write <files>"

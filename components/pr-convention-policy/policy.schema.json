@@ -100,7 +100,7 @@
               "uniqueItems": true,
               "items": { "type": "string", "pattern": "^[a-z]+ [a-z]+$" }
             },
-            "wordWindow": { "type": "integer", "minimum": 1 }
+            "wordWindow": { "type": "integer", "minimum": 1, "maximum": 50 }
           }
         }
       }

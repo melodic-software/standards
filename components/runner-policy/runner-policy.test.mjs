@@ -5986,7 +5986,7 @@ const WAVE_PATCH_TAG_CALLERS = [
 
 test("a governed caller of each reusable at the wave patch tag is admitted", async () => {
   let asserted = 0;
-  for (const { reusable, job, permissions, secrets } of WAVE_PATCH_TAG_CALLERS) {
+  for (const { reusable, job, permissions, secrets = [] } of WAVE_PATCH_TAG_CALLERS) {
     const reference = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml@${REPINE_LANE_SHA_V0_22_1}`;
     const block = (keys, indent) => keys.map((key) => `${indent}${key}`).join("\n");
     const root = await repository({
@@ -6004,7 +6004,7 @@ ${block(permissions, "      ")}
     uses: ${reference}
     with:
       runner: ${FLEET_LABEL}
-${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
+${secrets.length > 0 ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
       },
     });
     assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);
@@ -6015,7 +6015,7 @@ ${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
 
 test("a governed caller of each reusable at the convergence tag is admitted", async () => {
   let asserted = 0;
-  for (const { reusable, job, permissions, secrets } of WAVE_PATCH_TAG_CALLERS) {
+  for (const { reusable, job, permissions, secrets = [] } of WAVE_PATCH_TAG_CALLERS) {
     const reference = `melodic-software/ci-workflows/.github/workflows/${reusable}.yml@${REPINE_LANE_SHA_V0_22_2}`;
     const block = (keys, indent) => keys.map((key) => `${indent}${key}`).join("\n");
     const root = await repository({
@@ -6033,7 +6033,7 @@ ${block(permissions, "      ")}
     uses: ${reference}
     with:
       runner: ${FLEET_LABEL}
-${secrets ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
+${secrets.length > 0 ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
       },
     });
     assert.deepEqual(await audit(root), [], `a governed caller of ${reusable} was not admitted`);

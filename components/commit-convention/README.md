@@ -4,7 +4,7 @@ The org commit-subject convention, as one file:
 [`commit-convention.yml`](commit-convention.yml). The `commit-convention`
 component in [`distribution/sync-manifest.yml`](../../distribution/sync-manifest.yml)
 materializes it to `docs/conventions/source-control/commit-convention.yml` in
-every sync target, which is the well-known path the guardrails resolver and
+every sync target that manages it, which is the well-known path the guardrails resolver and
 the source-control plugin read
 ([seam contract](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/conventions/commit-convention/README.md)).
 A repository therefore needs no `## subject_pattern` section in its
@@ -44,8 +44,9 @@ disagree, when the copy differs, when the resolver does not print the pattern
 from a tracked file, or when the hook accepts or rejects the wrong subjects.
 
 A repository that needs a different convention moves the component to
-`locally-owned` in its manifest target block and tracks its own file at the
-same path.
+`locally-owned` in its manifest target block and tracks its own convention,
+either at the same path or in `docs/conventions/source-control.yaml`, which the
+guardrails resolver reads first. claude-code-plugins does the latter.
 
 Rollback: remove the component from the targets and the manifest. The sync
 never deletes a file, so each target then deletes its copy in a repository

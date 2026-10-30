@@ -6,3 +6,7 @@ type-checking stays in CI because it operates on a project graph. Compose this
 fragment with `lefthook-base` for shared strict settings and glob matching. The
 hook fails closed when Biome is not installed locally; it never downloads an
 unpinned version during a commit.
+
+`lefthook-typescript.test.sh` builds a temporary consumer and checks that the
+biome lane passes a clean file, fails a lint finding, and passes a commit that
+stages only files the consumer's Biome config ignores.

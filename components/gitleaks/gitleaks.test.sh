@@ -53,6 +53,24 @@ for format in json sarif; do
   assert_not_contains "$format report command output omits the detected value" "$out" "$gh_token"
 done
 
+# A stateless App installation token (ghs_<appid>_<jwt>) is flagged by the
+# component's own rule: no default rule matches past the `_` after the app id.
+# The values are placeholders built from parts, not a real token.
+mkdir -p "$tmp/stateless"
+app_prefix='ghs_'
+app_token="${app_prefix}1234567_eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjAwMDAwMDB9.c2lnbmF0dXJlLXBsYWNlaG9sZGVy"
+printf 'GITHUB_TOKEN=%s\n' "$app_token" >"$tmp/stateless/app.env"
+out="$(gitleaks dir "$tmp/stateless" --config "$config" --no-banner --redact \
+  --report-format json --report-path "$tmp/reports/stateless.json" \
+  -i "$tmp/stateless" 2>&1)"
+rc=$?
+assert_exit 'stateless installation token is flagged (exit 1)' 1 "$rc"
+assert_contains 'stateless token report names the rule' \
+  "$(<"$tmp/reports/stateless.json")" 'github-app-installation-token'
+assert_not_contains 'stateless token is redacted in output' "$out" "$app_token"
+assert_not_contains 'stateless token is redacted in the report' \
+  "$(<"$tmp/reports/stateless.json")" "$app_token"
+
 # The same token silenced with the native gitleaks:allow pragma is ignored.
 printf 'EXAMPLE_TOKEN=%s # gitleaks:allow\n' "$gh_token" >"$tmp/allow/ok.env"
 gitleaks dir "$tmp/allow" --config "$config" --no-banner --redact \

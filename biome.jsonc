@@ -1,13 +1,14 @@
 {
   // Standards-specific adapter, not the reusable ruleset. The package and
   // policy source is components/biome/biome.json (root: false). This root file
-  // provides only this repository's scope and local auto-discovery. Keep the
-  // schema in lockstep with the component when Biome changes.
+  // provides only this repository's scope and local auto-discovery. The schema
+  // follows this repository's Biome CLI; the component's stays at its oldest
+  // supported version.
   //
   // This is .jsonc, not .json, on purpose: Biome silently ignores a biome.json
   // that contains comments (no error — it just falls back to defaults), so a
   // commented stub MUST use the .jsonc extension.
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "root": true,
   "extends": ["./components/biome/biome.json"],
   // File scope is per-repo, NOT part of the shared ruleset: Biome UNIONS
@@ -17,5 +18,9 @@
   // carry packages.lock.json), and each consumer scopes its own files block.
   "files": {
     "includes": ["**", "!**/packages.lock.json"]
-  }
+  },
+  // markdownlint owns Markdown style. Biome 2.6 began formatting Markdown and
+  // YAML; these keys stay out of the shared payload, which still supports 2.5.
+  "markdown": { "formatter": { "enabled": false } },
+  "yaml": { "formatter": { "enabled": false } }
 }
