@@ -562,7 +562,6 @@ targets:
   melodic-software/claude-code-plugins:
     managed:
       - actionlint
-      - commit-convention
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -608,6 +607,13 @@ targets:
       # Directory-source dogfooding: this repo's bootstrap carries same-version
       # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
+      # The repository carries the convention in
+      # `docs/conventions/source-control.yaml` (ADR 0064), which the guardrails
+      # resolver reads first (claude-code-plugins#10134), so the folder-form
+      # file is deleted there and a sync would restore a second, unread copy.
+      # Removal trigger: the guardrails resolver dropping its folder-form
+      # fallback, after which the component can retire fleet-wide.
+      - commit-convention
       - ruff
   # Phase 4 fleet expansion (standards-sync-audit plan, Brief line "Phase 4"):
   # claude-code-proxy, codex-plugins, and cursor-plugins enter with the
