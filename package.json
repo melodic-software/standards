@@ -37,7 +37,6 @@
     "test:runner-policy": "node --test components/runner-policy/runner-policy.test.mjs"
   },
   "overrides": {
-    "smol-toml": "^1.9.0",
     "katex": "~0.18.2"
   }
 }
