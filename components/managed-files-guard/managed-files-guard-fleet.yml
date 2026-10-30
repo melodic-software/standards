@@ -60,6 +60,7 @@ on:
       - .github/workflows/pr-check-managed-files.yml
       - .github/workflows/pr-review-security.yml
       - .github/workflows/pr-review.yml
+      - .github/zizmor.yml
       - .gitleaks.toml
       - .lefthook/base.yml
       - .lefthook/dotnet-format-staged.mjs
