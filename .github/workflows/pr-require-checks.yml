@@ -392,6 +392,9 @@ jobs:
       - name: Lefthook ShellCheck contract test
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-shellcheck/lefthook-shellcheck.test.sh
+      - name: Lefthook TypeScript contract test
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
+        run: bash harness/shell/run-tests.sh components/lefthook-typescript/lefthook-typescript.test.sh
       - name: Test .NET staged adapter
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: npm run test:lefthook-dotnet
@@ -520,7 +523,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/biome@0691df79a6c0de7f1e49df618ac7b321605563f9 # v0.68.0
         with:
-          config: components/biome/biome.json
+          config: biome.jsonc
           paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
       - name: Set up Node
         if: ${{ !cancelled() }}
