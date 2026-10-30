@@ -109,8 +109,24 @@ fi
   if [[ -f package-lock.json ]]; then
     if [[ ! -f node_modules/.package-lock.json ]] ||
       [[ package-lock.json -nt node_modules/.package-lock.json ]]; then
-      npm ci --no-audit --no-fund >/dev/null 2>&1 ||
+      if npm ci --no-audit --no-fund >/dev/null 2>&1; then
+        # A repo whose .npmrc sets ignore-scripts=true skips Lefthook's
+        # postinstall, so install the hooks through `prepare`, skipped under
+        # the same condition as that postinstall: CI set and LEFTHOOK unset
+        # (a value of "", 0 or false counts as unset).
+        hooks_skipped=false
+        case "${CI:-}" in
+          '' | 0 | false) ;;
+          *) case "${LEFTHOOK:-}" in '' | 0 | false) hooks_skipped=true ;; *) ;; esac ;;
+        esac
+        if [[ "$hooks_skipped" == false &&
+          "$(npm config get ignore-scripts 2>/dev/null)" == true ]]; then
+          npm run prepare --if-present >/dev/null 2>&1 ||
+            toolchain_warn 'npm run prepare failed; git hooks are not installed'
+        fi
+      else
         toolchain_warn 'npm ci failed; node_modules is unavailable this session'
+      fi
     fi
   fi
 
