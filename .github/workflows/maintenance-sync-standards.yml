@@ -28,9 +28,11 @@ permissions:
 
 jobs:
   # A burst of merges would otherwise start one full sync (and refresh every
-  # target PR, re-running its CI) per push. A push waits out a quiet window
-  # first; a newer push cancels the older run's wait before any mutation, so a
-  # burst yields one sync per target. Schedule and dispatch skip the wait.
+  # target PR, re-running its CI) per push. Each push waits a window first, one
+  # wait at a time: GitHub keeps one pending run per group and a newer push
+  # replaces it, so a burst yields about one sync per window. A wait is never
+  # cancelled, so a steady stream of merges cannot postpone syncing
+  # indefinitely. Schedule and dispatch skip the wait.
   # Tune the window with the STANDARDS_SYNC_SETTLE_SECONDS repo variable
   # (integer seconds, 0-3600; default 600).
   collect-merge-burst:
@@ -40,7 +42,7 @@ jobs:
     permissions: {}
     concurrency:
       group: standards-sync-settle
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - name: Wait for the push burst to settle
         env:
