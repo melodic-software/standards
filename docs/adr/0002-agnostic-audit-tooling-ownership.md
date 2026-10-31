@@ -12,9 +12,9 @@ consuming repository. That enumeration predates the capability-distribution
 home becoming an owner in its own right rather than a delivery detail.
 
 The rest of the repository already reflects the fifth owner.
-[`../../conventions/process/autonomy-binding.md`](../../conventions/process/autonomy-binding.md)
+[`../../standards/process/autonomy-binding.md`](../../standards/process/autonomy-binding.md)
 binds the capability-distribution home role to the `claude-code-plugins`
-marketplace, and [`../../conventions/README.md`](../../conventions/README.md)
+marketplace, and [`../../standards/README.md`](../../standards/README.md)
 records the `review` plugin resolving this repository's criteria at review
 time. Only the ownership summary lagged, leaving a reader to conclude that
 every quality-policy surface is an org policy choice owned here.

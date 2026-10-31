@@ -1,8 +1,8 @@
 # Native-reference review credential
 
 Classification for the read-only credential a private calling repo's CI job
-uses to mount this repo's `conventions/review` tree by native reference, the
-depth tier described in [`conventions/README.md`](../conventions/README.md)
+uses to mount this repo's `standards/review` tree by native reference, the
+depth tier described in [`standards/README.md`](../standards/README.md)
 and cited from the synced `REVIEW.md`. Scope is exactly this credential's
 authentication and republication boundary. It is adjacent to, but distinct
 from, the sync-manifest push credential covered by
@@ -33,7 +33,7 @@ behind it; under the current visibility state there is nothing to provision.
 >
 > **These are one source, not three, and the claim does not meet this
 > repository's corroboration floor.** Under
-> [`source-authority-tiers.md`](../conventions/engineering/source-authority-tiers.md)
+> [`source-authority-tiers.md`](../standards/engineering/source-authority-tiers.md)
 > sources that "share an upstream pool" count once, and all three read GitHub's
 > repository state. Repository visibility is a fact GitHub *owns*; no
 > independent pool exists to corroborate it from, so the floor of one primary
@@ -191,7 +191,7 @@ or when any open question above is resolved either way.
 verify it against the API rather than restating this document: visibility is
 mutable, and a stale firsthand claim is exactly what invalidated this
 classification once already. The claim is time-bound per
-`conventions/engineering/documentation-and-citations.md` (verification date
+`standards/engineering/documentation-and-citations.md` (verification date
 2026-07-26). Recheck cheaply with:
 
 ```bash

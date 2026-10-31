@@ -10,7 +10,7 @@ Fleet CI enforced PR title and body conventions only reactively through
 were embedded in workflow JavaScript and duplicated across consumers: allowed
 Conventional Commits types, required `## Related` section, closing keyword or
 no-issue marker. Knowledge did not land at authoring time, and drift between
-gates and `conventions/process/issue-tracker.md` required periodic reconciliation
+gates and `standards/process/issue-tracker.md` required periodic reconciliation
 (#247).
 
 The path-detection component (#171 / #172) established the pattern: one

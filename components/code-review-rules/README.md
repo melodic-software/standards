@@ -65,7 +65,7 @@ only, so whether the Codex reviewer fetches that URL is unverified; adopting
 `review-instructions` gives a repository the in-repository form.
 
 `standards` owns no other org-wide review rule that belongs in the block:
-`REVIEW.md` already points into [`conventions/review/`](../../conventions/review/README.md),
+`REVIEW.md` already points into [`standards/review/`](../../standards/review/README.md),
 and the pull-request title, body and `do-not-merge` contract is checked by the
 `ci-status` pull-request contract step, so it stays out.
 
