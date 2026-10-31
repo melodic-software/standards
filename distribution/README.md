@@ -213,7 +213,10 @@ materialization as well. The runtime loads both schemas directly; omitting them
 would make the supposedly atomic payload fail on a clean consumer checkout.
 
 Repository-specific adoption remains a separate consumer change. Each target
-must add all of the following in the same integration PR:
+except `pr-pipeline-sandbox` must add all of the following in the same
+integration PR. The sandbox takes the runtime only as the npm manifest its
+PR-pipeline lanes install, and runs no runner-policy gate, so its adoption is
+deferred until it gains one:
 
 1. A locally owned `.github/runner-policy.json` with correct visibility,
    enrollment, and exact job exception and local-routing-grant inventory. A
