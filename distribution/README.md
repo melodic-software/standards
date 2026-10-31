@@ -31,7 +31,7 @@ fail-closed guarantees, residual risks, and security review triggers for the
 reconciliation engine itself. The
 [native-reference review credential](REVIEW-CREDENTIAL.md) classifies the
 separate, read-only credential a private calling repo's review job uses to
-mount `conventions/review` by native reference, and its republication
+mount `standards/review` by native reference, and its republication
 limits. The [governance process](governance-process.md) records the
 copy-adoption back-link and drift-check requirement and the cross-doc
 reconciliation step for normative-doc changes, all three outside this
