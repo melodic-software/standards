@@ -259,7 +259,7 @@ components:
   # Link-check config for every target's offline lychee lane. Deliberate
   # non-targets:
   # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
-  #   code or authored docs, like claude-lane-sandbox; not a sync target.
+  #   code or authored docs, and no lychee lane.
   # - songwriting (github-iac ADR-0006), azure-iac (a trust root the sync App
   #   must not write to), architecture and knowledge-corpus (not sync targets)
   #   run the offline lane with no copy of this file: the ci-workflows
@@ -857,6 +857,29 @@ targets:
       # Diverged local copy at the canonical destination (_typos.toml,
       # 174 lines vs 58). Recorded 2026-08-16 (audit).
       - typos
+  # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
+  # payloads those lanes read from `.github/standards/` (dependabot-policy,
+  # github-actions-conventions, runner-policy with node-runtime, and
+  # trusted-actors), so the copies stop drifting from claude-code-plugins',
+  # plus the hosted-only `managed-files-guard-caller` every public target
+  # carries. It reads runner-policy as the npm manifest its lanes install,
+  # with no repo-local `.github/runner-policy.json` or gate job yet, so the
+  # handoff in distribution/README.md is not done there. Its other configs
+  # stay repo-owned: it has no product code or authored docs to lint.
+  melodic-software/pr-pipeline-sandbox:
+    managed:
+      - dependabot-policy
+      - github-actions-conventions
+      - managed-files-guard-caller
+      - node-runtime
+      - runner-policy
+      - trusted-actors
+    # Its review callers are pr-review-cli variants pinned to the release
+    # claude-code-plugins tests, with a kill-switch job and hold inputs, so
+    # the sandbox can probe the lanes before claude-code-plugins adopts them.
+    locally-owned:
+      - claude-review-hosted-caller
+      - claude-security-review-hosted-caller
   melodic-software/provisioning:
     managed:
       - actionlint

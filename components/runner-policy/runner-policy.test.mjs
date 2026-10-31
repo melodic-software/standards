@@ -5713,6 +5713,7 @@ const TARGET_VISIBILITY = new Map([
   ["melodic-software/claude-code-plugins", "public"],
   ["melodic-software/codex-plugins", "public"],
   ["melodic-software/cursor-plugins", "public"],
+  ["melodic-software/pr-pipeline-sandbox", "public"],
   ["melodic-software/standards", "public"],
   ["melodic-software/agent-automations", "private"],
   ["melodic-software/claude-code-proxy", "private"],

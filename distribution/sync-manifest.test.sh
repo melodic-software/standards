@@ -583,7 +583,7 @@ assert_eq 'production validate batches tracked-source ls-files calls' '1' \
   "$(cat "$spawn_count_dir/ls-files")"
 assert_eq 'production validate batches tracked-source hash-object calls' '1' \
   "$(cat "$spawn_count_dir/hash-object")"
-assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 14 targets'
+assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 15 targets'
 
 if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   rm "$tmp_root/symlink-probe"
@@ -690,13 +690,13 @@ done < <(
     "$actual_manifest"
 )
 
-expected_runner_policy_targets='["melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/provisioning"]'
+expected_runner_policy_targets='["melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/pr-pipeline-sandbox","melodic-software/provisioning"]'
 actual_runner_policy_targets="$(
   yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == "runner-policy") | .key]' \
     "$actual_manifest"
 )"
-assert_eq 'runner-policy covers exactly the six enrolled consumers' \
+assert_eq 'runner-policy covers exactly the seven enrolled consumers' \
   "$expected_runner_policy_targets" "$actual_runner_policy_targets"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(

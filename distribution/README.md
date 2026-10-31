@@ -203,6 +203,7 @@ public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 - `melodic-software/dotfiles`
 - `melodic-software/github-iac`
 - `melodic-software/medley`
+- `melodic-software/pr-pipeline-sandbox`
 - `melodic-software/provisioning`
 
 It includes `runner-policy.mjs`, `policy.json`, both Draft 2020-12 policy schema

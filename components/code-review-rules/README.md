@@ -106,9 +106,9 @@ verbatim.
   sync target. A private repository outside the installation is not visible to
   either token.
 - Both listings skip a repository with the `sandbox` topic, such as
-  `pr-pipeline-sandbox`: a disposable test bed is no convergence target, for
-  the reason `distribution/sync-manifest.yml` records for
-  `claude-lane-sandbox`. `code-review-rules.sh names` holds that one filter;
+  `pr-pipeline-sandbox`: a disposable test bed takes no `review-instructions`
+  and so carries no pointer to it, even where `distribution/sync-manifest.yml`
+  syncs it other payloads. `code-review-rules.sh names` holds that one filter;
   the public listing applies it in the script and the workflow pipes the
   private listing through it.
 
