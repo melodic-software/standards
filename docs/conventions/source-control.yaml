@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/plugins/source-control/schemas/source-control.schema.json
+# Team layer of the source-control plugin's settings. Keys, values and resolution:
+# https://github.com/melodic-software/claude-code-plugins/blob/main/plugins/source-control/reference/config-resolution.md
+# (the babysit_loop_* keys under "Loop-lane keys", pr_body_required_sections under "The config
+# surface"). The merge-rung ladder and the ratification rule that makes this reviewed file the
+# recorded baseline: https://github.com/melodic-software/claude-code-plugins/blob/main/docs/contracts/loop-lane/README.md
+babysit_loop_stop_mode: standing
+babysit_loop_tier: worker
+babysit_loop_merge: c3-autonomous
+babysit_loop_grace_window_minutes: 30
+pr_body_required_sections:
+  - Summary
+  - Fix
+  - Verification
+  - Related

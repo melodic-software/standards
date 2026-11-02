@@ -7,9 +7,8 @@ materializes it to `docs/conventions/source-control/commit-convention.yml` in
 every sync target that manages it, which is the well-known path the guardrails resolver and
 the source-control plugin read
 ([seam contract](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/conventions/commit-convention/README.md)).
-A repository therefore needs no `## subject_pattern` section in its
-`.claude/source-control.md`; when the tracked file is present, its keys win
-over that section.
+A repository therefore needs no `subject_pattern` key in its
+`docs/conventions/source-control.yaml`; a key set there wins over this file.
 
 ## What reads it
 
