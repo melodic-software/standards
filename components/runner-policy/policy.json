@@ -158,7 +158,8 @@
         "cli-version",
         "hold-label",
         "hold-paths",
-        "generated-copies"
+        "generated-copies",
+        "generated-data"
       ],
       "allowedSecrets": {
         "CLAUDE_API_KEY": "${{ secrets.REVIEWS_CLAUDE_API_KEY }}",
