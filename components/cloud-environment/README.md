@@ -415,6 +415,10 @@ the snapshot.
   `GH_VERSION` and `GH_SHA256` in the same change as the CI runner image and
   the dotfiles mise pin. The version is lockstep-tested against this README in
   `setup.test.sh`.
+- The `shfmt` pin (v3.14.1) is the same kind of pin: `guardrails` reads each Bash
+  call from `shfmt --to-json` and refuses the call when `shfmt` is missing, so a
+  session on a snapshot without it has no Bash. Bump `SHFMT_VERSION` and
+  `SHFMT_SHA256` together.
 - A merged change does **not** reach existing environments on its own: the
   snapshot rebuilds only on an edit to the environment's script/network
   fields or on ~7-day cache expiry. To pick up a new version immediately,

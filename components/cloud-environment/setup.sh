@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-10-10.2'
+SCRIPT_VERSION='2026-11-03.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -372,6 +372,11 @@ fi
 GH_VERSION='2.98.0'
 GH_SHA256='3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de'
 GH_TARBALL='/tmp/gh.tar.gz'
+# shfmt publishes no checksums file for this release: the hash is sha256sum of
+# the linux_amd64 asset, matched against a second download of that URL.
+SHFMT_VERSION='3.14.1'
+SHFMT_SHA256='76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf'
+SHFMT_ASSET='/tmp/shfmt'
 
 # Each parallel track writes to its own temp log (LOG is reassigned
 # subshell-locally, so the log() calls and command output inside a track all
@@ -381,7 +386,8 @@ track_a_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-a.$$")"
 track_b_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-b.$$")"
 track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
 
-# Track A: gh CLI (pinned upstream release tarball) + PowerShell (apt;
+# Track A: gh CLI (pinned upstream release tarball) + shfmt (pinned upstream
+# release asset) + PowerShell (apt;
 # packages.microsoft.com is on the default allowlist).
 (
   LOG="$track_a_log"
@@ -417,6 +423,25 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
     log "gh $GH_VERSION installed"
   fi
   rm -f "$GH_TARBALL" 2>/dev/null
+  # guardrails reads each Bash call from shfmt's parse tree and refuses the call
+  # when shfmt is missing, so every fleet repo needs it, not only a repo whose
+  # own bootstrap installs it. amd64 only, for the same reason as gh.
+  if [[ "$(uname -m)" != 'x86_64' ]]; then
+    log "WARN shfmt install skipped: no pinned asset for $(uname -m) (amd64 only)"
+  elif ! curl --fail --location --proto '=https' --tlsv1.2 \
+    --output "$SHFMT_ASSET" \
+    "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
+    >>"$LOG" 2>&1; then
+    log "WARN shfmt $SHFMT_VERSION download failed"
+  elif ! printf '%s  %s\n' "$SHFMT_SHA256" "$SHFMT_ASSET" |
+    sha256sum --check --strict >>"$LOG" 2>&1; then
+    log "WARN shfmt $SHFMT_VERSION checksum mismatch; refusing to install"
+  elif ! install -m 0755 "$SHFMT_ASSET" /usr/local/bin/shfmt 2>>"$LOG"; then
+    log "WARN shfmt $SHFMT_VERSION install failed"
+  else
+    log "shfmt $SHFMT_VERSION installed"
+  fi
+  rm -f "$SHFMT_ASSET" 2>/dev/null
   ubuntu_ver="$(sed -n 's/^VERSION_ID="\{0,1\}\([0-9.]*\).*/\1/p' /etc/os-release)"
   if curl -fsSL "https://packages.microsoft.com/config/ubuntu/${ubuntu_ver}/packages-microsoft-prod.deb" \
     -o /tmp/msprod.deb >>"$LOG" 2>&1 &&
