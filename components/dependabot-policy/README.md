@@ -48,8 +48,8 @@ was retired with no targets in #430 and is not reintroduced.
   hijacked non-major release of a dependency that runs in a job holding a
   secret merges at tier `auto` with no review. Acceptance: once the sync PR
   lands the file, no claude-code-plugins Dependabot pull request carries
-  `dependabot-policy-unreadable`, and the next `@anthropic-ai/claude-code`
-  update carries `review-only:@anthropic-ai/claude-code`. Rollback: move the
+  `dependabot-policy-unreadable`, and the next `@playwright/cli` update
+  carries `review-only:@playwright/cli`. Rollback: move the
   component to claude-code-plugins' `locally-owned` list, which keeps the
   last synced file in place. Removing the file without reverting the
   consumer's classifiers sends every Dependabot pull request to review,
