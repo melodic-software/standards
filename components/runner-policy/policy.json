@@ -34,7 +34,8 @@
         "issue-number",
         "allowed-author-ids",
         "allowed-bot-sender-ids",
-        "role"
+        "role",
+        "lane-transcript-public-key"
       ],
       "allowedSecrets": {
         "CLAUDE_API_KEY": "${{ secrets.INTAKE_CLAUDE_API_KEY }}",
@@ -159,7 +160,8 @@
         "hold-label",
         "hold-paths",
         "generated-copies",
-        "generated-data"
+        "generated-data",
+        "lane-transcript-public-key"
       ],
       "allowedSecrets": {
         "CLAUDE_API_KEY": "${{ secrets.REVIEWS_CLAUDE_API_KEY }}",
