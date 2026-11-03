@@ -84,6 +84,13 @@ are trusted only at their reviewed Git revision.
   minor release that outlasts the cooldown, passes `ci-status` and is not in
   `autoMerge.reviewOnly` merges with no review, and that its install script
   runs wherever CI installs it.
+- The owner accepted
+  ([claude-code-plugins#12807](https://github.com/melodic-software/claude-code-plugins/pull/12807))
+  that `@anthropic-ai/claude-code` in claude-code-plugins is not in
+  `autoMerge.reviewOnly`: its non-major updates merge with no review and,
+  since that repository's `dependabot.yml` exempts it from the cooldown, no
+  soak, and its install script runs in the eval-browser-dispatch job that
+  holds the lane's OAuth token.
 - Dependabot options can change after a passing audit. The standard tracks the
   reviewed option set and values, not all future service behavior.
 - Grouping and the pull-request cap bound bot-pull-request volume but not the
