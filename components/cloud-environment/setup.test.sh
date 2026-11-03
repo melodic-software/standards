@@ -179,6 +179,30 @@ assert_contains 'setup.sh verifies the gh asset before installing it' \
   "$(cat "$script")" 'sha256sum --check --strict'
 assert_contains 'README documents the gh version the script installs' \
   "$(cat "$readme")" "$gh_pin"
+
+# shfmt install contract: guardrails refuses every Bash call without shfmt, so
+# this script installs it for repos whose own bootstrap does not.
+shfmt_pin="$(sed -n "s/^SHFMT_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
+if [[ -n "$shfmt_pin" ]]; then
+  pass "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')"
+else
+  fail "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')" \
+    "no SHFMT_VERSION='<version>' assignment found"
+fi
+if grep -Eq "^SHFMT_SHA256='[0-9a-f]{64}'\$" "$script"; then
+  pass 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)'
+else
+  fail 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)' \
+    "no SHFMT_SHA256='<64 hex chars>' assignment found"
+fi
+# shellcheck disable=SC2016 # the ${SHFMT_VERSION} is literal text being searched for
+assert_contains 'setup.sh fetches shfmt from the pinned upstream release asset' \
+  "$(cat "$script")" 'https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/'
+# shellcheck disable=SC2016 # the $ is a literal in the needle
+assert_contains 'setup.sh verifies the shfmt asset before installing it' \
+  "$(cat "$script")" 'printf '"'"'%s  %s\n'"'"' "$SHFMT_SHA256" "$SHFMT_ASSET"'
+assert_contains 'README documents the shfmt version the script installs' \
+  "$(cat "$readme")" "$shfmt_pin"
 assert_contains 'README bootstrap URL matches the component path' \
   "$(cat "$readme")" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
