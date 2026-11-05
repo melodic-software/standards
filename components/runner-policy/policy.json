@@ -43,6 +43,7 @@
         "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
       },
       "allowedCallerPermissions": {
+        "actions": "read",
         "contents": "read",
         "issues": "write"
       },
