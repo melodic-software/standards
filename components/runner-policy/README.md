@@ -188,9 +188,10 @@ unknown secret names, and alternate expressions:
 - `runner-input` names the one canonical runner input. Unknown workflows,
   unapproved refs, omitted runner inputs, and extra inputs fail closed.
   A contract may additionally name one exact `allowedCallerPermissions`
-  mapping when an independently reviewed workflow needs a narrowly
-  scoped write-capable caller token. The caller's effective job permissions
-  must match every scope and access level exactly; missing scopes, additional
+  mapping, or a non-empty list of exact mappings, when an independently
+  reviewed workflow needs a narrowly scoped write-capable caller token. The
+  caller's effective job permissions must match every scope and access level
+  of one mapping exactly; missing scopes, additional
   scopes, `write-all`, and access drift fail closed. Omitting this field keeps
   the ordinary read-only local-workload boundary. This waiver applies only
   while the call's runner input carries the managed fleet label; a caller that
@@ -341,10 +342,14 @@ next event. A change to that surface is ordered so no caller is refused:
 2. A removed or renamed input: remove it from every caller, found with an
    org-wide code search rather than a remembered list, then from the contract,
    then from the reusable.
-3. A secret or `allowedCallerPermissions` change: every caller must send exactly
-   the contract's secret map and caller permissions, so the contract change and
-   every caller's change take effect together; callers on either side of the
-   sync fail until both land.
+3. A secret change: every caller must send exactly the contract's secret map,
+   so the contract change and every caller's change take effect together;
+   callers on either side of the sync fail until both land. An
+   `allowedCallerPermissions` change lands expand/contract instead: the
+   contract first lists the old and the new map, the component sync
+   distributes it, every caller moves to the new map, and a follow-up removes
+   the old map. A caller passes while its permissions equal any one listed map
+   exactly.
 4. A new reusable path gets its own contract entry before its first caller
    lands.
 

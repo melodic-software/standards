@@ -2675,6 +2675,136 @@ jobs:
   }
 });
 
+const MIGRATION_OLD_MAP = { contents: "read", "pull-requests": "write" };
+const MIGRATION_NEW_MAP = { contents: "read", "pull-requests": "write", "id-token": "write" };
+
+async function callerPermissionRepository(allowedCallerPermissions, permissions) {
+  return repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: {},
+          allowedCallerPermissions,
+        },
+      },
+    },
+    workflows: {
+      "claude-review.yml": `permissions: read-all
+jobs:
+  review:
+    permissions:
+      ${permissions}
+    uses: ${FLEET_CLAUDE_REVIEW_REFERENCE}
+    with:
+      runner: ${FLEET_LABEL}
+`,
+    },
+  });
+}
+
+test("a caller matching either listed caller permission map passes", async () => {
+  for (const permissions of [
+    "contents: read\n      pull-requests: write",
+    "contents: read\n      pull-requests: write\n      id-token: write",
+  ]) {
+    const root = await callerPermissionRepository(
+      [MIGRATION_OLD_MAP, MIGRATION_NEW_MAP],
+      permissions,
+    );
+    assert.deepEqual(await audit(root), [], permissions);
+  }
+});
+
+test("a caller matching no listed caller permission map fails, naming every map", async () => {
+  const root = await callerPermissionRepository(
+    [MIGRATION_OLD_MAP, MIGRATION_NEW_MAP],
+    "contents: read\n      issues: write",
+  );
+  const findings = (await audit(root)).filter(({ rule }) => rule === "runner-target-contract");
+  assert.equal(findings.length, 1, "exactly one runner-target-contract finding");
+  assert.ok(
+    findings[0].message.includes(
+      'reusable workflow caller permissions must be exactly one of {"contents":"read","pull-requests":"write"}, {"contents":"read","pull-requests":"write","id-token":"write"}',
+    ),
+    findings[0].message,
+  );
+});
+
+test("a superset, subset, or access drift of any listed caller permission map fails", async () => {
+  for (const permissions of [
+    "contents: read",
+    "pull-requests: write",
+    "contents: read\n      pull-requests: write\n      issues: write",
+    "contents: read\n      pull-requests: write\n      id-token: write\n      issues: write",
+    "contents: write\n      pull-requests: write",
+    "contents: read\n      pull-requests: read\n      id-token: write",
+  ]) {
+    const root = await callerPermissionRepository(
+      [MIGRATION_OLD_MAP, MIGRATION_NEW_MAP],
+      permissions,
+    );
+    assert.ok(
+      (await audit(root)).some(({ rule }) => rule === "runner-target-contract"),
+      permissions,
+    );
+  }
+});
+
+test("the single-map caller permission form keeps its exact match and wording", async () => {
+  assert.deepEqual(
+    await audit(
+      await callerPermissionRepository(
+        MIGRATION_NEW_MAP,
+        "contents: read\n      pull-requests: write\n      id-token: write",
+      ),
+    ),
+    [],
+    "the exact single map passes",
+  );
+  for (const [permissions, expected] of [
+    [
+      "contents: read\n      pull-requests: write",
+      'reusable workflow caller permissions.id-token must be exactly "write"',
+    ],
+    [
+      "contents: read\n      pull-requests: write\n      id-token: write\n      issues: write",
+      "reusable workflow caller permissions has unapproved properties: issues",
+    ],
+  ]) {
+    const findings = await audit(await callerPermissionRepository(MIGRATION_NEW_MAP, permissions));
+    assert.ok(
+      findings.some(
+        ({ rule, message }) => rule === "runner-target-contract" && message.includes(expected),
+      ),
+      `${permissions}: ${JSON.stringify(findings)}`,
+    );
+  }
+});
+
+test("an empty caller permission map list fails the policy schema", async () => {
+  await assert.rejects(
+    async () => audit(await callerPermissionRepository([], "contents: read")),
+    (error) =>
+      error instanceof ConfigurationError && error.message.includes("allowedCallerPermissions"),
+  );
+});
+
+test("every listed caller permission map must authorize a write scope", async () => {
+  await assert.rejects(
+    async () =>
+      audit(
+        await callerPermissionRepository(
+          [MIGRATION_OLD_MAP, { contents: "read" }],
+          "contents: read",
+        ),
+      ),
+    /allowedCallerPermissions\[1\] must include at least one write permission/,
+  );
+});
+
 test("reviewed caller permissions do not authorize other credential surfaces", async () => {
   for (const scenario of [
     {
