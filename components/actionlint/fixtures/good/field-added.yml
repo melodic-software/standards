@@ -1,9 +1,9 @@
-# The `issues` `field_added` activity type the pinned actionlint rejects, in the
-# shape claude-code-plugins work-resolve-issue.yml uses.
+# The `issues` `field_added` and `field_removed` activity types the pinned
+# actionlint rejects, in the shape claude-code-plugins intake-reenter.yml uses.
 name: field-added fixture
 on:
   issues:
-    types: [labeled, field_added]
+    types: [labeled, field_added, field_removed]
 permissions: {}
 jobs:
   noop:
