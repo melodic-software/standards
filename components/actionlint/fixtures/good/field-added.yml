@@ -1,0 +1,13 @@
+# The `issues` `field_added` activity type the pinned actionlint rejects, in the
+# shape claude-code-plugins work-resolve-issue.yml uses.
+name: field-added fixture
+on:
+  issues:
+    types: [labeled, field_added]
+permissions: {}
+jobs:
+  noop:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: exit 0
