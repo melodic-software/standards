@@ -141,4 +141,31 @@ rc=$?
 assert_nonzero 'a job cache-mode workflow fails without the config (removal tripwire)' "$rc"
 assert_contains 'control run reports the cache-mode message' "$out" "$cache_mode_message"
 
+# `issues` `field_added`: the scoped ignore admits it, and only its exact message.
+field_added_message='invalid activity type "field_added" for "issues" Webhook event'
+cp "$config" "$project/.github/"
+rm -f "$project"/.github/workflows/*.yml
+cp components/actionlint/fixtures/good/field-added.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_exit 'an issues field_added workflow lints clean with the config' 0 "$rc"
+assert_silent 'the field_added run emits no findings' "$out"
+
+cp components/actionlint/fixtures/bad/unknown-issues-type.yml "$project/.github/workflows/"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'an unknown issues activity type still fails with the config' "$rc"
+assert_contains 'the unknown activity type is reported' "$out" 'invalid activity type "field_removed_twice"'
+assert_not_contains 'the field_added suppression stays scoped to its exact message' "$out" "$field_added_message"
+
+# Control: without the config the field_added type must be rejected. When this
+# case fails, the pinned engine knows `field_added` natively; drop the ignore
+# instead of patching this test.
+rm "$project/.github/actionlint.yaml" \
+  "$project/.github/workflows/unknown-issues-type.yml"
+out="$(cd "$project" && actionlint -no-color 2>&1)"
+rc=$?
+assert_nonzero 'an issues field_added workflow fails without the config (removal tripwire)' "$rc"
+assert_contains 'control run reports the field_added message' "$out" "$field_added_message"
+
 [[ $FAILED -eq 0 ]] || exit 1

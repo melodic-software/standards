@@ -1,0 +1,13 @@
+# An `issues` activity type GitHub does not have: the field_added ignore must not
+# admit it.
+name: unknown-issues-type fixture
+on:
+  issues:
+    types: [field_removed_twice]
+permissions: {}
+jobs:
+  noop:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: exit 0
