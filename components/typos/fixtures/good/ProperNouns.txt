@@ -9,5 +9,8 @@ calibre.calibre is the winget package id for the Calibre ebook manager.
 Its CLI binaries are calibre and calibredb, and CALIBRE_CONFIG_DIRECTORY
 points at its profile. A step id reads calibreInstall.
 
+canva@claude-plugins-official is the Claude Code plugin for Canva, the
+design platform; it is not a misspelled canvas.
+
 Reaching for the full axe is the American spelling; en-us prefers the ax
 variant and would rewrite it.
