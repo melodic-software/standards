@@ -30,11 +30,12 @@ ci-workflows `intake-triage.yml` sets `cache-mode: none` on its model jobs.
 actionlint cannot check the key's value. Remove the ignore when actionlint
 knows the key and the pinned actionlint is bumped.
 
-A fourth scoped ignore admits GitHub's `issues` activity type `field_added`,
-which actionlint 1.7.12 rejects with `invalid activity type "field_added" for
-"issues" Webhook event`. claude-code-plugins `work-resolve-issue.yml` starts on
-the Work status field through it. Remove the ignore when actionlint lists the
-type and the pinned actionlint is bumped.
+Two more scoped ignores admit GitHub's `issues` activity types `field_added` and
+`field_removed`, which actionlint 1.7.12 rejects with `invalid activity type
+"field_added" for "issues" Webhook event` (and the same for `field_removed`).
+claude-code-plugins `work-resolve-issue.yml` starts on the Work status field
+through `field_added`, and `intake-reenter.yml` through both. Remove the ignores
+when actionlint lists the types and the pinned actionlint is bumped.
 
 Execution and the engine pin are owned by the actionlint action in
 `ci-workflows`. `fixtures/` and `actionlint.test.sh` prove the allowlist against
@@ -47,5 +48,5 @@ The `$/` cases follow the same shape: a `$/` workflow lints clean, a ref-less
 reference, which fails once actionlint accepts it natively. The queue cases
 match: a queue workflow lints clean, an unrelated unexpected key still fails,
 and a configless control run reports the queue message. The `cache-mode` cases
-repeat that shape, and so do the `field_added` cases, whose unrelated failure is
+repeat that shape, and so do the `issues` field cases, whose unrelated failure is
 an `issues` activity type GitHub does not have.
