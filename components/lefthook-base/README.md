@@ -52,5 +52,7 @@ change happens to touch.
 
 `lefthook-base.test.sh` builds a temporary consumer, composes the managed
 fragment, and proves the Markdownlint lane resolves the consumer's own
-`node_modules/.bin` binary rather than an arbitrary one on `PATH`, and that a
-missing local install fails loudly with its remediation.
+`node_modules/.bin` binary rather than an arbitrary one on `PATH`. Because
+`node_modules` is per worktree, a missing local binary makes the lane run
+`npm ci` and then lint; if that install fails or leaves no binary, the lane
+fails loudly with its remediation.
