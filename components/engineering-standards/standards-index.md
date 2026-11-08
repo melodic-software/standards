@@ -14,8 +14,8 @@ there, not here.
 | concise-prose | writing or reviewing any prose: docs, comments, commit messages, PR bodies, replies | concise-prose.md |
 | design-for-change | designing or reviewing a module boundary, an extension point, configuration, dependency wiring, or a design pattern; any change whose reversal would edit many files | design-for-change.md |
 | deterministic-work-execution | counts, diffs, sorting, arithmetic, inventories; composing shell commands an agent runs | deterministic-work-execution.md |
-| issue-tracker | filing, titling, triaging or closing an issue; adding, renaming or deleting a label, issue field or milestone; choosing labels versus fields | issue-tracker.md |
 | documentation-and-citations | citing upstream docs; recording an external default or version; labeling the basis of a recommendation | documentation-and-citations.md |
+| issue-tracker | filing, titling, triaging or closing an issue; adding, renaming or deleting a label, issue field or milestone; choosing labels versus fields | issue-tracker.md |
 | reference-dont-duplicate | a fact, value, or rule appearing in more than one place; origin or history notes in code or docs | reference-dont-duplicate.md |
 | simpler-code | writing or reviewing code; proposing a new check, process, document, or dependency; serializing work; keeping an existing mechanism | simpler-code.md |
 | source-authority-tiers | grounding a recommendation, option, or decision; judging how much a source is worth | source-authority-tiers.md |

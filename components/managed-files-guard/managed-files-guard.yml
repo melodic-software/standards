@@ -76,10 +76,10 @@ on:
       - docs/standards/design-for-change.md
       - docs/standards/deterministic-work-execution.md
       - docs/standards/documentation-and-citations.md
+      - docs/standards/issue-tracker.md
       - docs/standards/reference-dont-duplicate.md
       - docs/standards/simpler-code.md
       - docs/standards/source-authority-tiers.md
-      - docs/standards/issue-tracker.md
       - eng/dotnet-analysis/Directory.Build.props
       - eng/dotnet-analysis/dotnet.globalconfig
       - lychee.toml

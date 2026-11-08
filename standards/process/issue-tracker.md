@@ -19,7 +19,7 @@ Labels follow one grammar across every axis, so a reader parses any label withou
 - **One color family per axis.** Every value on an axis shares a color family, so the axis is legible at a glance in a crowded label list. The colors are part of the definition and are set in infrastructure-as-code.
 - **Small, curated set.** Each axis stays deliberately small. A value earns its place by being triaged on; a value nobody filters by is noise. Values are added deliberately, through governance, not reactively.
 
-**Bare marker labels are a deliberate exception to the colon-space grammar.** Boolean flags, hold labels and lifecycle floor markers, which stack rather than pick one value from an axis, are spelled as one flat lowercase kebab-case name, notably `needs-triage` (triage floor; see "Triage floor" below) and `recurring` (rolling-item identity marker; see "Recurring and rolling items" below), are intentionally spelled without an `<axis>: <value>` prefix. They are not values on an enumerated axis; they signal a workflow condition or reconcile identity that absence-checking and label-plus-marker matching depend on. Workflows and infrastructure-as-code use these bare spellings.
+**Bare marker labels are a deliberate exception to the colon-space grammar.** Boolean flags, hold labels and lifecycle floor markers, which stack rather than pick one value from an axis, are spelled as one flat lowercase kebab-case name without an `<axis>: <value>` prefix: notably `needs-triage` (triage floor; see "Triage floor" below) and `recurring` (rolling-item identity marker; see "Recurring and rolling items" below). They are not values on an enumerated axis; they signal a workflow condition or reconcile identity that absence-checking and label-plus-marker matching depend on. Workflows and infrastructure-as-code use these bare spellings.
 
 **The space costs a quoting hazard, and that cost is accepted.** A `label:` search qualifier whose value contains a space fails silently unless the value is quoted: `label:<axis>: <value>` returns zero results with no error, where `label:"<axis>: <value>"` returns the correct count. Prefer `gh`'s `--label` flag, which is exact and quote-safe, and quote the value wherever a search qualifier is unavoidable. The work-items tracker seam does not inherit the hazard, because it filters labels [core-side over the items its adapter already returned](https://github.com/melodic-software/claude-code-plugins/blob/main/plugins/work-items/tools/work-item-tracker/CONTRACT.md#verbs-core-public-surface), so provider search syntax is never involved. But a lane that builds its own `label:` query string still does. Reversing the separator would buy those lanes partial relief: a slash label with a single-word value (`priority/low`) contains no whitespace, so its `label:` qualifier needs no quoting. But a multiword value (`status/needs decision`) keeps the space and the silent-zero failure with it, so query-building lanes must keep the quoting discipline for the general case either way. And buying that partial relief would rename every prefixed label fleet-wide, exposing every live attachment to a rename path GitHub does not document. The partial win does not cover the migration's cost.
 
@@ -39,12 +39,11 @@ Every issue meets one rule, whether a person, an agent session or a bot workflow
 
 - a plain title, as above;
 - the Issue Type set;
-- the issue fields set: Work status, and Size, Complexity and Uncertainty once the work is assessed;
-- a priority;
+- Work status, Size, Complexity, Uncertainty and a priority;
 - a parent issue when the work belongs to a larger one;
 - a blocked-by edge when it waits on other work or a decision (see "The status axis" below).
 
-A bot that files the same record repeatedly (a monitoring signal, a post-merge alert) meets the rule too. A running log of observations is a Discussion, not an issue.
+The title and Issue Type are set at filing, always. The filer sets the other values it knows at filing; triage sets the rest before the issue is worked, and no value is ever a placeholder. A bot that files the same record repeatedly (a monitoring signal, a post-merge alert) knows these values and sets them at filing. A running log of observations is a Discussion, not an issue.
 
 ## The type axis
 
