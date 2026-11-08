@@ -1,4 +1,4 @@
-name: release-publish-packages
+name: Release Publish Packages
 
 # Package components are published directly from their cohesive source slices.
 # There is no staging copy: the authored, tested, packed, and published config

@@ -126,7 +126,7 @@
             "items": { "enum": ["*", "workflow-filename", "workflow-name"] }
           },
           "expectedName": {
-            "description": "For a workflow-name exemption, the one `name:` value accepted instead of the stem.",
+            "description": "For a workflow-name exemption, the one `name:` value accepted instead of the stem or its Title Case form.",
             "type": "string",
             "minLength": 1
           },

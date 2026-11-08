@@ -1,4 +1,4 @@
-name: maintenance-audit-code-review-rules
+name: Maintenance Audit Code Review Rules
 
 # Flags a repository whose root AGENTS.md lacks the `## Code Review Rules`
 # section that components/code-review-rules/README.md defines, so a new

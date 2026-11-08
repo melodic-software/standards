@@ -1,4 +1,4 @@
-name: maintenance-sync-standards
+name: Maintenance Sync Standards
 
 # Exact-file distribution: standards owns desired bytes and ci-workflows owns
 # GitHub orchestration. Every real run opens or refreshes one reviewed PR per

@@ -367,7 +367,7 @@ sourced from `components/claude-lanes-hosted/` and materialized at
 `.github/workflows/pr-review-hosted.yml` and
 `.github/workflows/pr-review-security-hosted.yml`. Each file equals its
 fleet sibling except for comments, `runner: ubuntu-24.04` and the workflow
-`name:`, which equals each file's stem; the job ids match, so the check
+`name:`, which is each file's stem in Title Case; the job ids match, so the check
 contexts do too. The destinations differ because
 a destination has one owning component. They are `managed` for .github,
 agent-plugins, ci-runner, claude-code-account-rotation, codex-plugins and
@@ -421,8 +421,8 @@ the same caller at the same pin.
 Both call `.github/actions/check-managed-files` at the same pin. The two files
 differ only in `runs-on`, comments, their `on.pull_request.paths` entries (each
 lists the managed destinations of the targets that receive it) and the workflow
-`name:`, which equals each destination stem (`pr-check-managed-files-hosted` and
-`pr-check-managed-files`). They share the job id and job name
+`name:`, which is each destination stem in Title Case (`PR Check Managed Files Hosted` and
+`PR Check Managed Files`). They share the job id and job name
 `pr-check-managed-files`, so the check context is `pr-check-managed-files`
 on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The

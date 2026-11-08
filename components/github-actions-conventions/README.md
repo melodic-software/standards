@@ -47,8 +47,16 @@ A workflow file is named `<stage>-<function>[-<modifier>].yml`, in kebab-case.
 | `upstream` | Track and take in changes from upstream sources. |
 <!-- stages:end -->
 
-The workflow's `name:` equals the file stem. A caller of a reusable workflow
-takes the reusable's file name.
+A workflow's `name:` is its file stem in Title Case: each hyphen becomes a
+space and each word is capitalized, with `PR`, `CI`, `API` and `WIP` in upper
+case (`pr-run-checks-go` is named `PR Run Checks Go`). A caller of a reusable
+workflow takes the reusable's file name, so its `name:` is that file name in
+Title Case.
+
+Names come in two tiers. Workflow and composite action `name:` values are
+Title Case display names. Job ids and job names stay kebab-case, because a
+job's name is its check name (see [Jobs and check names](#jobs-and-check-names))
+and `ci-status` is the one required check.
 
 ## Jobs and check names
 
@@ -81,6 +89,9 @@ into it. Lanes are added or renamed behind it without touching a ruleset.
   and verb-first (`check-managed-files`, `report-lane-outcome`).
 - An action that wraps one tool keeps the tool's name (`markdownlint`,
   `psscriptanalyzer`).
+- An action's `name:` is the name of the directory holding its `action.yml`,
+  in Title Case by the workflow rule above (`check-managed-files` is named
+  `Check Managed Files`). naming-lint checks the directory, not this `name:`.
 
 ## Settings a called workflow does not inherit
 
@@ -146,6 +157,7 @@ The complete list is `exemptions` in `vocabulary.json`. It holds one entry:
 github-iac's OIDC negative test, `release-deploy-oidc-negative-test.yml`,
 whose `name:` is `release-deployx`: the deploy workflow's name plus one
 character, so the identity policy that trusts `release-deploy` must reject it.
+Only that exact value passes: neither the stem nor a Title Case form does.
 GitHub's dynamic workflows (Dependabot, CodeQL default setup, Pages) need no
 entry: they have no file in `.github/workflows/`.
 
@@ -191,7 +203,7 @@ directory under `.github/actions/` that holds an `action.yml` or
 | Rule | Level | Fails when |
 | --- | --- | --- |
 | `workflow-filename` | error | the file stem is not `<stage>-<function>[-<modifier>]` with a known stage and function word |
-| `workflow-name` | error | `name:` is missing or differs from the stem (or from a recorded exception) |
+| `workflow-name` | error | `name:` is missing, or is neither the stem's Title Case form nor the stem (see [Rollout](#rollout)), or differs from a recorded exception |
 | `workflow-unparsable` | error | the file is not a YAML mapping |
 | `gate-ci-status` | error | `pr-require-checks` has no `ci-status` job |
 | `job-id-kebab` | error | a job id is not kebab-case |
@@ -224,6 +236,9 @@ closed the advisory period.
   renamed to `release-publish-plugins.yml` before the switch.
 - **Rollback:** set the composite's `mode: advisory`, which reports every
   finding as a warning and passes, or remove the lane.
+- **Title Case names:** `workflow-name` accepts the bare stem as well as its
+  Title Case form until every org repository is converted; a later change then
+  accepts the Title Case form only.
 
 ### Ownership and operation
 

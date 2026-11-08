@@ -23,6 +23,7 @@ const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/u;
 const GATE_STEM = "pr-require-checks";
 const MODES = ["advisory", "enforcing"];
 const FORMATS = ["text", "json", "github"];
+const TITLE_CASE_ACRONYMS = new Set(["pr", "ci", "api", "wip"]);
 
 function parseJson(source, location) {
   // The yaml parser in strict JSON mode rejects duplicate keys, which
@@ -156,6 +157,19 @@ export function parseSlotName(name, vocabulary) {
   }
   const modifier = rest === fn ? undefined : rest.slice(fn.length + 1);
   return { stage, function: fn, modifier };
+}
+
+// A file or directory stem's display name: hyphens become spaces, each word is
+// capitalized, and the listed acronyms are upper case.
+export function titleCaseName(stem) {
+  return stem
+    .split("-")
+    .map((word) =>
+      TITLE_CASE_ACRONYMS.has(word)
+        ? word.toUpperCase()
+        : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+    )
+    .join(" ");
 }
 
 function isSlotName(name, vocabulary) {
@@ -323,8 +337,15 @@ async function workflowFindings(root, repository, vocabulary) {
     const nameNode = document.contents.get("name", true);
     const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
     const nameExemption = waived("workflow-name");
-    const expectedName = nameExemption?.expectedName ?? stem;
-    if (name !== expectedName) {
+    const titleCase = titleCaseName(stem);
+    // The Title Case form is the convention. The bare stem also passes until
+    // every org repository is converted; a later stage then drops it from this
+    // list. A recorded exception is exact: it takes neither form.
+    const accepted = nameExemption ? [nameExemption.expectedName] : [titleCase, stem];
+    if (!accepted.includes(name)) {
+      const target = nameExemption
+        ? `the recorded exception \`${accepted[0]}\``
+        : `the Title Case form of the file stem, \`${titleCase}\``;
       findings.push(
         finding(
           "error",
@@ -332,8 +353,8 @@ async function workflowFindings(root, repository, vocabulary) {
           file,
           lineOf(lineCounter, nameNode),
           name === undefined
-            ? `workflow has no \`name:\`; set it to the file stem \`${expectedName}\``
-            : `workflow \`name: ${name}\` must equal ${nameExemption ? "the recorded exception" : "the file stem"} \`${expectedName}\``,
+            ? `workflow has no \`name:\`; set it to ${target}`
+            : `workflow \`name: ${name}\` must equal ${target}`,
         ),
       );
     }

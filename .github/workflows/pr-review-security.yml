@@ -1,4 +1,4 @@
-name: pr-review-security
+name: PR Review Security
 
 # Automated PR security review via the ci-workflows reusable workflow, the
 # security sibling of pr-review.yml. Advisory: never add any check in this

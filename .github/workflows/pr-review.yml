@@ -1,4 +1,4 @@
-name: pr-review
+name: PR Review
 
 # Automated PR code review via the ci-workflows reusable workflow. The caller
 # owns the triggers + GITHUB_TOKEN permission grant (a called workflow can only
