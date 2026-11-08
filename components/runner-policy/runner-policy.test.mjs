@@ -2805,6 +2805,251 @@ test("every listed caller permission map must authorize a write scope", async ()
   );
 });
 
+const SECRET_MIGRATION_OLD_MAP = {
+  "app-client-id": `\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}`,
+  "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
+};
+const SECRET_MIGRATION_NEW_MAP = {
+  "app-client-id": `\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}`,
+  "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
+  "fallback-private-key": `\${{ secrets.STANDARDS_SYNC_FALLBACK_PRIVATE_KEY }}`,
+};
+const OLD_SECRET_LINES = `      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+`;
+const NEW_SECRET_LINES = `${OLD_SECRET_LINES}      fallback-private-key: \${{ secrets.STANDARDS_SYNC_FALLBACK_PRIVATE_KEY }}
+`;
+const MISMATCHED_SECRET_LINES = `      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+      app-private-key: \${{ secrets.OTHER_PRIVATE_KEY }}
+`;
+
+async function callerSecretRepository(allowedSecrets, secretLines) {
+  return repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: { ...SYNC_RUNNER_INPUT_CONTRACT, allowedSecrets },
+      },
+    },
+    workflows: {
+      "sync.yml": `permissions:
+  contents: read
+jobs:
+  sync:
+    uses: ${SYNC_RUNNER_INPUT_REFERENCE}
+    with:
+      runner: ${FLEET_LABEL}
+    secrets:
+${secretLines}`,
+    },
+  });
+}
+
+async function secretContractFindings(allowedSecrets, secretLines) {
+  return (await audit(await callerSecretRepository(allowedSecrets, secretLines))).filter(
+    ({ rule }) => rule === "runner-target-contract",
+  );
+}
+
+test("a caller matching either listed secret map passes", async () => {
+  for (const [label, secretLines] of [
+    ["old map", OLD_SECRET_LINES],
+    ["new map", NEW_SECRET_LINES],
+  ]) {
+    const root = await callerSecretRepository(
+      [SECRET_MIGRATION_OLD_MAP, SECRET_MIGRATION_NEW_MAP],
+      secretLines,
+    );
+    assert.deepEqual(await audit(root), [], label);
+  }
+});
+
+test("a caller matching no listed secret map fails, naming every map", async () => {
+  const findings = await secretContractFindings(
+    [SECRET_MIGRATION_OLD_MAP, SECRET_MIGRATION_NEW_MAP],
+    MISMATCHED_SECRET_LINES,
+  );
+  assert.equal(findings.length, 1, "exactly one runner-target-contract finding");
+  assert.ok(
+    findings[0].message.includes(
+      `reusable workflow secrets must be exactly one of {"app-client-id":"\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}","app-private-key":"\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"}, {"app-client-id":"\${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}","app-private-key":"\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}","fallback-private-key":"\${{ secrets.STANDARDS_SYNC_FALLBACK_PRIVATE_KEY }}"}`,
+    ),
+    findings[0].message,
+  );
+});
+
+test("a superset, subset, or expression drift of any listed secret map fails", async () => {
+  for (const secretLines of [
+    `      app-client-id: \${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}\n`,
+    `${NEW_SECRET_LINES}      extra: \${{ secrets.EXTRA }}\n`,
+    `${OLD_SECRET_LINES}      extra: \${{ secrets.EXTRA }}\n`,
+    `${OLD_SECRET_LINES}      fallback-private-key: \${{ secrets.OTHER_FALLBACK_KEY }}\n`,
+    MISMATCHED_SECRET_LINES,
+  ]) {
+    assert.equal(
+      (
+        await secretContractFindings(
+          [SECRET_MIGRATION_OLD_MAP, SECRET_MIGRATION_NEW_MAP],
+          secretLines,
+        )
+      ).length,
+      1,
+      secretLines,
+    );
+  }
+});
+
+test("the single-map secret form keeps its exact match and wording", async () => {
+  for (const [label, allowedSecrets, secretLines] of [
+    ["the old single map admits the old caller", SECRET_MIGRATION_OLD_MAP, OLD_SECRET_LINES],
+    ["the new single map admits the new caller", SECRET_MIGRATION_NEW_MAP, NEW_SECRET_LINES],
+  ]) {
+    assert.deepEqual(
+      await audit(await callerSecretRepository(allowedSecrets, secretLines)),
+      [],
+      label,
+    );
+  }
+  for (const [allowedSecrets, secretLines, expected] of [
+    [
+      SECRET_MIGRATION_NEW_MAP,
+      OLD_SECRET_LINES,
+      `reusable workflow secrets.fallback-private-key must be exactly "\${{ secrets.STANDARDS_SYNC_FALLBACK_PRIVATE_KEY }}"`,
+    ],
+    [
+      SECRET_MIGRATION_OLD_MAP,
+      NEW_SECRET_LINES,
+      "reusable workflow secrets has unapproved properties: fallback-private-key",
+    ],
+    [
+      SECRET_MIGRATION_OLD_MAP,
+      MISMATCHED_SECRET_LINES,
+      `reusable workflow secrets.app-private-key must be exactly "\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}"`,
+    ],
+  ]) {
+    const findings = await secretContractFindings(allowedSecrets, secretLines);
+    assert.equal(findings.length, 1, secretLines);
+    assert.ok(findings[0].message.includes(expected), findings[0].message);
+  }
+});
+
+test("an empty secret map list fails the policy schema", async () => {
+  await assert.rejects(
+    async () => audit(await callerSecretRepository([], OLD_SECRET_LINES)),
+    (error) => error instanceof ConfigurationError && error.message.includes("allowedSecrets"),
+  );
+});
+
+test("every listed secret map must hold exact whole named-secret expressions", async () => {
+  await assert.rejects(
+    async () =>
+      audit(
+        await callerSecretRepository(
+          [SECRET_MIGRATION_OLD_MAP, { "app-client-id": `\${{ toJSON(secrets) }}` }],
+          OLD_SECRET_LINES,
+        ),
+      ),
+    /allowedSecrets\[1\]\.app-client-id must be exactly one whole/,
+  );
+});
+
+test("every listed secret map of a privileged contract must map each secret to its own name", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: {
+        [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
+          routing: "runner-input",
+          runnerInput: "runner",
+          allowedInputs: ["runner"],
+          allowedSecrets: [
+            { CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` },
+            { CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.OTHER_TOKEN }}` },
+          ],
+          allowedCallerPermissions: { contents: "write" },
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    () => audit(root),
+    /allowedSecrets\[1\]\.CLAUDE_CODE_OAUTH_TOKEN must be exactly "\$\{\{ secrets\.CLAUDE_CODE_OAUTH_TOKEN \}\}" when allowedCallerPermissions is present/,
+  );
+});
+
+test("a hosted-only contract accepts either listed secret map and refuses any other", async () => {
+  const hostedSecretRepository = (secretLines) =>
+    repository({
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [pathOf(REUSABLE_REFERENCE)]: {
+            routing: "hosted-only",
+            allowedInputs: [],
+            allowedSecrets: [SECRET_MIGRATION_OLD_MAP, SECRET_MIGRATION_NEW_MAP],
+            fixedRunsOn: ["ubuntu-24.04"],
+          },
+        },
+      },
+      workflows: {
+        "ci.yml": `jobs:
+  scan:
+    uses: ${REUSABLE_REFERENCE}
+    secrets:
+${secretLines}`,
+      },
+    });
+  for (const [label, secretLines] of [
+    ["old map", OLD_SECRET_LINES],
+    ["new map", NEW_SECRET_LINES],
+  ]) {
+    assert.deepEqual(await audit(await hostedSecretRepository(secretLines)), [], label);
+  }
+  const findings = await audit(await hostedSecretRepository(MISMATCHED_SECRET_LINES));
+  assert.ok(
+    findings.some(
+      ({ rule, message }) =>
+        rule === "runner-target-contract" &&
+        message.includes("reusable workflow secrets must be exactly one of"),
+    ),
+    JSON.stringify(findings),
+  );
+});
+
+test("a denylisted secret in any listed map is visibility-scoped surface", async () => {
+  for (const [label, listedMap] of [
+    ["by name", { STANDARDS_REVIEW_APP_ID: `\${{ secrets.STANDARDS_REVIEW_APP_ID }}` }],
+    ["by aliased expression", { REVIEW_APP_ID: `\${{ secrets.STANDARDS_REVIEW_APP_ID }}` }],
+  ]) {
+    const root = await repository({
+      visibility: "public",
+      selfHostedCi: false,
+      policyOverrides: {
+        approvedReusableWorkflowContracts: {
+          [CLAUDE_REVIEW_PATH]: {
+            routing: "hosted-only",
+            allowedInputs: [],
+            allowedSecrets: [{}, listedMap],
+            fixedRunsOn: ["ubuntu-24.04"],
+          },
+        },
+      },
+      workflows: {
+        "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      },
+    });
+    assert.deepEqual(
+      await audit(root, { repositoryVisibility: "public" }),
+      [
+        {
+          rule: "visibility-scoped-reusable-contract",
+          file: "runner-policy-policy.json",
+          message: `reusable workflow contract ${CLAUDE_REVIEW_PATH} lists visibility-scoped surface (STANDARDS_REVIEW_APP_ID) while this repository is public; shared contracts cannot enable sensitive inputs for private consumers only`,
+        },
+      ],
+      label,
+    );
+  }
+});
+
 test("reviewed caller permissions do not authorize other credential surfaces", async () => {
   for (const scenario of [
     {
