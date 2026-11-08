@@ -1,14 +1,14 @@
-# `@melodic-software/tsconfig`
+# TypeScript base
 
-Strict, runtime-neutral TypeScript compiler defaults. This component directory
-is both the source slice and npm package: `tsconfig.json` is authored, tested,
-and published here with no staging copy.
+Strict, runtime-neutral TypeScript compiler defaults. The sync delivers
+`tsconfig.json` to each target at `.github/standards/tsconfig/tsconfig.json`
+(the `tsconfig` component in `distribution/sync-manifest.yml`).
 
-Install from GitHub Packages and extend the package from a project config:
+Extend it by relative path from a project config:
 
 ```json
 {
-  "extends": "@melodic-software/tsconfig/tsconfig.json",
+  "extends": "./.github/standards/tsconfig/tsconfig.json",
   "compilerOptions": {
     "target": "ES2024",
     "module": "NodeNext",
@@ -22,17 +22,15 @@ The base owns strict type-safety switches but deliberately omits runtime floor,
 module environment, source scope, output, and `noEmit`. It also omits unused
 symbol checks because Biome owns those findings.
 
-The package declares TypeScript `>=5 <8`. TypeScript 5.0 is the compatibility
-floor because it introduced `verbatimModuleSyntax`. The peer range is the
-intended compiler-config compatibility range; it makes no compatibility claim
-for frameworks or tools that consume TypeScript compiler APIs. CI runs the
-packed consumer contract against exact representative maintained stable patches
-for every declared major: 5.9.3, 6.0.3, and 7.0.2. See the official
-[TypeScript 5.0 release notes][1].
+The base supports TypeScript 5.0 through 7.x. TypeScript 5.0 is the floor
+because it introduced `verbatimModuleSyntax`. The range is a compiler-config
+compatibility claim only; it makes none for frameworks or tools that consume
+TypeScript compiler APIs. CI runs the contract test against exact
+representative maintained stable patches for every supported major: 5.9.3,
+6.0.3, and 7.0.2. See the official [TypeScript 5.0 release notes][1].
 
-`fixtures/` and `tsconfig.test.sh` pack and install the package in an isolated
-consumer, then prove strict and `noUncheckedIndexedAccess` diagnostics. The
-publish workflow packs this directory directly and requires a version bump
-whenever the complete packed payload differs from an already-published version.
+`fixtures/` and `tsconfig.test.sh` extend the base by relative path from an
+isolated consumer, then prove strict and `noUncheckedIndexedAccess`
+diagnostics.
 
 [1]: https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html#--verbatimmodulesyntax

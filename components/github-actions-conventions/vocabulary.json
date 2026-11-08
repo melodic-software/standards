@@ -90,7 +90,6 @@
       { "name": "deploy", "status": "in-use" },
       { "name": "publish-binaries", "status": "in-use" },
       { "name": "publish-image", "status": "in-use" },
-      { "name": "publish-packages", "status": "in-use" },
       {
         "name": "publish-plugins",
         "status": "reserved",

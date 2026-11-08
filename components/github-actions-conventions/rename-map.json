@@ -1681,18 +1681,6 @@
   {
     "repo": "standards",
     "kind": "workflow",
-    "from": ".github/workflows/publish-packages.yml",
-    "to": ".github/workflows/release-publish-packages.yml",
-    "from_name": "publish-packages",
-    "to_name": "release-publish-packages",
-    "job_renames": [],
-    "couplings": [],
-    "confidence": "high",
-    "note": "Push to main on components/biome|tsconfig: npm publish"
-  },
-  {
-    "repo": "standards",
-    "kind": "workflow",
     "from": ".github/workflows/sync.yml",
     "to": ".github/workflows/maintenance-sync-standards.yml",
     "from_name": "standards-sync",

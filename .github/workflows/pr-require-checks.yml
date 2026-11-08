@@ -523,21 +523,21 @@ jobs:
         uses: melodic-software/ci-workflows/.github/actions/biome@8e1076f6c33cb9ca3544a1ad2a215fd2262b4a72 # v0.71.0
         with:
           config: biome.jsonc
-          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution harness/packages
+          paths: components/biome/fixtures/good components/concurrency-policy components/dependabot-policy components/github-actions-conventions components/mcp-launcher components/runner-policy distribution
       - name: Set up Node
         if: ${{ !cancelled() }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       # Each supported TypeScript release in turn, installed on PATH so the
-      # packed tsconfig contract test drives that exact tsc.
-      - name: Test packed tsconfig contract on TypeScript 5.9.3
+      # tsconfig contract test drives that exact tsc.
+      - name: Test tsconfig contract on TypeScript 5.9.3
         if: ${{ !cancelled() }}
         run: npm install --global typescript@5.9.3 && test "$(tsc --version)" = "Version 5.9.3" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
-      - name: Test packed tsconfig contract on TypeScript 6.0.3
+      - name: Test tsconfig contract on TypeScript 6.0.3
         if: ${{ !cancelled() }}
         run: npm install --global typescript@6.0.3 && test "$(tsc --version)" = "Version 6.0.3" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
-      - name: Test packed tsconfig contract on TypeScript 7.0.2
+      - name: Test tsconfig contract on TypeScript 7.0.2
         if: ${{ !cancelled() }}
         run: npm install --global typescript@7.0.2 && test "$(tsc --version)" = "Version 7.0.2" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
       - name: Install biome and tsc
@@ -716,7 +716,6 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node
         if: ${{ !cancelled() }}
@@ -738,14 +737,6 @@ jobs:
           npm ci --prefix components/concurrency-policy --ignore-scripts
           npm ci --prefix components/dependabot-policy --ignore-scripts
           npm ci --prefix components/pr-convention-policy --ignore-scripts
-      - name: Test package lifecycle
-        if: ${{ !cancelled() }}
-        run: npm run test:packages
-      - name: Enforce package lifecycle
-        if: ${{ !cancelled() }}
-        env:
-          PACKAGE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: node harness/packages/package-lifecycle.mjs
       - name: Test runner policy
         if: ${{ !cancelled() }}
         run: npm run test:runner-policy
