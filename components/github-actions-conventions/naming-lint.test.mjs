@@ -15,6 +15,7 @@ import {
   loadVocabulary,
   parseArguments,
   parseSlotName,
+  titleCaseName,
   validateVocabulary,
 } from "./naming-lint.mjs";
 
@@ -190,6 +191,63 @@ test("the OIDC negative-test name exception applies only in github-iac", async (
   assert.deepEqual(summary(elsewhere), [
     "error workflow-name .github/workflows/release-deploy-oidc-negative-test.yml",
   ]);
+});
+
+test("the recorded exception is exact: neither the stem nor a Title Case form passes", async () => {
+  for (const name of [
+    "release-deploy-oidc-negative-test",
+    "Release Deploy Oidc Negative Test",
+    "Release Deployx",
+  ]) {
+    const root = await repository({
+      workflows: { "release-deploy-oidc-negative-test.yml": workflow(name, ["test"]) },
+    });
+    const findings = await lintRepository({
+      root,
+      vocabulary,
+      mode: "enforcing",
+      repository: "melodic-software/github-iac",
+    });
+    assert.deepEqual(
+      summary(findings),
+      ["error workflow-name .github/workflows/release-deploy-oidc-negative-test.yml"],
+      name,
+    );
+    assert.match(findings[0].message, /recorded exception `release-deployx`/u);
+  }
+});
+
+test("a stem's Title Case form capitalizes each word and upper-cases the acronyms", () => {
+  for (const [stem, expected] of [
+    ["pr-run-checks-go", "PR Run Checks Go"],
+    ["maintenance-repin-ci-workflows", "Maintenance Repin CI Workflows"],
+    ["post-merge-detect-silent-revert", "Post Merge Detect Silent Revert"],
+    ["work-check-api-wip", "Work Check API WIP"],
+    ["release-deploy-oidc", "Release Deploy Oidc"],
+  ]) {
+    assert.equal(titleCaseName(stem), expected);
+  }
+});
+
+test("a workflow name is its stem or the stem's Title Case form, and nothing else", async () => {
+  for (const name of ["pr-review-security", "PR Review Security"]) {
+    const root = await repository({
+      workflows: { "pr-review-security.yml": workflow(name, ["pr-review-security"]) },
+    });
+    assert.deepEqual(await lintRepository({ root, vocabulary, mode: "enforcing" }), [], name);
+  }
+  for (const name of ["Pr Review Security", "pr review security", "PR-Review-Security"]) {
+    const root = await repository({
+      workflows: { "pr-review-security.yml": workflow(name, ["pr-review-security"]) },
+    });
+    const findings = await lintRepository({ root, vocabulary, mode: "enforcing" });
+    assert.deepEqual(
+      summary(findings),
+      ["error workflow-name .github/workflows/pr-review-security.yml"],
+      name,
+    );
+    assert.match(findings[0].message, /Title Case form of the file stem, `PR Review Security`/u);
+  }
 });
 
 test("every target name in the approved rename map passes the vocabulary", async () => {

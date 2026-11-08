@@ -12,8 +12,8 @@
 #      its approved label, one step (no caller checkout), and the composite action
 #      pinned to a full 40-character SHA (org policy) with
 #      `standards-ref: main` for the soak, and a workflow name equal to the
-#      destination stem. The two files differ only in `runs-on`, the workflow
-#      name, the `paths` entries and comments.
+#      destination stem in Title Case. The two files differ only in `runs-on`,
+#      the workflow name, the `paths` entries and comments.
 #   2. Manifest wiring: each component maps to its locked destination; a
 #      target that manages a `components/claude-lanes/`-sourced caller takes
 #      the fleet sibling, never the hosted caller; no target manages both;
@@ -72,6 +72,19 @@ managed_union() {
 # ------------------------------------------------------------------ 1. shape
 
 # check_shape <source> <component> <runs-on> <destination>: the locked design, per file.
+title_case() {
+  local words word title=''
+  IFS=- read -r -a words <<<"$1"
+  for word in "${words[@]}"; do
+    case "$word" in
+      pr | ci | api | wip) word="${word^^}" ;;
+      *) word="${word^}" ;;
+    esac
+    title+="${title:+ }$word"
+  done
+  printf '%s' "$title"
+}
+
 check_shape() {
   local source="$1" component="$2" runs_on="$3" destination="$4" p="$1:" stem
   q() { yq -r "$1" "$source"; }
@@ -82,7 +95,7 @@ check_shape() {
   assert_contains "$p header names the manifest component" "$(head -n 12 "$source")" "$component"
 
   stem="${destination##*/}"
-  assert_eq "$p workflow name equals the destination stem" "${stem%.yml}" "$(q '.name')"
+  assert_eq "$p workflow name is the destination stem in Title Case" "$(title_case "${stem%.yml}")" "$(q '.name')"
   assert_eq "$p triggers on pull_request only" 'pull_request' "$(q '.on | keys | join(",")')"
   assert_eq "$p pull_request carries types and paths only" 'paths,types' \
     "$(q '.on.pull_request | keys | sort | join(",")')"

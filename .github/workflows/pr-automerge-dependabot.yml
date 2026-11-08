@@ -1,4 +1,4 @@
-name: pr-automerge-dependabot
+name: PR Automerge Dependabot
 
 # Thin caller of the org's pr-automerge-dependabot reusable workflow
 # (melodic-software/ci-workflows). It arms GitHub auto-merge (squash) on

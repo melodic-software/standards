@@ -12,7 +12,7 @@ binary, the fix path is always a standards change, and the guard is what
 makes a hand-edit visible before the next sync silently reverts it.
 
 Two files, one per `runner-policy` inventory, identical except for `runs-on`,
-the workflow `name:` (each equals its destination stem) and their headers:
+the workflow `name:` (each is its destination stem in Title Case) and their headers:
 
 | Manifest component | Source | Destination | `runs-on` |
 | --- | --- | --- | --- |

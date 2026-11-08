@@ -1,4 +1,4 @@
-name: maintenance-audit-org-architecture-pointer
+name: Maintenance Audit Org Architecture Pointer
 
 # Flags a repository whose root AGENTS.md and CLAUDE.md both lack the
 # `melodic-software/architecture` pointer that

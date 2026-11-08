@@ -1,4 +1,4 @@
-name: maintenance-repin-ci-workflows
+name: Maintenance Repin CI Workflows
 
 # Action currency for first-party ci-workflows composite ACTIONS. The org
 # Actions policy requires every action pinned to a full commit SHA, while

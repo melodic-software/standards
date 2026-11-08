@@ -28,6 +28,11 @@ components:
     files:
       docs/adr/README.md: docs/adr/README.md
       docs/adr/adr-template.md: docs/adr/adr-template.md
+  # Shared Biome policy (`root: false`); a target's root biome.json extends it
+  # by relative path and keeps its own scope.
+  biome:
+    files:
+      components/biome/biome.json: .github/standards/biome/biome.json
   claude-permissions:
     files:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
@@ -81,7 +86,7 @@ components:
   # so the check contexts match the fleet callers. The destinations differ
   # (`.github/workflows/pr-review-hosted.yml`,
   # `.github/workflows/pr-review-security-hosted.yml`) because a destination
-  # has exactly one owning component; each workflow `name:` equals its stem. The files live outside
+  # has exactly one owning component; each workflow `name:` is its stem in Title Case. The files live outside
   # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on
   # that directory stay as strict as they are; runner-policy.test.mjs holds
   # the hosted pair to its own rules and forbids a target managing both
@@ -398,6 +403,11 @@ components:
     files:
       components/trusted-actors/trusted-actors.json: .github/standards/trusted-actors/trusted-actors.json
       components/trusted-actors/trusted-actors.schema.json: .github/standards/trusted-actors/trusted-actors.schema.json
+  # Shared strict TypeScript base; a target's tsconfig extends it by relative
+  # path and sets its own runtime, module and scope options.
+  tsconfig:
+    files:
+      components/tsconfig/tsconfig.json: .github/standards/tsconfig/tsconfig.json
   typos:
     files:
       _typos.toml: _typos.toml
@@ -790,6 +800,7 @@ targets:
   melodic-software/medley:
     managed:
       - architecture-decisions
+      - biome
       # claude-review-caller replaces medley's hand-written caller: its
       # missing `reopened` trigger and skip-actors divergence normalize away;
       # its `paths-ignore` tuning is an ACCEPTED LOSS (the component carries
@@ -817,6 +828,7 @@ targets:
       - path-detection-tools
       - pr-body-contract-rule
       - runner-policy
+      - tsconfig
       - zizmor
     locally-owned:
       - actionlint
