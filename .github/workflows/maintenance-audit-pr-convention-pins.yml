@@ -1,4 +1,4 @@
-name: maintenance-audit-pr-convention-pins
+name: Maintenance Audit PR Convention Pins
 
 # Lockstep drift check (ADR-0008), caller-pin half: dereferences the
 # ci-workflows artifact every gate caller pins and checks the contract at that

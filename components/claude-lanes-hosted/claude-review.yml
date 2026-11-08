@@ -1,4 +1,4 @@
-name: pr-review-hosted
+name: PR Review Hosted
 
 # SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
 # Source of truth: melodic-software/standards,
@@ -25,7 +25,7 @@ name: pr-review-hosted
 # on a public repository. It is the hosted sibling of
 # components/claude-lanes/claude-review.yml, which names the private fleet
 # review label, and differs from it only in these comments, `runner` and the
-# workflow `name:`, which equals each file's stem. The job id is the same, so
+# workflow `name:`, which is each file's stem in Title Case. The job id is the same, so
 # the check context is the same on every target. A target manages one of the
 # two, never both.
 #

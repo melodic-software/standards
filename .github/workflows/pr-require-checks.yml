@@ -1,4 +1,4 @@
-name: pr-require-checks
+name: PR Require Checks
 
 on:
   push:

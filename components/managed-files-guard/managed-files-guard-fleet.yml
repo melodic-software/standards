@@ -1,4 +1,4 @@
-name: pr-check-managed-files
+name: PR Check Managed Files
 
 # SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
 # Source of truth: melodic-software/standards,
@@ -27,7 +27,7 @@ name: pr-check-managed-files
 # for local CI routing. Public and un-enrolled private targets take the
 # hosted sibling, components/managed-files-guard/managed-files-guard.yml.
 # The two files differ only in this paragraph, the source lines above, the
-# workflow `name:` (each equals its destination stem), the `paths` entries
+# workflow `name:` (each is its destination stem in Title Case), the `paths` entries
 # (each lists its own targets' destinations) and `runs-on`; the job
 # name is the same, so the check context is `pr-check-managed-files` on every
 # target.

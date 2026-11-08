@@ -81,7 +81,7 @@ components:
   # so the check contexts match the fleet callers. The destinations differ
   # (`.github/workflows/pr-review-hosted.yml`,
   # `.github/workflows/pr-review-security-hosted.yml`) because a destination
-  # has exactly one owning component; each workflow `name:` equals its stem. The files live outside
+  # has exactly one owning component; each workflow `name:` is its stem in Title Case. The files live outside
   # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on
   # that directory stay as strict as they are; runner-policy.test.mjs holds
   # the hosted pair to its own rules and forbids a target managing both
