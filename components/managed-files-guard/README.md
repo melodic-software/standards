@@ -43,9 +43,9 @@ after the admitting pull request (standards#496); that issue is the record
 until each target's promotion lands. Promotion must also decide whether the
 action's `dependabot[bot]` actor skip stays: under it, a Dependabot pull
 request that edits a managed destination passes the guard rather than reds
-it, and the next sync reverts the edit; the durable fix is the action
-absorbing the consumer
-checkout, which needs a ci-workflows release.
+it, and the next sync reverts the edit. The callers carry no third-party pin
+for such a pull request to bump: the action checks out the consumer itself
+(ci-workflows#881).
 
 **Hosted caller.** `managed-files-guard.yml` runs on `ubuntu-24.04`
 directly. `runner-policy` admits that shape on a public repository and on a
@@ -190,27 +190,15 @@ the guard executes); do not pin it in this hop.
   fleet-wide. Nothing else references the file.
 - **Failure behavior:** the action fails closed on an unreadable diff or an
   unresolvable manifest, no-ops when the repository is not a manifest target,
-  and needs only `contents: read` (standards is public; the checkout of it
-  uses the job's ambient token with `persist-credentials: false`) and
+  and needs only `contents: read` (the action checks out the consumer with
+  full history and standards beside it, both with the job's ambient token
+  and `persist-credentials: false`) and
   `pull-requests: read` (the action lists the pull request's commits to
   skip pull requests whose every commit is Dependabot's).
-- **The `actions/checkout` pin.** Unlike the Claude lane callers, this file
-  carries a third-party action pin, and two consequences follow. In this
-  repository, Dependabot's `github-actions` ecosystem scans
-  `.github/workflows/` only, so the component's checkout pin never moves on
-  its own; the contract test asserts it equals the sibling workflows' pin, so
-  a Dependabot bump of those workflows fails the `check-github-actions` job until the
-  component follows in the same change. That is the checkout advance path,
-  and it is deliberate lockstep, not friction to remove. In a consumer, its
-  own Dependabot will propose bumping `actions/checkout` inside the managed
-  file. From ci-workflows v0.23.0 the action skips the `dependabot[bot]`
-  actor, so that pull request passes the guard rather than reds it, and the
-  next sync reverts the edit; the pin therefore moves only by a hand edit to
-  this standards component, not by a consumer's Dependabot. Before
-  promotion, resolve it one of two ways: the action absorbs the consumer
-  checkout (so the caller carries no third-party pin at all), or the fleet
-  Dependabot posture for managed callers is settled in `github-iac`. Neither
-  belongs to this hop.
+- **No caller checkout.** The action checks out the consumer repository
+  itself (ci-workflows#881), so each file is one step and carries no
+  third-party action pin for a consumer's Dependabot to bump. The
+  `actions/checkout` pin lives in the action and moves with the action pin.
 
 ## Verification
 
@@ -220,9 +208,8 @@ to the managed union of the targets that receive that file, free of glob
 metacharacters; `contents: read` and `pull-requests: read` as the whole
 grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
-literal label with a 10-minute timeout, calling no reusable workflow; a
-full-history, credential-free checkout pinned like the sibling workflows; the
-action pinned to a full 40-character SHA; and `standards-ref: main`. It asserts the two files carry the same
+literal label with a 10-minute timeout, calling no reusable workflow; one
+step, the action pinned to a full 40-character SHA; and `standards-ref: main`. It asserts the two files carry the same
 action pin and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
 manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
