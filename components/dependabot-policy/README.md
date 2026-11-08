@@ -183,10 +183,11 @@ auto-merge with `GITHUB_TOKEN` on auto-tier bumps: GitHub Actions from
 only in a repository without a merge queue. Until such a repository runs a
 review lane, its review-tier pull requests stay open.
 
-The reusable's `PUBLISHER_ALLOWLIST` constant copies the `tier: auto` keys
-of `autoMerge.publishers`. [`automerge-lockstep.mjs`](automerge-lockstep.mjs)
-fetches that reusable at `main`, where first-party callers run it, and fails
-when the constant and those keys differ. It does not check the SHAs a
+The default of the reusable's `publisher-allowlist` input copies the
+`tier: auto` keys of `autoMerge.publishers`; a caller can pass a narrower list.
+[`automerge-lockstep.mjs`](automerge-lockstep.mjs) fetches that reusable at
+`main`, where first-party callers run it, and fails when the default and those
+keys differ. It does not check the SHAs a
 `runner-policy` contract still lists in `approvedShas` for callers mid-move to
 `@main`. It blocks from admission, with no report-only period: a run either
 matches or names the differing lists.
