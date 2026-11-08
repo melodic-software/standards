@@ -12,7 +12,6 @@
     "jsonc-parser": "3.3.1",
     "lefthook": "2.2.2",
     "markdownlint-cli2": "0.24.0",
-    "semver": "7.8.5",
     "yaml": "2.9.1"
   },
   "scripts": {
@@ -34,7 +33,6 @@
     "test:pr-convention-policy": "node --test components/pr-convention-policy/pr-convention-policy.test.mjs",
     "test:mcp-launcher": "node --test components/mcp-launcher/launcher.test.mjs",
     "test:lefthook-dotnet": "node --test components/lefthook-dotnet/dotnet-format-staged.test.mjs",
-    "test:packages": "node --test harness/packages/package-lifecycle.test.mjs",
     "test:runner-policy": "node --test components/runner-policy/runner-policy.test.mjs"
   },
   "overrides": {

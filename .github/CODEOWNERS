@@ -16,7 +16,6 @@
 /.mcp.json @kyle-sexton
 /package.json @kyle-sexton
 /distribution/ @kyle-sexton
-/components/biome/package.json @kyle-sexton
 /components/claude-lanes/ @kyle-sexton
 /components/claude-lanes-hosted/ @kyle-sexton
 /components/claude-permissions/ @kyle-sexton
@@ -38,7 +37,6 @@
 /components/pr-convention-policy/ @kyle-sexton
 /components/runner-policy/ @kyle-sexton
 /components/trusted-actors/ @kyle-sexton
-/components/tsconfig/package.json @kyle-sexton
 
 # The dependabot-policy runtime is installed by no privileged job and is not synced,
 # so its lockfile bumps need no code-owner review. The policy and analyzer stay owned.

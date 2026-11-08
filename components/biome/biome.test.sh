@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Tests the Biome component: the packaged ruleset passes the good fixture and
-# flags the bad fixture. Skips cleanly when Biome is absent.
+# Tests the Biome component: a consumer that extends the synced ruleset by
+# relative path passes the good fixture and flags the bad fixture. Skips cleanly
+# when Biome is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -10,35 +11,26 @@ cd "$root" || exit 1
 
 good='components/biome/fixtures/good/example.ts'
 bad='components/biome/fixtures/bad/violations.ts'
+# The destination distribution/sync-manifest.yml gives the `biome` component.
+synced_path='.github/standards/biome/biome.json'
 
 command -v biome >/dev/null 2>&1 || skip_suite 'biome not installed'
-command -v npm >/dev/null 2>&1 || skip_suite 'npm not installed'
-command -v node >/dev/null 2>&1 || skip_suite 'node not installed'
 
-workspace="$(mktemp -d)"
-trap 'rm -rf "$workspace"' EXIT
-pack_json="$(npm pack ./components/biome --json --ignore-scripts --pack-destination "$workspace")"
-filename="$(node -p 'JSON.parse(process.argv[1])[0].filename' "$pack_json")"
-consumer="$workspace/consumer"
-mkdir -p "$consumer"
-printf '{"name":"biome-config-consumer","private":true}\n' >"$consumer/package.json"
-npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund --package-lock=false \
-  --legacy-peer-deps "$workspace/$filename" >/dev/null 2>&1
-assert_exit 'packed Biome config installs in an isolated consumer' 0 "$?"
-assert_file_exists 'installed package contains biome.json' \
-  "$consumer/node_modules/@melodic-software/biome-config/biome.json"
-
+consumer="$(mktemp -d)"
+trap 'rm -rf "$consumer"' EXIT
+mkdir -p "$consumer/$(dirname "$synced_path")"
+cp components/biome/biome.json "$consumer/$synced_path"
 cp "$good" "$consumer/good.ts"
 cp "$bad" "$consumer/bad.ts"
 printf '%s\n' \
   '{' \
   '  "root": true,' \
-  '  "extends": ["@melodic-software/biome-config/biome"]' \
+  "  \"extends\": [\"./$synced_path\"]" \
   '}' >"$consumer/biome.json"
 
 # `biome ci` runs lint + format + import sorting in one read-only pass. Running
-# from the isolated consumer proves package export and resolution, not only the
-# source-tree configuration path.
+# from the isolated consumer proves the relative-path extends a sync target
+# uses, not only the source-tree configuration path.
 biome ci --config-path="$consumer/biome.json" --error-on-warnings "$consumer/good.ts" >/dev/null 2>&1
 assert_exit 'good fixture lints and formats clean' 0 "$?"
 

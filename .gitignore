@@ -29,6 +29,3 @@ lefthook-local.yml
 # .NET — build output from the dotnet fixtures
 bin/
 obj/
-
-# Local npm pack output (CI writes packages to a temporary directory).
-components/*/*.tgz
