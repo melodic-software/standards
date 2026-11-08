@@ -2,9 +2,9 @@
 
 // Lockstep check: the ci-workflows `pr-automerge-dependabot.yml` reusable
 // carries its own copy of the `tier: auto` keys of `autoMerge.publishers` as
-// the PUBLISHER_ALLOWLIST env constant. This script fetches the reusable at
-// `main`, the ref every caller runs, and fails when that constant differs from
-// those keys. The pure checks are exported for automerge-lockstep.test.mjs.
+// the default of its `publisher-allowlist` input. This script fetches the
+// reusable at `main`, the ref every caller runs, and fails when that default
+// differs from those keys. The pure checks are exported for automerge-lockstep.test.mjs.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 export const REUSABLE_PATH = ".github/workflows/pr-automerge-dependabot.yml";
+const INPUT = "publisher-allowlist";
 const CONTRACT_KEY = `melodic-software/ci-workflows/${REUSABLE_PATH}`;
 
 export class LockstepError extends Error {
@@ -38,20 +39,14 @@ export function extractPublisherAllowlist(workflowText) {
   } catch (error) {
     throw new LockstepError(`drift: ${REUSABLE_PATH} is not valid YAML: ${error.message}`);
   }
-  const constants = Object.values(workflow?.jobs ?? {}).flatMap((job) =>
-    (job?.steps ?? [])
-      .map((step) => step?.env?.PUBLISHER_ALLOWLIST)
-      .filter((value) => value !== undefined),
-  );
-  if (constants.length !== 1) {
-    throw new LockstepError(
-      `drift: expected one PUBLISHER_ALLOWLIST in ${REUSABLE_PATH}, found ${constants.length}`,
-    );
+  const value = workflow?.on?.workflow_call?.inputs?.[INPUT]?.default;
+  if (typeof value !== "string") {
+    throw new LockstepError(`drift: expected a string ${INPUT} input default in ${REUSABLE_PATH}`);
   }
   try {
-    return JSON.parse(constants[0]);
+    return JSON.parse(value);
   } catch (error) {
-    throw new LockstepError(`drift: PUBLISHER_ALLOWLIST is not valid JSON: ${error.message}`);
+    throw new LockstepError(`drift: ${INPUT} default is not valid JSON: ${error.message}`);
   }
 }
 
@@ -63,7 +58,7 @@ export function checkLockstep(dependabotPolicy, workflowText) {
   const actual = extractPublisherAllowlist(workflowText);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new LockstepError(
-      `drift: ${REUSABLE_PATH} PUBLISHER_ALLOWLIST ${JSON.stringify(actual)} != policy.json autoMerge.publishers tier auto ${JSON.stringify(expected)}`,
+      `drift: ${REUSABLE_PATH} ${INPUT} default ${JSON.stringify(actual)} != policy.json autoMerge.publishers tier auto ${JSON.stringify(expected)}`,
     );
   }
 }
@@ -103,7 +98,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     );
     checkLockstep(dependabotPolicy, workflowText);
     // biome-ignore lint/suspicious/noConsole: CLI success line is this script's interface
-    console.log("dependabot automerge lockstep: PUBLISHER_ALLOWLIST at main matches policy.json");
+    console.log("dependabot automerge lockstep: allowlist default at main matches policy.json");
   } catch (error) {
     // biome-ignore lint/suspicious/noConsole: CLI failure output is this script's interface
     console.error(error.message);
