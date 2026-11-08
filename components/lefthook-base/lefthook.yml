@@ -73,9 +73,11 @@ pre-commit:
       # Resolve the consumer's pinned markdownlint-cli2 directly from
       # node_modules/.bin (node_modules/.bin is not on a hook's PATH) instead of
       # npx --no-install, which silently falls back to an arbitrary global
-      # version when the local package is missing. Hard-fail loudly instead, so
-      # a missing dependency surfaces as "run npm ci" rather than a
-      # wrong-version lint. The binary still auto-discovers its own config.
+      # version when the local package is missing. node_modules is per worktree,
+      # so when the binary is missing the lane runs `npm ci` once and lints; if
+      # that install fails or still leaves no binary, it hard-fails with the
+      # "run npm ci" remediation rather than a wrong-version lint. The binary
+      # still auto-discovers its own config.
       glob: "**/*.{md,markdown}"
-      run: "test -x node_modules/.bin/markdownlint-cli2 || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
-      fail_text: "Markdown lint failures, or markdownlint-cli2 missing (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
+      run: "test -x node_modules/.bin/markdownlint-cli2 || { npm ci --no-audit --no-fund >&2 && test -x node_modules/.bin/markdownlint-cli2; } || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
+      fail_text: "Markdown lint failures, or markdownlint-cli2 missing and npm ci failed (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
