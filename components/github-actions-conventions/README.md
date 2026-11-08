@@ -48,8 +48,9 @@ A workflow file is named `<stage>-<function>[-<modifier>].yml`, in kebab-case.
 <!-- stages:end -->
 
 A workflow's `name:` is its file stem in Title Case: each hyphen becomes a
-space and each word is capitalized, with `PR`, `CI`, `API` and `WIP` in upper
-case (`pr-run-checks-go` is named `PR Run Checks Go`). A caller of a reusable
+space and each word is capitalized, and a word listed in `displayWords` in
+[`vocabulary.json`](vocabulary.json) takes that form instead
+(`pr-run-checks-go` is named `PR Run Checks Go`). A caller of a reusable
 workflow takes the reusable's file name, so its `name:` is that file name in
 Title Case.
 

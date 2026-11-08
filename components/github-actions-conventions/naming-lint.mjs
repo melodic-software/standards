@@ -23,7 +23,6 @@ const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/u;
 const GATE_STEM = "pr-require-checks";
 const MODES = ["advisory", "enforcing"];
 const FORMATS = ["text", "json", "github"];
-const TITLE_CASE_ACRONYMS = new Set(["pr", "ci", "api", "wip"]);
 
 function parseJson(source, location) {
   // The yaml parser in strict JSON mode rejects duplicate keys, which
@@ -160,13 +159,13 @@ export function parseSlotName(name, vocabulary) {
 }
 
 // A file or directory stem's display name: hyphens become spaces, each word is
-// capitalized, and the listed acronyms are upper case.
-export function titleCaseName(stem) {
+// capitalized, and a word in `displayWords` takes its listed form.
+export function titleCaseName(stem, displayWords) {
   return stem
     .split("-")
     .map((word) =>
-      TITLE_CASE_ACRONYMS.has(word)
-        ? word.toUpperCase()
+      Object.hasOwn(displayWords, word)
+        ? displayWords[word]
         : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
     )
     .join(" ");
@@ -337,7 +336,7 @@ async function workflowFindings(root, repository, vocabulary) {
     const nameNode = document.contents.get("name", true);
     const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
     const nameExemption = waived("workflow-name");
-    const titleCase = titleCaseName(stem);
+    const titleCase = titleCaseName(stem, vocabulary.displayWords);
     // The Title Case form is the convention. The bare stem also passes until
     // every org repository is converted; a later stage then drops it from this
     // list. A recorded exception is exact: it takes neither form.

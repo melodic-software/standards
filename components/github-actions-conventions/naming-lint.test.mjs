@@ -223,9 +223,10 @@ test("a stem's Title Case form capitalizes each word and upper-cases the acronym
     ["maintenance-repin-ci-workflows", "Maintenance Repin CI Workflows"],
     ["post-merge-detect-silent-revert", "Post Merge Detect Silent Revert"],
     ["work-check-api-wip", "Work Check API WIP"],
-    ["release-deploy-oidc", "Release Deploy Oidc"],
+    ["release-deploy-oidc", "Release Deploy OIDC"],
+    ["release-publish-nuget-dotnet", "Release Publish NuGet .NET"],
   ]) {
-    assert.equal(titleCaseName(stem), expected);
+    assert.equal(titleCaseName(stem, vocabulary.displayWords), expected);
   }
 });
 

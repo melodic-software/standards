@@ -14,6 +14,7 @@
     "engines",
     "reservedJobIds",
     "activityGrammar",
+    "displayWords",
     "exemptions",
     "apps"
   ],
@@ -100,6 +101,12 @@
           "items": { "type": "string" }
         }
       }
+    },
+    "displayWords": {
+      "description": "Stem words whose Title Case display form is not the word capitalized: acronyms and product spellings.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
     },
     "exemptions": {
       "description": "The complete exemption list. Nothing else is exempt.",
