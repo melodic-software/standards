@@ -208,6 +208,7 @@ components:
       standards/engineering/reference-dont-duplicate.md: docs/standards/reference-dont-duplicate.md
       standards/engineering/simpler-code.md: docs/standards/simpler-code.md
       standards/engineering/source-authority-tiers.md: docs/standards/source-authority-tiers.md
+      standards/process/issue-tracker.md: docs/standards/issue-tracker.md
   github-actions-conventions:
     files:
       components/github-actions-conventions/vocabulary.json: .github/standards/github-actions-conventions/vocabulary.json

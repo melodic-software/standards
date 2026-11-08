@@ -1,14 +1,14 @@
 # Engineering standards
 
 The team layer of the standards contract: eight `standards/engineering/`
-files, plus the index in [`standards-index.md`](standards-index.md), synced into
+files and `standards/process/issue-tracker.md`, plus the index in [`standards-index.md`](standards-index.md), synced into
 `docs/standards/` of each target. Planning and review skills in
 `melodic-software/claude-code-plugins` resolve that directory through the
 contract (`docs/conventions/standards/` there, version 1.0.2) and load only the
 files whose `Applies when` row matches the task, so work is built to the same
 criteria it is reviewed against.
 
-The eight files stay in `standards/engineering/`, their canonical location;
+The nine files stay in `standards/`, their canonical location;
 this directory holds only the index and this record. The file list is the
 `engineering-standards` entry in
 [`sync-manifest.yml`](../../distribution/sync-manifest.yml), and its targets are
@@ -32,11 +32,11 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
 - **Alternatives and overlap**: a per-repository copy would drift with no
   owner. `code-review-rules` and `REVIEW.md` carry review criteria; this
   component carries working conventions and links into them rather than
-  restating them. `managed-files-guard` lists the eight destinations, so a
+  restating them. `managed-files-guard` lists the nine destinations, so a
   local edit to a synced file is caught as drift instead of competing with the
   source.
 - **Operational fit**: `sync-manifest.sh plan` for a target lists exactly the
-  eight files; the payload is markdown with absolute links, checked by lychee
+  nine files; the payload is markdown with absolute links, checked by lychee
   offline with no errors. No runtime cost in the target: nothing executes, and
   dotfiles' `.chezmoiignore` already ignores `docs`, so nothing renders into a
   home directory. Failure behavior is the sync engine's: a target that cannot
@@ -55,7 +55,7 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
 ## Ownership
 
 - **Owner**: the `standards` maintainers.
-- **Acceptance**: each target's sync pull request adds the eight files under
+- **Acceptance**: each target's sync pull request adds the nine files under
   `docs/standards/`, and a planning or review skill run there names a
   `docs/standards/` file from the index.
 - **Customization**: a target relocates the team layer through
