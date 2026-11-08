@@ -88,6 +88,7 @@ on:
       - docs/standards/reference-dont-duplicate.md
       - docs/standards/simpler-code.md
       - docs/standards/source-authority-tiers.md
+      - docs/standards/issue-tracker.md
       - dot_local/bin/executable_pages-publish
       - dot_markdownlint-cli2.jsonc
       - eng/dotnet-analysis/Directory.Build.props
