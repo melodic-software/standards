@@ -4,7 +4,7 @@ name: pr-automerge-dependabot
 # (melodic-software/ci-workflows). It arms GitHub auto-merge (squash) on
 # Dependabot minor and patch bumps under the merge tiers in
 # components/dependabot-policy/README.md: GitHub Actions from `tier: auto`
-# publishers, and npm, pip and NuGet packages outside
+# publishers, and npm, pip, uv and NuGet packages outside
 # `review-only-dependencies` (this repository's `autoMerge.reviewOnly`
 # entries). Arming never merges: GitHub merges once every required check,
 # `ci-status` included, passes.

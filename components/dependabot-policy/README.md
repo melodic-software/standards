@@ -119,12 +119,13 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
 - **Auto tier.** Every update in the pull request is non-major: the first
   numeric version component does not change, and below 1.0 the second does
   not either. Every update is in an `autoMerge.ecosystems` ecosystem
-  (`github-actions`, `npm`, `pip`, `nuget`, spelled as in `dependabot.yml`;
-  the auto-merge workflow checks fetch-metadata's `npm_and_yarn` for npm).
+  (`github-actions`, `npm`, `pip`, `uv`, `nuget`, spelled as in
+  `dependabot.yml`; the auto-merge workflow checks fetch-metadata's
+  `npm_and_yarn` for npm).
   A `github-actions` update comes from a publisher with `tier: auto` in
   `autoMerge.publishers` (`actions/*`, `github/*`, `anthropics/*`), each
   entry with the date it was `reviewed` and the `basis` for its tier; an
-  `npm`, `pip` or `nuget` update needs no publisher entry. No update is a
+  `npm`, `pip`, `uv` or `nuget` update needs no publisher entry. No update is a
   security-critical dependency (below), and no package is named in the
   repository's `autoMerge.reviewOnly` entries, which the caller passes as
   `review-only-dependencies` and the workflow never arms. `ci-status` is not
@@ -136,7 +137,10 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   release from them adds no new trust. For `npm`, `pip` and `nuget` the basis
   is the owner's decision (2026-10-18) that the organization never runs
   vulnerable versions, so non-major package updates merge and majors never
-  take the auto tier. In both, the cooldown (each repository's
+  take the auto tier. `uv` joined on the same terms as `pip`
+  ([#820](https://github.com/melodic-software/standards/issues/820),
+  2026-11-08): it resolves the same PyPI packages, and Dependabot's `uv`
+  commits carry the same `update-type` metadata. In both, the cooldown (each repository's
   `cooldown.default-days`, at least the 3-day floor), `ci-status`, the
   non-major rule and the `autoMerge.reviewOnly` opt-out catch a bad release;
   see the [threat model](THREAT-MODEL.md).
@@ -179,7 +183,9 @@ The ci-workflows `pr-automerge-dependabot.yml` reusable arms GitHub
 auto-merge with `GITHUB_TOKEN` on auto-tier bumps: GitHub Actions from
 `tier: auto` publishers and, unless the caller passes
 `package-auto-merge: false`, npm, pip and NuGet packages not in its
-`review-only-dependencies`. It is valid
+`review-only-dependencies`; uv packages too from
+[ci-workflows#1025](https://github.com/melodic-software/ci-workflows/pull/1025),
+once a caller repins to a release that contains it. It is valid
 only in a repository without a merge queue. Until such a repository runs a
 review lane, its review-tier pull requests stay open.
 
