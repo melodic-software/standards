@@ -934,9 +934,9 @@ jobs:
       # has to be here for the job to start. The lane stays annotations-only
       # (upload-sarif defaults false), so nothing is written to code scanning.
       security-events: write
-    # Actions security lint. High-severity findings block the lane; lower
-    # severities annotate. Gating runs in-lane via the SARIF guard, so it
-    # rides the existing ci-status gate — no code-scanning upload.
+    # Actions security lint. Any finding, informational and up, blocks the
+    # lane, matching ci-workflows, ci-runner and medley. Gating runs in-lane,
+    # so it rides the existing ci-status gate — no code-scanning upload.
     #
     # `.` audits this repo's own workflows only: zizmor discovers workflow
     # definitions by their `.github/workflows` location, so the workflow BYTES
@@ -948,7 +948,7 @@ jobs:
     with:
       runner: ubuntu-24.04
       paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/claude-lanes-hosted/claude-review.yml components/claude-lanes-hosted/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml components/managed-files-guard/managed-files-guard-fleet.yml
-      fail-on-severity: high
+      fail-on-severity: low
 
   pr-scan-dependencies:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
