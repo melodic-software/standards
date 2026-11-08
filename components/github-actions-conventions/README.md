@@ -53,11 +53,6 @@ case (`pr-run-checks-go` is named `PR Run Checks Go`). A caller of a reusable
 workflow takes the reusable's file name, so its `name:` is that file name in
 Title Case.
 
-Names come in two tiers. Workflow and composite action `name:` values are
-Title Case display names. Job ids and job names stay kebab-case, because a
-job's name is its check name (see [Jobs and check names](#jobs-and-check-names))
-and `ci-status` is the one required check.
-
 ## Jobs and check names
 
 GitHub names a check `<caller job name or id> / <called job name or id>`; the
