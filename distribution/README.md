@@ -212,6 +212,11 @@ files, and the component-local npm manifest and lockfile. The component requires
 materialization as well. The runtime loads both schemas directly; omitting them
 would make the supposedly atomic payload fail on a clean consumer checkout.
 
+The `runner-policy-contract` component carries only `policy.json` and
+`policy.schema.json`, to `.github/standards/runner-policy-contract/`. Its one
+target, `melodic-software/ci-workflows`, reads the approved contracts for its
+caller-surface check and is not enrolled in the runner-policy gate.
+
 Repository-specific adoption remains a separate consumer change. Each target
 except `pr-pipeline-sandbox` must add all of the following in the same
 integration PR. The sandbox takes the runtime only as the npm manifest its

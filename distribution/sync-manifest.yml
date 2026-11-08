@@ -383,6 +383,13 @@ components:
       components/runner-policy/policy.schema.json: .github/standards/runner-policy/policy.schema.json
       components/runner-policy/repository-policy.schema.json: .github/standards/runner-policy/repository-policy.schema.json
       components/runner-policy/runner-policy.mjs: .github/standards/runner-policy/runner-policy.mjs
+  # Policy data alone, for a repository that reads the approved contracts
+  # without running the runner-policy gate. Its own destination keeps it
+  # distinct from the atomic runner-policy runtime.
+  runner-policy-contract:
+    files:
+      components/runner-policy/policy.json: .github/standards/runner-policy-contract/policy.json
+      components/runner-policy/policy.schema.json: .github/standards/runner-policy-contract/policy.schema.json
   shellcheck:
     files:
       .shellcheckrc: .shellcheckrc
@@ -514,6 +521,7 @@ targets:
       - psscriptanalyzer
       - repository-text
       - review-instructions
+      - runner-policy-contract
       - shellcheck
       - typos
     # ci-workflows hosts the managed-files-guard action and already runs it
