@@ -9,7 +9,7 @@
 #      trigger filtered to the union of the managed destinations of every
 #      target that receives that file,
 #      read-only token, the canonical concurrency block, one job on
-#      its approved label, a full-history checkout, and the composite action
+#      its approved label, one step (no caller checkout), and the composite action
 #      pinned to a full 40-character SHA (org policy) with
 #      `standards-ref: main` for the soak, and a workflow name equal to the
 #      destination stem. The two files differ only in `runs-on`, the workflow
@@ -69,8 +69,6 @@ managed_union() {
   done | LC_ALL=C sort -u
 }
 
-sibling_checkout="$(grep -m1 -oE 'actions/checkout@[0-9a-f]{40}' .github/workflows/pr-require-checks.yml)"
-
 # ------------------------------------------------------------------ 1. shape
 
 # check_shape <source> <component> <runs-on> <destination>: the locked design, per file.
@@ -120,24 +118,13 @@ check_shape() {
   assert_eq "$p no job-level permissions block (the workflow grant is the whole grant)" '0' \
     "$(q '[.jobs[] | select(has("permissions"))] | length')"
 
-  assert_eq "$p two steps: checkout, then the guard" '2' "$(q '.jobs["pr-check-managed-files"].steps | length')"
+  # The action checks out the repository itself (ci-workflows#881), so the
+  # caller carries no checkout and no third-party pin.
+  assert_eq "$p one step: the guard" '1' "$(q '.jobs["pr-check-managed-files"].steps | length')"
 
-  local checkout_uses guard_uses
-  checkout_uses="$(q '.jobs["pr-check-managed-files"].steps[0].uses')"
-  assert_contains "$p first step is actions/checkout" "$checkout_uses" 'actions/checkout@'
-  assert_eq "$p checkout is pinned to the same SHA as the sibling workflows" "$sibling_checkout" "$checkout_uses"
-  if [[ "$checkout_uses" =~ @[0-9a-f]{40}$ ]]; then
-    pass "$p checkout pin is a full 40-character SHA"
-  else
-    fail "$p checkout pin is a full 40-character SHA" "got $checkout_uses"
-  fi
-  assert_eq "$p checkout does not persist credentials" 'false' \
-    "$(q '.jobs["pr-check-managed-files"].steps[0].with["persist-credentials"]')"
-  assert_eq "$p checkout fetches full history so the guard can diff base...head" '0' \
-    "$(q '.jobs["pr-check-managed-files"].steps[0].with["fetch-depth"]')"
-
-  guard_uses="$(q '.jobs["pr-check-managed-files"].steps[1].uses')"
-  assert_contains "$p second step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
+  local guard_uses
+  guard_uses="$(q '.jobs["pr-check-managed-files"].steps[0].uses')"
+  assert_contains "$p the step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
   if [[ "$guard_uses" =~ ^${action_path}@[0-9a-f]{40}$ ]]; then
     pass "$p guard action is pinned to a full 40-character SHA (org policy)"
   else
@@ -146,9 +133,9 @@ check_shape() {
   assert_eq "$p guard action pin line is unique in the file" '1' \
     "$(grep -c "uses: ${action_path}@" "$source")"
   assert_eq "$p standards-ref is main for the soak" 'main' \
-    "$(q '.jobs["pr-check-managed-files"].steps[1].with["standards-ref"]')"
+    "$(q '.jobs["pr-check-managed-files"].steps[0].with["standards-ref"]')"
   assert_eq "$p the guard step passes standards-ref and nothing else" 'standards-ref' \
-    "$(q '.jobs["pr-check-managed-files"].steps[1].with | keys | join(",")')"
+    "$(q '.jobs["pr-check-managed-files"].steps[0].with | keys | join(",")')"
 }
 
 check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"
