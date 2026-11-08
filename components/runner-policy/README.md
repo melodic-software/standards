@@ -181,8 +181,9 @@ workflow's current main, so the contract holds for whatever main declares and
 a ci-workflows change needs no standards sync unless it changes the contract
 surface (see [Contract revision lockstep](#contract-revision-lockstep)). Its contract names the
 complete set of reviewed caller input names, an exact secret-name-to-expression
-map (which may be empty), and one of two routing modes. Every
-reusable call rejects `secrets: inherit`, omitted required secret mappings,
+map (which may be empty) or a non-empty list of exact maps, and one of two
+routing modes. A caller's `secrets:` block must equal one listed map exactly.
+Every reusable call rejects `secrets: inherit`, omitted required secret mappings,
 unknown secret names, and alternate expressions:
 
 - `runner-input` names the one canonical runner input. Unknown workflows,
@@ -242,7 +243,8 @@ unknown secret names, and alternate expressions:
   same way a hosted-only contract's mapping does. The caller's permissions keep
   the ordinary explicit read-only requirement unless the contract also names
   `allowedCallerPermissions`.
-  A contract with `allowedCallerPermissions` maps each secret to its own name
+  A contract with `allowedCallerPermissions` maps each secret in every listed
+  map to its own name
   (`NAME: ${{ secrets.NAME }}`). A contract that also declares a funding
   `role` (lower kebab, and `role` must be in `allowedInputs`) may instead map
   it to that role's prefixed name, `NAME: ${{ secrets.<ROLE>_NAME }}`, with
@@ -294,7 +296,7 @@ workflow content into every target and have it self-merge. `ci-workflows`,
 which hosts the engine, is itself a target.
 
 The policy records each path, fixed runner label, caller-input allowlist, and
-exact secret map; changing any field requires another review.
+exact secret map or maps; changing any field requires another review.
 
 ## Visibility-scoped reusable contracts (Claude lanes)
 
@@ -342,19 +344,17 @@ next event. A change to that surface is ordered so no caller is refused:
 2. A removed or renamed input: remove it from every caller, found with an
    org-wide code search rather than a remembered list, then from the contract,
    then from the reusable.
-3. A secret change: every caller must send exactly the contract's secret map,
-   so the contract change and every caller's change take effect together;
-   callers on either side of the sync fail until both land. An
-   `allowedCallerPermissions` change lands expand/contract instead: the
+3. A secret or `allowedCallerPermissions` change lands expand/contract: the
    contract first lists the old and the new map, the component sync
    distributes it, every caller moves to the new map, and a follow-up removes
-   the old map. A caller passes while its permissions equal any one listed map
-   exactly.
+   the old map. A caller passes while its secrets, and its permissions, each
+   equal any one listed map exactly.
 4. A new reusable path gets its own contract entry before its first caller
    lands.
 
 A caller still pinned to an approved SHA is checked against the same path
-contract, so it too must send the current secret map and caller permissions.
+contract, so it too must send one of the currently listed secret maps and
+caller permission maps.
 
 A production fleet relabel is the same class of event plus its own sites:
 `approvedManagedRunnerLabels` and `managedLabelPatterns` in `policy.json`,
