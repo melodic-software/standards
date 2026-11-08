@@ -183,6 +183,8 @@ surface (see [Contract revision lockstep](#contract-revision-lockstep)). Its con
 complete set of reviewed caller input names, an exact secret-name-to-expression
 map (which may be empty) or a non-empty list of exact maps, and one of two
 routing modes. A caller's `secrets:` block must equal one listed map exactly.
+A list of more than one map is an open switchover and needs its
+`allowedSecretsUntil` date (see item 3 of the lockstep below).
 Every reusable call rejects `secrets: inherit`, omitted required secret mappings,
 unknown secret names, and alternate expressions:
 
@@ -192,7 +194,8 @@ unknown secret names, and alternate expressions:
   mapping, or a non-empty list of exact mappings, when an independently
   reviewed workflow needs a narrowly scoped write-capable caller token. The
   caller's effective job permissions must match every scope and access level
-  of one mapping exactly; missing scopes, additional
+  of one mapping exactly; a list of more than one mapping needs its
+  `allowedCallerPermissionsUntil` date; missing scopes, additional
   scopes, `write-all`, and access drift fail closed. Omitting this field keeps
   the ordinary read-only local-workload boundary. This waiver applies only
   while the call's runner input carries the managed fleet label; a caller that
@@ -348,7 +351,12 @@ next event. A change to that surface is ordered so no caller is refused:
    contract first lists the old and the new map, the component sync
    distributes it, every caller moves to the new map, and a follow-up removes
    the old map. A caller passes while its secrets, and its permissions, each
-   equal any one listed map exactly.
+   equal any one listed map exactly. While a list holds more than one map, the
+   contract carries the switchover date, `allowedSecretsUntil` or
+   `allowedCallerPermissionsUntil` (UTC `YYYY-MM-DD`), at most 90 days after
+   the day the check runs. Every repository's check fails the day after that
+   date until the follow-up removes the old map and the date field together. The
+   policy refuses the date field on a single map or a one-entry list.
 4. A new reusable path gets its own contract entry before its first caller
    lands.
 
