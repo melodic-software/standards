@@ -170,10 +170,15 @@ async function repository({
   return root;
 }
 
+// A fixed audit date keeps switchover-date fixtures inside their window.
+const TEST_TODAY = "2026-11-08";
+const SWITCHOVER_UNTIL = "2026-12-08";
+
 function audit(root, options = {}) {
   return auditRepository({
     root,
     policyPath: path.join(root, "runner-policy-policy.json"),
+    today: TEST_TODAY,
     ...options,
   });
 }
@@ -2678,6 +2683,10 @@ jobs:
 const MIGRATION_OLD_MAP = { contents: "read", "pull-requests": "write" };
 const MIGRATION_NEW_MAP = { contents: "read", "pull-requests": "write", "id-token": "write" };
 
+// An open switchover (more than one listed map) must carry its date field.
+const switchoverDate = (field, maps) =>
+  Array.isArray(maps) && maps.length > 1 ? { [`${field}Until`]: SWITCHOVER_UNTIL } : {};
+
 async function callerPermissionRepository(allowedCallerPermissions, permissions) {
   return repository({
     policyOverrides: {
@@ -2688,6 +2697,7 @@ async function callerPermissionRepository(allowedCallerPermissions, permissions)
           allowedInputs: ["runner"],
           allowedSecrets: {},
           allowedCallerPermissions,
+          ...switchoverDate("allowedCallerPermissions", allowedCallerPermissions),
         },
       },
     },
@@ -2827,7 +2837,11 @@ async function callerSecretRepository(allowedSecrets, secretLines) {
   return repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
-        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: { ...SYNC_RUNNER_INPUT_CONTRACT, allowedSecrets },
+        [pathOf(SYNC_RUNNER_INPUT_REFERENCE)]: {
+          ...SYNC_RUNNER_INPUT_CONTRACT,
+          allowedSecrets,
+          ...switchoverDate("allowedSecrets", allowedSecrets),
+        },
       },
     },
     workflows: {
@@ -2964,6 +2978,7 @@ test("every listed secret map of a privileged contract must map each secret to i
             { CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` },
             { CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.OTHER_TOKEN }}` },
           ],
+          allowedSecretsUntil: SWITCHOVER_UNTIL,
           allowedCallerPermissions: { contents: "write" },
         },
       },
@@ -2985,6 +3000,7 @@ test("a hosted-only contract accepts either listed secret map and refuses any ot
             routing: "hosted-only",
             allowedInputs: [],
             allowedSecrets: [SECRET_MIGRATION_OLD_MAP, SECRET_MIGRATION_NEW_MAP],
+            allowedSecretsUntil: SWITCHOVER_UNTIL,
             fixedRunsOn: ["ubuntu-24.04"],
           },
         },
@@ -3028,6 +3044,7 @@ test("a denylisted secret in any listed map is visibility-scoped surface", async
             routing: "hosted-only",
             allowedInputs: [],
             allowedSecrets: [{}, listedMap],
+            allowedSecretsUntil: SWITCHOVER_UNTIL,
             fixedRunsOn: ["ubuntu-24.04"],
           },
         },
@@ -3046,6 +3063,169 @@ test("a denylisted secret in any listed map is visibility-scoped surface", async
         },
       ],
       label,
+    );
+  }
+});
+
+const SWITCHOVER_FIELDS = [
+  {
+    field: "allowedSecrets",
+    path: pathOf(SYNC_RUNNER_INPUT_REFERENCE),
+    contract: (fields) => ({ ...SYNC_RUNNER_INPUT_CONTRACT, ...fields }),
+    oldMap: SECRET_MIGRATION_OLD_MAP,
+    newMap: SECRET_MIGRATION_NEW_MAP,
+  },
+  {
+    field: "allowedCallerPermissions",
+    path: pathOf(FLEET_CLAUDE_REVIEW_REFERENCE),
+    contract: (fields) => ({
+      routing: "runner-input",
+      runnerInput: "runner",
+      allowedInputs: ["runner"],
+      allowedSecrets: {},
+      ...fields,
+    }),
+    oldMap: MIGRATION_OLD_MAP,
+    newMap: MIGRATION_NEW_MAP,
+  },
+];
+
+function switchoverRepository({ path: contractPath, contract }, fields) {
+  return repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: { [contractPath]: contract(fields) },
+    },
+  });
+}
+
+test("a list of more than one map requires its switchover date", async () => {
+  for (const scenario of SWITCHOVER_FIELDS) {
+    const { field, path: contractPath, oldMap, newMap } = scenario;
+    await assert.rejects(
+      async () => audit(await switchoverRepository(scenario, { [field]: [oldMap, newMap] })),
+      (error) =>
+        error instanceof ConfigurationError &&
+        error.message.includes(
+          `reusable workflow contract ${contractPath}.${field}Until is required while ${field} lists more than one map`,
+        ),
+      field,
+    );
+  }
+});
+
+test("a switchover date on a single map or one-entry list is rejected", async () => {
+  for (const scenario of SWITCHOVER_FIELDS) {
+    const { field, path: contractPath, newMap } = scenario;
+    for (const [shape, value] of [
+      ["single map", newMap],
+      ["one-entry list", [newMap]],
+    ]) {
+      await assert.rejects(
+        async () =>
+          audit(
+            await switchoverRepository(scenario, {
+              [field]: value,
+              [`${field}Until`]: SWITCHOVER_UNTIL,
+            }),
+          ),
+        (error) =>
+          error instanceof ConfigurationError &&
+          error.message.includes(
+            `reusable workflow contract ${contractPath}.${field}Until is allowed only while ${field} lists more than one map`,
+          ),
+        `${field} ${shape}`,
+      );
+    }
+  }
+});
+
+test("a switchover fails the day after its date and passes on it", async () => {
+  for (const scenario of SWITCHOVER_FIELDS) {
+    const { field, path: contractPath, oldMap, newMap } = scenario;
+    const root = await switchoverRepository(scenario, {
+      [field]: [oldMap, newMap],
+      [`${field}Until`]: "2026-12-08",
+    });
+    assert.deepEqual(await audit(root, { today: "2026-12-08" }), [], `${field} on its date`);
+    assert.deepEqual(
+      await audit(root, { today: "2026-12-09" }),
+      [
+        {
+          rule: "contract-switchover-expired",
+          file: "runner-policy-policy.json",
+          message: `today (2026-12-09 UTC) is past the switchover date while more than one map is still listed; remove the old map and its date field: ${contractPath}.${field} (${field}Until 2026-12-08)`,
+        },
+      ],
+      `${field} the day after`,
+    );
+  }
+});
+
+test("a switchover date may be at most 90 days after today", async () => {
+  for (const scenario of SWITCHOVER_FIELDS) {
+    const { field, path: contractPath, oldMap, newMap } = scenario;
+    const atCap = await switchoverRepository(scenario, {
+      [field]: [oldMap, newMap],
+      [`${field}Until`]: "2027-02-06",
+    });
+    assert.deepEqual(await audit(atCap, { today: "2026-11-08" }), [], `${field} at 90 days`);
+    const pastCap = await switchoverRepository(scenario, {
+      [field]: [oldMap, newMap],
+      [`${field}Until`]: "2027-02-07",
+    });
+    assert.deepEqual(
+      await audit(pastCap, { today: "2026-11-08" }),
+      [
+        {
+          rule: "contract-switchover-window",
+          file: "runner-policy-policy.json",
+          message: `a switchover date may be at most 90 days after today (2026-11-08 UTC): ${contractPath}.${field}Until 2027-02-07`,
+        },
+      ],
+      `${field} at 91 days`,
+    );
+  }
+});
+
+test("every expired switchover is named in one finding", async () => {
+  const root = await repository({
+    policyOverrides: {
+      approvedReusableWorkflowContracts: Object.fromEntries(
+        SWITCHOVER_FIELDS.map(({ field, path: contractPath, contract, oldMap, newMap }) => [
+          contractPath,
+          contract({ [field]: [oldMap, newMap], [`${field}Until`]: "2026-12-08" }),
+        ]),
+      ),
+    },
+  });
+  const findings = await audit(root, { today: "2027-01-01" });
+  assert.equal(findings.length, 1, JSON.stringify(findings));
+  assert.equal(findings[0].rule, "contract-switchover-expired");
+  for (const { field, path: contractPath } of SWITCHOVER_FIELDS) {
+    assert.ok(
+      findings[0].message.includes(`${contractPath}.${field} (${field}Until 2026-12-08)`),
+      findings[0].message,
+    );
+  }
+});
+
+test("a switchover date must be a real calendar date", async () => {
+  const [scenario] = SWITCHOVER_FIELDS;
+  const { field, oldMap, newMap } = scenario;
+  for (const [date, expected] of [
+    ["2026-02-30", "allowedSecretsUntil must be a real calendar date (YYYY-MM-DD)"],
+    ["2026-2-3", "allowedSecretsUntil"],
+  ]) {
+    await assert.rejects(
+      async () =>
+        audit(
+          await switchoverRepository(scenario, {
+            [field]: [oldMap, newMap],
+            [`${field}Until`]: date,
+          }),
+        ),
+      (error) => error instanceof ConfigurationError && error.message.includes(expected),
+      date,
     );
   }
 });

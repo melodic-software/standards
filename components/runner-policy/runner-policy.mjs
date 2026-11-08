@@ -176,6 +176,10 @@ export function validatePolicy(value) {
       contract.allowedSecrets,
       `reusable workflow contract ${reference}.allowedSecrets`,
     );
+    const switchovers = [
+      switchoverDeadline(contract, reference, "allowedSecrets", secretMaps),
+      switchoverDeadline(contract, reference, "allowedCallerPermissions", callerPermissionMaps),
+    ].filter((switchover) => switchover !== undefined);
     if (contract.routing === "runner-input") {
       if (!contract.allowedInputs.includes(contract.runnerInput)) {
         throw new ConfigurationError(
@@ -298,6 +302,7 @@ export function validatePolicy(value) {
         : {}),
       ...(contract.fixedRunsOn ? { fixedRunsOn: new Set(contract.fixedRunsOn) } : {}),
       approvedShas: new Set(contract.approvedShas ?? []),
+      switchovers: Object.freeze(switchovers),
     });
   }
 
@@ -922,6 +927,85 @@ function exactMapsError(actual, allowedMaps, location) {
     return errors[0];
   }
   return `${location} must be exactly one of ${allowedMaps.map((map) => JSON.stringify(map)).join(", ")}`;
+}
+
+// A listed map is fleet-wide, so no one repository can see that callers have
+// stopped sending the old one; the date is what forces the contract step.
+const SWITCHOVER_MAX_DAYS = 90;
+const DAY_MILLISECONDS = 86_400_000;
+
+// Days since the epoch for a real YYYY-MM-DD calendar date, else undefined.
+function utcDay(text) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(text);
+  if (match === null) {
+    return undefined;
+  }
+  const milliseconds = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return new Date(milliseconds).toISOString().slice(0, 10) === text
+    ? milliseconds / DAY_MILLISECONDS
+    : undefined;
+}
+
+function switchoverDeadline(contract, reference, field, maps) {
+  const dateField = `${field}Until`;
+  const location = `reusable workflow contract ${reference}.${dateField}`;
+  if (maps.length < 2) {
+    if (Object.hasOwn(contract, dateField)) {
+      throw new ConfigurationError(
+        `${location} is allowed only while ${field} lists more than one map; remove it with the old map`,
+      );
+    }
+    return undefined;
+  }
+  if (!Object.hasOwn(contract, dateField)) {
+    throw new ConfigurationError(
+      `${location} is required while ${field} lists more than one map: the date the old map is removed, at most ${SWITCHOVER_MAX_DAYS} days out`,
+    );
+  }
+  const day = utcDay(contract[dateField]);
+  if (day === undefined) {
+    throw new ConfigurationError(`${location} must be a real calendar date (YYYY-MM-DD)`);
+  }
+  return Object.freeze({ field, dateField, date: contract[dateField], day });
+}
+
+// One finding per rule names every affected contract, because findings are
+// deduplicated by file, job, and rule.
+function switchoverFindings(contracts, today, policyFile) {
+  const todayDay = utcDay(today);
+  const expired = [];
+  const tooFar = [];
+  for (const [reference, contract] of contracts) {
+    for (const { field, dateField, date, day } of contract.switchovers) {
+      if (todayDay > day) {
+        expired.push(`${reference}.${field} (${dateField} ${date})`);
+      } else if (day - todayDay > SWITCHOVER_MAX_DAYS) {
+        tooFar.push(`${reference}.${dateField} ${date}`);
+      }
+    }
+  }
+  const findings = [];
+  if (expired.length > 0) {
+    findings.push(
+      finding(
+        "contract-switchover-expired",
+        policyFile,
+        undefined,
+        `today (${today} UTC) is past the switchover date while more than one map is still listed; remove the old map and its date field: ${expired.join(", ")}`,
+      ),
+    );
+  }
+  if (tooFar.length > 0) {
+    findings.push(
+      finding(
+        "contract-switchover-window",
+        policyFile,
+        undefined,
+        `a switchover date may be at most ${SWITCHOVER_MAX_DAYS} days after today (${today} UTC): ${tooFar.join(", ")}`,
+      ),
+    );
+  }
+  return findings;
 }
 
 const PERMISSION_ACCESS_RANK = { none: 0, read: 1, write: 2 };
@@ -2024,7 +2108,11 @@ export async function auditRepository({
   policyPath = DEFAULT_POLICY_PATH,
   repositoryVisibility,
   githubRepository,
+  today = new Date().toISOString().slice(0, 10),
 } = {}) {
+  if (utcDay(today) === undefined) {
+    throw new ConfigurationError("today must be a real calendar date (YYYY-MM-DD)");
+  }
   const resolvedRoot = path.resolve(root);
   const resolvedConfig = path.isAbsolute(configPath)
     ? configPath
@@ -2054,12 +2142,14 @@ export async function auditRepository({
   const consumedLocalRoutingGrants = new Set();
   const consumedRequiredReusableCallInputs = new Set();
   const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
+  const policyFile = path.relative(resolvedRoot, resolvedPolicy) || path.basename(resolvedPolicy);
   findings.push(
     ...visibilityScopedReusableContractFindings(policy.approvedReusableWorkflowContracts, {
       visibility: config.visibility,
       repositoryVisibility,
-      policyFile: path.relative(resolvedRoot, resolvedPolicy) || path.basename(resolvedPolicy),
+      policyFile,
     }),
+    ...switchoverFindings(policy.approvedReusableWorkflowContracts, today, policyFile),
   );
   const localPermissionVisits = new Set();
   const localIncomingFiles = new Set();
