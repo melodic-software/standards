@@ -248,6 +248,7 @@
     "acl": "ACL",
     "api": "API",
     "ci": "CI",
+    "cli": "CLI",
     "dotnet": ".NET",
     "editorconfig": "EditorConfig",
     "markdownlint": "markdownlint",
