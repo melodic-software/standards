@@ -185,7 +185,7 @@ function displayTokens(name) {
 function knownNames(vocabulary) {
   return new Set([
     ...Object.values(vocabulary.displayWords),
-    ...vocabulary.properNouns.flatMap((noun) => noun.split(" ")),
+    ...vocabulary.properNouns.filter((noun) => !noun.includes(" ")),
     ...vocabulary.toolNames,
     ...vocabulary.engines,
   ]);
@@ -223,21 +223,28 @@ export function checkJobName(id, name, vocabulary) {
 // identifier, and a later capitalized word is a proper noun from the
 // vocabulary, an acronym, or a mixed-case identifier.
 export function checkStepName(name, vocabulary) {
-  let text = name;
-  for (const noun of vocabulary.properNouns.filter((entry) => entry.includes(" "))) {
-    text = text.replaceAll(noun, " ");
-  }
   const known = knownNames(vocabulary);
-  const [first, ...rest] = displayTokens(text);
-  if (
-    first !== undefined &&
-    displayTokens(name)[0] === first &&
-    /^\p{Ll}+$/u.test(first) &&
-    !known.has(first)
-  ) {
+  const tokens = displayTokens(name);
+  // A multi-word proper noun exempts its words where they appear together,
+  // and only there: `Claude Code` passes, `Code` alone does not.
+  const exempt = tokens.map((token) => known.has(token));
+  for (const noun of vocabulary.properNouns.filter((entry) => entry.includes(" "))) {
+    const words = noun.split(" ");
+    for (let start = 0; start + words.length <= tokens.length; start += 1) {
+      if (words.every((word, offset) => tokens[start + offset] === word)) {
+        words.forEach((_, offset) => {
+          exempt[start + offset] = true;
+        });
+      }
+    }
+  }
+  const [first] = tokens;
+  if (first !== undefined && !exempt[0] && /^\p{Ll}+$/u.test(first)) {
     return `step name \`${name}\` must start with a capital letter (sentence case)`;
   }
-  const capitalized = rest.filter((token) => /^\p{Lu}\p{Ll}+$/u.test(token) && !known.has(token));
+  const capitalized = tokens.filter(
+    (token, index) => index > 0 && !exempt[index] && /^\p{Lu}\p{Ll}+$/u.test(token),
+  );
   if (capitalized.length > 0) {
     return (
       `step name \`${name}\` is not sentence case: ${capitalized.map((token) => `\`${token}\``).join(", ")} ` +

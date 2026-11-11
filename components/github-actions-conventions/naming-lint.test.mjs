@@ -329,6 +329,9 @@ test("a step name is sentence case", () => {
     ["Install Pinned Tools", /`Pinned`, `Tools` is capitalized/u],
     ["Create tag + GitHub Release", /`Release` is capitalized/u],
     ["install the tools", /must start with a capital letter/u],
+    ["Claude Code Review", /`Review` is capitalized/u],
+    ["Pulumi Cloud Deploy", /`Deploy` is capitalized/u],
+    ["Review the Code", /`Code` is capitalized/u],
   ]) {
     assert.match(checkStepName(name, vocabulary) ?? "", pattern, name);
   }
