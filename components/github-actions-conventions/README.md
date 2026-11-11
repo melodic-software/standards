@@ -1,14 +1,14 @@
 # GitHub Actions naming and structure conventions
 
 The one source for how Melodic Software names GitHub Actions workflow files,
-workflow `name:` values, job ids, composite action directories, activities and
-GitHub Apps. `naming-lint.mjs` checks a repository against it. Rules that
+workflow `name:` values, job ids, job and step display names, composite action
+directories and names, activities and GitHub Apps. `naming-lint.mjs` checks a repository against it. Rules that
 another component already owns are linked under
 [Rules owned elsewhere](#rules-owned-elsewhere), not restated here.
 
 | File | Role |
 | --- | --- |
-| [`vocabulary.json`](vocabulary.json) | Stages, function words per stage, verbs, tool and engine names, the activity grammar, exemptions and Apps |
+| [`vocabulary.json`](vocabulary.json) | Stages, function words per stage, verbs, tool and engine names, the activity grammar, display words and proper nouns, exemptions and Apps |
 | [`vocabulary.schema.json`](vocabulary.schema.json) | Draft 2020-12 schema for the vocabulary |
 | [`rename-map.json`](rename-map.json) | Every workflow and composite action rename across the active repositories, with job id renames and couplings |
 | [`rename-map.schema.json`](rename-map.schema.json) | Draft 2020-12 schema for the rename map |
@@ -72,9 +72,27 @@ workflow `name:` and file name never appear in it. So:
 - An activity may carry one mode after `#`, from the pairs in
   `activityGrammar.modes` (`simplify#diff`, `fix-docs#report`).
 
-`ci-status` is the only required check in every repository and keeps that name
-everywhere. The gate workflow, `pr-require-checks.yml`, aggregates every lane
-into it. Lanes are added or renamed behind it without touching a ruleset.
+Every job, caller jobs included, has a display `name:` in Title Case, separate
+from its id: every word starts with a capital letter or a digit, or is a
+`displayWords` form (`markdownlint`). An expression keeps its place, so a matrix
+job reads `Drift (${{ matrix.skill }})`. The check then shows that name, not the
+id: `PR Review / Claude` where the jobs are `pr-review` and `claude`.
+
+Step names are sentence case, as GitHub's own steps are (`Set up job`): the
+first word is capitalized, and a later word is capitalized only when it is a
+proper noun in `properNouns`, an acronym (`JSON`) or a mixed-case name
+(`GitHub`). The first word may be a lowercase tool name (`shellcheck`) or an
+identifier (`linux-x64`). Text in backticks and `${{ }}` expressions is not
+checked.
+
+The CI Status job (id `ci-status`, named `CI Status`) is the only required
+check in every repository. The gate workflow, `pr-require-checks.yml`,
+aggregates every lane into it, so lanes are added or renamed behind it without
+touching a ruleset. While the org ci-gate ruleset still requires the context
+`ci-status`, the gate also carries the `report-ci-status` job, named `ci-status`
+(`jobNameExceptions` in `vocabulary.json`): it needs the CI Status job, runs
+`if: always()`, and ends with that job's result. Once the ruleset requires
+`CI Status`, each repository removes it.
 
 ## Composite actions
 
@@ -87,7 +105,7 @@ into it. Lanes are added or renamed behind it without touching a ruleset.
   `psscriptanalyzer`).
 - An action's `name:` is the name of the directory holding its `action.yml`,
   in Title Case by the workflow rule above (`check-managed-files` is named
-  `Check Managed Files`). naming-lint checks the directory, not this `name:`.
+  `Check Managed Files`).
 
 ## Settings a called workflow does not inherit
 
@@ -113,8 +131,11 @@ renaming, find each of these and change it in the same rollout:
 1. **Required checks.** Renaming a required job (its caller id or the called
    job's `name:`) blocks every merge while all checks show green: GitHub
    reports no pending check, and the only API signal is
-   `mergeStateStatus: BLOCKED`. Keeping `ci-status` the single required check
-   makes file and lane renames safe; never rename `ci-status`.
+   `mergeStateStatus: BLOCKED`. Keeping CI Status the single required check
+   makes file and lane renames safe. Renaming the required job itself takes
+   three steps: every governed repository reports both the old and the new
+   name (the alias job above), then the ci-gate ruleset in github-iac switches
+   to the new name, then the alias goes.
 2. **Runner policy.** The runner-policy contract is keyed by the reusable
    workflow's bare path and fails closed on an unknown path. A renamed reusable
    needs a contract under its new path before any consumer calls it.
@@ -199,16 +220,21 @@ directory under `.github/actions/` that holds an `action.yml` or
 | Rule | Level | Fails when |
 | --- | --- | --- |
 | `workflow-filename` | error | the file stem is not `<stage>-<function>[-<modifier>]` with a known stage and function word |
-| `workflow-name` | error | `name:` is missing, or is neither the stem's Title Case form nor the stem (see [Rollout](#rollout)), or differs from a recorded exception |
+| `workflow-name` | error | `name:` is missing or is not the stem's Title Case form (or the recorded exception) |
 | `workflow-unparsable` | error | the file is not a YAML mapping |
 | `gate-ci-status` | error | `pr-require-checks` has no `ci-status` job |
 | `job-id-kebab` | error | a job id is not kebab-case |
 | `job-id-stage-word` | warning | a job id starts with a stage word but is not a known slot name |
 | `job-id-verb-first` | warning | a job id is not verb-first and is not a listed tool, engine or reserved id; whether a word is a verb cannot always be decided, so this never blocks |
+| `job-name` | `displayNameLevel` | a job has no `name:`, its name is not Title Case, the `ci-status` job is not named `CI Status`, or a `jobNameExceptions` job differs from its recorded name |
+| `step-name` | `displayNameLevel` | a step name in a workflow or composite action is not sentence case |
 | `action-directory` | error | an action directory is not kebab-case, not verb-first, an engine or a listed tool, or not a `<lane>/<unit>` pair under a slot name |
+| `action-name` | error | an action's `name:` is not its directory's Title Case form |
+| `action-unparsable` | error | an `action.yml` is not a YAML mapping |
 
-`checkActivityName` and `parseSlotName` are exported for tools that validate
-activity and slot names outside workflow files.
+`checkActivityName`, `checkJobName`, `checkStepName`, `parseSlotName` and
+`titleCaseName` are exported for tools that validate these names outside
+workflow files.
 
 ### Rollout
 
@@ -232,9 +258,14 @@ closed the advisory period.
   renamed to `release-publish-plugins.yml` before the switch.
 - **Rollback:** set the composite's `mode: advisory`, which reports every
   finding as a warning and passes, or remove the lane.
-- **Title Case names:** `workflow-name` accepts the bare stem as well as its
-  Title Case form until every org repository is converted; a later change then
-  accepts the Title Case form only.
+- **Display names:** `job-name` and `step-name` report at
+  `displayNameLevel`, `warning` while the org's repositories name their jobs
+  and adopt the lint; ci-workflows runs the analyzer from standards' `main`, so
+  an `error` level would block it before its jobs are named. Each repository
+  names its jobs in the same change that updates every script and filter
+  reading the old check names. Once standards, ci-workflows and
+  claude-code-plugins pass with no warning of either rule, a change sets
+  `displayNameLevel` to `error`.
 
 ### Ownership and operation
 

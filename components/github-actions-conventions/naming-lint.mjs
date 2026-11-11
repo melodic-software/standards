@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import Ajv2020 from "ajv/dist/2020.js";
-import { isMap, isScalar, LineCounter, parseDocument } from "yaml";
+import { isMap, isScalar, isSeq, LineCounter, parseDocument } from "yaml";
 
 export class ConfigurationError extends Error {
   constructor(message) {
@@ -171,6 +171,82 @@ export function titleCaseName(stem, displayWords) {
     .join(" ");
 }
 
+// The words of a display name, with `${{ }}` expressions and backtick spans
+// removed and surrounding punctuation and a possessive `'s` trimmed.
+function displayTokens(name) {
+  return name
+    .replace(/\$\{\{.*?\}\}/gu, " ")
+    .replace(/`[^`]*`/gu, " ")
+    .split(/\s+/u)
+    .map((token) => token.replace(/^[^\p{L}\p{N}.]+|[^\p{L}\p{N}]+$/gu, "").replace(/'s$/u, ""))
+    .filter((token) => token !== "");
+}
+
+function knownNames(vocabulary) {
+  return new Set([
+    ...Object.values(vocabulary.displayWords),
+    ...vocabulary.properNouns.flatMap((noun) => noun.split(" ")),
+    ...vocabulary.toolNames,
+    ...vocabulary.engines,
+  ]);
+}
+
+// A job's display name is Title Case: every word starts with a capital letter
+// or a digit, or is a `displayWords` form (`markdownlint`, `yq`).
+export function checkJobName(id, name, vocabulary) {
+  const exception = vocabulary.jobNameExceptions.find((entry) => entry.jobId === id);
+  if (exception !== undefined) {
+    return name === exception.name
+      ? undefined
+      : `job \`${id}\` is a recorded exception and must be named exactly \`${exception.name}\``;
+  }
+  const suggestion = titleCaseName(id, vocabulary.displayWords);
+  if (name === undefined) {
+    return `job \`${id}\` has no \`name:\`; give it a Title Case display name such as \`${suggestion}\``;
+  }
+  // The required check's context is this job's name, so it is fixed.
+  if (vocabulary.reservedJobIds.includes(id) && name !== suggestion) {
+    return `job \`${id}\` is the required check and must be named exactly \`${suggestion}\``;
+  }
+  const displayForms = new Set(Object.values(vocabulary.displayWords));
+  const lower = displayTokens(name).filter(
+    (token) => /^\p{Ll}/u.test(token) && !displayForms.has(token),
+  );
+  if (lower.length > 0) {
+    return `job \`${id}\` name \`${name}\` is not Title Case (${lower.map((token) => `\`${token}\``).join(", ")}); for example \`${suggestion}\``;
+  }
+  return undefined;
+}
+
+// A step name is sentence case, as GitHub's own steps are (`Set up job`): the
+// first word is capitalized unless it is a known lowercase name or an
+// identifier, and a later capitalized word is a proper noun from the
+// vocabulary, an acronym, or a mixed-case identifier.
+export function checkStepName(name, vocabulary) {
+  let text = name;
+  for (const noun of vocabulary.properNouns.filter((entry) => entry.includes(" "))) {
+    text = text.replaceAll(noun, " ");
+  }
+  const known = knownNames(vocabulary);
+  const [first, ...rest] = displayTokens(text);
+  if (
+    first !== undefined &&
+    displayTokens(name)[0] === first &&
+    /^\p{Ll}+$/u.test(first) &&
+    !known.has(first)
+  ) {
+    return `step name \`${name}\` must start with a capital letter (sentence case)`;
+  }
+  const capitalized = rest.filter((token) => /^\p{Lu}\p{Ll}+$/u.test(token) && !known.has(token));
+  if (capitalized.length > 0) {
+    return (
+      `step name \`${name}\` is not sentence case: ${capitalized.map((token) => `\`${token}\``).join(", ")} ` +
+      "is capitalized; lower-case it, or add the proper noun to `properNouns`"
+    );
+  }
+  return undefined;
+}
+
 function isSlotName(name, vocabulary) {
   return KEBAB.test(name) && parseSlotName(name, vocabulary).function !== undefined;
 }
@@ -286,6 +362,32 @@ function checkJobId(file, id, line, vocabulary) {
   );
 }
 
+function stepFindings(file, steps, lineCounter, vocabulary) {
+  if (!isSeq(steps)) {
+    return [];
+  }
+  const findings = [];
+  for (const step of steps.items) {
+    const nameNode = isMap(step) ? step.get("name", true) : undefined;
+    if (!isScalar(nameNode)) {
+      continue;
+    }
+    const problem = checkStepName(String(nameNode.value), vocabulary);
+    if (problem !== undefined) {
+      findings.push(
+        finding(
+          vocabulary.displayNameLevel,
+          "step-name",
+          file,
+          lineOf(lineCounter, nameNode),
+          problem,
+        ),
+      );
+    }
+  }
+  return findings;
+}
+
 async function workflowFindings(root, repository, vocabulary) {
   const directory = path.join(root, ".github", "workflows");
   let entries;
@@ -337,13 +439,12 @@ async function workflowFindings(root, repository, vocabulary) {
     const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
     const nameExemption = waived("workflow-name");
     const titleCase = titleCaseName(stem, vocabulary.displayWords);
-    // The Title Case form is the convention. The bare stem also passes until
-    // every org repository is converted; a later stage then drops it from this
-    // list. A recorded exception is exact: it takes neither form.
-    const accepted = nameExemption ? [nameExemption.expectedName] : [titleCase, stem];
-    if (!accepted.includes(name)) {
+    // A recorded exception is exact: it takes neither the stem nor its Title
+    // Case form.
+    const expected = nameExemption ? nameExemption.expectedName : titleCase;
+    if (name !== expected) {
       const target = nameExemption
-        ? `the recorded exception \`${accepted[0]}\``
+        ? `the recorded exception \`${expected}\``
         : `the Title Case form of the file stem, \`${titleCase}\``;
       findings.push(
         finding(
@@ -368,6 +469,25 @@ async function workflowFindings(root, repository, vocabulary) {
         if (item !== undefined) {
           findings.push(item);
         }
+        const job = isMap(pair.value) ? pair.value : undefined;
+        const jobNameNode = job?.get("name", true);
+        const jobNameProblem = checkJobName(
+          id,
+          isScalar(jobNameNode) ? String(jobNameNode.value) : undefined,
+          vocabulary,
+        );
+        if (jobNameProblem !== undefined) {
+          findings.push(
+            finding(
+              vocabulary.displayNameLevel,
+              "job-name",
+              file,
+              lineOf(lineCounter, jobNameNode ?? pair.key),
+              jobNameProblem,
+            ),
+          );
+        }
+        findings.push(...stepFindings(file, job?.get("steps", true), lineCounter, vocabulary));
       }
     }
     if (stem === GATE_STEM && !jobIds.some((id) => vocabulary.reservedJobIds.includes(id))) {
@@ -443,6 +563,51 @@ function checkActionDirectory(segments, vocabulary) {
   return `action directory \`${display}\` is nested too deep; use \`.github/actions/<lane>/<unit>/\` or a flat directory`;
 }
 
+// An action's `name:` is its directory's Title Case form, and its composite
+// steps follow the step-name rule.
+async function actionMetadataFindings(root, file, directory, vocabulary) {
+  const lineCounter = new LineCounter();
+  const document = parseDocument(await readFile(path.join(root, file), "utf8"), { lineCounter });
+  if (document.errors.length > 0 || !isMap(document.contents)) {
+    return [
+      finding(
+        "error",
+        "action-unparsable",
+        file,
+        1,
+        `action metadata could not be parsed: ${document.errors[0]?.message ?? "top level is not a mapping"}`,
+      ),
+    ];
+  }
+  const findings = [];
+  const nameNode = document.contents.get("name", true);
+  const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
+  const expected = titleCaseName(directory, vocabulary.displayWords);
+  if (name !== expected) {
+    findings.push(
+      finding(
+        "error",
+        "action-name",
+        file,
+        lineOf(lineCounter, nameNode),
+        name === undefined
+          ? `action has no \`name:\`; set it to the Title Case form of its directory, \`${expected}\``
+          : `action \`name: ${name}\` must equal the Title Case form of its directory, \`${expected}\``,
+      ),
+    );
+  }
+  const runs = document.contents.get("runs", true);
+  findings.push(
+    ...stepFindings(
+      file,
+      isMap(runs) ? runs.get("steps", true) : undefined,
+      lineCounter,
+      vocabulary,
+    ),
+  );
+  return findings;
+}
+
 export async function lintRepository({
   root = process.cwd(),
   repository = "",
@@ -456,18 +621,12 @@ export async function lintRepository({
   const resolvedRoot = path.resolve(root);
   const findings = await workflowFindings(resolvedRoot, repository, words);
   for (const { segments, metadata } of await actionDirectories(resolvedRoot)) {
+    const file = `.github/actions/${segments.join("/")}/${metadata}`;
     const problem = checkActionDirectory(segments, words);
     if (problem !== undefined) {
-      findings.push(
-        finding(
-          "error",
-          "action-directory",
-          `.github/actions/${segments.join("/")}/${metadata}`,
-          1,
-          problem,
-        ),
-      );
+      findings.push(finding("error", "action-directory", file, 1, problem));
     }
+    findings.push(...(await actionMetadataFindings(resolvedRoot, file, segments.at(-1), words)));
   }
   if (mode === "advisory") {
     for (const item of findings) {
