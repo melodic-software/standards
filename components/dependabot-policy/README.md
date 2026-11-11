@@ -56,7 +56,10 @@ was retired with no targets in #430 and is not reintroduced.
   because they fail closed.
 - **Delivery boundary**: exact materialization. `policy.json` stays the only
   authority for the tiers. The consumer reads its synced copy at the base,
-  which the pull request under review cannot change.
+  which the pull request under review cannot change. Schema version 2 only
+  adds `cooldownDays` and `fastTrack`; neither consumer's classifier
+  (`dependency-classify.mjs`, `babysit_dependabot.py`) reads `schemaVersion`,
+  so the bump does not change their tiers.
 - **Alternatives and overlap**: a copy in the consumer would be a second
   authority that drifts. Reading this repository at run time would put a
   cross-repository token into the lanes. Syncing the full analyzer payload
@@ -86,8 +89,9 @@ was retired with no targets in #430 and is not reintroduced.
 
 ## The standard
 
-The canonical values live in [`policy.json`](policy.json). Each `updates` entry
-in `.github/dependabot.yml` must:
+[`policy.json`](policy.json) is the organization's one policy for dependency
+and tool updates: Dependabot, and the version-bump tooling that pins tools
+outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
 - schedule on the standard interval (`weekly`);
 - set `cooldown.default-days` to at least the minimum (`3`), so a compromised or
@@ -98,17 +102,62 @@ in `.github/dependabot.yml` must:
 - keep `open-pull-requests-limit` at or below the maximum (`5`); an omitted
   limit is accepted because GitHub's default is already the maximum.
 
-One 3-day floor covers every ecosystem and every outside publisher, with no
-exemption for any vendor action. The analyzer still accepts a narrow
-`cooldown.exclude`; the fleet uses it only for its own `melodic-software/*`
-actions, which this organization publishes. GitHub made 3 days Dependabot's
-default in July 2026 and found that
-malicious versions were pulled within hours of publication
+### Cooldown by change class
+
+`cooldownDays` sets the soak per change class (owner decision, 2026-11-11):
+
+| Class | Days | Applies to |
+| --- | --- | --- |
+| `own` | 0 | a `melodic-software/*` release |
+| `patch` | 3 | a patch update from anyone else |
+| `minor` | 3 | a minor update from anyone else |
+| `major` | 7 | a major update from anyone else |
+
+GitHub made 3 days Dependabot's default in July 2026 and found that malicious
+versions were pulled within hours of publication
 ([GitHub blog](https://github.blog/security/supply-chain-security/the-case-for-a-cooldown-why-dependabot-now-waits-before-issuing-version-updates/)),
-so 3 days catches them while keeping bumps current. Security updates skip the
-cooldown natively: the option applies only to version updates
+so 3 days catches them while keeping bumps current; a major gets a longer soak
+because it also changes behavior. Security updates skip the cooldown natively:
+the option applies only to version updates
 ([options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)).
-The standard still sets the value explicitly rather than relying on the default.
+The standard still sets the values explicitly rather than relying on the
+default.
+
+`cooldownMinimumDays` is the floor the analyzer enforces on every
+`default-days` and `semver-*-days` value. It must equal `cooldownDays.patch`;
+the analyzer refuses a policy where they differ. The analyzer does not yet
+check `semver-major-days` against the `major` class or the fast-track
+excludes below: it moves to ci-workflows as a reusable conformance check,
+which adds those rules, in the next phase of this work.
+
+### Fast track
+
+`fastTrack` lists the updates that take no cooldown and merge at the auto
+tier as soon as `ci-status` passes:
+
+- `npm`: `@anthropic-ai/claude-code`;
+- `githubActions`: every `anthropics/*` action;
+- `own`: every `melodic-software/*` release, the `own` class above.
+
+The owner wants Claude Code and Anthropic updates in as soon as they publish
+(2026-11-11), so these are deliberately exempt from the soak every other
+outside publisher gets. A repository puts them in `cooldown.exclude` for the
+matching ecosystem; the analyzer already accepts a narrow exclude and
+rejects a match-all one. The fast track removes the soak only. The merge
+tiers below still apply: a fast-tracked update merges at the auto tier only
+when it is non-major, a major still goes to review, and a `reviewOnly` entry
+still routes to review.
+
+These safeguards remain on a fast-tracked update:
+
+- every action stays pinned to a full commit SHA, so the update is one
+  reviewable diff that moves a pin, never a tag that changes underneath;
+- `ci-status` must pass before any merge, and the merge lanes' gates
+  (non-major rule, `reviewOnly`, readable `updated-dependencies` metadata)
+  apply unchanged;
+- security updates still arrive immediately, as for every dependency.
+
+The residual risk is in the [threat model](THREAT-MODEL.md).
 
 ## Merge tiers for Dependabot pull requests
 
@@ -141,9 +190,10 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   ([#820](https://github.com/melodic-software/standards/issues/820),
   2026-11-08): it resolves the same PyPI packages, and Dependabot's `uv`
   commits carry the same `update-type` metadata. In both, the cooldown (each repository's
-  `cooldown.default-days`, at least the 3-day floor), `ci-status`, the
-  non-major rule and the `autoMerge.reviewOnly` opt-out catch a bad release;
-  see the [threat model](THREAT-MODEL.md).
+  `cooldown.default-days`, at least the 3-day floor, except for the
+  [fast track](#fast-track)), `ci-status`, the non-major rule and the
+  `autoMerge.reviewOnly` opt-out catch a bad release; see the
+  [threat model](THREAT-MODEL.md).
 - **Review tier.** Everything else: a major from any publisher, an action
   from an unlisted publisher or one listed with `tier: review`, a
   security-critical dependency, a red

@@ -8,6 +8,9 @@ ci-workflows auto-merge reusable's allowlist matches `autoMerge`. GitHub's Depen
 systems. Their behavior is modeled where it crosses this analyzer's boundary,
 but this component does not operate or attest to them.
 
+The model was last reviewed for schema version 2 of `policy.json`, which adds
+the cooldown classes (`cooldownDays`) and the fast track (`fastTrack`).
+
 The model follows OWASP's maintained threat-modeling loop: describe the system,
 identify what can go wrong, map concrete responses, and validate the result.
 
@@ -18,7 +21,7 @@ identify what can go wrong, map concrete responses, and validate the result.
   capacity.
 - The soak (`cooldown`) is never silently dropped below the minimum, so a
   compromised or yanked release is caught before adoption while security
-  updates still bypass it.
+  updates still bypass it. The only exemption is the named `fastTrack` list.
 - The exception inventory cannot become a blanket bypass or outlive the
   condition it records.
 - Findings fail the CI gate clearly without modifying `dependabot.yml`.
@@ -68,6 +71,8 @@ are trusted only at their reviewed Git revision.
 | YAML or JSON ambiguity hides a different policy. | The parser requires unique keys and disables aliases and merge keys; duplicate JSON members are rejected before `JSON.parse`, per [RFC 8259 section 4](https://www.rfc-editor.org/rfc/rfc8259#section-4). A non-`version: 2` config is a finding. | The malformed-config, duplicate-member, and unsupported-version cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | The auto-merge reusable's `publisher-allowlist` input default drifts from the `tier: auto` keys of `autoMerge.publishers`, so a publisher this policy routes to the review tier merges with no AI review. | The lockstep fetches the reusable at `main` over the GitHub contents API (three attempts) and fails on a fetch error, a missing or non-JSON default, or any difference. | `npm run lint:dependabot-automerge-lockstep` in the `check-policies` CI job. |
 | A compromised or hijacked non-major release of an npm, pip, uv or NuGet dependency, including one whose install script runs in CI, merges at the auto tier with no human review. | Owner decision (2026-10-18; uv added on pip's terms by [#820](https://github.com/melodic-software/standards/issues/820), 2026-11-08): packages auto-merge only on a patch or minor update (below 1.0, patch only); each repository's `cooldown.default-days` soaks the release for at least the 3-day floor; `ci-status` must pass; a dependency listed in `autoMerge.reviewOnly`, which the caller passes as `review-only-dependencies`, is never armed. | The cooldown cases in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs), `autoMerge.reviewOnly` in [`policy.json`](policy.json), and the package gate tests in the ci-workflows reusable (ci-workflows#783). |
+| A compromised release of a fast-tracked dependency (`fastTrack`: `@anthropic-ai/claude-code`, any `anthropics/*` action, any `melodic-software/*` release) lands with no soak, because the owner exempted it from the cooldown (2026-11-11). | No soak by design. What remains: actions are pinned to a full commit SHA, so the update is one diff moving a pin; `ci-status` must pass; the merge tiers still send a major or a `reviewOnly` dependency to AI review; security updates are unaffected. The analyzer still rejects a match-all `cooldown.exclude`, so the exemption cannot widen past a named list. | The match-all and narrow-exclude cases, and the fast-track schema cases, in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
+| The analyzer floor and the patch class drift apart, so readers of `cooldownDays` and the analyzer enforce different soaks. | The analyzer refuses a policy whose `cooldownMinimumDays` differs from `cooldownDays.patch`. | The floor-differs case in [`dependabot-policy.test.mjs`](dependabot-policy.test.mjs). |
 | A change weakens validation unnoticed. | The central and repository schemas reject unknown shapes and reasons; the runtime is exactly locked; CI runs the behavioral tests and then audits this repository. | [`policy.schema.json`](policy.schema.json), [`dependabot-policy.schema.json`](dependabot-policy.schema.json), [`package-lock.json`](package-lock.json), and the `check-policies` CI job. |
 
 ## Residual and accepted risk
@@ -91,10 +96,16 @@ are trusted only at their reviewed Git revision.
 - The owner accepted
   ([claude-code-plugins#12807](https://github.com/melodic-software/claude-code-plugins/pull/12807))
   that `@anthropic-ai/claude-code` in claude-code-plugins is not in
-  `autoMerge.reviewOnly`: its non-major updates merge with no review and,
-  since that repository's `dependabot.yml` exempts it from the cooldown, no
-  soak, and its install script runs in the eval-browser-dispatch job that
-  holds the lane's OAuth token.
+  `autoMerge.reviewOnly`: its non-major updates merge with no review, and its
+  install script runs in the eval-browser-dispatch job that holds the lane's
+  OAuth token.
+- The owner decided (2026-11-11) that every `fastTrack` entry takes no
+  cooldown in every repository: `@anthropic-ai/claude-code`, every
+  `anthropics/*` action, and every `melodic-software/*` release. A
+  compromised release from one of them that passes `ci-status` merges within
+  hours of publication, with no soak and, when non-major, no review. The
+  trade is deliberate: the owner wants Claude Code and Anthropic updates in
+  as soon as they ship.
 - Dependabot options can change after a passing audit. The standard tracks the
   reviewed option set and values, not all future service behavior.
 - Grouping and the pull-request cap bound bot-pull-request volume but not the
