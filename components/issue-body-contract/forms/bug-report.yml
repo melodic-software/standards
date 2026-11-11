@@ -48,6 +48,8 @@ body:
     attributes:
       label: Severity justification
       description: "One sentence: the blast radius, what it blocks, or the data at risk."
+    validations:
+      required: true
   - type: input
     id: fix-location
     attributes:

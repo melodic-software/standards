@@ -27,20 +27,25 @@ export function validateContract(contract) {
     fail("floorLabels must be a non-empty array");
   }
   const forms = new Set();
+  const floor = JSON.stringify(contract.floorLabels);
   for (const [key, type] of Object.entries(contract.types ?? {})) {
     const at = `types.${key}`;
-    if (!/^[a-z0-9-]+\.yml$/.test(type.form ?? ""))
-      fail(`${at}.form must be a kebab-case .yml name`);
-    if (forms.has(type.form)) fail(`${at}.form ${type.form} is used twice`);
-    forms.add(type.form);
+    if (type.form !== null) {
+      if (!/^[a-z0-9-]+\.yml$/.test(type.form ?? ""))
+        fail(`${at}.form must be a kebab-case .yml name or null`);
+      if (forms.has(type.form)) fail(`${at}.form ${type.form} is used twice`);
+      forms.add(type.form);
+      // A public form applies exactly the floor: role labels are granted at triage.
+      if (JSON.stringify(type.labels) !== floor)
+        fail(`${at}.labels must equal floorLabels ${floor}`);
+    } else if (!Array.isArray(type.labels)) {
+      fail(`${at}.labels must be an array`);
+    }
     for (const field of ["name", "description"]) {
       if (typeof type[field] !== "string" || type[field] === "") fail(`${at}.${field} is required`);
     }
     if (type.nativeType !== null && typeof type.nativeType !== "string") {
       fail(`${at}.nativeType must be a string or null`);
-    }
-    for (const label of contract.floorLabels ?? []) {
-      if (!type.labels?.includes(label)) fail(`${at}.labels lacks the floor label ${label}`);
     }
     const ids = new Set();
     const headings = new Set();
@@ -62,9 +67,10 @@ export function validateContract(contract) {
       }
     }
   }
-  if (forms.size === 0) fail("types must declare at least one issue type");
+  if (forms.size === 0) fail("types must declare at least one form");
   // GitHub's community profile counts no issue template when every form sets `type:`.
-  if (Object.values(contract.types ?? {}).every((type) => type.nativeType !== null)) {
+  const formTypes = Object.values(contract.types ?? {}).filter((type) => type.form !== null);
+  if (formTypes.every((type) => type.nativeType !== null)) {
     fail(
       "at least one type must set nativeType null, or the community profile reports no issue templates",
     );
@@ -91,7 +97,9 @@ export function renderForm(type) {
 
 export function renderAll(contract) {
   return Object.fromEntries(
-    Object.values(contract.types).map((type) => [type.form, renderForm(type)]),
+    Object.values(contract.types)
+      .filter((type) => type.form !== null)
+      .map((type) => [type.form, renderForm(type)]),
   );
 }
 
@@ -119,28 +127,31 @@ export async function diffForms(contract, formsDir = FORMS_DIR) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const mode = process.argv[2] ?? "check";
   const contract = await loadContract();
+  const say = (stream, line) => stream.write(`${line}\n`);
   const errors = validateContract(contract);
   if (errors.length > 0) {
-    for (const error of errors) process.stderr.write(`${`contract.json: ${error}`}\n`);
+    for (const error of errors) say(process.stderr, `contract.json: ${error}`);
     process.exit(1);
   }
+  const forms = renderAll(contract);
   if (mode === "write") {
-    for (const [name, text] of Object.entries(renderAll(contract))) {
+    for (const [name, text] of Object.entries(forms)) {
       await writeFile(path.join(FORMS_DIR, name), text);
     }
-    process.stdout.write(`${`issue-forms: wrote ${Object.keys(contract.types).length} forms`}\n`);
+    say(process.stdout, `issue-forms: wrote ${Object.keys(forms).length} forms`);
   } else if (mode === "check") {
     const drift = await diffForms(contract);
     if (drift.length > 0) {
-      for (const line of drift) process.stderr.write(`${`drift: ${line}`}\n`);
-      process.stderr.write(
-        `${"Run `node components/issue-body-contract/issue-forms.mjs write` and commit the result."}\n`,
+      for (const line of drift) say(process.stderr, `drift: ${line}`);
+      say(
+        process.stderr,
+        "Run `node components/issue-body-contract/issue-forms.mjs write` and commit the result.",
       );
       process.exit(1);
     }
-    process.stdout.write(`${"issue-forms: committed forms match contract.json"}\n`);
+    say(process.stdout, "issue-forms: committed forms match contract.json");
   } else {
-    process.stderr.write(`${`usage: issue-forms.mjs [check|write], got ${mode}`}\n`);
+    say(process.stderr, `usage: issue-forms.mjs [check|write], got ${mode}`);
     process.exit(2);
   }
 }

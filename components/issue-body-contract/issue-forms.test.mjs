@@ -26,7 +26,7 @@ test("the committed forms match the contract", async () => {
 });
 
 test("each generated form carries the contract's name, type, labels and fields", () => {
-  for (const type of Object.values(contract.types)) {
+  for (const type of Object.values(contract.types).filter((t) => t.form !== null)) {
     const form = parse(renderForm(type));
     assert.equal(form.name, type.name);
     assert.equal(form.description, type.description);
@@ -56,12 +56,22 @@ test("a contract where every form sets a native type is rejected", () => {
   assert.match(validateContract(bad).join("\n"), /community profile/);
 });
 
-test("a type missing the floor label is rejected", () => {
-  const bad = clone();
-  bad.types.task.labels = [];
-  assert.match(
-    validateContract(bad).join("\n"),
-    /types\.task\.labels lacks the floor label needs-triage/,
+test("a form whose labels are not exactly the floor is rejected", () => {
+  for (const labels of [[], ["needs-triage", "agent-ready"]]) {
+    const bad = clone();
+    bad.types.task.labels = labels;
+    assert.match(validateContract(bad).join("\n"), /types\.task\.labels must equal floorLabels/);
+  }
+});
+
+test("a type with no form generates no form file and skips the floor rule", () => {
+  assert.equal(contract.types["decomposed-item"].form, null);
+  const forms = Object.keys(renderAll(contract));
+  assert.deepEqual(
+    forms.sort((a, b) => a.localeCompare(b)),
+    Object.values(contract.types)
+      .flatMap((type) => (type.form === null ? [] : [type.form]))
+      .sort((a, b) => a.localeCompare(b)),
   );
 });
 

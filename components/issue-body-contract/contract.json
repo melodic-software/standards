@@ -45,7 +45,7 @@
           "id": "severity-justification",
           "heading": "Severity justification",
           "kind": "textarea",
-          "required": false,
+          "required": true,
           "description": "One sentence: the blast radius, what it blocks, or the data at risk."
         },
         {
@@ -191,6 +191,43 @@
           "kind": "textarea",
           "required": true,
           "description": "The neighboring code and features this change leaves as they are."
+        }
+      ]
+    },
+    "decomposed-item": {
+      "form": null,
+      "name": "Decomposed work item",
+      "description": "A vertical slice /work-items:decompose publishes, born triaged; no public form.",
+      "nativeType": null,
+      "labels": [],
+      "fields": [
+        {
+          "id": "outcome",
+          "heading": "Outcome",
+          "kind": "textarea",
+          "required": true,
+          "description": "The one observable change a user gets when this slice merges, end to end."
+        },
+        {
+          "id": "key-interfaces",
+          "heading": "Key interfaces",
+          "kind": "textarea",
+          "required": true,
+          "description": "The design this slice touches, named by contract, or None."
+        },
+        {
+          "id": "done-when",
+          "heading": "Done when",
+          "kind": "textarea",
+          "required": true,
+          "description": "The slice's acceptance criteria, each a check with a pass or fail answer."
+        },
+        {
+          "id": "out-of-scope",
+          "heading": "Out of scope",
+          "kind": "textarea",
+          "required": true,
+          "description": "Adjacent work this slice must not change."
         }
       ]
     }
