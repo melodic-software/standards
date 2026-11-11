@@ -120,8 +120,8 @@ check_shape() {
 
   assert_eq "$p exactly one job" '1' "$(q '.jobs | length')"
   assert_eq "$p the job is named pr-check-managed-files" 'pr-check-managed-files' "$(q '.jobs | keys | .[0]')"
-  assert_eq "$p the job display name equals its id (check context is pr-check-managed-files)" \
-    'pr-check-managed-files' "$(q '.jobs["pr-check-managed-files"].name')"
+  assert_eq "$p the job display name is the Title Case of its id (check context is PR Check Managed Files)" \
+    'PR Check Managed Files' "$(q '.jobs["pr-check-managed-files"].name')"
   assert_eq "$p the job runs on $runs_on directly" "$runs_on" \
     "$(q '.jobs["pr-check-managed-files"]["runs-on"]')"
   assert_eq "$p the job has a 10-minute timeout" '10' "$(q '.jobs["pr-check-managed-files"]["timeout-minutes"]')"

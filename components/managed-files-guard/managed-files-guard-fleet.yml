@@ -29,7 +29,7 @@ name: PR Check Managed Files
 # The two files differ only in this paragraph, the source lines above, the
 # workflow `name:` (each is its destination stem in Title Case), the `paths` entries
 # (each lists its own targets' destinations) and `runs-on`; the job
-# name is the same, so the check context is `pr-check-managed-files` on every
+# name is the same, so the check context is `PR Check Managed Files` on every
 # target.
 
 # The guard fails only on an exact managed destination path, so the workflow
@@ -115,9 +115,9 @@ concurrency:
 
 jobs:
   pr-check-managed-files:
-    # Equal to the job id so the check context is `pr-check-managed-files`;
-    # zizmor's pedantic `anonymous-definition` audit flags an unnamed job.
-    name: pr-check-managed-files
+    # The check context is this Title Case name (org naming lint, job-name);
+    # zizmor's pedantic `anonymous-definition` audit also flags an unnamed job.
+    name: PR Check Managed Files
     runs-on: melodic-ubuntu-24.04-x64
     timeout-minutes: 10
     # No checkout step: the action checks out this repository itself, with

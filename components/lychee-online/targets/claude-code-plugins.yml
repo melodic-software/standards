@@ -27,6 +27,7 @@ permissions: {}
 
 jobs:
   check-links:
+    name: Check Links
     permissions:
       contents: read
     uses: melodic-software/ci-workflows/.github/workflows/maintenance-check-links-online.yml@main
