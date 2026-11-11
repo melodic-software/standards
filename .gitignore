@@ -29,3 +29,6 @@ lefthook-local.yml
 # .NET — build output from the dotnet fixtures
 bin/
 obj/
+
+# Personal overrides beside tracked convention layers (docs/conventions/work-items.local.yaml)
+docs/conventions/**/*.local.*
