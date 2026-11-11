@@ -9,8 +9,7 @@ slice `/work-items:decompose` publishes. Everything that writes or checks an iss
 | Consumer | How it gets the contract |
 | --- | --- |
 | Org issue forms in `melodic-software/.github` `.github/ISSUE_TEMPLATE/` | [`issue-forms.mjs`](issue-forms.mjs) generates [`forms/`](forms/) from the contract; the sync (`issue-forms` component) materializes them byte-exact, with the contract beside them at `.github/standards/issue-body-contract/contract.json` for that repository's own drift check |
-| `/bugs:write` | sync copy at `plugins/bugs/reference/issue-body-contract.json` in `claude-code-plugins` |
-| `/work-items:track add`, `decompose`, `triage` | sync copy at `plugins/work-items/reference/issue-body-contract.json` in `claude-code-plugins` |
+| `/bugs:write`; `/work-items:track add`, `decompose`, `triage` | sync copy at `docs/contracts/issue-body/contract.json` in `claude-code-plugins`, which that repository's `scripts/sync-shared-copies.sh` copies into each plugin's `reference/issue-body-contract.json` |
 
 `config.yml` (blank issues off, the `SUPPORT.md` contact link) stays owned by
 `melodic-software/.github`; the sync never touches it.
