@@ -74,6 +74,7 @@ on:
       - .shellcheckrc
       - REVIEW.md
       - _typos.toml
+      - docs/contracts/issue-body/contract.json
       - docs/conventions/source-control/commit-convention.yml
       - docs/standards/README.md
       - docs/standards/bulk-mutation.md
@@ -88,9 +89,7 @@ on:
       - eng/dotnet-analysis/Directory.Build.props
       - eng/dotnet-analysis/dotnet.globalconfig
       - lychee.toml
-      - plugins/bugs/reference/issue-body-contract.json
       - plugins/guardrails/lib/path-detection/machine-path-patterns.sh
-      - plugins/work-items/reference/issue-body-contract.json
 
 permissions:
   contents: read
