@@ -271,7 +271,7 @@ jobs:
       # The pull-request half of the Code Review Rules check: this repository's
       # own AGENTS.md. Other repositories are checked by the scheduled
       # maintenance-audit-code-review-rules workflow.
-      - name: Code Review Rules contract test
+      - name: Test the `Code Review Rules` contract
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/code-review-rules/code-review-rules.test.sh
       - name: This repository's AGENTS.md carries the section

@@ -258,6 +258,38 @@
     "wip": "WIP",
     "yq": "yq"
   },
+  "properNouns": [
+    "App",
+    "Bash",
+    "Biome",
+    "Bun",
+    "Buildx",
+    "Chromium",
+    "Claude",
+    "Claude Code",
+    "Dependabot",
+    "Docker",
+    "Gitleaks",
+    "Go",
+    "Lefthook",
+    "Markdown",
+    "Node",
+    "Pester",
+    "Playwright",
+    "Pulumi",
+    "Pulumi Cloud",
+    "Python",
+    "Ruff",
+    "Windows"
+  ],
+  "displayNameLevel": "warning",
+  "jobNameExceptions": [
+    {
+      "jobId": "report-ci-status",
+      "name": "ci-status",
+      "reason": "Keeps the required context `ci-status` reporting, with the `CI Status` job's conclusion, until the github-iac ci-gate ruleset requires `CI Status`; removed once it does."
+    }
+  ],
   "exemptions": [
     {
       "path": ".github/workflows/release-deploy.yml",

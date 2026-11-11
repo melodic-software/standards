@@ -10,6 +10,8 @@ import Ajv2020 from "ajv/dist/2020.js";
 import {
   ConfigurationError,
   checkActivityName,
+  checkJobName,
+  checkStepName,
   formatAnnotation,
   lintRepository,
   loadVocabulary,
@@ -29,24 +31,36 @@ test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
+// The workflow name is given as a stem and written in its Title Case form;
+// `{ raw: "..." }` writes it as given. Each job is named for its id.
 function workflow(name, jobIds) {
-  const header = name === undefined ? "" : `name: ${name}\n`;
+  const written =
+    typeof name === "string" ? titleCaseName(name, vocabulary.displayWords) : name?.raw;
+  const header = written === undefined ? "" : `name: ${written}\n`;
   const jobs = jobIds
-    .map((id) => `  ${id}:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "true"\n`)
+    .map(
+      (id) =>
+        `  ${id}:\n    name: ${titleCaseName(id, vocabulary.displayWords)}\n` +
+        `    runs-on: ubuntu-24.04\n    steps:\n      - name: Run it\n        run: "true"\n`,
+    )
     .join("");
   return `${header}on: pull_request\npermissions: {}\njobs:\n${jobs}`;
 }
 
-const ACTION = `name: fixture
+const action = (
+  directory,
+) => `name: ${titleCaseName(directory.split("/").at(-1), vocabulary.displayWords)}
 description: Fixture action.
 runs:
   using: composite
   steps:
-    - run: "true"
+    - name: Run it
+      run: "true"
       shell: bash
 `;
 
-// workflows: { "file.yml": source }, actions: ["dir", "lane/unit"]
+// workflows: { "file.yml": source }, actions: ["dir", "lane/unit"] or
+// { "dir": source }
 async function repository({ workflows = {}, actions = [] }) {
   const root = await mkdtemp(path.join(tmpdir(), "naming-lint-"));
   temporaryRoots.push(root);
@@ -54,9 +68,12 @@ async function repository({ workflows = {}, actions = [] }) {
   for (const [file, source] of Object.entries(workflows)) {
     await writeFile(path.join(root, ".github", "workflows", file), source);
   }
-  for (const directory of actions) {
+  const sources = Array.isArray(actions)
+    ? Object.fromEntries(actions.map((directory) => [directory, action(directory)]))
+    : actions;
+  for (const [directory, source] of Object.entries(sources)) {
     await mkdir(path.join(root, ".github", "actions", directory), { recursive: true });
-    await writeFile(path.join(root, ".github", "actions", directory, "action.yml"), ACTION);
+    await writeFile(path.join(root, ".github", "actions", directory, "action.yml"), source);
   }
   return root;
 }
@@ -94,7 +111,7 @@ test("each convention breach is reported under its own rule", async () => {
     workflows: {
       "ci.yml": workflow("ci", ["ci-status"]),
       "pr-gatekeep.yml": workflow("pr-gatekeep", ["check"]),
-      "pr-review.yml": workflow("Claude Review", [
+      "pr-review.yml": workflow({ raw: "Claude Review" }, [
         "Build_Test",
         "pr-section-drift",
         "security-review",
@@ -129,7 +146,7 @@ test("each convention breach is reported under its own rule", async () => {
     "warning job-id-verb-first .github/workflows/pr-review.yml",
   ]);
   const kebab = findings.find((item) => item.rule === "job-id-kebab");
-  // workflow("Claude Review", ...) puts the first job key on line 5.
+  // workflow({ raw: "Claude Review" }, ...) puts the first job key on line 5.
   assert.equal(kebab.line, 5);
 });
 
@@ -170,7 +187,7 @@ test("annotations escape the characters the workflow command syntax reserves", (
 test("the OIDC negative-test name exception applies only in github-iac", async () => {
   const root = await repository({
     workflows: {
-      "release-deploy-oidc-negative-test.yml": workflow("release-deployx", ["test"]),
+      "release-deploy-oidc-negative-test.yml": workflow({ raw: "release-deployx" }, ["test"]),
     },
   });
   assert.deepEqual(
@@ -200,7 +217,9 @@ test("the recorded exception is exact: neither the stem nor a Title Case form pa
     "Release Deployx",
   ]) {
     const root = await repository({
-      workflows: { "release-deploy-oidc-negative-test.yml": workflow(name, ["test"]) },
+      workflows: {
+        "release-deploy-oidc-negative-test.yml": workflow({ raw: name }, ["test"]),
+      },
     });
     const findings = await lintRepository({
       root,
@@ -230,16 +249,21 @@ test("a stem's Title Case form capitalizes each word and upper-cases the acronym
   }
 });
 
-test("a workflow name is its stem or the stem's Title Case form, and nothing else", async () => {
-  for (const name of ["pr-review-security", "PR Review Security"]) {
+test("a workflow name is the stem's Title Case form, and nothing else", async () => {
+  const passing = await repository({
+    workflows: {
+      "pr-review-security.yml": workflow({ raw: "PR Review Security" }, ["pr-review-security"]),
+    },
+  });
+  assert.deepEqual(await lintRepository({ root: passing, vocabulary, mode: "enforcing" }), []);
+  for (const name of [
+    "pr-review-security",
+    "Pr Review Security",
+    "pr review security",
+    "PR-Review-Security",
+  ]) {
     const root = await repository({
-      workflows: { "pr-review-security.yml": workflow(name, ["pr-review-security"]) },
-    });
-    assert.deepEqual(await lintRepository({ root, vocabulary, mode: "enforcing" }), [], name);
-  }
-  for (const name of ["Pr Review Security", "pr review security", "PR-Review-Security"]) {
-    const root = await repository({
-      workflows: { "pr-review-security.yml": workflow(name, ["pr-review-security"]) },
+      workflows: { "pr-review-security.yml": workflow({ raw: name }, ["pr-review-security"]) },
     });
     const findings = await lintRepository({ root, vocabulary, mode: "enforcing" });
     assert.deepEqual(
@@ -248,6 +272,100 @@ test("a workflow name is its stem or the stem's Title Case form, and nothing els
       name,
     );
     assert.match(findings[0].message, /Title Case form of the file stem, `PR Review Security`/u);
+  }
+});
+
+test("a job name is Title Case, and an expression keeps its place", () => {
+  for (const name of [
+    "Check Links",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    "Drift (${{ matrix.skill }})",
+    "PR Review / Claude",
+    "Lint Markdown With markdownlint",
+    "Test 2",
+  ]) {
+    assert.equal(checkJobName("check-links", name, vocabulary), undefined, name);
+  }
+  for (const [name, pattern] of [
+    [undefined, /has no `name:`; .* `Check Links`/u],
+    ["check-links", /not Title Case \(`check-links`\)/u],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    ["drift (${{ matrix.skill }})", /not Title Case \(`drift`\)/u],
+    ["Build and Test", /not Title Case \(`and`\)/u],
+  ]) {
+    assert.match(checkJobName("check-links", name, vocabulary) ?? "", pattern, String(name));
+  }
+});
+
+test("the required job is named CI Status, and the alias keeps the old context", () => {
+  assert.equal(checkJobName("ci-status", "CI Status", vocabulary), undefined);
+  assert.match(checkJobName("ci-status", "Ci Status", vocabulary), /exactly `CI Status`/u);
+  assert.match(checkJobName("ci-status", "Required Checks", vocabulary), /exactly `CI Status`/u);
+  assert.equal(checkJobName("report-ci-status", "ci-status", vocabulary), undefined);
+  assert.match(
+    checkJobName("report-ci-status", "Report CI Status", vocabulary),
+    /recorded exception .* exactly `ci-status`/u,
+  );
+});
+
+test("a step name is sentence case", () => {
+  for (const name of [
+    "Set up job",
+    "Set up Node",
+    "Install and verify the Claude Code CLI",
+    "Authenticate to Pulumi Cloud",
+    "Check the lanes App's token",
+    "Validate against the JSON schema",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    "Publish the GitHub release with ${{ inputs.Tag }}",
+    "Check the `Code Review Rules` section",
+    "shellcheck (zero findings)",
+    "linux-x64 publish serves the dashboard",
+    "Set up Node.js",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    "${{ matrix.os }} smoke test",
+    "`npm` install",
+  ]) {
+    assert.equal(checkStepName(name, vocabulary), undefined, name);
+  }
+  for (const [name, pattern] of [
+    ["Install Pinned Tools", /`Pinned`, `Tools` is capitalized/u],
+    ["Create tag + GitHub Release", /`Release` is capitalized/u],
+    ["install the tools", /must start with a capital letter/u],
+    ["Claude Code Review", /`Review` is capitalized/u],
+    ["Pulumi Cloud Deploy", /`Deploy` is capitalized/u],
+    ["Review the Code", /`Code` is capitalized/u],
+  ]) {
+    assert.match(checkStepName(name, vocabulary) ?? "", pattern, name);
+  }
+});
+
+test("display-name findings report at displayNameLevel; action names are errors", async () => {
+  const root = await repository({
+    workflows: {
+      "pr-review.yml":
+        "name: PR Review\non: pull_request\npermissions: {}\njobs:\n" +
+        '  pr-review:\n    runs-on: ubuntu-24.04\n    steps:\n      - name: Run The Review\n        run: "true"\n',
+    },
+    actions: {
+      "check-links":
+        'name: check-links\nruns:\n  using: composite\n  steps:\n    - name: Check Every Link\n      run: "true"\n      shell: bash\n',
+      "report-lane-outcome": "jobs: [unclosed\n",
+    },
+  });
+  for (const level of ["warning", "error"]) {
+    const findings = await lintRepository({
+      root,
+      vocabulary: { ...vocabulary, displayNameLevel: level },
+      mode: "enforcing",
+    });
+    assert.deepEqual(summary(findings), [
+      "error action-name .github/actions/check-links/action.yml",
+      `${level} step-name .github/actions/check-links/action.yml`,
+      "error action-unparsable .github/actions/report-lane-outcome/action.yml",
+      `${level} job-name .github/workflows/pr-review.yml`,
+      `${level} step-name .github/workflows/pr-review.yml`,
+    ]);
   }
 });
 
@@ -269,8 +387,16 @@ test("every target name in the approved rename map passes the vocabulary", async
       if (entry.to.endsWith("/pr-require-checks.yml")) {
         jobs.push("ci-status");
       }
+      // A recorded name exception is written as given; any other target name
+      // is a stem, written in its Title Case form.
+      const exception = vocabulary.exemptions.some(
+        (item) =>
+          item.repository === `melodic-software/${repo}` &&
+          item.path === entry.to &&
+          item.expectedName === entry.to_name,
+      );
       workflows[path.basename(entry.to)] = workflow(
-        entry.to_name,
+        exception ? { raw: entry.to_name } : entry.to_name,
         jobs.length > 0 ? jobs : ["test"],
       );
     }
