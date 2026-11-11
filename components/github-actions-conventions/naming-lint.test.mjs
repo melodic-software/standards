@@ -322,6 +322,9 @@ test("a step name is sentence case", () => {
     "shellcheck (zero findings)",
     "linux-x64 publish serves the dashboard",
     "Set up Node.js",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    "${{ matrix.os }} smoke test",
+    "`npm` install",
   ]) {
     assert.equal(checkStepName(name, vocabulary), undefined, name);
   }
@@ -489,8 +492,7 @@ test("the vocabulary loader rejects cross-field drift the schema cannot express"
   assert.throws(() => validateVocabulary(nounFunction), /accepted verb/u);
 
   const nameWithoutValue = clone();
-  delete nameWithoutValue.exemptions.find((item) => item.rules.includes("workflow-name"))
-    .expectedName;
+  delete nameWithoutValue.exemptions[0].expectedName;
   assert.throws(() => validateVocabulary(nameWithoutValue), /expectedName/u);
 
   const badShape = clone();

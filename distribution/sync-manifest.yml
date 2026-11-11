@@ -224,6 +224,23 @@ components:
   go-analysis:
     files:
       .golangci.yml: .golangci.yml
+  # Issue-body contract (components/issue-body-contract/README.md). The org
+  # forms are generated from contract.json at authoring time and land byte-exact
+  # in the org-defaults repository with the contract beside them for its local
+  # drift check. config.yml stays repo-owned there. The two plugin copies are
+  # the canonical claude-code-plugins fans out with its sync-shared-copies.sh into
+  # the plugins that read it (bugs:write, the work-items skills), since a byte-
+  # identical file in two plugins must be registered in the same change.
+  issue-body-contract-plugins:
+    files:
+      components/issue-body-contract/contract.json: docs/contracts/issue-body/contract.json
+  issue-forms:
+    files:
+      components/issue-body-contract/contract.json: .github/standards/issue-body-contract/contract.json
+      components/issue-body-contract/forms/agent-ready.yml: .github/ISSUE_TEMPLATE/agent-ready.yml
+      components/issue-body-contract/forms/bug-report.yml: .github/ISSUE_TEMPLATE/bug-report.yml
+      components/issue-body-contract/forms/feature-request.yml: .github/ISSUE_TEMPLATE/feature-request.yml
+      components/issue-body-contract/forms/task.yml: .github/ISSUE_TEMPLATE/task.yml
   lefthook-base:
     requires:
       - editorconfig-checker
@@ -449,6 +466,7 @@ targets:
       - editorconfig-checker
       - engineering-standards
       - gitleaks
+      - issue-forms
       - lychee
       - managed-files-guard-caller
       - markdownlint
@@ -595,6 +613,7 @@ targets:
       - engineering-standards
       - github-actions-conventions
       - gitleaks
+      - issue-body-contract-plugins
       - lychee
       - lychee-online-claude-code-plugins
       - managed-files-guard-caller
