@@ -1,0 +1,53 @@
+# Generated from melodic-software/standards components/issue-body-contract/contract.json.
+# Edit the contract and run `node components/issue-body-contract/issue-forms.mjs write`.
+name: Agent-Ready Work Item
+description: Work written as an agent brief. Triage decides its type and whether it is agent-ready.
+labels:
+  - needs-triage
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: The change, in one line.
+    validations:
+      required: true
+  - type: input
+    id: root-cause
+    attributes:
+      label: Root cause
+      description: "Bugs only: unknown, or known: the cause in one line."
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current behavior
+      description: What the code does today.
+    validations:
+      required: true
+  - type: textarea
+    id: desired-behavior
+    attributes:
+      label: Desired behavior
+      description: What is true once this lands, edge cases and failure handling included. The end state, not edit instructions.
+    validations:
+      required: true
+  - type: textarea
+    id: key-interfaces
+    attributes:
+      label: Key interfaces
+      description: The types, signatures, config keys, or observable behaviors that change, named by contract rather than file path or line.
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Checks that each give a yes or no.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: The neighboring code and features this change leaves as they are.
+    validations:
+      required: true
