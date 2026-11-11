@@ -1,0 +1,62 @@
+# Generated from melodic-software/standards components/issue-body-contract/contract.json.
+# Edit the contract and run `node components/issue-body-contract/issue-forms.mjs write`.
+name: Bug Report
+description: Report an unexpected problem or behavior.
+type: Bug
+labels:
+  - needs-triage
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps that reproduce the behavior.
+      placeholder: |-
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happens? Include error messages, stack traces, or screenshots.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How bad is it? Say why under Severity justification.
+      options:
+        - low
+        - medium
+        - high
+        - critical
+    validations:
+      required: true
+  - type: textarea
+    id: severity-justification
+    attributes:
+      label: Severity justification
+      description: "One sentence: the blast radius, what it blocks, or the data at risk."
+    validations:
+      required: true
+  - type: input
+    id: fix-location
+    attributes:
+      label: Suggested fix location
+      description: The file and function or class where the fix likely belongs, if known. No patch.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, runtime and tool versions, and anything else relevant.

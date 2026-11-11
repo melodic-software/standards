@@ -299,6 +299,13 @@ export async function auditRepository({
     validatePolicyStructure,
     "policy",
   );
+  // The floor is the patch class: a policy where they differ would enforce a
+  // soak no reader of cooldownDays expects.
+  if (policy.cooldownMinimumDays !== policy.cooldownDays.patch) {
+    throw new ConfigurationError(
+      `policy.cooldownMinimumDays (${policy.cooldownMinimumDays}) must equal policy.cooldownDays.patch (${policy.cooldownDays.patch})`,
+    );
+  }
   const rawConfig = await readJson(resolve(configPath), "repository dependabot policy");
   const config =
     rawConfig === undefined

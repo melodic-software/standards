@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -551,13 +551,106 @@ test("duplicate JSON members in the config fail closed", () => {
   );
 });
 
+function updateClasses() {
+  return {
+    cooldownDays: { own: 0, patch: 3, minor: 3, major: 7 },
+    fastTrack: {
+      reviewed: "2026-11-11",
+      basis: "test",
+      npm: ["@anthropic-ai/claude-code"],
+      "github-actions": ["anthropics/*"],
+      own: ["melodic-software/*"],
+    },
+  };
+}
+
+function minimalPolicy() {
+  return {
+    schemaVersion: 2,
+    scheduleInterval: "weekly",
+    cooldownMinimumDays: 3,
+    ...updateClasses(),
+    maxOpenPullRequests: 5,
+    requireGroups: true,
+    autoMerge: {
+      ecosystems: ["github-actions"],
+      publishers: { "actions/*": { tier: "auto", reviewed: "2026-10-08", basis: "test" } },
+      reviewOnly: [],
+      excludeSemverMajor: true,
+      requiredCheck: "ci-status",
+    },
+  };
+}
+
+async function auditWithPolicy(policy) {
+  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+  const policyPath = path.join(root, "policy.json");
+  await writeFile(policyPath, JSON.stringify(policy));
+  return auditRepository({ root, policyPath });
+}
+
+test("the shipped policy records the owner's cooldown classes and fast track", async () => {
+  const policy = parseUniqueJson(
+    await readFile(new URL("./policy.json", import.meta.url), "utf8"),
+    "policy.json",
+  );
+  assert.equal(policy.schemaVersion, 2);
+  assert.deepEqual(policy.cooldownDays, { own: 0, patch: 3, minor: 3, major: 7 });
+  assert.equal(policy.cooldownMinimumDays, 3, "the analyzer floor stays the patch class");
+  assert.deepEqual(policy.fastTrack.npm, ["@anthropic-ai/claude-code"]);
+  assert.deepEqual(policy.fastTrack["github-actions"], ["anthropics/*"]);
+  assert.deepEqual(policy.fastTrack.own, ["melodic-software/*"]);
+});
+
+test("a v2 policy with the update classes validates and audits clean", async () => {
+  assert.deepEqual(await auditWithPolicy(minimalPolicy()), []);
+});
+
+test("a floor that differs from the patch class fails closed", async () => {
+  const policy = minimalPolicy();
+  policy.cooldownMinimumDays = 4;
+  await assert.rejects(
+    auditWithPolicy(policy),
+    (error) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("must equal policy.cooldownDays.patch"),
+  );
+});
+
+test("a malformed cooldown class or fast-track block fails closed", async () => {
+  const cases = [
+    ["missing cooldownDays", (policy) => delete policy.cooldownDays],
+    ["missing fastTrack", (policy) => delete policy.fastTrack],
+    ["negative own days", (policy) => (policy.cooldownDays.own = -1)],
+    ["zero major days", (policy) => (policy.cooldownDays.major = 0)],
+    ["unknown class", (policy) => (policy.cooldownDays.prerelease = 3)],
+    ["npm name with a space", (policy) => (policy.fastTrack.npm = ["bad name"])],
+    [
+      "action that is not a publisher glob",
+      (policy) => (policy.fastTrack["github-actions"] = ["anthropics/claude-code-action"]),
+    ],
+    ["own that is not a publisher glob", (policy) => (policy.fastTrack.own = ["melodic-software"])],
+    ["schema version 1", (policy) => (policy.schemaVersion = 1)],
+  ];
+  for (const [name, mutate] of cases) {
+    const policy = minimalPolicy();
+    mutate(policy);
+    await assert.rejects(
+      auditWithPolicy(policy),
+      (error) => error instanceof ConfigurationError,
+      `${name} must be rejected`,
+    );
+  }
+});
+
 test("an auto-merge publisher key that is not a whole publisher fails closed", async () => {
   const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
   const review = { tier: "auto", reviewed: "2026-10-08", basis: "test" };
   const policy = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     scheduleInterval: "weekly",
     cooldownMinimumDays: 3,
+    ...updateClasses(),
     maxOpenPullRequests: 5,
     requireGroups: true,
     autoMerge: {
@@ -597,9 +690,10 @@ test("a review-only dependency entry needs its scope and the control it cites", 
     control: "distribution/THREAT-MODEL.md#npm-supply-chain-production-engine",
   };
   const policy = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     scheduleInterval: "weekly",
     cooldownMinimumDays: 3,
+    ...updateClasses(),
     maxOpenPullRequests: 5,
     requireGroups: true,
     autoMerge: {
