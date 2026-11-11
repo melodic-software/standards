@@ -133,11 +133,13 @@ which adds those rules, in the next phase of this work.
 ### Fast track
 
 `fastTrack` lists the updates that take no cooldown and merge at the auto
-tier as soon as `ci-status` passes:
+tier as soon as `ci-status` passes. Each list except `own` is keyed by its
+Dependabot `package-ecosystem` name, as in `autoMerge.ecosystems`:
 
 - `npm`: `@anthropic-ai/claude-code`;
-- `githubActions`: every `anthropics/*` action;
-- `own`: every `melodic-software/*` release, the `own` class above.
+- `github-actions`: every `anthropics/*` action;
+- `own`: every `melodic-software/*` release, the `own` class above, in any
+  ecosystem.
 
 The owner wants Claude Code and Anthropic updates in as soon as they publish
 (2026-11-11), so these are deliberately exempt from the soak every other

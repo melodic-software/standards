@@ -12,7 +12,7 @@
     "reviewed": "2026-11-11",
     "basis": "Owner decision 2026-11-11: Claude Code and Anthropic updates land as soon as they publish, and this organization's own releases need no soak from itself.",
     "npm": ["@anthropic-ai/claude-code"],
-    "githubActions": ["anthropics/*"],
+    "github-actions": ["anthropics/*"],
     "own": ["melodic-software/*"]
   },
   "maxOpenPullRequests": 5,

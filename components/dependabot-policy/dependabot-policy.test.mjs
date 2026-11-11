@@ -558,7 +558,7 @@ function updateClasses() {
       reviewed: "2026-11-11",
       basis: "test",
       npm: ["@anthropic-ai/claude-code"],
-      githubActions: ["anthropics/*"],
+      "github-actions": ["anthropics/*"],
       own: ["melodic-software/*"],
     },
   };
@@ -598,7 +598,7 @@ test("the shipped policy records the owner's cooldown classes and fast track", a
   assert.deepEqual(policy.cooldownDays, { own: 0, patch: 3, minor: 3, major: 7 });
   assert.equal(policy.cooldownMinimumDays, 3, "the analyzer floor stays the patch class");
   assert.deepEqual(policy.fastTrack.npm, ["@anthropic-ai/claude-code"]);
-  assert.deepEqual(policy.fastTrack.githubActions, ["anthropics/*"]);
+  assert.deepEqual(policy.fastTrack["github-actions"], ["anthropics/*"]);
   assert.deepEqual(policy.fastTrack.own, ["melodic-software/*"]);
 });
 
@@ -627,7 +627,7 @@ test("a malformed cooldown class or fast-track block fails closed", async () => 
     ["npm name with a space", (policy) => (policy.fastTrack.npm = ["bad name"])],
     [
       "action that is not a publisher glob",
-      (policy) => (policy.fastTrack.githubActions = ["anthropics/claude-code-action"]),
+      (policy) => (policy.fastTrack["github-actions"] = ["anthropics/claude-code-action"]),
     ],
     ["own that is not a publisher glob", (policy) => (policy.fastTrack.own = ["melodic-software"])],
     ["schema version 1", (policy) => (policy.schemaVersion = 1)],
