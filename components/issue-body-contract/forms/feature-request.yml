@@ -1,0 +1,31 @@
+# Generated from melodic-software/standards components/issue-body-contract/contract.json.
+# Edit the contract and run `node components/issue-body-contract/issue-forms.mjs write`.
+name: Feature Request
+description: Propose a new feature or enhancement.
+type: Feature
+labels:
+  - needs-triage
+body:
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User story
+      description: Who benefits and why?
+      placeholder: As a [role], I want [capability] so that [benefit].
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: How do we know this is done? One verifiable check per line.
+      placeholder: |-
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Affected area / component
+      description: Which part of the project would this affect?

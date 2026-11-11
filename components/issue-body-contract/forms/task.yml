@@ -1,0 +1,36 @@
+# Generated from melodic-software/standards components/issue-body-contract/contract.json.
+# Edit the contract and run `node components/issue-body-contract/issue-forms.mjs write`.
+name: Task
+description: A chore, maintenance task, audit, or other housekeeping item.
+type: Task
+labels:
+  - needs-triage
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What surfaced this, and what leaving it costs.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-work
+    attributes:
+      label: Proposed work
+      description: The concrete next actions.
+      placeholder: "- ..."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: One verifiable check per line.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Rules, files, pull requests, or docs this relates to.

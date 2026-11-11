@@ -771,6 +771,12 @@ jobs:
       - name: Enforce pr-convention policy sample
         if: ${{ !cancelled() }}
         run: npm run lint:pr-convention-policy
+      - name: Test issue-body contract
+        if: ${{ !cancelled() }}
+        run: npm run test:issue-forms
+      - name: Enforce generated issue forms match the contract
+        if: ${{ !cancelled() }}
+        run: npm run lint:issue-forms
 
   # Lockstep drift check (ADR-0008), copy half. Separate job, not a step in
   # check-policies: the live run fetches the gate composite, the plugin hook
