@@ -486,7 +486,8 @@ test("the vocabulary loader rejects cross-field drift the schema cannot express"
   assert.throws(() => validateVocabulary(nounFunction), /accepted verb/u);
 
   const nameWithoutValue = clone();
-  delete nameWithoutValue.exemptions[0].expectedName;
+  delete nameWithoutValue.exemptions.find((item) => item.rules.includes("workflow-name"))
+    .expectedName;
   assert.throws(() => validateVocabulary(nameWithoutValue), /expectedName/u);
 
   const badShape = clone();
