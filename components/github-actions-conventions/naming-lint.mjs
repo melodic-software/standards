@@ -239,7 +239,10 @@ export function checkStepName(name, vocabulary) {
     }
   }
   const [first] = tokens;
-  if (first !== undefined && !exempt[0] && /^\p{Ll}+$/u.test(first)) {
+  // A name that opens with an expression or a code span has no checked first
+  // word: the token after it is not where the sentence starts.
+  const opensWithSpan = /^\s*(\$\{\{|`)/u.test(name);
+  if (first !== undefined && !opensWithSpan && !exempt[0] && /^\p{Ll}+$/u.test(first)) {
     return `step name \`${name}\` must start with a capital letter (sentence case)`;
   }
   const capitalized = tokens.filter(

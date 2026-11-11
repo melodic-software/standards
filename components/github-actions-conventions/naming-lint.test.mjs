@@ -322,6 +322,9 @@ test("a step name is sentence case", () => {
     "shellcheck (zero findings)",
     "linux-x64 publish serves the dashboard",
     "Set up Node.js",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub expression, not a JS template
+    "${{ matrix.os }} smoke test",
+    "`npm` install",
   ]) {
     assert.equal(checkStepName(name, vocabulary), undefined, name);
   }
