@@ -265,7 +265,9 @@ closed the advisory period.
   names its jobs in the same change that updates every script and filter
   reading the old check names. Once standards, ci-workflows and
   claude-code-plugins pass with no warning of either rule, a change sets
-  `displayNameLevel` to `error`.
+  `displayNameLevel` to `error`:
+  [#985](https://github.com/melodic-software/standards/issues/985), due
+  2026-12-11.
 
 ### Ownership and operation
 
