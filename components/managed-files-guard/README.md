@@ -20,7 +20,7 @@ the workflow `name:` (each is its destination stem in Title Case) and their head
 | `managed-files-guard-fleet-caller` | `managed-files-guard-fleet.yml` | `.github/workflows/pr-check-managed-files.yml` | `melodic-ubuntu-24.04-x64` |
 
 Both carry the same action pin and the same job name, so the check context is
-`pr-check-managed-files` on every target. The destinations differ because the
+`PR Check Managed Files` on every target. The destinations differ because the
 manifest requires each destination to have one owning component.
 The guard caller is the second recorded exception to the rule that workflow callers stay
 consumer-owned (`distribution/README.md`), for the same reason as the Claude

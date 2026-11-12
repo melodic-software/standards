@@ -104,9 +104,9 @@ concurrency:
 
 jobs:
   pr-check-managed-files:
-    # Equal to the job id so the check context is `pr-check-managed-files`;
-    # zizmor's pedantic `anonymous-definition` audit flags an unnamed job.
-    name: pr-check-managed-files
+    # The check context is this Title Case name (org naming lint, job-name);
+    # zizmor's pedantic `anonymous-definition` audit also flags an unnamed job.
+    name: PR Check Managed Files
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # No checkout step: the action checks out this repository itself, with

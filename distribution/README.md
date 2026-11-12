@@ -422,9 +422,9 @@ Both call `.github/actions/check-managed-files` at the same pin. The two files
 differ only in `runs-on`, comments, their `on.pull_request.paths` entries (each
 lists the managed destinations of the targets that receive it) and the workflow
 `name:`, which is each destination stem in Title Case (`PR Check Managed Files Hosted` and
-`PR Check Managed Files`). They share the job id and job name
-`pr-check-managed-files`, so the check context is `pr-check-managed-files`
-on every target, hosted or fleet-routed. The hosted caller
+`PR Check Managed Files`). They share the job id
+`pr-check-managed-files` and job name `PR Check Managed Files`, which is the
+check context on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The
 fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
 the fleet-enrolled private targets (`agent-automations`,
