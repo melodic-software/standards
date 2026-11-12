@@ -17,21 +17,26 @@ Two switches, each with one job:
   `lychee-online-<repo>` component. The cron is the one value that differs
   per target, and the manifest has no per-target values or transforms
   (`distribution/README.md`), so each target has its own source file under
-  `targets/`. Destinations must be unique across components, so each
-  destination carries the repository name.
+  `targets/`. The destination is
+  `.github/workflows/maintenance-check-links-online.yml`, whose stem in Title
+  Case is the workflow `name:`. Destinations must be
+  unique across components, so a second target cannot ship that path: opting
+  one in needs another way to vary the cron first.
 - **Schedule**: the org custom property `link-check-online` (`true_false`, no
   default; unset means off). The reusable reads it on a `schedule` run and
   skips unless it is `true`. A `workflow_dispatch` run always checks.
 
-To opt a repository in: add its caller here and dispatch it once the sync
-delivers it. When that run is green, or fails only on man7.org, link it on
-ci-workflows#739 and set the property to `true`. A repository whose property
-is unset gets no scheduled online run even if it carries a caller.
+Only `claude-code-plugins` can opt in today, because of the one-path limit
+under Delivery. Its caller is dispatched once the sync delivers it. When that
+run is green, or fails only on man7.org, link it on ci-workflows#739 and set
+the property to `true`. A repository whose property is unset gets no scheduled
+online run even if it carries a caller.
 
 ## Cron slots
 
-Each target picks a minute and a weekday no other target uses, so targets do
-not hit the same hosts at once.
+One target holds a slot today. Once a second target can ship a caller, each
+picks a minute and a weekday no other target uses, so targets do not hit the
+same hosts at once.
 
 | Target | Cron (UTC) | Source |
 | --- | --- | --- |
