@@ -108,6 +108,7 @@
       { "name": "audit-org-architecture-pointer", "status": "in-use" },
       { "name": "audit-pr-convention-pins", "status": "in-use" },
       { "name": "audit-test-selection", "status": "in-use" },
+      { "name": "bump-pinned-versions", "status": "in-use" },
       {
         "name": "check-links",
         "status": "in-use",
