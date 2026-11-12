@@ -182,6 +182,7 @@ reason. Two kinds stand:
   the lint enforcing before a file it cannot rename yet is renamed; the
   entry's reason links the issue whose rename removes it, and every other rule
   still applies to the file.
+
 GitHub's dynamic workflows (Dependabot, CodeQL default setup, Pages) need no
 entry: they have no file in `.github/workflows/`.
 
