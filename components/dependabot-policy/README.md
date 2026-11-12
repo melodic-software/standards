@@ -28,7 +28,9 @@ node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
 
 The `dependabot-policy` sync component ships `policy.json` alone to that
 path, for a target whose Dependabot merge classifiers read it at the base
-(claude-code-plugins reads `autoMerge.reviewOnly`). Its admission evidence is
+(claude-code-plugins reads `autoMerge.reviewOnly`), or whose
+ci-workflows `bump-versions` run takes its `cooldownDays` (dotfiles,
+provisioning). Its admission evidence is
 [below](#sync-component-admission-evidence).
 
 ## Sync component admission evidence
@@ -44,6 +46,11 @@ was retired with no targets in #430 and is not reintroduced.
   `.github/standards/dependabot-policy/policy.json` at the base. An update
   to a dependency `autoMerge.reviewOnly` lists for that repository goes to the
   AI review tier (`review-only:<dependency>`).
+- **Live consumer**: melodic-software/dotfiles and melodic-software/provisioning.
+  Their `maintenance-bump-pinned-versions.yml` runs ci-workflows'
+  `.github/actions/bump-versions`, whose `bump.py` (`load_policy`,
+  `synced_cooldown_days`) reads `cooldownDays` from this copy when the repo's
+  `.github/version-bump/policy.yaml` sets none, and stops when both are absent.
 - **Owner and outcome**: owned by the `standards` maintainers. Problem: a
   hijacked non-major release of a dependency that runs in a job holding a
   secret merges at tier `auto` with no review. Acceptance: once the sync PR

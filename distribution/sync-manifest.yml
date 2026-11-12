@@ -179,7 +179,9 @@ components:
       components/commit-convention/commit-convention.yml: docs/conventions/source-control/commit-convention.yml
   # The central Dependabot policy, read at the base by a target's Dependabot
   # merge classifiers (claude-code-plugins sends every update to a dependency
-  # its `autoMerge.reviewOnly` lists to the review tier).
+  # its `autoMerge.reviewOnly` lists to the review tier) and by ci-workflows'
+  # bump-versions action, which takes its cooldownDays when the target's
+  # version-bump policy sets none (dotfiles, provisioning).
   dependabot-policy:
     files:
       components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
@@ -766,6 +768,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -927,6 +930,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - gitleaks
