@@ -298,13 +298,15 @@ components:
   # Weekly online link-check callers (ci-workflows#739), the third recorded
   # exception to the workflow-caller exclusion in README.md: one source file
   # per opted-in target, because the cron minute and day differ per target
-  # and a component has exact bytes. Each destination carries the repository
-  # name because destinations are unique across components. The schedule
+  # and a component has exact bytes. The destination is
+  # `maintenance-check-links-online.yml`, so the workflow `name:` is its stem
+  # in Title Case; destinations are unique across components, so only one
+  # component can ship it (components/lychee-online/README.md). The schedule
   # also needs the target's `link-check-online` org property set to true; the
   # reusable reads it at run time (components/lychee-online/README.md).
   lychee-online-claude-code-plugins:
     files:
-      components/lychee-online/targets/claude-code-plugins.yml: .github/workflows/maintenance-check-links-online-claude-code-plugins.yml
+      components/lychee-online/targets/claude-code-plugins.yml: .github/workflows/maintenance-check-links-online.yml
   # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
   # workflow calling the ci-workflows `check-managed-files` composite action,
   # which fails a consumer PR that hand-edits one of that repository's

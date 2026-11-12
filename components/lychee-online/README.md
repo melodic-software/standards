@@ -17,8 +17,11 @@ Two switches, each with one job:
   `lychee-online-<repo>` component. The cron is the one value that differs
   per target, and the manifest has no per-target values or transforms
   (`distribution/README.md`), so each target has its own source file under
-  `targets/`. Destinations must be unique across components, so each
-  destination carries the repository name.
+  `targets/`. The destination is
+  `.github/workflows/maintenance-check-links-online.yml`, whose stem in Title
+  Case is the workflow `name:`. Destinations must be
+  unique across components, so a second target cannot ship that path: opting
+  one in needs another way to vary the cron first.
 - **Schedule**: the org custom property `link-check-online` (`true_false`, no
   default; unset means off). The reusable reads it on a `schedule` run and
   skips unless it is `true`. A `workflow_dispatch` run always checks.

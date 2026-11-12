@@ -442,15 +442,17 @@ the promotion record live in
 ## Online link-check caller components
 
 One component per opted-in target, `lychee-online-<repo>`, materializes
-`.github/workflows/maintenance-check-links-online-<repo>.yml`: a thin caller
+`.github/workflows/maintenance-check-links-online.yml`: a thin caller
 for the `ci-workflows` reusable `maintenance-check-links-online.yml`
 (ci-workflows#739), which runs lychee online against the target's managed
 `lychee.toml`. It is the third recorded exception to the consumer-owned-caller
 rule, for the same reason as the first two: one definition at one pin across
 every target that runs it. Each target has its own source file under
 `components/lychee-online/targets/` because the cron minute and day differ
-per target and this manifest has no per-target values; the destination
-carries the repository name because a destination has one owning component.
+per target and this manifest has no per-target values. The workflow `name:`
+is the destination's stem in Title Case, and a destination has one owning
+component, so only one target can take this caller until the cron can vary
+another way.
 A scheduled run also needs the target's `link-check-online` org property set
 to `true`, which the reusable reads at run time; a dispatched run always
 checks. The opt-in steps and the cron slots in use live in
