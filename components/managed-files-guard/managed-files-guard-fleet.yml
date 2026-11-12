@@ -51,6 +51,7 @@ on:
       - .gitattributes
       - .github/actionlint.yaml
       - .github/standards/biome/biome.json
+      - .github/standards/dependabot-policy/policy.json
       - .github/standards/pyright/pyrightconfig.json
       - .github/standards/runner-policy/package-lock.json
       - .github/standards/runner-policy/package.json
