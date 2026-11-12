@@ -1125,7 +1125,7 @@ jobs:
   report-ci-status:
     name: ci-status
     needs: [ci-status]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions: {}
