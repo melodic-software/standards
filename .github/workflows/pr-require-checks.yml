@@ -1035,6 +1035,7 @@ jobs:
         run: bash distribution/sync-manifest.sh validate
 
   ci-status:
+    name: CI Status
     if: ${{ !cancelled() }}
     permissions:
       # `yield-to-full-run` lists this workflow's runs on the head SHA, and
@@ -1086,8 +1087,11 @@ jobs:
         # and the `ci-lanes` status is on the SHA for the next contract-only
         # run.
         if: ${{ !cancelled() }}
-        uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/aggregate-results@8e1076f6c33cb9ca3544a1ad2a215fd2262b4a72 # v0.71.0
+        uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/aggregate-results@ac4d8780de793b20e60a66890e767df579c80d83 # ac4d878 2026-11-11
         with:
+          # report-ci-status mirrors this gate under `ci-status` and runs on
+          # contract-only events too; the run-shape reads must ignore it.
+          alias-jobs: ci-status
           treat-skipped-as: fail
           step-name: Aggregate lane results
           token: ${{ github.token }}
@@ -1117,3 +1121,18 @@ jobs:
             ${{ needs.pr-scan-dependencies.result }}
             ${{ needs.test-cloud-environment.result }}
             ${{ needs.test-distribution.result }}
+
+  report-ci-status:
+    name: ci-status
+    needs: [ci-status]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions: {}
+    steps:
+      - name: Report the conclusion of `CI Status`
+        env:
+          RESULT: ${{ needs.ci-status.result }}
+        run: |
+          echo "CI Status: $RESULT"
+          [ "$RESULT" = success ]
