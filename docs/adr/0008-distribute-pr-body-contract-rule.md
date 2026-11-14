@@ -58,7 +58,7 @@ in a gate repo loads regardless of installed plugins.
 
 ## Revisited 2026-10-06 (#641)
 
-The driver above changed: the `pr-contract` step inside `ci-status` now fails
+The driver above changed: the `check-contract` step inside `ci-status` now fails
 only on the title and the `do-not-merge` label, and a body missing its closing
 keyword or a section draws an advisory comment and the `needs-issue-linkage`
 label instead of a failed check. Decision 1 stands with a narrower rule: the
