@@ -4,6 +4,7 @@
 # lefthook-typescript lane runs it; the root biome.jsonc extends the component
 # ruleset. Commands run from the repository root.
 globs: ["*.ts", "*.tsx", "*.mts", "*.cts", "*.js", "*.jsx", "*.mjs", "*.cjs"]
+project-discovery: []
 build-cmd: null
 test-cmd: null
 check-cmd: "npx --no-install @biomejs/biome check --no-errors-on-unmatched <files>"
@@ -11,4 +12,4 @@ fix-cmd: "npx --no-install @biomejs/biome format --write <files>"
 code-fix-cmd: "npx --no-install @biomejs/biome check --write <files>"
 opt-in: "biome.jsonc at the repository root"
 install-hint: "node 24; npm ci --ignore-scripts at the repository root installs the pinned Biome"
-notes: "build-cmd is null: no authored code has a tsconfig; components/tsconfig is a ruleset whose contract test drives tsc itself. test-cmd is null: no package has a test script; the suites run through the root package.json test:<component> scripts, each after npm ci in its component (CI check-policies). Files under components/*/fixtures/bad/ break the rules on purpose; the root lefthook.yml excludes them."
+notes: "Biome is the root package.json devDependency (2.6.6); CI's check-typescript job installs 2.5.1 inline for the contract tests. The lefthook Biome lane also lints *.json and *.jsonc; these globs leave them out because code-metrics reads the same key as its typescript lane, so a JSON-only change does not select this ecosystem. build-cmd is null: no authored code has a tsconfig; components/tsconfig is a ruleset whose contract test drives tsc itself. test-cmd is null: no package has a test script; the suites run through the root package.json test:<component> scripts, each after npm ci in its component (CI check-policies). Files under components/*/fixtures/bad/ break the rules on purpose; the root lefthook.yml excludes them, this record does not."
