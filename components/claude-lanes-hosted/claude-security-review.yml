@@ -22,7 +22,7 @@ name: PR Review Security Hosted
 # NEVER add workflow-level `paths:`/`paths-ignore:` to this caller: a check
 # whose workflow never triggers is missing, not green, so a required check
 # would stay Pending forever, and the babysit merge gate, which waits for
-# `pr-review-security / security-review`, never arms.
+# `PR Review Security / Claude`, never arms.
 #
 # The reusable skips fork PRs (they receive no secrets and a read-only token)
 # and every `[bot]` actor whose sender id is not in `allowed-bot-sender-ids`
@@ -65,6 +65,7 @@ concurrency:
 
 jobs:
   pr-review-security:
+    name: PR Review Security
     # A draft is work in progress and does not spend a review; the
     # ready_for_review trigger above is what delivers one when it is ready.
     if: github.event.pull_request.draft == false
