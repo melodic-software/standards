@@ -97,7 +97,7 @@ are trusted only at their reviewed Git revision.
   ([claude-code-plugins#12807](https://github.com/melodic-software/claude-code-plugins/pull/12807))
   that `@anthropic-ai/claude-code` in claude-code-plugins is not in
   `autoMerge.reviewOnly`: its non-major updates merge with no review, and its
-  install script runs in the eval-browser-dispatch job that holds the lane's
+  install script runs in the pr-run-plugin-evals job that holds the lane's
   OAuth token.
 - The owner decided (2026-11-11) that every `fastTrack` entry takes no
   cooldown in every repository: `@anthropic-ai/claude-code`, every
