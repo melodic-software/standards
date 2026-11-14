@@ -2,13 +2,15 @@
 # https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
 # Lint-only: /toolchain:lint runs it, /toolchain:check does not. actionlint reads
 # .github/actionlint.yaml and zizmor reads .github/zizmor.yml; both run from the
-# repository root.
+# repository root. Both checks run and either failure fails the command.
 globs: [".github/**/*.yml", ".github/**/*.yaml"]
 build-cmd: null
 test-cmd: null
 check-cmd: |
-  actionlint
-  zizmor --offline <files>
+  rc=0
+  actionlint || rc=1
+  zizmor --offline <files> || rc=1
+  test "$rc" -eq 0
 fix-cmd: null
 opt-in: "GitHub Actions workflows present"
 install-hint: |
