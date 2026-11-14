@@ -32,6 +32,7 @@ concurrency:
 
 jobs:
   pr-review-security:
+    name: PR Review Security
     # A draft does not spend a review; ready_for_review delivers one.
     if: github.event.pull_request.draft == false
     permissions:

@@ -37,7 +37,7 @@ permissions:
 # ("any existing pending job or workflow in the same concurrency group will be
 # canceled") and is NOT governed by `cancel-in-progress`, so the old shared
 # group let one contract-only event evict another and leave a check suite on the
-# current head with no `ci-status` check run at all, a required check that stops
+# current head with no `CI Status` check run at all, a required check that stops
 # reporting until someone re-runs that specific run (dotfiles#647, 2h14m
 # silent). Uniqueness costs a burst of one-job runs when labels flip repeatedly,
 # seconds each, writing nothing.
@@ -96,6 +96,7 @@ jobs:
   # changed, so main always runs everything. Gating is per step, not per job:
   # a skipped job fails ci-status (`treat-skipped-as: fail`).
   check-shell:
+    name: Check Shell
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -136,6 +137,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
 
   check-markdown-and-links:
+    name: Check Markdown And Links
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -210,6 +212,7 @@ jobs:
         run: bash components/lychee/private-repo-inventory.sh check --config lychee.toml
 
   check-repo-hygiene:
+    name: Check Repo Hygiene
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -284,6 +287,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/org-architecture-pointer/org-architecture-pointer.test.sh
 
   check-powershell:
+    name: Check PowerShell
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -324,6 +328,7 @@ jobs:
   # workflow (about 70 s); it stays out of check-powershell so neither job
   # becomes the sum of both.
   test-lefthook:
+    name: Test Lefthook
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -419,6 +424,7 @@ jobs:
         run: ./components/lefthook-powershell/psscriptanalyzer-staged.test.ps1
 
   check-python:
+    name: Check Python
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -498,6 +504,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   check-typescript:
+    name: Check TypeScript
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -556,6 +563,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh
 
   check-dotnet:
+    name: Check .NET
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -642,6 +650,7 @@ jobs:
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   check-go:
+    name: Check Go
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -707,6 +716,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh
 
   check-policies:
+    name: Check Policies
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -787,6 +797,7 @@ jobs:
   # workflow token suffices; the caller-pin half reads private repositories
   # and runs on main in maintenance-audit-pr-convention-pins.yml.
   check-pr-convention-copies:
+    name: Check PR Convention Copies
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -832,6 +843,7 @@ jobs:
         run: bash harness/shell/run-tests.sh components/commit-convention/commit-convention.test.sh
 
   check-github-actions:
+    name: Check GitHub Actions
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -921,6 +933,7 @@ jobs:
           exit "$status"
 
   pr-audit-workflows:
+    name: PR Audit Workflows
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -948,6 +961,7 @@ jobs:
       fail-on-severity: low
 
   pr-scan-dependencies:
+    name: PR Scan Dependencies
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -959,6 +973,7 @@ jobs:
       runner: ubuntu-24.04
 
   test-cloud-environment:
+    name: Test Cloud Environment
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
@@ -989,6 +1004,7 @@ jobs:
         run: node --test components/mcp-launcher/launcher.test.mjs
 
   test-distribution:
+    name: Test Distribution
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read

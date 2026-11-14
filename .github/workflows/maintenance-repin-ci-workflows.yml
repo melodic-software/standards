@@ -33,6 +33,7 @@ concurrency:
 
 jobs:
   repin:
+    name: Repin
     permissions:
       contents: read
     # The App key lives only in the claude-lanes-repin environment, whose branch
