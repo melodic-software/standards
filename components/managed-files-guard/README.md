@@ -111,7 +111,7 @@ destination fails CI here until both callers follow in the same pull
 request; the next sync then delivers the new list together with the new
 file. A required check could not take this filter (a workflow skipped by
 `paths` leaves its check pending), which is one more thing promotion has to
-decide; today only `ci-status` is required on any target.
+decide; today only `CI Status` is required on any target.
 
 Known gaps, both fail-open on an advisory check: GitHub skips a filtered
 workflow when the diff exceeds 3,000 files and no match is among the first

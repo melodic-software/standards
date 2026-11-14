@@ -577,7 +577,7 @@ function minimalPolicy() {
       publishers: { "actions/*": { tier: "auto", reviewed: "2026-10-08", basis: "test" } },
       reviewOnly: [],
       excludeSemverMajor: true,
-      requiredCheck: "ci-status",
+      requiredCheck: "CI Status",
     },
   };
 }
@@ -658,7 +658,7 @@ test("an auto-merge publisher key that is not a whole publisher fails closed", a
       publishers: { "actions/checkout": review },
       reviewOnly: [],
       excludeSemverMajor: true,
-      requiredCheck: "ci-status",
+      requiredCheck: "CI Status",
     },
   };
   const policyPath = path.join(root, "policy.json");
@@ -701,7 +701,7 @@ test("a review-only dependency entry needs its scope and the control it cites", 
       publishers: { "actions/*": { tier: "auto", reviewed: "2026-10-08", basis: "test" } },
       reviewOnly: [entry],
       excludeSemverMajor: true,
-      requiredCheck: "ci-status",
+      requiredCheck: "CI Status",
     },
   };
   const policyPath = path.join(root, "policy.json");

@@ -297,7 +297,7 @@ change the enabled set, suppression rules, or config version downstream.
 Analyzer execution remains a separate native workflow adoption. The consumer
 calls the merged `ci-workflows` Go quality workflow by a full commit SHA, passes
 the exact `.golangci.yml` path, runs native Linux and Windows analysis, and
-includes its stable local gateway job in required `ci-status`. The workflow
+includes its stable local gateway job in required `CI Status`. The workflow
 owns golangci-lint v2.12.2 and govulncheck v1.6.0 installation and integrity
 checks; this materialization component owns only analyzer policy bytes.
 

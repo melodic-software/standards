@@ -88,11 +88,7 @@ checked.
 The CI Status job (id `ci-status`, named `CI Status`) is the only required
 check in every repository. The gate workflow, `pr-require-checks.yml`,
 aggregates every lane into it, so lanes are added or renamed behind it without
-touching a ruleset. While the org ci-gate ruleset still requires the context
-`ci-status`, the gate also carries the `report-ci-status` job, named `ci-status`
-(`jobNameExceptions` in `vocabulary.json`): it needs the CI Status job, runs
-`if: always()`, and ends with that job's result. Once the ruleset requires
-`CI Status`, each repository removes it.
+touching a ruleset.
 
 ## Composite actions
 
@@ -283,7 +279,7 @@ closed the advisory period.
   analyzer; ci-workflows owns the `check-workflow-naming` composite; each
   consumer owns its lane and its renames.
 - **Outcome:** every workflow, job and action in a consumer passes
-  `--mode enforcing`, so check names read `<slot> / <unit>` and `ci-status`
+  `--mode enforcing`, so check names read `<slot> / <unit>` and `CI Status`
   stays the only required check.
 - **Rollback:** set the consumer's composite to `mode: advisory`, or remove
   the lane. Nothing else reads the analyzer's output.

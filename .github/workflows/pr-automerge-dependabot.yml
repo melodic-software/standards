@@ -7,7 +7,7 @@ name: PR Automerge Dependabot
 # publishers, and npm, pip, uv and NuGet packages outside
 # `review-only-dependencies` (this repository's `autoMerge.reviewOnly`
 # entries). Arming never merges: GitHub merges once every required check,
-# `ci-status` included, passes.
+# `CI Status` included, passes.
 
 on:
   pull_request:
