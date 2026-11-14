@@ -1995,5 +1995,89 @@
     "couplings": [],
     "consumers": "dotfiles ci.yml (uses + tests/install.test.sh), account-rotation-pin-bump.yml; .cursor/install.sh comment",
     "note": "As above; the action dir also holds install.sh and tests"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/dependabot-fragments.yml",
+    "to": ".github/workflows/release-generate-dependabot-changelog-fragments.yml",
+    "from_name": "Dependabot Fragments",
+    "to_name": "release-generate-dependabot-changelog-fragments",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Writes changelog fragments for merged Dependabot updates through one release-App pull request. The branch `release/dependabot-fragments`, the script names and the concurrency group keep their names"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/eval-browser-dispatch.yml",
+    "to": ".github/workflows/pr-run-plugin-evals.yml",
+    "from_name": "Eval Browser Dispatch",
+    "to_name": "pr-run-plugin-evals",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Runs `claude plugin eval` by hand or when a pull request gets the `eval: run` label. The key-credit stop marker embeds the workflow file name, so the marker text in the workflow, artifact-retention.json and its tests change with the file"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/eval-hill-climb-pass.yml",
+    "to": ".github/workflows/maintenance-measure-skill-edit-pass.yml",
+    "from_name": "Eval Hill Climb Pass",
+    "to_name": "maintenance-measure-skill-edit-pass",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Reusable: one measuring pass of maintenance-measure-skill-edit.yml, whose `uses:` lines change with the file"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/security-outside-actor.yml",
+    "to": ".github/workflows/intake-label-outside-actor-activity.yml",
+    "from_name": "Security Outside Actor",
+    "to_name": "intake-label-outside-actor-activity",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Labels an issue or pull request when someone outside the organization opens, edits, comments on or reviews it. The label `security: outside-actor` and the comment marker keep their names"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/pr-feedback-dispatch.yml",
+    "to": ".github/workflows/pr-dispatch-feedback.yml",
+    "from_name": "PR Feedback Dispatch",
+    "to_name": "pr-dispatch-feedback",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS", "SYNC"],
+    "confidence": "high",
+    "note": "Sequence: (1) azure-iac's lanes token broker accepts both paths (src/lanes-token-broker/src/dispatcher.mjs RUN_DISPATCHER_WORKFLOW) and is deployed, (2) this rename, (3) pr-pipeline-sandbox renames its copy (scripts/lanes/check-sync.sh lists it), (4) the broker drops the old path. Until (1), the broker refuses the address-feedback lane's token. The record prefix `pr-feedback-dispatched-` keeps its name"
+  },
+  {
+    "repo": "claude-code-plugins",
+    "kind": "workflow",
+    "from": ".github/workflows/post-merge-demotion-alert.yml",
+    "to": ".github/workflows/post-merge-file-demotion-issues.yml",
+    "from_name": "Post Merge Demotion Alert",
+    "to_name": "post-merge-file-demotion-issues",
+    "job_renames": [],
+    "couplings": ["GOV-TESTS"],
+    "confidence": "high",
+    "note": "Files the demotion issue when a post-merge signal fails on main. pr-merge.yml dispatches it by file name over REST, so that call changes with the file"
+  },
+  {
+    "repo": "azure-iac",
+    "kind": "workflow",
+    "from": ".github/workflows/azure-iac-production-deploy.yml",
+    "to": ".github/workflows/release-deploy.yml",
+    "from_name": "azure-iac-production-deploy-v1",
+    "to_name": "release-deploy",
+    "job_renames": [],
+    "couplings": ["OIDC", "PULUMI-GUARD", "GOV-TESTS"],
+    "confidence": "high",
+    "note": "Sequence: (1) the Pulumi Cloud OIDC issuer policy and a second Azure federated credential on the deploy identity trust the new subject (job_workflow_ref with the new path) beside the old one, outside any repo, (2) ci-workflows verify-pulumi-deploy-policy's contract accepts the new path and workflow name and is released, (3) azure-iac renames the file, repins and updates WorkflowContractTests.cs, scripts/operator/broker-prerequisites.sh and the runbook, (4) one preview deploy proves the new identity, (5) the old subject is removed. Until (1), deploys fail closed"
   }
 ]
