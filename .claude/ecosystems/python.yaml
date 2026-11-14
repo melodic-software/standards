@@ -1,0 +1,18 @@
+# Python in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# The only Python is the ruff and pyright component fixtures. Lint is ruff check
+# plus ruff format --check against the root ruff.toml, as the lefthook-python
+# lane runs them, with the intentionally bad fixtures excluded as CI's
+# check-python job excludes them. The test is the two components' contract
+# suites, as CI runs them. Commands run from the repository root.
+globs: ["*.py", "*.pyi"]
+build-cmd: null
+test-cmd: "bash harness/shell/run-tests.sh components/ruff/ruff.test.sh components/pyright/pyright.test.sh"
+check-cmd: "ruff check --force-exclude --extend-exclude 'components/*/fixtures/bad' <files> && ruff format --check --force-exclude --extend-exclude 'components/*/fixtures/bad' <files>"
+fix-cmd: "ruff format --force-exclude --extend-exclude 'components/*/fixtures/bad' <files>"
+code-fix-cmd: "ruff check --fix --force-exclude --extend-exclude 'components/*/fixtures/bad' <files>"
+opt-in: "ruff.toml at the repository root"
+install-hint: "uv tool install ruff==0.15.14 and uv tool install pyright==1.1.409 (the versions CI pins)"
+tool-pin:
+  ruff: "0.15.14"
+  pyright: "1.1.409"

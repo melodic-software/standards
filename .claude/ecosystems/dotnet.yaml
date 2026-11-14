@@ -1,0 +1,13 @@
+# .NET in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# The only .NET is the dotnet-analysis component fixtures (a good and a bad
+# project, no solution). The test is that component's contract suite, as CI's
+# check-dotnet job runs it; it builds and formats each fixture itself. Commands
+# run from the repository root.
+globs: ["*.cs"]
+build-cmd: null
+test-cmd: "bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-analysis.test.sh"
+check-cmd: null
+fix-cmd: null
+install-hint: "Install the .NET 10 SDK from https://dot.net (CI pins 10.0.301)"
+notes: "No anchor: there is no solution, and the bad fixture project fails analysis on purpose."

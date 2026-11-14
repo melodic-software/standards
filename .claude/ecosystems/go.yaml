@@ -1,0 +1,15 @@
+# Go in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# The only Go is the go-analysis component fixtures, one module each; the bad
+# ones fail build, vet and lint on purpose. The test is that component's
+# contract suite, as CI's check-go job runs it, and it drives go and
+# golangci-lint over each fixture itself. Commands run from the repository root.
+globs: ["*.go"]
+build-cmd: null
+test-cmd: "bash harness/shell/run-tests.sh components/go-analysis/go-analysis.test.sh"
+check-cmd: null
+fix-cmd: null
+install-hint: "Go 1.26.5 and golangci-lint 2.12.2 (the versions CI pins): https://go.dev/dl/ and https://golangci-lint.run/docs/welcome/install/"
+tool-pin:
+  golangci-lint: "2.12.2"
+notes: "No project-discovery and no go-mod-tidy gate: every go.mod is a fixture, and the contract suite asserts each fixture's expected result, including the failures of the bad ones."

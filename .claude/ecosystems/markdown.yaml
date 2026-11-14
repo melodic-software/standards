@@ -1,0 +1,14 @@
+# Markdown in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# markdownlint-cli2 at the version package.json pins, with the root config and
+# the intentionally bad fixtures left out, as package.json's lint:md script and
+# CI's check-markdown-and-links job run it. Commands run from the repository root.
+globs: ["*.md"]
+build-cmd: null
+test-cmd: null
+check-cmd: 'markdownlint-cli2 --config "$REPO_ROOT/.markdownlint-cli2.jsonc" <files> "!components/**/fixtures/bad/**"'
+fix-cmd: 'markdownlint-cli2 --config "$REPO_ROOT/.markdownlint-cli2.jsonc" --fix <files> "!components/**/fixtures/bad/**"'
+opt-in: ".markdownlint-cli2.jsonc at the repository root"
+install-hint: "npm ci (package.json pins markdownlint-cli2 0.24.0), or npm i -g markdownlint-cli2@0.24.0 to put it on PATH"
+tool-pin:
+  markdownlint-cli2: "0.24.0"

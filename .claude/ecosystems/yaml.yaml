@@ -1,0 +1,17 @@
+# GitHub Actions workflows in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# Lint-only: /toolchain:lint runs it, /toolchain:check does not. actionlint reads
+# .github/actionlint.yaml and zizmor reads .github/zizmor.yml; both run from the
+# repository root.
+globs: [".github/**/*.yml", ".github/**/*.yaml"]
+build-cmd: null
+test-cmd: null
+check-cmd: |
+  actionlint
+  zizmor --offline <files>
+fix-cmd: null
+opt-in: "GitHub Actions workflows present"
+install-hint: |
+  actionlint: winget install rhysd.actionlint | brew install actionlint
+  zizmor: pip install zizmor
+notes: "Lint-only: owned by /toolchain:lint. CI's pr-audit-workflows job also audits the workflow files components/claude-lanes, components/claude-lanes-hosted and components/managed-files-guard ship to consumers; they sit outside .github and this record's globs."

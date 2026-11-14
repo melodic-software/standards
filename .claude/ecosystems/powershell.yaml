@@ -1,0 +1,16 @@
+# PowerShell in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# The repository's own PSScriptAnalyzer adapter (the root lefthook.yml
+# psscriptanalyzer lane): it loads the root PSScriptAnalyzerSettings.psd1 from
+# the working directory, analyzes each file in its own pwsh worker, and exits 1
+# on any finding. Commands run from the repository root.
+globs: ["*.ps1", "*.psm1", "*.psd1"]
+build-cmd: null
+test-cmd: null
+check-cmd: 'pwsh -NoProfile -NonInteractive -File "$REPO_ROOT/components/lefthook-powershell/psscriptanalyzer-staged.ps1" <files>'
+fix-cmd: null
+opt-in: "PSScriptAnalyzerSettings.psd1 at the repository root"
+install-hint: "pwsh 7.4 or later; Install-PSResource PSScriptAnalyzer -Version 1.25.0"
+tool-pin:
+  PSScriptAnalyzer: "1.25.0"
+notes: "Files under components/*/fixtures/bad/ break the rules on purpose; the root lefthook.yml and CI's check-powershell job exclude them, and a finding in one is expected. test-cmd is null: CI runs the adapter's regression script and the component contract test by name."
