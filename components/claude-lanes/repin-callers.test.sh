@@ -364,9 +364,9 @@ lane_repo() {
 name: claude-review
 on: pull_request
 jobs:
-  contract:
+  status:
     steps:
-      - uses: melodic-software/ci-workflows/.github/actions/pr-contract@${pin_sha} # ${pin_tag}
+      - uses: melodic-software/ci-workflows/.github/actions/ci-status@${pin_sha} # ${pin_tag}
 YAML
   cat > "$dir/components/claude-lanes/claude-security-review.yml" <<YAML
 name: claude-security-review
@@ -744,38 +744,38 @@ assert_silent 'apply: no-diff run leaves the tree clean' "$(git -C "$repo" statu
 # A release that renamed a pinned action no longer carries the old path, so
 # rewriting the SHA alone would pin a path that does not exist at it. The
 # expected new paths are the ci-workflows action entries of rename-map.json.
-renamed_paths='.github/actions/pr-require-checks/check-contract .github/actions/report-lane-outcome'
+renamed_paths='.github/actions/pr-require-checks/aggregate-results .github/actions/report-lane-outcome'
 repo="$scratch/repo-renamed"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 export STUB_PRESENT_PATHS="$renamed_paths"
 out_file="$scratch/out-apply-renamed"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'apply: a renamed upstream path exits 0' 0 "$rc"
-assert_contains 'apply: the contract caller moves to the renamed path' \
+assert_contains 'apply: the status caller moves to the renamed path' \
   "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/check-contract@${new_sha} # v0.9.2"
+  "uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/aggregate-results@${new_sha} # v0.9.2"
 assert_contains 'apply: the outcome caller moves to the renamed path' \
   "$(cat "$repo/components/claude-lanes/claude-security-review.yml")" \
   "uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${new_sha} # v0.9.2"
 assert_not_contains 'apply: no caller keeps an old path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'pr-contract@'
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'ci-status@'
 # shellcheck disable=SC2016  # markdown code spans in the expected note, not shell expansions
 assert_contains 'apply: the version note names the rename' "$(cat "$out_file")" \
-  '`.github/actions/pr-contract` to `.github/actions/pr-require-checks/check-contract`'
+  '`.github/actions/ci-status` to `.github/actions/pr-require-checks/aggregate-results`'
 
 # A release cut before the rename still carries the old path: the SHA moves,
 # the path stays.
 repo="$scratch/repo-pre-rename"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS='.github/actions/pr-contract .github/actions/claude-lane-outcome'
+export STUB_PRESENT_PATHS='.github/actions/ci-status .github/actions/claude-lane-outcome'
 out_file="$scratch/out-apply-pre-rename"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'apply: a pre-rename release exits 0' 0 "$rc"
-assert_contains 'apply: a pre-rename release keeps the contract path' \
+assert_contains 'apply: a pre-rename release keeps the status path' \
   "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/actions/pr-contract@${new_sha} # v0.9.2"
+  "uses: melodic-software/ci-workflows/.github/actions/ci-status@${new_sha} # v0.9.2"
 assert_not_contains 'apply: a pre-rename release maps no path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'check-contract'
+  "$(cat "$repo"/components/claude-lanes/*.yml)" 'aggregate-results'
 
 # Neither path at the release: no pin can be right, so nothing is rewritten.
 repo="$scratch/repo-path-gone"
@@ -783,7 +783,7 @@ lane_repo "$repo" "$old_sha" 'v0.9.1'
 export STUB_PRESENT_PATHS=''
 rc=0; out="$(run_apply "$repo" "$scratch/out-apply-path-gone" 'v0.9.2' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a pinned path absent under both names fails' "$rc"
-assert_contains 'apply: the absent path is named' "$out" '.github/actions/pr-contract'
+assert_contains 'apply: the absent path is named' "$out" '.github/actions/ci-status'
 assert_silent 'apply: an absent path touches nothing' "$(git -C "$repo" status --porcelain)"
 
 # A probe that fails for any reason but 404 proves nothing about the path.
@@ -1044,7 +1044,7 @@ unset STUB_COMPARE_FILES
 # action changed.
 repo="$scratch/repo-lane-selective"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_COMPARE_FILES='.github/actions/pr-contract/action.yml'
+export STUB_COMPARE_FILES='.github/actions/ci-status/action.yml'
 out_file="$scratch/out-lane-selective"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'selective: the enumerated lane set exits 0' 0 "$rc"
@@ -1056,7 +1056,7 @@ unset STUB_COMPARE_FILES
 # release SHA; it still takes the tag form, and nothing else moves.
 repo="$scratch/repo-lane-relabel"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-sed -i -E "s|pr-contract@${old_sha} # v0\.9\.1|pr-contract@${new_sha} # a1b2c3d 2026-08-21|" \
+sed -i -E "s|ci-status@${old_sha} # v0\.9\.1|ci-status@${new_sha} # a1b2c3d 2026-08-21|" \
   "$repo/components/claude-lanes/claude-review.yml"
 git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'fallback pin to the release commit'
 export STUB_COMPARE_FILES=''
@@ -1064,7 +1064,7 @@ out_file="$scratch/out-lane-relabel"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'relabel: a fallback pin on the release SHA exits 0' 0 "$rc"
 assert_contains 'relabel: the fallback pin on the release SHA takes the tag form' \
-  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "pr-contract@${new_sha} # v0.9.2"
+  "$(cat "$repo/components/claude-lanes/claude-review.yml")" "ci-status@${new_sha} # v0.9.2"
 assert_eq 'relabel: only that caller is modified' \
   'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
 unset STUB_COMPARE_FILES

@@ -13,7 +13,7 @@
 // codex-plugins v0.9.1 case) is drift no source-copy diff can see.
 //
 // Phase 3 of the ci-perf program (github-iac#396) moves the fleet from the
-// `pr-issue-linkage.yml` reusable to the `pr-contract` composite, one
+// `pr-issue-linkage.yml` reusable to the `check-contract` composite, one
 // repository at a time. A consumer therefore runs one artifact or the other,
 // never both, for the days that transition takes: the fleet scan detects
 // which one a repository uses and checks the contract with the matching
@@ -58,12 +58,7 @@ const RULES_FILE_PATH = path.join(
 const API_BASE = "https://api.github.com/repos/melodic-software";
 const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
 
-// The ci-workflows naming rename moves the composite; until every consumer
-// repins, a pin may name either path. The renamed path comes first.
-export const COMPOSITE_DIRECTORIES = [
-  ".github/actions/pr-require-checks/check-contract",
-  ".github/actions/pr-contract",
-];
+export const COMPOSITE_DIRECTORY = ".github/actions/pr-require-checks/check-contract";
 const REUSABLE_PATH = ".github/workflows/pr-issue-linkage.yml";
 
 export const COPY_SOURCES = {
@@ -582,23 +577,22 @@ export function parseCompositeNegation(runShText, location) {
 // Every pattern below anchors on a `uses:` entry with no `#` earlier on the
 // line, so only a live call site counts. The same paths appear elsewhere in
 // ci-workflows' own `ci.yml` as a lint `paths:` list and as a
-// `bash .github/actions/pr-contract/run.test.sh` command, and a migration
-// leaves commented-out call sites behind; either one would otherwise select an
-// artifact the repository does not run and suppress the one it does.
+// `bash .github/actions/pr-require-checks/check-contract/run.test.sh` command,
+// and a migration leaves commented-out call sites behind; either one would
+// otherwise select an artifact the repository does not run and suppress the
+// one it does.
 const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
-const COMPOSITE_DIRECTORY_GROUP = `(${COMPOSITE_DIRECTORIES.map((directory) =>
-  directory.replaceAll(".", "\\."),
-).join("|")})`;
+const COMPOSITE_DIRECTORY_PATTERN = COMPOSITE_DIRECTORY.replaceAll(".", "\\.");
 // A `uses:` of the composite at `main` or a 40-hex ci-workflows SHA.
 const COMPOSITE_PIN_PATTERN = new RegExp(
-  `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_GROUP}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
+  `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_PATTERN}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
   "m",
 );
 // ci-workflows dogfoods its own composite through a local `./` or `$/`
 // (self-repository) reference, which carries no SHA — the artifact is that
 // repository's own tree at `main`.
 const COMPOSITE_LOCAL_PATTERN = new RegExp(
-  `${USES_PREFIX}[.$]/${COMPOSITE_DIRECTORY_GROUP}(?=\\s|$)`,
+  `${USES_PREFIX}[.$]/${COMPOSITE_DIRECTORY_PATTERN}(?=\\s|$)`,
   "m",
 );
 const REUSABLE_PIN_PATTERN = new RegExp(
@@ -612,11 +606,10 @@ const REUSABLE_PIN_PATTERN = new RegExp(
 export function detectArtifactPin(workflowText) {
   const pinned = workflowText.match(COMPOSITE_PIN_PATTERN);
   if (pinned) {
-    return { kind: "composite", sha: pinned[2], directory: pinned[1] };
+    return { kind: "composite", sha: pinned[1] };
   }
-  const local = workflowText.match(COMPOSITE_LOCAL_PATTERN);
-  if (local) {
-    return { kind: "composite", sha: "main", directory: local[1], local: true };
+  if (COMPOSITE_LOCAL_PATTERN.test(workflowText)) {
+    return { kind: "composite", sha: "main", local: true };
   }
   const reusable = workflowText.match(REUSABLE_PIN_PATTERN);
   if (reusable) {
@@ -1098,7 +1091,9 @@ export function checkFleet(policy, resolutions) {
       continue;
     }
     if (resolution.kind === "none") {
-      errors.push(`caller ${repo}: no pr-contract composite step and no pr-issue-linkage caller`);
+      errors.push(
+        `caller ${repo}: no check-contract composite step and no pr-issue-linkage caller`,
+      );
       continue;
     }
     if (resolution.kind === "composite") {
@@ -1167,24 +1162,18 @@ async function fetchTextOrNull(url) {
   return response === null ? null : await response.text();
 }
 
-// The live gate on ci-workflows `main`, at the first composite path that
-// exists there. `readOrNull` returns null for a missing file.
+// The live gate on ci-workflows `main`. `readOrNull` returns null for a
+// missing file.
 export async function readGateComposite(readOrNull) {
-  for (const directory of COMPOSITE_DIRECTORIES) {
-    const gateRun = await readOrNull(contentsUrl("ci-workflows", "main", `${directory}/run.sh`));
-    if (gateRun === null) {
-      continue;
+  const read = async (file) => {
+    const url = contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/${file}`);
+    const text = await readOrNull(url);
+    if (text === null) {
+      throw new FetchError(`fetch-error: ${url}: HTTP 404`);
     }
-    const actionUrl = contentsUrl("ci-workflows", "main", `${directory}/action.yml`);
-    const gateAction = await readOrNull(actionUrl);
-    if (gateAction === null) {
-      throw new FetchError(`fetch-error: ${actionUrl}: HTTP 404`);
-    }
-    return { gateRun, gateAction };
-  }
-  throw new FetchError(
-    `fetch-error: ci-workflows main has no composite at ${COMPOSITE_DIRECTORIES.join(" or ")}`,
-  );
+    return text;
+  };
+  return { gateRun: await read("run.sh"), gateAction: await read("action.yml") };
 }
 
 async function fetchDirectory(url) {
@@ -1304,8 +1293,10 @@ export async function runPinScan(env = process.env) {
         resolutions.set(repo, {
           kind: "composite",
           sha: found.sha,
-          runSh: await cachedText(contentsUrl(source, ref, `${found.directory}/run.sh`)),
-          actionYml: await cachedText(contentsUrl(source, ref, `${found.directory}/action.yml`)),
+          runSh: await cachedText(contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/run.sh`)),
+          actionYml: await cachedText(
+            contentsUrl(source, ref, `${COMPOSITE_DIRECTORY}/action.yml`),
+          ),
         });
         continue;
       }
