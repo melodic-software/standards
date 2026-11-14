@@ -17,7 +17,7 @@ name: PR Review Security Hosted
 # There is no workflow-level path gating. The reusable skips, with a green
 # check, a review whose files in scope are all documentation (its
 # `docs-only-paths` default: `docs/**/*.md`, READMEs and changelogs). A
-# `.github/claude-security-paths` file is no longer read.
+# `.github/claude-security-paths` file has no effect.
 #
 # NEVER add workflow-level `paths:`/`paths-ignore:` to this caller: a check
 # whose workflow never triggers is missing, not green, so a required check

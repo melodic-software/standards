@@ -7,8 +7,6 @@ is authored and distributed across repositories; it does not own the prompt's bo
 migration gate, or Claude Code's product semantics. Those live in the repositories and upstream docs
 this playbook cites rather than restates (see [`../engineering/reference-dont-duplicate.md`](../engineering/reference-dont-duplicate.md)).
 
-Decided 2026-08-09 in [melodic-software/claude-code-plugins#2072](https://github.com/melodic-software/claude-code-plugins/issues/2072), grounded in same-day fetches of the Claude Code deep-links, skills, and settings documentation and validated by three independent review agents.
-
 ## A team prompt is a skill
 
 Custom slash commands are merged into skills in Claude Code; the native storage form for a prebaked
