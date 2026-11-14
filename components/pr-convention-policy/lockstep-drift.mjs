@@ -594,10 +594,11 @@ const COMPOSITE_PIN_PATTERN = new RegExp(
   `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_GROUP}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
   "m",
 );
-// ci-workflows dogfoods its own composite through a local `./` reference,
-// which carries no SHA — the artifact is that repository's own tree at `main`.
+// ci-workflows dogfoods its own composite through a local `./` or `$/`
+// (self-repository) reference, which carries no SHA — the artifact is that
+// repository's own tree at `main`.
 const COMPOSITE_LOCAL_PATTERN = new RegExp(
-  `${USES_PREFIX}\\./${COMPOSITE_DIRECTORY_GROUP}(?=\\s|$)`,
+  `${USES_PREFIX}[.$]/${COMPOSITE_DIRECTORY_GROUP}(?=\\s|$)`,
   "m",
 );
 const REUSABLE_PIN_PATTERN = new RegExp(
@@ -1297,7 +1298,7 @@ export async function runPinScan(env = process.env) {
         continue;
       }
       if (found.kind === "composite") {
-        // A local `./` reference reads that repository's own tree.
+        // A local `./` or `$/` reference reads that repository's own tree.
         const source = found.local ? repo : "ci-workflows";
         const ref = found.sha;
         resolutions.set(repo, {

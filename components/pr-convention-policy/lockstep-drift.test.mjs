@@ -1496,6 +1496,15 @@ test("a local reference to the renamed composite resolves to main", () => {
   });
 });
 
+test("a self-repository `$/` reference to the composite resolves to main", () => {
+  assert.deepEqual(detectArtifactPin(`        uses: $/${RENAMED_DIRECTORY}\n`), {
+    kind: "composite",
+    sha: "main",
+    directory: RENAMED_DIRECTORY,
+    local: true,
+  });
+});
+
 test("a reusable consumer is detected at its pin", () => {
   assert.deepEqual(detectArtifactPin(`jobs:\n  linkage:\n${REUSABLE_CALL}\n`), {
     kind: "reusable",
@@ -1508,7 +1517,7 @@ test("the composite wins when a repository carries both mid-transition", () => {
   assert.equal(detectArtifactPin(both).kind, "composite");
 });
 
-// ci-workflows dogfoods its own composite through a local `./` reference,
+// ci-workflows dogfoods its own composite through a local `./` or `$/` reference,
 // which carries no SHA. The same path appears in that workflow as a lint
 // `paths:` entry and as a `bash .../run.test.sh` command; neither is a call
 // site, so the detector anchors on `uses:`.
@@ -1541,6 +1550,7 @@ test("a commented-out call site is not a call site", () => {
     detectArtifactPin(`      # - uses: ./.github/actions/pr-contract\n${REUSABLE_CALL}\n`).kind,
     "reusable",
   );
+  assert.equal(detectArtifactPin(`      # - uses: $/${RENAMED_DIRECTORY}\n`), null);
 });
 
 // The ci-workflows rename moves the gate from `ci.yml` to
