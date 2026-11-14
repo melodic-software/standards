@@ -36,6 +36,7 @@ jobs:
   # Tune the window with the STANDARDS_SYNC_SETTLE_SECONDS repo variable
   # (integer seconds, 0-3600; default 600).
   collect-merge-burst:
+    name: Collect Merge Burst
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
@@ -55,6 +56,7 @@ jobs:
           sleep "$((10#$SETTLE_SECONDS))"
 
   maintenance-sync-standards:
+    name: Maintenance Sync Standards
     needs: collect-merge-burst
     if: ${{ !cancelled() && (needs.collect-merge-burst.result == 'success' || needs.collect-merge-burst.result == 'skipped') }}
     # Real runs attest App access for the complete unfiltered manifest before

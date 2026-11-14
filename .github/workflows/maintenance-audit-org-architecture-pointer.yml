@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   audit:
+    name: Audit
     permissions:
       contents: read
     # The App key lives only in the standards-sync environment, whose branch

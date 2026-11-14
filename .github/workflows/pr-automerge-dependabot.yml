@@ -20,6 +20,7 @@ permissions: {}
 
 jobs:
   pr-automerge-dependabot:
+    name: PR Automerge Dependabot
     permissions:
       contents: write # enablePullRequestAutoMerge
       pull-requests: write # enable or disable auto-merge on the PR
