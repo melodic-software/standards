@@ -1795,18 +1795,6 @@
   {
     "repo": "ci-workflows",
     "kind": "action",
-    "from": ".github/actions/pr-contract",
-    "to": ".github/actions/pr-require-checks/check-contract",
-    "from_name": null,
-    "to_name": null,
-    "job_renames": [],
-    "couplings": ["PIN", "REPIN", "SYNC", "MFG"],
-    "consumers": ".github, agent-plugins, ci-runner, ci-workflows, claude-code-account-rotation, claude-code-plugins, claude-code-proxy, codex-plugins, cursor-plugins, dotfiles, github-iac, medley (ci-status.yml), provisioning, standards; standards components/pr-convention-policy/lockstep-drift.mjs (+test)",
-    "note": "Step inside the ci-status job: checks PR title, do-not-merge label, issue linkage. No stage word inside the unit (Q56)"
-  },
-  {
-    "repo": "ci-workflows",
-    "kind": "action",
     "from": ".github/actions/claude-lane-outcome",
     "to": ".github/actions/report-lane-outcome",
     "from_name": null,
