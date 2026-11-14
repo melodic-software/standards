@@ -1059,9 +1059,9 @@ jobs:
       # the full run records `success`. Write covers the read.
       actions: write
       contents: read
-      # pr-contract upserts the advisory linkage comment and moves the linkage
-      # label; ci-status records the `ci-lanes` commit status the carry-forward
-      # branch reads back on the next contract-only event.
+      # check-contract upserts the advisory linkage comment and moves the
+      # linkage label; ci-status records the `ci-lanes` commit status the
+      # carry-forward branch reads back on the next contract-only event.
       pull-requests: write
       statuses: write
     needs:
@@ -1098,7 +1098,7 @@ jobs:
           # `*[bot]` pattern.
           exempt-authors: 'dependabot[bot]'
       - name: Aggregate lane results
-        # `!cancelled()` so a failing pr-contract step does not skip the
+        # `!cancelled()` so a failing check-contract step does not skip the
         # aggregation: the job still fails on the contract step's exit code,
         # and the `ci-lanes` status is on the SHA for the next contract-only
         # run.
