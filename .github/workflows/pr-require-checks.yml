@@ -37,7 +37,7 @@ permissions:
 # ("any existing pending job or workflow in the same concurrency group will be
 # canceled") and is NOT governed by `cancel-in-progress`, so the old shared
 # group let one contract-only event evict another and leave a check suite on the
-# current head with no `ci-status` check run at all, a required check that stops
+# current head with no `CI Status` check run at all, a required check that stops
 # reporting until someone re-runs that specific run (dotfiles#647, 2h14m
 # silent). Uniqueness costs a burst of one-job runs when labels flip repeatedly,
 # seconds each, writing nothing.
