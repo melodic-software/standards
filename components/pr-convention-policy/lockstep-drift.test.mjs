@@ -53,8 +53,10 @@ const POLICY = parseUniqueJson(
   "policy.json",
 );
 
-// The two executable copies are vendored verbatim, because the behavioral
-// layer runs them: the composite's run.sh from ci-workflows
+// The two executable copies are vendored, because the behavioral layer runs
+// them. Each matches its upstream commit except the message prefix and the
+// comment marker, which carry the composite's name `check-contract`: the
+// composite's run.sh from ci-workflows
 // 8b3cc4bf282b30e51dd0eef31e2997b978770cea (ci-workflows#733, the
 // `issue-ref-pattern` shape, plus one `spellchecker:ignore-next-line` awk
 // comment for this repository's typos lane), the same run.sh from ci-workflows
