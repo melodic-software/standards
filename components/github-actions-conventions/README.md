@@ -262,16 +262,6 @@ closed the advisory period.
   renamed to `release-publish-plugins.yml` before the switch.
 - **Rollback:** set the composite's `mode: advisory`, which reports every
   finding as a warning and passes, or remove the lane.
-- **Display names:** `job-name` and `step-name` report at
-  `displayNameLevel`, `warning` while the org's repositories name their jobs
-  and adopt the lint; ci-workflows runs the analyzer from standards' `main`, so
-  an `error` level would block it before its jobs are named. Each repository
-  names its jobs in the same change that updates every script and filter
-  reading the old check names. Once standards, ci-workflows and
-  claude-code-plugins pass with no warning of either rule, a change sets
-  `displayNameLevel` to `error`:
-  [#985](https://github.com/melodic-software/standards/issues/985), due
-  2026-12-11.
 
 ### Ownership and operation
 
