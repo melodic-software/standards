@@ -297,14 +297,21 @@ test("a job name is Title Case, and an expression keeps its place", () => {
   }
 });
 
-test("the required job is named CI Status, and the alias keeps the old context", () => {
+test("the required job is named CI Status", () => {
   assert.equal(checkJobName("ci-status", "CI Status", vocabulary), undefined);
   assert.match(checkJobName("ci-status", "Ci Status", vocabulary), /exactly `CI Status`/u);
   assert.match(checkJobName("ci-status", "Required Checks", vocabulary), /exactly `CI Status`/u);
-  assert.equal(checkJobName("report-ci-status", "ci-status", vocabulary), undefined);
+});
+
+test("a recorded exception fixes a job's name", () => {
+  const withException = {
+    ...vocabulary,
+    jobNameExceptions: [{ jobId: "legacy-gate", name: "legacy", reason: "test" }],
+  };
+  assert.equal(checkJobName("legacy-gate", "legacy", withException), undefined);
   assert.match(
-    checkJobName("report-ci-status", "Report CI Status", vocabulary),
-    /recorded exception .* exactly `ci-status`/u,
+    checkJobName("legacy-gate", "Legacy Gate", withException),
+    /recorded exception .* exactly `legacy`/u,
   );
 });
 

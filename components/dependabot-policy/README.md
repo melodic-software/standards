@@ -140,7 +140,7 @@ which adds those rules, in the next phase of this work.
 ### Fast track
 
 `fastTrack` lists the updates that take no cooldown and merge at the auto
-tier as soon as `ci-status` passes. Each list except `own` is keyed by its
+tier as soon as `CI Status` passes. Each list except `own` is keyed by its
 Dependabot `package-ecosystem` name, as in `autoMerge.ecosystems`:
 
 - `npm`: `@anthropic-ai/claude-code`;
@@ -161,7 +161,7 @@ These safeguards remain on a fast-tracked update:
 
 - every action stays pinned to a full commit SHA, so the update is one
   reviewable diff that moves a pin, never a tag that changes underneath;
-- `ci-status` must pass before any merge, and the merge lanes' gates
+- `CI Status` must pass before any merge, and the merge lanes' gates
   (non-major rule, `reviewOnly`, readable `updated-dependencies` metadata)
   apply unchanged;
 - security updates still arrive immediately, as for every dependency.
@@ -186,10 +186,10 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   `npm`, `pip`, `uv` or `nuget` update needs no publisher entry. No update is a
   security-critical dependency (below), and no package is named in the
   repository's `autoMerge.reviewOnly` entries, which the caller passes as
-  `review-only-dependencies` and the workflow never arms. `ci-status` is not
+  `review-only-dependencies` and the workflow never arms. `CI Status` is not
   red, and the updates in the commit's
   `updated-dependencies` metadata agree with the title or the group's
-  `Updates` lines. The pull request merges once `ci-status` passes, with no
+  `Updates` lines. The pull request merges once `CI Status` passes, with no
   review. For `github-actions`, every repository already trusts these
   publishers, who run the platform and the review agents, so a non-major
   release from them adds no new trust. For `npm`, `pip` and `nuget` the basis
@@ -200,19 +200,19 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
   2026-11-08): it resolves the same PyPI packages, and Dependabot's `uv`
   commits carry the same `update-type` metadata. In both, the cooldown (each repository's
   `cooldown.default-days`, at least the 3-day floor, except for the
-  [fast track](#fast-track)), `ci-status`, the non-major rule and the
+  [fast track](#fast-track)), `CI Status`, the non-major rule and the
   `autoMerge.reviewOnly` opt-out catch a bad release; see the
   [threat model](THREAT-MODEL.md).
 - **Review tier.** Everything else: a major from any publisher, an action
   from an unlisted publisher or one listed with `tier: review`, a
   security-critical dependency, a red
-  `ci-status`, or updates the lane cannot read. An AI review lane reads the
+  `CI Status`, or updates the lane cannot read. An AI review lane reads the
   update and its release notes as data and records one verdict bound to the
   head it reviewed: `merge`, `fix` (push a fix commit, then review again),
   `close` (close the pull request and propose a Dependabot `ignore` entry),
   or `escalate`. A security update is never closed. The merge lane merges a
   review-tier pull request only on a `merge` verdict at its current head,
-  and only once `ci-status` passes there.
+  and only once `CI Status` passes there.
 
 **Security-critical dependencies.** A dependency a threat model singles out
 is listed in `autoMerge.reviewOnly`, each entry scoped by `repository`,

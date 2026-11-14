@@ -106,7 +106,7 @@ CI installs pinned engines and runs the complete suite.
 ### CI posture
 
 This repository is public, so every `pr-require-checks.yml` job runs on GitHub-hosted
-`ubuntu-24.04` under a literal label, with no runner selector. `ci-status` is
+`ubuntu-24.04` under a literal label, with no runner selector. `CI Status` is
 the one required status-check context; the org `ci-gate` ruleset requires
 nothing else, and lanes are added or removed behind it without touching the
 ruleset. Both of those follow from the organization-wide posture, whose
