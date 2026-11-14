@@ -2,8 +2,8 @@
 
 // Lockstep drift check (ADR-0008): `policy.json` is the canonical record of
 // the fleet PR convention, but other copies of the contract exist and must
-// change in lockstep with it — the ci-workflows `pr-contract` composite (the
-// live gate every consumer runs inside its `ci-status` job), the
+// change in lockstep with it — the ci-workflows `check-contract` composite
+// (the live gate every consumer runs inside its `ci-status` job), the
 // source-control plugin's PreToolUse validator, the org `.github` PR
 // template, and this repository's distributed
 // `.claude/rules/pr-body-contract.md`. Letting any copy drift is exactly the
@@ -135,7 +135,7 @@ function collect(errors, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// The `pr-contract` composite (the live gate, and every migrated consumer).
+// The `check-contract` composite (the live gate, and every migrated consumer).
 //
 // `run.sh` states the section list as data: the analyzer's END block calls
 // `section_report("<name>")` once per required section, in contract order.
@@ -745,7 +745,7 @@ function assertMentionsAny(text, terms, location) {
   }
 }
 
-// The `pr-contract` composite masks fenced and indented code blocks and inline
+// The `check-contract` composite masks fenced and indented code blocks and inline
 // code spans before matching a PR body, so an escape an author copies verbatim
 // from a backticked template is invisible to the gate and the PR draws the
 // advisory `needs-issue-linkage` label with no visible cause (.github#135). The
