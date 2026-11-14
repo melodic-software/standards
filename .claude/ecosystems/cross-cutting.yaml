@@ -1,0 +1,26 @@
+# Repository-wide text checks in this repository. Contract and schema:
+# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
+# Lint-only: /toolchain:lint runs it, /toolchain:check does not. Each tool reads
+# its root config; the intentionally bad fixtures are excluded the way CI's
+# check-repo-hygiene and check-markdown-and-links jobs exclude them. Commands run
+# from the repository root.
+globs: ["**"]
+build-cmd: null
+test-cmd: null
+check-cmd: |
+  typos --exclude 'components/*/fixtures/bad/'
+  gitleaks detect --source . --redact --no-banner --no-git
+  # editorconfig-checker: binary name varies by install method (ec / editorconfig-checker / ec-windows-amd64)
+  "$EC_BIN" -exclude 'components/[^/]+/fixtures/bad/'
+  # lychee-offline: on-disk link and anchor integrity, no network
+  lychee --offline --no-progress --exclude-path 'components/[^/]+/fixtures/bad' './**/*.md'
+fix-cmd: null
+opt-in: "each tool's own config at the repository root (_typos.toml, .gitleaks.toml, .editorconfig-checker.json, lychee.toml)"
+install-hint: |
+  typos: winget install Crate-CI.Typos | brew install typos-cli
+  gitleaks: winget install Gitleaks.Gitleaks | brew install gitleaks
+  editorconfig-checker: winget install EditorConfig-Checker.EditorConfig-Checker | brew install editorconfig-checker
+  lychee: winget install lycheeverse.lychee | brew install lychee
+tool-pin:
+  lychee: "0.24.2"
+notes: "Lint-only: owned by /toolchain:lint."
