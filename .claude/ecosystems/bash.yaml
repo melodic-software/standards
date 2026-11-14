@@ -12,4 +12,4 @@ opt-in: "shellcheck always applies to shell files"
 install-hint: "winget install ShellCheck.ShellCheck mvdan.shfmt | brew install shellcheck shfmt"
 tool-pin:
   shellcheck: "0.11.0"
-notes: "test-cmd is null: CI runs each component's *.test.sh contract suite by name through harness/shell/run-tests.sh, which treats every argument as a test file, so a changed-files command would run non-test scripts as tests. Extensionless shebang scripts (components/cloud-environment/vault-exec and its siblings) match no glob; CI's shellcheck action lints them."
+notes: "test-cmd is null: CI runs each component's *.test.sh contract suite by name through harness/shell/run-tests.sh, which treats every argument as a test file, so a changed-files command would run non-test scripts as tests. Extensionless shebang scripts (components/cloud-environment/vault-exec and its siblings) match no glob."
