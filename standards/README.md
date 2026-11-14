@@ -6,7 +6,7 @@ Three concerns live here:
 
 - **[engineering/](engineering/)**: the standards a contributor follows while writing: philosophy, architecture and design, domain modeling, naming, simplicity, code organization, and the source-of-truth disciplines.
 - **[review/](review/)**: the criteria a reviewer applies to a change: code quality, architecture, error handling, concurrency, performance, security, cross-platform, observability, testing, AI-generated code, and thin per-stack overlays.
-- **[process/](process/)**: the operational standards for how work is tracked and moved: the issue-tracker usage, naming, and governance playbook.
+- **[process/](process/)**: the operational standards for how work is tracked and moved; [process/README.md](process/README.md) lists them.
 
 ## How this is consumed
 

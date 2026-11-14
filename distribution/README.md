@@ -334,10 +334,11 @@ What stays consumer-owned:
   their Pulumi declarations. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob
   but was never one of them; it is the observer key named above and it stays.
 
-The security lane has no path gating from ci-workflows v0.29.0: it reviews every
-non-draft same-repository PR whose actor is not a bot (or is a bot whose sender id the
-caller lists in `allowed-bot-sender-ids`, from ci-workflows v0.40.0), and a target's `.github/claude-security-paths` file is
-no longer read. The manifest never managed that file.
+The security lane has no path gating: it reviews every non-draft
+same-repository PR whose actor is not a bot (or is a bot whose sender id the
+caller lists in `allowed-bot-sender-ids`), and a target's
+`.github/claude-security-paths` file has no effect. The manifest never managed
+that file.
 
 The two callers deliberately carry different concurrency values (per-PR
 cancel on the code-review caller; cancel disabled and

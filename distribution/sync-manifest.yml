@@ -102,12 +102,12 @@ components:
   # below, so one caller serves both visibilities. Then the hosted pair and
   # its destinations retire.
   #
-  # The security lane has no path gating from ci-workflows v0.29.0: it reviews
-  # every non-draft same-repository PR whose actor is not a bot (or is a bot
-  # whose sender id the caller lists in `allowed-bot-sender-ids`, from
-  # ci-workflows v0.40.0), and a target's `.github/claude-security-paths`
-  # file is no longer read. The manifest never synced that file, so a target
-  # removes its copy in a repo-local PR if it wants to.
+  # The security lane has no path gating: it reviews every non-draft
+  # same-repository PR whose actor is not a bot (or is a bot whose sender id
+  # the caller lists in `allowed-bot-sender-ids`), and a target's
+  # `.github/claude-security-paths` file has no effect. The manifest never
+  # synced that file, so a target removes its copy in a repo-local PR if it
+  # wants to.
   #
   # `claude-security-review-caller` is managed for the private targets
   # (their target blocks below). One shared shape for both visibilities is still blocked: both callers pass
