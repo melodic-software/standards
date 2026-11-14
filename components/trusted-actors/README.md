@@ -27,7 +27,7 @@ gh api users/<login> --jq '[.id, .login, .type]'
 URL-encode the brackets of an App bot login (`dependabot%5Bbot%5D`). `kind` is
 `bot` when `type` is `Bot` or when an agent signs in as the account (`cursoragent`
 is a `User` account listed as `bot`), and `human` for a person. A lane that grants
-extra power to listed humans, such as `eval-browser-dispatch`, so excludes agent
+extra power to listed humans, such as `pr-run-plugin-evals`, so excludes agent
 identities.
 
 `github-actions[bot]` is absent on purpose: a canary test posts as that account
