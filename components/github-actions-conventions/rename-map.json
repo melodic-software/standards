@@ -1055,7 +1055,7 @@
     "job_renames": [],
     "couplings": ["OIDC", "PULUMI-GUARD", "RP-repo", "ACTIONLINT", "GOV-TESTS"],
     "confidence": "high",
-    "note": "D1: `name: github-iac-production-deploy-v1` becomes `release-deploy`. Sequence: (1) change the Pulumi Cloud OIDC issuer policy (outside any repo), (2) release ci-workflows `verify-pulumi-deploy-policy` (name hardcoded at guard.sh:104 and contracts/kyle-sexton-github-iac.json:22), (3) repin github-iac. Until the policy changes, deploys fail closed. Also edit RunbookContractTests.cs:1393-1436 and 1497-1547, runner-policy.json keys, actionlint.yaml:12, README and runbooks (`gh workflow run deploy.yml`)"
+    "note": "D1: `name: github-iac-production-deploy-v1` becomes `Release Deploy`, its stem's Title Case form. Sequence: (1) change the Pulumi Cloud OIDC issuer policy (outside any repo), (2) release ci-workflows `verify-pulumi-deploy-policy` (name hardcoded at guard.sh:104 and contracts/kyle-sexton-github-iac.json:22), (3) repin github-iac. Until the policy changes, deploys fail closed. Also edit RunbookContractTests.cs:1393-1436 and 1497-1547, runner-policy.json keys, actionlint.yaml:12, README and runbooks (`gh workflow run deploy.yml`)"
   },
   {
     "repo": "github-iac",
@@ -2078,6 +2078,6 @@
     "job_renames": [],
     "couplings": ["OIDC", "PULUMI-GUARD", "GOV-TESTS"],
     "confidence": "high",
-    "note": "Sequence: (1) the Pulumi Cloud OIDC issuer policy and a second Azure federated credential on the deploy identity trust the new subject (job_workflow_ref with the new path) beside the old one, outside any repo, (2) ci-workflows verify-pulumi-deploy-policy's contract accepts the new path and workflow name and is released, (3) azure-iac renames the file, repins and updates WorkflowContractTests.cs, scripts/operator/broker-prerequisites.sh and the runbook, (4) one preview deploy proves the new identity, (5) the old subject is removed. Until (1), deploys fail closed"
+    "note": "Sequence: (1) the Pulumi Cloud OIDC issuer policy and a second Azure federated credential on the deploy identity trust the new subject (job_workflow_ref with the new path) beside the old one, outside any repo, (2) ci-workflows verify-pulumi-deploy-policy's contract accepts the new path and the workflow name `Release Deploy` and is released, (3) azure-iac renames the file, repins and updates WorkflowContractTests.cs, scripts/operator/broker-prerequisites.sh and the runbook, (4) one preview deploy proves the new identity, (5) the old subject is removed. Until (1), deploys fail closed"
   }
 ]
