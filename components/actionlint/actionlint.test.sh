@@ -15,6 +15,12 @@ if ! command -v actionlint >/dev/null 2>&1; then
 fi
 # The `paths` config key shipped in actionlint 1.7.4; older engines reject it.
 require_min_version actionlint "$(actionlint -version | awk 'NR == 1 { print $NF }')" 1.7.4
+# The kjanat fork accepts `$/`, `concurrency.queue`, job `cache-mode` and the
+# `issues` field activity types natively, so their four controls below run only
+# on upstream actionlint. Their ignores stay while a consumer still lints with
+# upstream; drop an ignore and its control once none does.
+upstream_engine=true
+[[ "$(actionlint -version | head -n 1)" == *kjanat* ]] && upstream_engine=false
 
 # actionlint resolves the config and workflows from the project root, so the
 # fixtures run inside a scratch repo mirroring a consumer checkout.
@@ -82,10 +88,12 @@ cp components/actionlint/fixtures/bad/missing-ref.yml "$project/.github/workflow
 # patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/missing-ref.yml"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
-rc=$?
-assert_nonzero 'a $/ reference fails without the config (removal tripwire)' "$rc"
-assert_contains 'control run reports the $/ reference' "$out" 'specifying action "$/.github/actions/typos"'
+if [[ $upstream_engine == true ]]; then
+  out="$(cd "$project" && actionlint -no-color 2>&1)"
+  rc=$?
+  assert_nonzero 'a $/ reference fails without the config (removal tripwire)' "$rc"
+  assert_contains 'control run reports the $/ reference' "$out" 'specifying action "$/.github/actions/typos"'
+fi
 
 # `concurrency.queue`: the scoped ignore admits it, and only its exact message.
 queue_message='unexpected key "queue" for "concurrency" section'
@@ -109,10 +117,12 @@ assert_not_contains 'the queue suppression stays scoped to its exact message' "$
 # instead of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-key.yml"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
-rc=$?
-assert_nonzero 'a concurrency.queue workflow fails without the config (removal tripwire)' "$rc"
-assert_contains 'control run reports the queue message' "$out" "$queue_message"
+if [[ $upstream_engine == true ]]; then
+  out="$(cd "$project" && actionlint -no-color 2>&1)"
+  rc=$?
+  assert_nonzero 'a concurrency.queue workflow fails without the config (removal tripwire)' "$rc"
+  assert_contains 'control run reports the queue message' "$out" "$queue_message"
+fi
 
 # Job-level `cache-mode`: the scoped ignore admits it, and only its exact message.
 cache_mode_message='unexpected key "cache-mode" for "job" section'
@@ -136,10 +146,12 @@ assert_not_contains 'the cache-mode suppression stays scoped to its exact messag
 # instead of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-key.yml"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
-rc=$?
-assert_nonzero 'a job cache-mode workflow fails without the config (removal tripwire)' "$rc"
-assert_contains 'control run reports the cache-mode message' "$out" "$cache_mode_message"
+if [[ $upstream_engine == true ]]; then
+  out="$(cd "$project" && actionlint -no-color 2>&1)"
+  rc=$?
+  assert_nonzero 'a job cache-mode workflow fails without the config (removal tripwire)' "$rc"
+  assert_contains 'control run reports the cache-mode message' "$out" "$cache_mode_message"
+fi
 
 # `issues` `field_added`: the scoped ignore admits it, and only its exact message.
 field_added_message='invalid activity type "field_added" for "issues" Webhook event'
@@ -165,10 +177,12 @@ assert_not_contains 'the field_removed suppression stays scoped to its exact mes
 # instead of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-issues-type.yml"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
-rc=$?
-assert_nonzero 'an issues field_added workflow fails without the config (removal tripwire)' "$rc"
-assert_contains 'control run reports the field_added message' "$out" "$field_added_message"
-assert_contains 'control run reports the field_removed message' "$out" "$field_removed_message"
+if [[ $upstream_engine == true ]]; then
+  out="$(cd "$project" && actionlint -no-color 2>&1)"
+  rc=$?
+  assert_nonzero 'an issues field_added workflow fails without the config (removal tripwire)' "$rc"
+  assert_contains 'control run reports the field_added message' "$out" "$field_added_message"
+  assert_contains 'control run reports the field_removed message' "$out" "$field_removed_message"
+fi
 
 [[ $FAILED -eq 0 ]] || exit 1
