@@ -155,7 +155,8 @@ matching ecosystem; the analyzer already accepts a narrow exclude and
 rejects a match-all one. The fast track removes the soak only. The merge
 tiers below still apply: a fast-tracked update merges at the auto tier only
 when it is non-major, a major still goes to review, and a `reviewOnly` entry
-still routes to review.
+still routes to review. Below 1.0, non-major is wider for an `own` release:
+see the [auto tier](#merge-tiers-for-dependabot-pull-requests).
 
 These safeguards remain on a fast-tracked update:
 
@@ -176,7 +177,14 @@ tiers, and automated lanes merge both; the publisher tiers are data in the
 
 - **Auto tier.** Every update in the pull request is non-major: the first
   numeric version component does not change, and below 1.0 the second does
-  not either. Every update is in an `autoMerge.ecosystems` ecosystem
+  not either. The organization's own releases (`fastTrack.own`) are exempt
+  from the below-1.0 rule (owner decision, 2026-11-15): below 1.0, an `own`
+  update is non-major when only the second or third component changes, and a
+  change of the first still goes to review. Every repository already calls
+  ci-workflows' reusable workflows at `@main` with no pin, so a ci-workflows
+  release already reaches every repository unreviewed; holding its action
+  pins back would add a hand step and no protection.
+  Every update is in an `autoMerge.ecosystems` ecosystem
   (`github-actions`, `npm`, `pip`, `uv`, `nuget`, spelled as in
   `dependabot.yml`; the auto-merge workflow checks fetch-metadata's
   `npm_and_yarn` for npm).
