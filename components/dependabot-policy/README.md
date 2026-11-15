@@ -28,9 +28,10 @@ node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
 
 The `dependabot-policy` sync component ships `policy.json` alone to that
 path, for a target whose Dependabot merge classifiers read it at the base
-(claude-code-plugins reads `autoMerge.reviewOnly`), or whose
+(claude-code-plugins reads `autoMerge.reviewOnly`), whose
 ci-workflows `bump-versions` run takes its `cooldownDays` (dotfiles,
-provisioning). Its admission evidence is
+provisioning), or whose `pr-automerge-dependabot.yml` caller takes its
+allowlist and `fastTrack` globs from it. Its admission evidence is
 [below](#sync-component-admission-evidence).
 
 ## Sync component admission evidence
@@ -51,6 +52,14 @@ was retired with no targets in #430 and is not reintroduced.
   `.github/actions/bump-versions`, whose `bump.py` (`load_policy`,
   `synced_cooldown_days`) reads `cooldownDays` from this copy when the repo's
   `.github/version-bump/policy.yaml` sets none, and stops when both are absent.
+- **Live consumer**: every target that calls ci-workflows'
+  `pr-automerge-dependabot.yml` at its default `publisher-allowlist`. With the
+  copy at the base, the reusable's allowlist is the copy's `tier: auto`
+  publishers plus its `fastTrack` `github-actions` and `own` globs, and a
+  below-1.0 minor bump of an `own` dependency arms auto-merge; with no copy the
+  input is the allowlist and no own release is armed (the reusable's header
+  comment). provisioning's first own bump merged this way
+  (melodic-software/provisioning#1031).
 - **Owner and outcome**: owned by the `standards` maintainers. Problem: a
   hijacked non-major release of a dependency that runs in a job holding a
   secret merges at tier `auto` with no review. Acceptance: once the sync PR
