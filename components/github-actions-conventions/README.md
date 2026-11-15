@@ -167,13 +167,11 @@ what it does. The Apps in use are listed under `apps` in `vocabulary.json`.
 ## Exemptions
 
 The complete list is `exemptions` in `vocabulary.json`, each entry with its
-reason. Two kinds stand:
+reason. None stands today. Two kinds are possible:
 
-- **OIDC trust inputs.** github-iac's `release-deploy.yml` keeps the `name:`
-  `release-deploy`, which the Pulumi issuer policy trusts, and its negative
-  test `release-deploy-oidc-negative-test.yml` keeps `release-deployx`, one
-  character more, which that policy must reject. Only those exact values pass:
-  neither the stem's Title Case form nor anything else does.
+- **A recorded name.** A `workflow-name` exemption carries an `expectedName`,
+  and only that exact value passes: neither the stem's Title Case form nor
+  anything else does.
 - **Pending renames.** A `workflow-filename` exemption lets a repository run
   the lint enforcing before a file it cannot rename yet is renamed; the
   entry's reason links the issue whose rename removes it, and every other rule

@@ -184,7 +184,17 @@ test("annotations escape the characters the workflow command syntax reserves", (
   );
 });
 
-test("the OIDC negative-test name exception applies only in github-iac", async () => {
+// The vocabulary holds no exemption today; these tests exercise the mechanism.
+const NAME_EXEMPTION = {
+  path: ".github/workflows/release-deploy-oidc-negative-test.yml",
+  repository: "melodic-software/github-iac",
+  rules: ["workflow-name"],
+  expectedName: "release-deployx",
+  reason: "Test fixture: a recorded workflow-name exception.",
+};
+const exempting = { ...vocabulary, exemptions: [NAME_EXEMPTION] };
+
+test("a recorded workflow-name exception applies only in its repository", async () => {
   const root = await repository({
     workflows: {
       "release-deploy-oidc-negative-test.yml": workflow({ raw: "release-deployx" }, ["test"]),
@@ -193,7 +203,7 @@ test("the OIDC negative-test name exception applies only in github-iac", async (
   assert.deepEqual(
     await lintRepository({
       root,
-      vocabulary,
+      vocabulary: exempting,
       mode: "enforcing",
       repository: "melodic-software/github-iac",
     }),
@@ -201,7 +211,7 @@ test("the OIDC negative-test name exception applies only in github-iac", async (
   );
   const elsewhere = await lintRepository({
     root,
-    vocabulary,
+    vocabulary: exempting,
     mode: "enforcing",
     repository: "melodic-software/medley",
   });
@@ -223,7 +233,7 @@ test("the recorded exception is exact: neither the stem nor a Title Case form pa
     });
     const findings = await lintRepository({
       root,
-      vocabulary,
+      vocabulary: exempting,
       mode: "enforcing",
       repository: "melodic-software/github-iac",
     });
@@ -499,7 +509,8 @@ test("the vocabulary loader rejects cross-field drift the schema cannot express"
   assert.throws(() => validateVocabulary(nounFunction), /accepted verb/u);
 
   const nameWithoutValue = clone();
-  delete nameWithoutValue.exemptions.find((e) => e.rules.includes("workflow-name")).expectedName;
+  const { expectedName: _dropped, ...withoutValue } = NAME_EXEMPTION;
+  nameWithoutValue.exemptions.push(withoutValue);
   assert.throws(() => validateVocabulary(nameWithoutValue), /expectedName/u);
 
   const badShape = clone();
