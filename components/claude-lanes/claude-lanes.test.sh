@@ -21,7 +21,7 @@ if ! command -v actionlint >/dev/null 2>&1; then
   skip_suite 'actionlint not installed'
 fi
 # The `paths` config key shipped in actionlint 1.7.4; older engines reject it.
-require_min_version actionlint "$(actionlint -version | head -n 1)" 1.7.4
+require_min_version actionlint "$(actionlint -version | awk 'NR == 1 { print $NF }')" 1.7.4
 
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
