@@ -181,7 +181,9 @@ components:
   # merge classifiers (claude-code-plugins sends every update to a dependency
   # its `autoMerge.reviewOnly` lists to the review tier) and by ci-workflows'
   # bump-versions action, which takes its cooldownDays when the target's
-  # version-bump policy sets none (dotfiles, provisioning).
+  # version-bump policy sets none (dotfiles, provisioning), and by ci-workflows'
+  # pr-automerge-dependabot.yml reusable, which arms the organization's own
+  # releases only when the base holds this copy.
   dependabot-policy:
     files:
       components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
