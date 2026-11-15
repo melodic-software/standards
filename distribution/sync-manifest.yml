@@ -181,7 +181,9 @@ components:
   # merge classifiers (claude-code-plugins sends every update to a dependency
   # its `autoMerge.reviewOnly` lists to the review tier) and by ci-workflows'
   # bump-versions action, which takes its cooldownDays when the target's
-  # version-bump policy sets none (dotfiles, provisioning).
+  # version-bump policy sets none (dotfiles, provisioning), and by ci-workflows'
+  # pr-automerge-dependabot.yml reusable, which arms the organization's own
+  # releases only when the base holds this copy.
   dependabot-policy:
     files:
       components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
@@ -487,6 +489,7 @@ targets:
       - claude-review-caller
       - claude-security-review-caller
       - commit-convention
+      - dependabot-policy
       - lychee
       - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
@@ -501,6 +504,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -519,6 +523,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -589,6 +594,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - dotnet-analysis
       - editorconfig-checker
       - engineering-standards
@@ -701,6 +707,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - gitleaks
       - lefthook-base
@@ -734,6 +741,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - gitleaks
@@ -750,6 +758,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - gitleaks
       - lychee
@@ -802,6 +811,7 @@ targets:
       - claude-settings-github-iac
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - dotnet-analysis
       - editorconfig-checker
       - engineering-standards
@@ -841,6 +851,7 @@ targets:
       # wrapper.
       - comment-hygiene-tools
       - commit-convention
+      - dependabot-policy
       - engineering-standards
       - lychee
       - managed-files-guard-fleet-caller
