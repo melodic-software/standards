@@ -109,7 +109,8 @@ was retired with no targets in #430 and is not reintroduced.
 and tool updates: Dependabot, and the version-bump tooling that pins tools
 outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
-- schedule on the standard interval (`weekly`);
+- schedule on an interval its ecosystem accepts: `daily` or `weekly` for
+  `github-actions`, `weekly` for every other ecosystem;
 - set `cooldown.default-days` to at least the minimum (`3`), so a compromised or
   yanked release is caught before adoption while security updates still bypass
   the soak;
@@ -117,6 +118,15 @@ outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
   request instead of one per dependency;
 - keep `open-pull-requests-limit` at or below the maximum (`5`); an omitted
   limit is accepted because GitHub's default is already the maximum.
+
+`scheduleInterval` is the standard interval; `scheduleIntervalByEcosystem`
+lists the `accepted` intervals for an ecosystem that differs, with the date
+it was `reviewed` and its `basis`. The `github-actions` entry may check daily
+(owner decision, 2026-11-16) because this organization's own releases reach
+each repository as pin bumps in that entry, and a weekly check leaves
+repositories on different releases for days. Vendor actions keep their
+cooldown and grouping, and `open-pull-requests-limit` still caps the entry,
+so a daily check adds the organization's own bumps, not a burst.
 
 ### Cooldown by change class
 
@@ -284,7 +294,8 @@ matches or names the differing lists.
 Per `updates` entry, keyed by `<package-ecosystem>:<directory>` (the plural
 `directories` list is joined, so a multi-root entry has one key):
 
-- `schedule-not-standard`: `schedule.interval` is not the standard interval.
+- `schedule-not-standard`: `schedule.interval` is not an interval the entry's
+  ecosystem accepts; the finding names the accepted values.
 - `cooldown-below-minimum`: `cooldown.default-days`, or any `semver-*-days`
   override, is missing or below the minimum.
 - `cooldown-soak-bypassed`: a match-all `cooldown.exclude` (`"*"`) or a
