@@ -180,9 +180,13 @@ succeed.
 Every real sync derives the expected access set from the complete, unfiltered
 manifest. Before any target-specific write token, checkout, materialization, or
 pull-request mutation, it verifies the expected active organization App
-installation is in selected-repository mode and requires two consecutive,
-fully paginated snapshots to equal that set exactly. Missing, excess, malformed,
-or changing access fails the whole run. The optional `targets` input limits
+installation is in selected-repository mode and compares two consecutive, fully
+paginated snapshots of its repository access with that set. Malformed or changing
+access, or a selected trust root, fails the whole run; a missing target fails
+only its own sync job; any other excess repository is reported as an over-grant
+warning. `standards` itself, the sync source, is expected access and is not
+reported: its re-pin job (`.github/workflows/maintenance-repin-ci-workflows.yml`)
+opens pull requests as this App. The optional `targets` input limits
 reconciliation only; it never narrows access attestation.
 
 Adding, removing, transferring, or renaming a manifest target therefore
