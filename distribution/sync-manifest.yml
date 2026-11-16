@@ -64,8 +64,8 @@ components:
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
   #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
-  # - knowledge-corpus, songwriting: not sync targets (the Phase 4 note near
-  #   `targets:` records why), so neither can take these components.
+  # - knowledge-corpus, songwriting: sync targets for `dependabot-policy` and
+  #   the fleet-routed guard only (the Phase 4 note near `targets:`), so neither takes these components.
   #   songwriting carries repo-local copies of the fleet callers by owner
   #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
   #   longer holds. knowledge-corpus stays DEFERRED by owner decision
@@ -287,8 +287,8 @@ components:
   # non-targets:
   # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
   #   code or authored docs, and no lychee lane.
-  # - songwriting (github-iac ADR-0006), azure-iac (a trust root the sync App
-  #   must not write to), architecture and knowledge-corpus (not sync targets)
+  # - azure-iac (a trust root the sync App must not write to), and songwriting,
+  #   architecture and knowledge-corpus (targets for `dependabot-policy` and the guard only)
   #   run the offline lane with no copy of this file: the ci-workflows
   #   lychee-offline composite falls back to the canonical copy ci-workflows
   #   carries as a target here when the caller has none. knowledge-corpus
@@ -517,6 +517,12 @@ targets:
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
+  # Takes the Dependabot policy copy, which the auto-merge lane reads to arm
+  # the organization's own releases, and the fleet-routed guard every target carries.
+  melodic-software/architecture:
+    managed:
+      - dependabot-policy
+      - managed-files-guard-fleet-caller
   melodic-software/ci-runner:
     managed:
       - claude-review-hosted-caller
@@ -679,10 +685,10 @@ targets:
   # selected-repo grant covers them as of 2026-08-19 (grant-first per the
   # plan's exact-set attestation constraint). Deliberate NON-adoptions, per
   # the same locked plan:
-  # - knowledge-corpus: deferred from the sync-target ROSTER — structural LFS
+  # - knowledge-corpus: takes `dependabot-policy` and the fleet-routed guard only (owner decision 2026-11-15); the hygiene set stays deferred: structural LFS
   #   blocker recorded; no extend mechanism exists. The separate review-LANE
   #   question is answered at the claude-review caller comment above.
-  # - songwriting: dropped outright (github-iac ADR-0006); its two drifted
+  # - songwriting: takes `dependabot-policy` and the fleet-routed guard only (owner decision 2026-11-15); the hygiene set stays out (github-iac ADR-0006); its two drifted
   #   files were hand-fixed once (plan Phase 0.6), not adopted.
   # - claude-lane-sandbox: a disposable lane-testing sandbox, not a
   #   convergence target — sync PRs there are churn against throwaway state.
@@ -831,6 +837,11 @@ targets:
       - zizmor
     locally-owned:
       - actionlint
+  # The Dependabot policy copy and the fleet-routed guard, as for architecture.
+  melodic-software/knowledge-corpus:
+    managed:
+      - dependabot-policy
+      - managed-files-guard-fleet-caller
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -962,3 +973,8 @@ targets:
       - shellcheck
       - typos
       - zizmor
+  # The Dependabot policy copy and the fleet-routed guard, as for architecture.
+  melodic-software/songwriting:
+    managed:
+      - dependabot-policy
+      - managed-files-guard-fleet-caller
