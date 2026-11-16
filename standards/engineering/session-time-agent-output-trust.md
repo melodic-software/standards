@@ -89,6 +89,9 @@ instead of re-verifiable:
 - For anything executed, the record required by
   [`deterministic-work-execution.md#make-the-execution-honest`](deterministic-work-execution.md#make-the-execution-honest).
 - For any external fact, the source and its rung.
+- For a claim relayed from a subagent or peer, the cited line, read by the
+  relayer. Without that, the claim is labeled `UNVERIFIED` or left out, and
+  says no more than its source shows.
 - An explicit statement of what was *not* verified. This is the load-bearing
   item: a reader can act on a bounded claim, but cannot act safely on a claim
   whose boundary is unstated.
