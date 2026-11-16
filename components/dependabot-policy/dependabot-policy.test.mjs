@@ -98,7 +98,7 @@ test("multiple conformant entries including the directories plural form pass", a
       - /.github/actions/*
     open-pull-requests-limit: 5
     schedule:
-      interval: weekly
+      interval: daily
     cooldown:
       default-days: 3
     groups:
@@ -649,6 +649,15 @@ test("a github-actions interval outside its accepted list names the accepted val
     findings[0].message,
     'schedule.interval must be one of ["daily","weekly"] for github-actions, found "monthly"',
   );
+});
+
+test("an override that accepts one interval rejects the standard interval for that ecosystem", async () => {
+  const policy = dailyActionsPolicy();
+  policy.scheduleIntervalByEcosystem["github-actions"].accepted = ["daily"];
+  assert.deepEqual(await auditWithPolicy(policy, actionsEntry("daily")), []);
+  const findings = await auditWithPolicy(policy, actionsEntry("weekly"));
+  assert.deepEqual(rules(findings), ["github-actions:/:schedule-not-standard"]);
+  assert.equal(findings[0].message, 'schedule.interval must be "daily", found "weekly"');
 });
 
 test("an ecosystem with no interval override still accepts only the standard interval", async () => {

@@ -109,7 +109,7 @@ was retired with no targets in #430 and is not reintroduced.
 and tool updates: Dependabot, and the version-bump tooling that pins tools
 outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
-- schedule on an interval its ecosystem accepts: `daily` or `weekly` for
+- schedule on the interval its ecosystem accepts: `daily` for
   `github-actions`, `weekly` for every other ecosystem;
 - set `cooldown.default-days` to at least the minimum (`3`), so a compromised or
   yanked release is caught before adoption while security updates still bypass
@@ -121,7 +121,7 @@ outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
 `scheduleInterval` is the standard interval; `scheduleIntervalByEcosystem`
 lists the `accepted` intervals for an ecosystem that differs, with the date
-it was `reviewed` and its `basis`. The `github-actions` entry may check daily
+it was `reviewed` and its `basis`. The `github-actions` entry checks daily
 (owner decision, 2026-11-16) because this organization's own releases reach
 each repository as pin bumps in that entry, and a weekly check leaves
 repositories on different releases for days. Vendor actions keep their
