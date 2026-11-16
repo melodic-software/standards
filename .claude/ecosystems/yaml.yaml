@@ -14,6 +14,9 @@ check-cmd: |
 fix-cmd: null
 opt-in: "GitHub Actions workflows present"
 install-hint: |
-  actionlint: winget install rhysd.actionlint | brew install actionlint
-  zizmor: pip install zizmor
-notes: "Lint-only: owned by /toolchain:lint. CI's pr-audit-workflows job also audits the workflow files components/claude-lanes, components/claude-lanes-hosted and components/managed-files-guard ship to consumers; they sit outside .github and this record's globs."
+  actionlint: the kjanat/actionlint fork, v1.17.0 from https://github.com/kjanat/actionlint/releases (CI's actionlint composite installs it and verifies the linux_amd64 archive by SHA-256 620abd485a12b6ab1125b844a876414e1d5bd2af8a3125b27f82b01d0d9d6e5a; rhysd/actionlint 1.7.12 rejects $/ action references and concurrency.queue)
+  zizmor: uv tool install zizmor==1.30.0
+tool-pin:
+  actionlint: "1.17.0"
+  zizmor: "1.30.0"
+notes: "Lint-only: owned by /toolchain:lint. The actionlint pin is the kjanat/actionlint fork CI's check-github-actions job installs through the ci-workflows actionlint composite at the commit pr-require-checks.yml pins (actionlint/action.yml version and sha256 defaults); its version numbers overlap upstream's, so rhysd/actionlint on PATH reports a different version and can fail where CI passes. The zizmor pin is the version default of ci-workflows' pr-audit-workflows.yml, which CI's pr-audit-workflows job calls at @main with the regular persona and fail-on-severity low, so any finding blocks, as zizmor's own non-zero exit does here. --offline is narrower than CI, which runs the online audits with the workflow token: a local run spends no GitHub API calls. CI's pr-audit-workflows job also audits the workflow files components/claude-lanes, components/claude-lanes-hosted and components/managed-files-guard ship to consumers; they sit outside .github and this record's globs."
