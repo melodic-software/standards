@@ -10,8 +10,10 @@ name: Maintenance Repin CI Workflows
 # release tag -> action re-pin -> standards-sync cascade. This job automates
 # the middle hop; `maintenance-sync-standards.yml` carries it the rest of the way.
 #
-# It only ever proposes: the pull request it opens is reviewed and merged by a
-# human like any other, and nothing here arms auto-merge.
+# The pull request it opens arms auto-merge, as the sync pull requests it
+# cascades into do (distribution/README.md, `automerge`): GitHub merges it once
+# every required check, `CI Status` included, passes. Nothing here calls a
+# merge mutation, so it cannot bypass the required check.
 on:
   workflow_dispatch:
   schedule:
@@ -157,10 +159,9 @@ jobs:
       # Fixed branch plus fixed title: the action creates the pull request on
       # the first run and updates that same one on every later run, so a lane
       # left un-merged across several releases accumulates into one review
-      # rather than a queue of them. Auto-merge is never armed — the cascade
-      # this feeds rewrites four consumers' workflow files, which is a human
-      # review gate by design.
+      # rather than a queue of them.
       - name: Open or update the re-pin pull request
+        id: pull-request
         if: steps.repin.outputs.changed == 'true' && env.HAS_APP_CREDENTIAL == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
@@ -203,8 +204,9 @@ jobs:
 
             Merging this cascades: `maintenance-sync-standards.yml` re-materializes
             each changed caller component into every target
-            `distribution/sync-manifest.yml` manages it for, as a reviewed pull
-            request per target. This pull request is never auto-merged.
+            `distribution/sync-manifest.yml` manages it for, as a pull request
+            per target. This pull request arms auto-merge and merges once
+            `CI Status` passes, as those do.
 
             ## Verification
 
@@ -218,3 +220,13 @@ jobs:
 
             - Upstream release:
               https://github.com/melodic-software/ci-workflows/releases/tag/${{ steps.release.outputs.tag }}
+
+      # Arming never merges: GitHub merges once every required check passes.
+      # Re-run on every update, so a pull request left open across releases
+      # stays armed. A pull request whose checks already passed merges here.
+      - name: Arm auto-merge on the re-pin pull request
+        if: steps.pull-request.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.pull-request-number }}
+        run: gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --auto --squash
