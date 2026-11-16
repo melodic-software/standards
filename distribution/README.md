@@ -376,7 +376,7 @@ cursor-plugins.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
-knowledge-corpus and songwriting are not sync targets. songwriting carries
+knowledge-corpus and songwriting are sync targets for `dependabot-policy` and the fleet-routed guard only, so they take neither caller. songwriting carries
 repo-local copies of the fleet callers; knowledge-corpus's lane stays deferred
 over its prompt-injection surface (see the lane comment in
 `sync-manifest.yml`).
