@@ -469,6 +469,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-policy
       - editorconfig-checker
       - engineering-standards
       - gitleaks
