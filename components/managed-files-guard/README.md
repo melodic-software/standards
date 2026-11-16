@@ -128,7 +128,7 @@ a full SHA; only reusable workflows may float on `main`. The pin advances
 through `.github/workflows/maintenance-repin-ci-workflows.yml` (daily), which
 resolves the newest full-SemVer ci-workflows release and, when that release
 changed the action, rewrites the pin in both files to its SHA with a
-`# vX.Y.Z` comment in one reviewed, never auto-merged pull request; the sync
+`# vX.Y.Z` comment in one pull request that merges once `CI Status` passes; the sync
 then fans it out. A pin to a commit the release does not contain (the
 `# <short-sha> <date>` form) is left alone until a release contains it, so the
 job never moves a pin backwards. It moves action pins only, never a

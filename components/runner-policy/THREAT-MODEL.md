@@ -111,8 +111,11 @@ not duplicate those changing inventories.
   first-party reusable workflows.
 - First-party composite actions a caller names directly stay pinned to a full
   SHA (org policy). `maintenance-repin-ci-workflows` moves those pins to each
-  new ci-workflows release that changes the action, through a reviewed pull
-  request that is never auto-merged; it never moves a reusable-workflow ref.
+  new ci-workflows release that changes the action, through a pull request
+  the review lanes read and that merges once `CI Status` passes (owner
+  decision, 2026-11-15: a hold on the organization's own pin moves is a
+  workflow gate, not a security control); it never moves a reusable-workflow
+  ref.
 - `approvedShas` is migration-only: it keeps callers pinned to a previously
   approved SHA passing while they move to `@main`, and each path's list is
   deleted once no consumer pins that path to a SHA. An approved SHA is judged
