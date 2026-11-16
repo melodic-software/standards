@@ -10,7 +10,7 @@ test-cmd: null
 check-cmd: |
   rc=0
   typos --exclude 'components/*/fixtures/bad/' || rc=1
-  gitleaks detect --source . --redact --no-banner --no-git || rc=1
+  gitleaks dir . --config .gitleaks.toml --no-banner --redact || rc=1
   # editorconfig-checker: binary name varies by install method (ec / editorconfig-checker / ec-windows-amd64)
   if [ -n "$EC_BIN" ]; then "$EC_BIN" -exclude 'components/[^/]+/fixtures/bad/' || rc=1; else echo 'editorconfig-checker: no binary resolved (EC_BIN is empty)' >&2; rc=1; fi
   # lychee-offline: on-disk link and anchor integrity, no network
@@ -19,10 +19,13 @@ check-cmd: |
 fix-cmd: null
 opt-in: "each tool's own config at the repository root (_typos.toml, .gitleaks.toml, .editorconfig-checker.json, lychee.toml)"
 install-hint: |
-  typos: winget install Crate-CI.Typos | brew install typos-cli
-  gitleaks: winget install Gitleaks.Gitleaks | brew install gitleaks
-  editorconfig-checker: winget install EditorConfig-Checker.EditorConfig-Checker | brew install editorconfig-checker
-  lychee: winget install lycheeverse.lychee | brew install lychee
+  typos 1.50.3: winget install Crate-CI.Typos | brew install typos-cli
+  gitleaks 8.30.1: winget install Gitleaks.Gitleaks | brew install gitleaks
+  editorconfig-checker 4.0.2: winget install EditorConfig-Checker.EditorConfig-Checker | brew install editorconfig-checker
+  lychee 0.24.2: winget install lycheeverse.lychee | brew install lychee
 tool-pin:
+  typos: "1.50.3"
+  gitleaks: "8.30.1"
+  editorconfig-checker: "4.0.2"
   lychee: "0.24.2"
-notes: "Lint-only: owned by /toolchain:lint."
+notes: "Lint-only: owned by /toolchain:lint. The typos, gitleaks and editorconfig-checker pins are the version input defaults of the ci-workflows composites CI's check-repo-hygiene job calls at the commit pr-require-checks.yml pins (typos/action.yml, gitleaks/action.yml, editorconfig-checker/action.yml); lychee is the job's inline install. gitleaks runs as the composite does with CI's inputs: scan-mode dir, path '.', config .gitleaks.toml, then --no-banner --redact (gitleaks/action.yml defaults, gitleaks/scan.sh args). gitleaks dir scans every file on disk under the repository root, tracked, untracked or git-ignored, and not git history. When a first-party bump moves those pins, compare tool-pin with the composites' defaults."
