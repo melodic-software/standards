@@ -517,6 +517,11 @@ targets:
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
+  # Takes only the Dependabot policy copy, which the auto-merge lane reads to
+  # arm the organization's own releases (see `dependabot-policy` above).
+  melodic-software/architecture:
+    managed:
+      - dependabot-policy
   melodic-software/ci-runner:
     managed:
       - claude-review-hosted-caller
@@ -831,6 +836,10 @@ targets:
       - zizmor
     locally-owned:
       - actionlint
+  # Dependabot policy copy only, as for architecture.
+  melodic-software/knowledge-corpus:
+    managed:
+      - dependabot-policy
   melodic-software/medley:
     managed:
       - architecture-decisions
@@ -962,3 +971,7 @@ targets:
       - shellcheck
       - typos
       - zizmor
+  # Dependabot policy copy only, as for architecture.
+  melodic-software/songwriting:
+    managed:
+      - dependabot-policy
