@@ -582,8 +582,8 @@ function minimalPolicy() {
   };
 }
 
-async function auditWithPolicy(policy) {
-  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
+async function auditWithPolicy(policy, entries = CONFORMANT) {
+  const root = await repository({ dependabotYaml: dependabot(entries) });
   const policyPath = path.join(root, "policy.json");
   await writeFile(policyPath, JSON.stringify(policy));
   return auditRepository({ root, policyPath });
@@ -604,6 +604,107 @@ test("the shipped policy records the owner's cooldown classes and fast track", a
 
 test("a v2 policy with the update classes validates and audits clean", async () => {
   assert.deepEqual(await auditWithPolicy(minimalPolicy()), []);
+});
+
+const ACTIONS_ENTRY = `  - package-ecosystem: github-actions
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+`;
+
+function actionsEntry(interval) {
+  return ACTIONS_ENTRY.replace("interval: weekly", `interval: ${interval}`);
+}
+
+function dailyActionsPolicy() {
+  return {
+    ...minimalPolicy(),
+    scheduleIntervalByEcosystem: {
+      "github-actions": { accepted: ["daily", "weekly"], reviewed: "2026-11-16", basis: "test" },
+    },
+  };
+}
+
+test("a github-actions entry may schedule daily or weekly when its ecosystem accepts both", async () => {
+  for (const interval of ["daily", "weekly"]) {
+    assert.deepEqual(
+      await auditWithPolicy(dailyActionsPolicy(), actionsEntry(interval)),
+      [],
+      `github-actions ${interval} must pass`,
+    );
+  }
+});
+
+test("a github-actions interval outside its accepted list names the accepted values", async () => {
+  const findings = await auditWithPolicy(dailyActionsPolicy(), actionsEntry("monthly"));
+  assert.deepEqual(rules(findings), ["github-actions:/:schedule-not-standard"]);
+  assert.equal(
+    findings[0].message,
+    'schedule.interval must be one of ["daily","weekly"] for github-actions, found "monthly"',
+  );
+});
+
+test("an ecosystem with no interval override still accepts only the standard interval", async () => {
+  const findings = await auditWithPolicy(
+    dailyActionsPolicy(),
+    CONFORMANT.replace("interval: weekly", "interval: daily"),
+  );
+  assert.deepEqual(rules(findings), ["npm:/:schedule-not-standard"]);
+  assert.equal(findings[0].message, 'schedule.interval must be "weekly", found "daily"');
+});
+
+test("a policy with no interval overrides holds github-actions to the standard interval", async () => {
+  assert.deepEqual(await auditWithPolicy(minimalPolicy(), actionsEntry("weekly")), []);
+  const findings = await auditWithPolicy(minimalPolicy(), actionsEntry("daily"));
+  assert.deepEqual(rules(findings), ["github-actions:/:schedule-not-standard"]);
+  assert.equal(findings[0].message, 'schedule.interval must be "weekly", found "daily"');
+});
+
+test("a schedule waiver on an entry its accepted intervals already cover is drift", async () => {
+  const root = await repository({
+    dependabotYaml: dependabot(actionsEntry("daily")),
+    config: {
+      schemaVersion: 1,
+      exceptions: {
+        "github-actions:/": {
+          reason: "tracks-upstream-release",
+          justification: "Daily is already accepted for this ecosystem.",
+          waives: ["schedule"],
+        },
+      },
+    },
+  });
+  const policyPath = path.join(root, "policy.json");
+  await writeFile(policyPath, JSON.stringify(dailyActionsPolicy()));
+  assert.deepEqual(rules(await auditRepository({ root, policyPath })), [
+    "github-actions:/:exception-inventory-drift",
+  ]);
+});
+
+test("a malformed interval override fails closed", async () => {
+  const cases = [
+    ["unknown interval", (override) => (override.accepted = ["hourly"])],
+    ["empty accepted list", (override) => (override.accepted = [])],
+    ["duplicate interval", (override) => (override.accepted = ["daily", "daily"])],
+    ["missing basis", (override) => delete override.basis],
+    ["unknown key", (override) => (override.extra = true)],
+  ];
+  for (const [name, mutate] of cases) {
+    const policy = dailyActionsPolicy();
+    mutate(policy.scheduleIntervalByEcosystem["github-actions"]);
+    await assert.rejects(
+      auditWithPolicy(policy),
+      (error) => error instanceof ConfigurationError,
+      `${name} must be rejected`,
+    );
+  }
 });
 
 test("a floor that differs from the patch class fails closed", async () => {

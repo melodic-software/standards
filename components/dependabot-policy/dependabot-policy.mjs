@@ -152,16 +152,31 @@ function entryKey(entry) {
   return `${prefix}:?`;
 }
 
+// The intervals an ecosystem's entries may schedule on: its
+// scheduleIntervalByEcosystem list, else the one standard interval.
+function acceptedIntervals(policy, ecosystem) {
+  const overrides = policy.scheduleIntervalByEcosystem ?? {};
+  return Object.hasOwn(overrides, ecosystem)
+    ? overrides[ecosystem].accepted
+    : [policy.scheduleInterval];
+}
+
 function entryFindings(file, key, entry, policy) {
   const findings = [];
   const interval = entry.schedule?.interval;
-  if (interval !== policy.scheduleInterval) {
+  const ecosystem = entry["package-ecosystem"];
+  const accepted = acceptedIntervals(policy, ecosystem);
+  if (!accepted.includes(interval)) {
+    const expected =
+      accepted.length === 1
+        ? JSON.stringify(accepted[0])
+        : `one of ${JSON.stringify(accepted)} for ${ecosystem}`;
     findings.push(
       finding(
         "schedule-not-standard",
         file,
         key,
-        `schedule.interval must be ${JSON.stringify(policy.scheduleInterval)}, found ${JSON.stringify(interval ?? null)}`,
+        `schedule.interval must be ${expected}, found ${JSON.stringify(interval ?? null)}`,
       ),
     );
   }
