@@ -275,14 +275,20 @@ if [[ -n "$missing_twins" ]]; then
 else
   pass 'every Bash git row has its git -C twin'
 fi
-for cmd in 'git -C /repo worktree add -B b /tmp/wt' 'git -C /repo push --force origin b'; do
+# The `*` after `-C` also spans git's global options, which a plain row cannot
+# reach, so the config and exec-path globals are denied in that position:
+# `-c core.hooksPath=` skips the commit hooks, `-c core.sshCommand=` runs a
+# command on fetch or push.
+for cmd in 'git -C /repo worktree add -B b /tmp/wt' 'git -C /repo push --force origin b' \
+  'git -C /repo -c core.hooksPath=/dev/null commit -m x' 'git -C /repo -c core.sshCommand=x fetch origin' \
+  'git -C /repo --config-env=core.sshCommand=E push origin b' 'git -C /repo --exec-path=/tmp/x pull'; do
   if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
     pass "Bash denies: $cmd"
   else
-    fail "Bash denies: $cmd" 'the plain-git deny has no -C twin'
+    fail "Bash denies: $cmd" 'no deny row matches the -C form'
   fi
 done
-for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo worktree add /tmp/wt -b b'; do
+for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo worktree add /tmp/wt -b b' 'git -C /repo switch -c feature'; do
   if [[ -n "$(matching_rows allow Bash "$cmd")" && -z "$(matching_rows deny Bash "$cmd")" ]]; then
     pass "Bash allows: $cmd"
   else

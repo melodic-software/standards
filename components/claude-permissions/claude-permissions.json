@@ -542,7 +542,10 @@
       "Read(.env)",
       "Read(.env.*)",
       "Read(secrets.json)",
-      "Read(secrets/**)"
+      "Read(secrets/**)",
+      "Bash(git -C * -c *=*)",
+      "Bash(git -C * --config-env*)",
+      "Bash(git -C * --exec-path*)"
     ],
     "withdraw": [
       "Bash(bash \"${CLAUDE_PLUGIN_ROOT}/bin/source-control-babysit-merge\"*)",

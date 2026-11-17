@@ -204,9 +204,15 @@ negations. The docs name a PreToolUse hook as the mechanism for exactly what glo
 Sessions run git as `git -C <dir> <subcommand>`, and a whole-string glob written for
 `git <subcommand>` does not match that form, so without a twin a `-C` force push or
 `worktree add -B` would meet only the classifier and a `-C` commit would prompt. Each such
-`allow` and `deny` row therefore carries a `Bash(git -C * <subcommand> ...)` twin; an allow twin
-grants nothing its plain row does not. `claude-permissions.test.sh` fails on a missing twin and
-names it. Rows already written as `git *<subcommand>` match both forms and need none.
+`allow` and `deny` row therefore carries a `Bash(git -C * <subcommand> ...)` twin.
+`claude-permissions.test.sh` fails on a missing twin and names it. Rows already written as
+`git *<subcommand>` match both forms and need none.
+
+The `*` after `-C` also matches git's global options, which a plain row cannot reach: `git -C
+<dir> -c core.hooksPath=/dev/null commit` would skip the commit hooks, and `-c
+core.sshCommand=<cmd>` runs a command on fetch or push. `deny` therefore carries `Bash(git -C *
+-c *=*)`, `Bash(git -C * --config-env*)` and `Bash(git -C * --exec-path*)`. A `-c` with no `=`
+(`switch -c <branch>`) stays allowed.
 
 ### `git restore <path>` is left to the classifier and hooks
 
