@@ -18,6 +18,7 @@ Agent-agnostic engineering standards that no linter can decide for you: the auth
 | [reference-dont-duplicate.md](reference-dont-duplicate.md) | one source of truth per fact; cite, never recap; consolidation doctrine (ordered tests T1–T6) |
 | [documentation-and-citations.md](documentation-and-citations.md) | citing upstream authorities; read-on-demand over snapshots |
 | [source-authority-tiers.md](source-authority-tiers.md) | how much authority a source carries; how many independent corroborators a claim needs |
+| [check-placement.md](check-placement.md) | where an automated check runs (session hook, git hook, CI) by coverage, measured cost and what its output reaches |
 | [deterministic-artifact-scaffolding.md](deterministic-artifact-scaffolding.md) | stable artifact structure in deterministic mechanisms; judgment-bearing slots stay human- or agent-owned |
 | [deterministic-work-execution.md](deterministic-work-execution.md) | session-time tool execution for deterministic sub-work; judgment remains human- or agent-owned |
 | [bulk-mutation.md](bulk-mutation.md) | bounding a many-object create, delete, or change before it runs: scope sets blast radius, count first, unattended runs still need consent |
