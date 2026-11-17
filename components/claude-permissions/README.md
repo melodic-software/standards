@@ -199,20 +199,21 @@ the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which p
 requires an immutable `<expect>`, and also honors `--force-if-includes` and the last-wins
 negations. The docs name a PreToolUse hook as the mechanism for exactly what globs cannot express.
 
-### Every `Bash(git <subcommand> ...)` row has a `git -C *` twin
+### Every `Bash(git <subcommand> ...)` deny row has a `git -C *` twin; no allow row does
 
 Sessions run git as `git -C <dir> <subcommand>`, and a whole-string glob written for
 `git <subcommand>` does not match that form, so without a twin a `-C` force push or
-`worktree add -B` would meet only the classifier and a `-C` commit would prompt. Each such
-`allow` and `deny` row therefore carries a `Bash(git -C * <subcommand> ...)` twin.
-`claude-permissions.test.sh` fails on a missing twin and names it. Rows already written as
-`git *<subcommand>` match both forms and need none.
+`worktree add -B` would meet only the classifier. Each such `deny` row therefore carries a
+`Bash(git -C * <subcommand> ...)` twin, and `claude-permissions.test.sh` fails on a missing one
+and names it. Rows already written as `git *<subcommand>` match both forms and need none.
 
-The `*` after `-C` also matches git's global options, which a plain row cannot reach: `git -C
-<dir> -c core.hooksPath=/dev/null commit` would skip the commit hooks, and `-c
-core.sshCommand=<cmd>` runs a command on fetch or push. `deny` therefore carries `Bash(git -C *
--c *=*)`, `Bash(git -C * --config-env*)` and `Bash(git -C * --exec-path*)`. A `-c` with no `=`
-(`switch -c <branch>`) stays allowed.
+`allow` carries no `-C` twin. The `*` after `-C` also matches git's global options, which a plain
+row cannot reach: `git -C <dir> -c core.hooksPath=/dev/null commit` would skip the commit hooks,
+and `-c core.sshCommand=<cmd>` runs a command on fetch or push. Claude Code flags such a rule
+("allows any option at its *"), and no spelling of a directory avoids the wildcard, so `-C`
+commands go to the classifier. `deny` also carries `Bash(git -C * -c *=*)`,
+`Bash(git -C * --config-env*)` and `Bash(git -C * --exec-path*)`, so those shapes are refused
+outright; a `-c` with no `=` (`switch -c <branch>`) is left to the classifier.
 
 ### `git restore <path>` is left to the classifier and hooks
 
