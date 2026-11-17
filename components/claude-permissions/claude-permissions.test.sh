@@ -263,4 +263,31 @@ for shell in Bash PowerShell; do
   done
 done
 
+# Sessions run git as `git -C <dir> <subcommand>`, which no `Bash(git
+# <subcommand> ...)` row matches, so each such allow and deny row needs its
+# `Bash(git -C * <subcommand> ...)` twin or the two lists diverge in that form.
+missing_twins="$(jq -r '.claudePermissions | . as $c | ["allow", "deny"][] as $list
+  | $c[$list][] | select(test("^Bash\\(git [a-z][a-z-]*"))
+  | sub("^Bash\\(git "; "Bash(git -C * ") | select(. as $t | $c[$list] | index($t) | not)
+  | "\($list): \(.)"' "$config")"
+if [[ -n "$missing_twins" ]]; then
+  fail 'every Bash git row has its git -C twin' "add these rows: $missing_twins"
+else
+  pass 'every Bash git row has its git -C twin'
+fi
+for cmd in 'git -C /repo worktree add -B b /tmp/wt' 'git -C /repo push --force origin b'; do
+  if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash denies: $cmd"
+  else
+    fail "Bash denies: $cmd" 'the plain-git deny has no -C twin'
+  fi
+done
+for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo worktree add /tmp/wt -b b'; do
+  if [[ -n "$(matching_rows allow Bash "$cmd")" && -z "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash allows: $cmd"
+  else
+    fail "Bash allows: $cmd" 'the plain-git allow has no -C twin or a deny matches'
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1

@@ -199,6 +199,15 @@ the `guardrails` plugin's `block-dangerous-git` PreToolUse hook instead, which p
 requires an immutable `<expect>`, and also honors `--force-if-includes` and the last-wins
 negations. The docs name a PreToolUse hook as the mechanism for exactly what globs cannot express.
 
+### Every `Bash(git <subcommand> ...)` row has a `git -C *` twin
+
+Sessions run git as `git -C <dir> <subcommand>`, and a whole-string glob written for
+`git <subcommand>` does not match that form, so without a twin a `-C` force push or
+`worktree add -B` would meet only the classifier and a `-C` commit would prompt. Each such
+`allow` and `deny` row therefore carries a `Bash(git -C * <subcommand> ...)` twin; an allow twin
+grants nothing its plain row does not. `claude-permissions.test.sh` fails on a missing twin and
+names it. Rows already written as `git *<subcommand>` match both forms and need none.
+
 ### `git restore <path>` is left to the classifier and hooks
 
 `deny` carries only the whole-tree `git restore` discards (`.` and `:/`). No `allow` row covers
