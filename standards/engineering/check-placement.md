@@ -13,15 +13,17 @@ cover, what it costs, and what its output does to the person or agent reading it
    must stop a tool call, and a formatter that rewrites what the session just edited, belong in the
    session. A check that only reports does not.
 3. **Never report findings per edit.** A report fired on every edit judges in-between states the
-   author is about to change, and pulls an agent into fixes nobody asked for. Report once per batch,
-   at the end of a turn, or at the commit.
+   author is about to change, and pulls an agent into fixes nobody asked for. Report at the commit.
 4. **Choose the git hook by measured duration.** Measure each check; never guess. A check that fits
    the commit budget runs at `pre-commit`; a slower one at `pre-push`; one too slow for that runs in
    CI only. The budgets and measured durations live with the implementation, below.
 5. **Block on what the change touched.** A local hook blocks only on findings in changed lines, so
    an old finding never stops an unrelated commit.
-6. **Run each report-only check in one local place.** Formatters are the exception: they rewrite in
-   session and again at `pre-commit`.
+6. **Run each report-only check in one local place.** Formatters are the exception: they may
+   rewrite in the session and are checked again at `pre-commit`. Whether a git hook may rewrite and
+   re-stage is the hook manager's contract; the org's
+   [lefthook fragment](https://github.com/melodic-software/standards/blob/main/components/lefthook-base/README.md)
+   is check-only.
 7. **CI never trusts a local pass.** A hook can be missing, skipped or stale on any machine, so CI
    re-runs every check on the change, and a scheduled full-tree run catches what change scoping
    misses.
