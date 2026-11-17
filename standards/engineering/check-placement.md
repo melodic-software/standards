@@ -13,7 +13,8 @@ cover, what it costs, and what its output does to the person or agent reading it
    must stop a tool call, and a formatter that rewrites what the session just edited, belong in the
    session. A check that only reports does not.
 3. **Never report findings per edit.** A report fired on every edit judges in-between states the
-   author is about to change, and pulls an agent into fixes nobody asked for. Report at the commit.
+   author is about to change, and pulls an agent into fixes nobody asked for. Report in a git hook
+   or CI; rule 4 picks which.
 4. **Choose the git hook by measured duration.** Measure each check; never guess. A check that fits
    the commit budget runs at `pre-commit`; a slower one at `pre-push`; one too slow for that runs in
    CI only. The budgets and measured durations live with the implementation, below.
