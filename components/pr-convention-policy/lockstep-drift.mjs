@@ -24,7 +24,7 @@
 // sources over the GitHub contents API and exits
 // non-zero on drift; every network failure is a distinct `fetch-error`
 // failure, never a skip. Parsing and comparison logic is exported for the
-// hermetic fixture tests in `lockstep-drift.test.mjs`.
+// hermetic fixture tests in `lockstep-*.test.mjs`.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";

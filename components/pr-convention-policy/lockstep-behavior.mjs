@@ -495,7 +495,19 @@ function hookVerdict(record) {
   };
 }
 
+// The hook runs with a fixed environment, so its verdicts depend only on the
+// policy and the validator text: one run per distinct pair serves every check.
+const hookMismatchCache = new Map();
+
 export function checkHookBehavior(shellText, policy, location) {
+  const key = `${JSON.stringify(policy.body)}\0${shellText}`;
+  if (!hookMismatchCache.has(key)) {
+    hookMismatchCache.set(key, runHookMatrix(shellText, policy, location));
+  }
+  reportMismatches(hookMismatchCache.get(key), location);
+}
+
+function runHookMatrix(shellText, policy, location) {
   const matrix = linkageMatrix(policy);
   const directory = mkdtempSync(path.join(tmpdir(), "pr-lockstep-hook-"));
   let result;
@@ -537,5 +549,5 @@ export function checkHookBehavior(shellText, policy, location) {
       mismatches.push({ line, expected: show(expected), actual: show(actual) });
     }
   });
-  reportMismatches(mismatches, location);
+  return mismatches;
 }
