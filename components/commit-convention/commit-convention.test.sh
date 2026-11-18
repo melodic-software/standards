@@ -86,12 +86,14 @@ assert_eq 'types equal pr-convention-policy title.allowedTypes' "$policy_types" 
 require_scope="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).title.requireScope))' "$policy")"
 assert_eq 'pr-convention-policy keeps the scope optional, as the pattern does' 'false' "$require_scope"
 
-contract_pin="$(sed -E -n 's#^ *uses: melodic-software/ci-workflows/\.github/actions/pr-require-checks/check-contract@([0-9a-f]{40}).*#\1#p' \
+# report-ci-status runs check-contract through `$/` at the commit it is pinned
+# to, so either pin names the check-contract that gates.
+contract_pin="$(sed -E -n 's#^ *uses: melodic-software/ci-workflows/\.github/actions/pr-require-checks/(check-contract|report-ci-status)@([0-9a-f]{40}).*#\2#p' \
   "$root/.github/workflows/pr-require-checks.yml" | sort -u)"
 if [[ "$contract_pin" =~ ^[0-9a-f]{40}$ ]]; then
-  pass 'pr-require-checks.yml pins one check-contract SHA'
+  pass 'pr-require-checks.yml pins one check-contract or report-ci-status SHA'
 else
-  fail 'pr-require-checks.yml pins one check-contract SHA' "got: $contract_pin"
+  fail 'pr-require-checks.yml pins one check-contract or report-ci-status SHA' "got: $contract_pin"
 fi
 action_yml="$TEST_TMPDIR/check-contract-action.yml"
 auth=()
