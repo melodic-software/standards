@@ -23,7 +23,6 @@ source "$root/harness/shell/lib.sh"
 
 script="$root/components/claude-lanes/repin-callers.sh"
 fixture_corpus="$root/components/zizmor/fixtures"
-rename_map="$root/components/github-actions-conventions/rename-map.json"
 upstream='melodic-software/ci-workflows'
 old_sha='c136b27f404dd32ce3873f39a6f3443891d1c16e'
 new_sha='a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4'
@@ -59,7 +58,6 @@ not_found() { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
 # `--paginate`, which the release-list read passes ahead of the path.
 shift
 path=''
-silent=false
 skip_value=false
 for arg in "$@"; do
   if [[ "$skip_value" == true ]]; then
@@ -72,7 +70,6 @@ for arg in "$@"; do
     *) path="$arg"; break ;;
   esac
 done
-[[ "$*" == *--silent* ]] && silent=true
 case "$path" in
   */releases)
     # The published-release LIST — the subject's source of truth. Answers 200
@@ -135,23 +132,12 @@ case "$path" in
       --args $files
     ;;
   */contents/*)
-    # apply's renamed-path probe. STUB_PRESENT_PATHS lists, space-separated,
-    # the upstream paths that exist at the probed ref; unset means every path
-    # exists, the pre-rename world the older cases assume.
-    # STUB_CONTENTS_STATUS=500 forces a non-404 lookup failure.
-    if [[ "${STUB_CONTENTS_STATUS:-200}" == '500' ]]; then
-      echo 'gh: Server Error (HTTP 500)' >&2
-      exit 1
-    fi
-    probed="${path#*/contents/}"
-    probed="${probed%%\?*}"
-    if [[ -n "${STUB_PRESENT_PATHS+x}" && " ${STUB_PRESENT_PATHS} " != *" ${probed} "* ]]; then
-      not_found
-    fi
     # A raw read of a source apply follows for commit-relative references.
     # STUB_SOURCES_DIR holds upstream files by path; a path it lacks reads as
     # an empty file, one that references nothing.
-    if [[ "$silent" == false && -n "${STUB_SOURCES_DIR:-}" && -f "${STUB_SOURCES_DIR}/${probed}" ]]; then
+    probed="${path#*/contents/}"
+    probed="${probed%%\?*}"
+    if [[ -n "${STUB_SOURCES_DIR:-}" && -f "${STUB_SOURCES_DIR}/${probed}" ]]; then
       cat "${STUB_SOURCES_DIR}/${probed}"
     fi
     ;;
@@ -348,8 +334,7 @@ commit_all() {
 # callers that each pin one ci-workflows action AND this repository's REAL
 # zizmor fixture corpus, whose first-party action pin a repository-wide rewrite
 # would move, so the scope assertions run against an actual stand-in. Every
-# CALLER_DIRS directory exists, as in production. The two action paths are
-# rename-map.json `from` entries, so the rename cases reuse this fixture.
+# CALLER_DIRS directory exists, as in production.
 lane_repo() {
   local dir="$1" pin_sha="$2" pin_tag="$3"
   make_repo "$dir"
@@ -359,9 +344,8 @@ lane_repo() {
   git -C "$dir" config core.autocrlf false
   mkdir -p "$dir/components/claude-lanes" "$dir/components/zizmor" \
     "$dir/components/claude-lanes-hosted" "$dir/components/lychee-online/targets" \
-    "$dir/components/managed-files-guard" "$dir/components/github-actions-conventions"
+    "$dir/components/managed-files-guard"
   cp -R "$fixture_corpus" "$dir/components/zizmor/fixtures"
-  cp "$rename_map" "$dir/components/github-actions-conventions/rename-map.json"
 
   cat > "$dir/components/claude-lanes/claude-review.yml" <<YAML
 name: claude-review
@@ -699,62 +683,6 @@ assert_contains 'apply: no-diff run reports changed=false' "$(cat "$out_file")" 
 assert_not_contains 'apply: no-diff run never reports a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: no-diff run is a notice' "$out" '::notice::'
 assert_silent 'apply: no-diff run leaves the tree clean' "$(git -C "$repo" status --porcelain)"
-
-# ------------------------------------------------- apply: renamed upstream paths
-
-# A release that renamed a pinned action no longer carries the old path, so
-# rewriting the SHA alone would pin a path that does not exist at it. The
-# expected new paths are the ci-workflows action entries of rename-map.json.
-renamed_paths='.github/actions/pr-require-checks/aggregate-results .github/actions/report-lane-outcome'
-repo="$scratch/repo-renamed"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS="$renamed_paths"
-out_file="$scratch/out-apply-renamed"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
-assert_exit 'apply: a renamed upstream path exits 0' 0 "$rc"
-assert_contains 'apply: the status caller moves to the renamed path' \
-  "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/aggregate-results@${new_sha} # v0.9.2"
-assert_contains 'apply: the outcome caller moves to the renamed path' \
-  "$(cat "$repo/components/claude-lanes/claude-security-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${new_sha} # v0.9.2"
-assert_not_contains 'apply: no caller keeps an old path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'ci-status@'
-# shellcheck disable=SC2016  # markdown code spans in the expected note, not shell expansions
-assert_contains 'apply: the version note names the rename' "$(cat "$out_file")" \
-  '`.github/actions/ci-status` to `.github/actions/pr-require-checks/aggregate-results`'
-
-# A release cut before the rename still carries the old path: the SHA moves,
-# the path stays.
-repo="$scratch/repo-pre-rename"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS='.github/actions/ci-status .github/actions/claude-lane-outcome'
-out_file="$scratch/out-apply-pre-rename"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
-assert_exit 'apply: a pre-rename release exits 0' 0 "$rc"
-assert_contains 'apply: a pre-rename release keeps the status path' \
-  "$(cat "$repo/components/claude-lanes/claude-review.yml")" \
-  "uses: melodic-software/ci-workflows/.github/actions/ci-status@${new_sha} # v0.9.2"
-assert_not_contains 'apply: a pre-rename release maps no path' \
-  "$(cat "$repo"/components/claude-lanes/*.yml)" 'aggregate-results'
-
-# Neither path at the release: no pin can be right, so nothing is rewritten.
-repo="$scratch/repo-path-gone"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS=''
-rc=0; out="$(run_apply "$repo" "$scratch/out-apply-path-gone" 'v0.9.2' "$new_sha")" || rc=$?
-assert_nonzero 'apply: a pinned path absent under both names fails' "$rc"
-assert_contains 'apply: the absent path is named' "$out" '.github/actions/ci-status'
-assert_silent 'apply: an absent path touches nothing' "$(git -C "$repo" status --porcelain)"
-
-# A probe that fails for any reason but 404 proves nothing about the path.
-repo="$scratch/repo-probe-fail"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-export STUB_PRESENT_PATHS="$renamed_paths" STUB_CONTENTS_STATUS=500
-rc=0; out="$(run_apply "$repo" "$scratch/out-apply-probe-fail" 'v0.9.2' "$new_sha")" || rc=$?
-assert_nonzero 'apply: a failed path probe is a hard failure' "$rc"
-assert_silent 'apply: a failed path probe touches nothing' "$(git -C "$repo" status --porcelain)"
-unset STUB_PRESENT_PATHS STUB_CONTENTS_STATUS
 
 # ------------------------------------------------------------ apply: controls
 

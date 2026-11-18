@@ -26,7 +26,6 @@
 /components/comment-hygiene/ @kyle-sexton
 /components/dependabot-policy/ @kyle-sexton
 /components/dotnet-analysis/ @kyle-sexton
-/components/github-actions-conventions/rename-map.json @kyle-sexton
 /components/lefthook-*/ @kyle-sexton
 /components/lychee/ @kyle-sexton
 /components/lychee-online/ @kyle-sexton
