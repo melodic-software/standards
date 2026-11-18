@@ -27,13 +27,15 @@ fleet_message='label "melodic-ubuntu-24.04-x64" is unknown'
 review_message='label "melodic-review-ubuntu-24.04-x64" is unknown'
 undeclared_message='label "melodic-undeclared-ubuntu-24.04-x64" is unknown'
 
-out="$(cd "$project" && actionlint -no-color 2>&1)"
+lint() { (cd "$project" && actionlint -no-color 2>&1); }
+
+out="$(lint)"
 rc=$?
 assert_exit 'fleet-label workflow lints clean with the config' 0 "$rc"
 assert_silent 'configured run emits no findings' "$out"
 
 cp components/actionlint/fixtures/bad/unknown-runner-label.yml "$project/.github/workflows/"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
+out="$(lint)"
 rc=$?
 assert_nonzero 'an undeclared fleet-shaped label still fails with the config' "$rc"
 assert_contains 'an undeclared fleet-shaped label is still rejected' "$out" "$undeclared_message"
@@ -44,7 +46,7 @@ assert_not_contains 'the declared fleet label stays admitted' "$out" "$fleet_mes
 # of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-runner-label.yml"
-out="$(cd "$project" && actionlint -no-color 2>&1)"
+out="$(lint)"
 rc=$?
 assert_nonzero 'fleet-label workflow fails without the config (removal tripwire)' "$rc"
 assert_contains 'control run reports the build fleet label' "$out" "$fleet_message"

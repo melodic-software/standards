@@ -23,7 +23,14 @@ fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bad" "$tmp/allow" "$tmp/reports"
+mkdir -p "$tmp/bad" "$tmp/allow" "$tmp/reports" "$tmp/stateless" "$tmp/words"
+
+# scan_dir <dir> [flag...] — scan <dir> with the component config and -i <dir>.
+scan_dir() {
+  local dir="$1"
+  shift
+  gitleaks dir "$dir" --config "$config" --no-banner --redact "$@" -i "$dir"
+}
 
 # Real-shape token built from parts — the joined string is never a source literal.
 gh_prefix='ghp_'
@@ -31,8 +38,7 @@ gh_token="${gh_prefix}1A2b3C4d5E6f7G8h9I0jK1l2M3n4O5p6Q7r8"
 
 # A bare token is flagged.
 printf 'GITHUB_TOKEN=%s\n' "$gh_token" >"$tmp/bad/leak.env"
-out="$(gitleaks dir "$tmp/bad" --config "$config" --no-banner --redact \
-  -i "$tmp/bad" 2>&1)"
+out="$(scan_dir "$tmp/bad" 2>&1)"
 rc=$?
 assert_exit 'constructed secret is flagged (exit 1)' 1 "$rc"
 assert_contains 'reports leaks' "$out" 'leaks found'
@@ -41,8 +47,7 @@ assert_not_contains 'detected value is redacted' "$out" "$gh_token"
 # Machine-readable reports must contain the finding without retaining the value.
 for format in json sarif; do
   report="$tmp/reports/gitleaks.$format"
-  out="$(gitleaks dir "$tmp/bad" --config "$config" --no-banner --redact \
-    --report-format "$format" --report-path "$report" -i "$tmp/bad" 2>&1)"
+  out="$(scan_dir "$tmp/bad" --report-format "$format" --report-path "$report" 2>&1)"
   rc=$?
   assert_exit "$format report preserves detection failure (exit 1)" 1 "$rc"
   assert_file_exists "$format report is generated" "$report"
@@ -56,40 +61,32 @@ done
 # A stateless App installation token (ghs_<appid>_<jwt>) is flagged by the
 # component's own rule: no default rule matches past the `_` after the app id.
 # The values are placeholders built from parts, not a real token.
-mkdir -p "$tmp/stateless"
 app_prefix='ghs_'
 app_token="${app_prefix}1234567_eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjAwMDAwMDB9.c2lnbmF0dXJlLXBsYWNlaG9sZGVy"
 printf 'GITHUB_TOKEN=%s\n' "$app_token" >"$tmp/stateless/app.env"
-out="$(gitleaks dir "$tmp/stateless" --config "$config" --no-banner --redact \
-  --report-format json --report-path "$tmp/reports/stateless.json" \
-  -i "$tmp/stateless" 2>&1)"
+out="$(scan_dir "$tmp/stateless" --report-format json --report-path "$tmp/reports/stateless.json" 2>&1)"
 rc=$?
 assert_exit 'stateless installation token is flagged (exit 1)' 1 "$rc"
-assert_contains 'stateless token report names the rule' \
-  "$(<"$tmp/reports/stateless.json")" 'github-app-installation-token'
+report_content="$(<"$tmp/reports/stateless.json")"
+assert_contains 'stateless token report names the rule' "$report_content" 'github-app-installation-token'
 assert_not_contains 'stateless token is redacted in output' "$out" "$app_token"
-assert_not_contains 'stateless token is redacted in the report' \
-  "$(<"$tmp/reports/stateless.json")" "$app_token"
+assert_not_contains 'stateless token is redacted in the report' "$report_content" "$app_token"
 
 # Words that end in "ghs" followed by a long snake_case tail are not tokens.
-mkdir -p "$tmp/words"
 printf 'label = highs_and_lows_of_the_market_over_the_year\nmood = laughs_out_loud_at_the_whole_long_meeting_today\n' \
   >"$tmp/words/words.txt"
-gitleaks dir "$tmp/words" --config "$config" --no-banner --redact \
-  -i "$tmp/words" >/dev/null 2>&1
+scan_dir "$tmp/words" >/dev/null 2>&1
 rc=$?
 assert_exit 'words ending in ghs_ are not flagged (exit 0)' 0 "$rc"
 
 # The same token silenced with the native gitleaks:allow pragma is ignored.
 printf 'EXAMPLE_TOKEN=%s # gitleaks:allow\n' "$gh_token" >"$tmp/allow/ok.env"
-gitleaks dir "$tmp/allow" --config "$config" --no-banner --redact \
-  -i "$tmp/allow" >/dev/null 2>&1
+scan_dir "$tmp/allow" >/dev/null 2>&1
 rc=$?
 assert_exit 'gitleaks:allow silences the finding (exit 0)' 0 "$rc"
 
 # The committed clean fixture scans clean.
-gitleaks dir components/gitleaks/fixtures/good --config "$config" --no-banner --redact \
-  -i components/gitleaks/fixtures/good >/dev/null 2>&1
+scan_dir components/gitleaks/fixtures/good >/dev/null 2>&1
 rc=$?
 assert_exit 'good fixture exits 0' 0 "$rc"
 

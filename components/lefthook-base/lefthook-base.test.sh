@@ -72,9 +72,8 @@ printf '# Title\n' >doc.md
 git add doc.md
 
 # Case 1: with the local binary installed, the lane runs it — not the one on PATH.
-rc=0
-lefthook run pre-commit --command markdownlint >/dev/null 2>&1 || rc=$?
-assert_exit 'installed local binary passes the lane' 0 "$rc"
+lefthook run pre-commit --command markdownlint >/dev/null 2>&1
+assert_exit 'installed local binary passes the lane' 0 "$?"
 assert_file_exists 'the lane invoked node_modules/.bin/markdownlint-cli2' "$local_log"
 assert_contains 'the staged file reached the local binary' "$(cat "$local_log" 2>/dev/null)" 'doc.md'
 assert_file_absent 'the PATH binary stayed unused while the local one exists' "$global_log"
@@ -84,9 +83,8 @@ assert_file_absent 'an installed local binary triggers no npm ci' "$npm_log"
 # demand, then lints with the local binary, not the one on PATH.
 rm -rf "$work/node_modules" "$local_log"
 printf 'install\n' >"$work/npm.mode"
-rc=0
-lefthook run pre-commit --command markdownlint >/dev/null 2>&1 || rc=$?
-assert_exit 'a missing local binary is installed and the lane passes' 0 "$rc"
+lefthook run pre-commit --command markdownlint >/dev/null 2>&1
+assert_exit 'a missing local binary is installed and the lane passes' 0 "$?"
 assert_contains 'the lane ran a quiet npm ci' "$(cat "$npm_log" 2>/dev/null)" 'ci --no-audit --no-fund'
 assert_contains 'the staged file reached the installed local binary' "$(cat "$local_log" 2>/dev/null)" 'doc.md'
 assert_file_absent 'the PATH binary stayed unused after the install' "$global_log"
