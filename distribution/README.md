@@ -107,7 +107,7 @@ committed here.
 | Opt out | Same manifest move as Customize, per [Opting a repository out of a managed component](ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component). |
 | Re-adopt | Move `locally-owned` to `managed`; reconciliation restores the canonical payload. |
 | Retire | Remove upstream ownership first, then delete the obsolete downstream payload in a one-time PR. |
-| Relocate | Change the destination and coordinate deletion of the old path in the downstream migration PR. |
+| Relocate | Change the destination and add the old one to the component's `previous-destinations`; each target's sync PR writes the new path and deletes the old one in the same commit. Remove the entry once every target has converged. |
 | Reconcile | For a `locally-owned` target whose file predates and diverges from the canonical shape, a periodic check confirms the canonical minimum content is still present, not a byte diff. Drift opens a review; it is never auto-overwritten. |
 
 The consumer-facing index of these moves and the other sanctioned exception
@@ -115,7 +115,10 @@ surfaces lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
 
 Deselection never implies deletion. Without a downstream receipt, deletion and
 ownership transfer are indistinguishable; guessing would eventually erase a
-legitimate local file.
+legitimate local file. The one deletion is a relocation's: `apply` deletes a
+managed component's `previous-destinations` entry only when the target tracks
+it as a regular file, skips one already gone, and refuses (before any write)
+one that is untracked, a symlink, or not a regular file.
 
 ## Commands
 
@@ -135,8 +138,9 @@ distribution/sync-manifest.sh plan \
 `matrix` emits the JSON consumed by the reusable workflow. Source files must
 match their indexed Git blobs exactly. `apply` operates on one clean, disposable
 target checkout, validates every destination before the first write, and
-reconciles bytes plus executable mode. It never commits, pushes, merges, or
-deletes files. The single-target commands (`mappings`, `dest-paths`, `apply`)
+reconciles bytes plus executable mode. It never commits, pushes, or merges, and
+deletes only the tracked previous destinations `retired-paths` lists. The
+single-target commands (`mappings`, `dest-paths`, `retired-paths`, `apply`)
 take `--target OWNER/REPO`, and `apply` additionally takes `--target-root DIR`
 for the disposable checkout. The consumer-facing summary of every target
 filter lives in [ESCAPE-HATCHES.md](ESCAPE-HATCHES.md).
@@ -388,7 +392,7 @@ over its prompt-injection surface (see the lane comment in
 - On a public repository the lanes review only pull requests from
   same-repository branches. Fork and Dependabot pull requests get no secrets,
   so they get no review.
-- The sync never deletes a file. A target that moves between the hosted and
+- Deselecting a component never deletes its file. A target that moves between the hosted and
   fleet variants must delete the old caller in a repo-local pull request, or
   both run.
 - Removal trigger: the one-shape work below landing, after which the hosted

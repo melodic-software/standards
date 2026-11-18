@@ -114,6 +114,13 @@ They are not duplicated here.
 - Deselecting a component never deletes its old downstream files. This protects
   locally owned data but leaves stale-file discovery and coordinated retirement
   to a reviewed one-time change.
+- A relocation deletes downstream files: `apply` removes each path a managed
+  component lists under `previous-destinations`. The list is reviewed manifest
+  data, and the deletion is limited to a path the target tracks as a stage-0
+  regular file and that no component currently writes; an untracked, symlinked
+  or non-regular file there stops the apply before any write. A wrong entry
+  still deletes a tracked file in every target managing that component, so a
+  sync PR that deletes needs the same review as one that writes.
 - The target origin is identity evidence, not proof that GitHub served or
   authenticated the checkout. The target index proves only tracked path shape;
   neither establishes that the downstream revision is current, protected, or

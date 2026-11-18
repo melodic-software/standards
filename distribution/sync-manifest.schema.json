@@ -51,6 +51,12 @@
           "propertyNames": { "$ref": "#/$defs/nonWhitespaceString" },
           "additionalProperties": { "$ref": "#/$defs/nonWhitespaceString" }
         },
+        "previous-destinations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonWhitespaceString" }
+        },
         "requires": { "$ref": "#/$defs/componentList" }
       }
     },

@@ -34,6 +34,7 @@ const USAGE = `Usage:
   sync-manifest.sh plan     [--source-root DIR] [--manifest PATH] [--targets CSV]
   sync-manifest.sh mappings   [--source-root DIR] [--manifest PATH] --target OWNER/REPO
   sync-manifest.sh dest-paths [--source-root DIR] [--manifest PATH] --target OWNER/REPO
+  sync-manifest.sh retired-paths [--source-root DIR] [--manifest PATH] --target OWNER/REPO
   sync-manifest.sh apply      [--source-root DIR] [--manifest PATH] --target OWNER/REPO --target-root DIR
 
 Commands:
@@ -43,7 +44,11 @@ Commands:
   mappings    Print Markdown bullets for one target's managed mappings.
   dest-paths  Print one managed destination path per line for machine use.
               Unknown targets exit 0 with no output (reusable PR-check no-op).
-  apply       Copy one target's managed components and reproduce Git modes.
+  retired-paths
+              Print one previous destination path per line that apply deletes
+              for one target. Unknown targets exit 0 with no output.
+  apply       Copy one target's managed components, reproduce Git modes, and
+              delete each managed component's tracked previous destinations.
 
 PATH is relative to source-root. --targets is a comma-separated exact
 allowlist; empty selects every target in manifest order.
@@ -395,6 +400,7 @@ const targetNames = [];
 const componentExists = new Set();
 const targetExists = new Set();
 const filesByComponent = new Map();
+const previousByComponent = new Map();
 const sourceModes = new Map();
 const requiresByComponent = new Map();
 const managedByTarget = new Map();
@@ -496,7 +502,12 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   for (const item of componentsNode.items) {
     const component = deref(item.key).value;
     const { node, keys } = checkRecordShell("component", component, item.value);
-    validateRecordKeys(`component '${component}'`, "files", ["requires"], keys);
+    validateRecordKeys(
+      `component '${component}'`,
+      "files",
+      ["previous-destinations", "requires"],
+      keys,
+    );
 
     const filesNode = deref(findMapValue(node, "files"));
     if (!isMapShaped(filesNode) || filesNode.items.length === 0) {
@@ -542,6 +553,25 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     }
     filesByComponent.set(component, fileRows);
 
+    // Paths this component's files lived at before a relocation. apply
+    // deletes each one the target still tracks, in the same sync commit that
+    // writes the new path; remove an entry once every target has converged.
+    let previous = [];
+    if (keys.includes("previous-destinations")) {
+      previous = stringSeq(
+        findMapValue(node, "previous-destinations"),
+        `component '${component}' previous-destinations must be a non-empty sequence when present`,
+        `component '${component}' previous-destinations entries`,
+        `component '${component}' previous-destinations`,
+      );
+      for (const previousPath of previous) {
+        if (!isSafeRepoPath(previousPath)) {
+          die(`component '${component}' has unsafe previous destination '${previousPath}'`);
+        }
+      }
+    }
+    previousByComponent.set(component, previous);
+
     let dependencies = [];
     if (keys.includes("requires")) {
       dependencies = stringSeq(
@@ -560,6 +590,31 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
       }
     }
     requiresByComponent.set(component, dependencies);
+  }
+
+  // A previous destination is deleted on apply, so it may neither be, contain,
+  // nor sit inside any current destination, nor belong to two components.
+  const previousOwner = new Map();
+  for (const component of componentNames) {
+    for (const previousPath of previousByComponent.get(component)) {
+      if (previousOwner.has(previousPath)) {
+        die(
+          `previous destination '${previousPath}' is listed by both '${previousOwner.get(previousPath)}' and '${component}'`,
+        );
+      }
+      previousOwner.set(previousPath, component);
+      for (const [destination, owner] of destinationOwner) {
+        if (
+          destination === previousPath ||
+          destination.startsWith(`${previousPath}/`) ||
+          previousPath.startsWith(`${destination}/`)
+        ) {
+          die(
+            `previous destination '${previousPath}' in '${component}' overlaps current destination '${destination}' in '${owner}'`,
+          );
+        }
+      }
+    }
   }
 
   const uniqueSources = [
@@ -766,6 +821,13 @@ function emitManagedDestPaths(target) {
   for (const destination of paths) process.stdout.write(`${destination}\n`);
 }
 
+// The previous destinations of one target's managed components, sorted
+// uniquely like dest-paths: the only paths apply may delete there.
+function retiredPaths(target) {
+  const paths = managedByTarget.get(target).flatMap((c) => previousByComponent.get(c));
+  return [...new Set(paths)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
 function emitPlan(selected) {
   process.stdout.write("Distribution plan:\n");
   for (const target of selected) {
@@ -849,16 +911,38 @@ function preflightDestination(targetRoot, destination) {
   }
 }
 
+// A previous destination is deleted only when the target tracks it as a
+// stage-0 regular file and the worktree holds a regular file there. Absent is
+// a no-op (already converged); anything else is a file the sync did not write.
+function retiredPathPresent(targetRoot, retired) {
+  const stat = lstatOrNull(path.join(targetRoot, retired));
+  const entries = readExactIndexEntries(targetRoot, retired);
+  if (!stat && entries.length === 0) return false;
+  if (stat?.isSymbolicLink()) die(`previous destination is a symlink: ${retired}`);
+  if (!stat) die(`tracked previous destination is missing from the worktree: ${retired}`);
+  if (!stat.isFile()) die(`previous destination is not a regular file: ${retired}`);
+  if (entries.length !== 1) {
+    die(`refusing to delete untracked previous destination: ${retired}`);
+  }
+  const [mode, , stage] = entries[0];
+  if (stage !== "0" || (mode !== "100644" && mode !== "100755")) {
+    die(`previous destination is not a tracked stage-0 regular file: ${retired}`);
+  }
+  return true;
+}
+
 function applyTarget(sourceRoot, target, targetRootRequested) {
   const targetRoot = canonicalGitRoot(targetRootRequested);
   verifyTargetIdentity(targetRoot, target);
   const components = managedByTarget.get(target);
 
   const mappings = components.flatMap((component) => filesByComponent.get(component));
+  const retired = retiredPaths(target);
   const indexPaths = [
-    ...new Set(
-      mappings.flatMap(([, destination]) => [...parentPrefixes(destination), destination]),
-    ),
+    ...new Set([
+      ...mappings.flatMap(([, destination]) => [...parentPrefixes(destination), destination]),
+      ...retired,
+    ]),
   ];
   if (indexPaths.length > 0 && !prefetchIndexEntries(targetRoot, indexPaths)) {
     die(`could not inspect Git index path: ${indexPaths[0]}`);
@@ -866,6 +950,7 @@ function applyTarget(sourceRoot, target, targetRootRequested) {
   // Validate all destinations before the first mutation. A later I/O error stops
   // the workflow before PR creation, so no partial component update is published.
   for (const [, destination] of mappings) preflightDestination(targetRoot, destination);
+  const toDelete = retired.filter((p) => retiredPathPresent(targetRoot, p));
   for (const [source, destination] of mappings) {
     const mode = sourceModes.get(source);
     const destinationAbs = path.join(targetRoot, destination);
@@ -875,6 +960,10 @@ function applyTarget(sourceRoot, target, targetRootRequested) {
     else if (mode === "100755") fs.chmodSync(destinationAbs, 0o755);
     else die(`internal error: unsupported validated mode '${mode}'`);
     process.stdout.write(`synced ${source} -> ${destination} (${mode})\n`);
+  }
+  for (const retiredPath of toDelete) {
+    fs.unlinkSync(path.join(targetRoot, retiredPath));
+    process.stdout.write(`removed previous destination ${retiredPath}\n`);
   }
 }
 
@@ -891,7 +980,11 @@ function main() {
     usage(process.stdout);
     process.exit(0);
   }
-  if (!["validate", "matrix", "plan", "mappings", "dest-paths", "apply"].includes(command)) {
+  if (
+    !["validate", "matrix", "plan", "mappings", "dest-paths", "retired-paths", "apply"].includes(
+      command,
+    )
+  ) {
     usage(process.stderr);
     die(`unknown command '${command}'`);
   }
@@ -936,7 +1029,7 @@ function main() {
     if (target || targetRoot) {
       die(`${command} does not accept --target or --target-root`);
     }
-  } else if (command === "mappings" || command === "dest-paths") {
+  } else if (command === "mappings" || command === "dest-paths" || command === "retired-paths") {
     if (targetsFilter || targetRoot) {
       die(`${command} does not accept --targets or --target-root`);
     }
@@ -963,6 +1056,10 @@ function main() {
     // Unknown targets are a successful empty result so shared PR checks can
     // no-op outside the manifest. mappings/apply keep the hard error.
     if (targetExists.has(target)) emitManagedDestPaths(target);
+  } else if (command === "retired-paths") {
+    if (targetExists.has(target)) {
+      for (const retired of retiredPaths(target)) process.stdout.write(`${retired}\n`);
+    }
   } else if (command === "apply") {
     if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
     applyTarget(sourceRoot, target, targetRoot);
