@@ -93,7 +93,7 @@ components:
   # Known limit: on a public repository the lanes review only pull requests
   # from same-repository branches. Fork and Dependabot pull requests get no
   # secrets (code.claude.com/docs/en/github-actions), so they get no review.
-  # The sync never deletes a file: a target that moves between the hosted and
+  # Deselecting a component never deletes its file: a target that moves between the hosted and
   # fleet variants keeps the old caller, and double-reviews, until a one-time
   # repo-local pull request deletes it by hand, as claude-code-proxy#269
   # tracks for the managed-files-guard pair.
@@ -702,7 +702,7 @@ targets:
   # claude-code-proxy is private and fleet-enrolled in github-iac (its ci.yml
   # runs on the fleet label), so it takes the fleet-routed guard and both
   # lane callers. The sync overwrites its former repo-local lane copies at
-  # the same paths. The sync never deletes, so its old hosted
+  # the same paths. Deselection never deletes, so its old hosted
   # `.github/workflows/managed-files-guard.yml` stays until a one-time
   # claude-code-proxy PR deletes it (claude-code-proxy#269). Until then
   # both workflows share the name `managed-files-guard` and so one

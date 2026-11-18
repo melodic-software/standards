@@ -1019,6 +1019,103 @@ bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed: !!seq "oops"
 invalid_case 'target managed is a scalar with an explicit seq tag' "$bad" \
   "target 'beta/two' managed must be a non-empty sequence"
 
+# --- previous-destinations: a relocation deletes the old path in the same apply
+retired_manifest() {
+  cat <<'YAML'
+version: 2
+
+components:
+  base:
+    files:
+      policy.txt: .policy
+    previous-destinations:
+      - legacy/policy
+  consumer:
+    files:
+      consumer.txt: consumer.txt
+
+targets:
+  alpha/one:
+    managed:
+      - base
+  beta/two:
+    managed:
+      - consumer
+    locally-owned:
+      - base
+YAML
+}
+manifest="$(retired_manifest)"
+valid_case 'previous-destinations' "$manifest"
+retired_source="$tmp_root/retired-source"
+make_source "$retired_source" "$manifest"
+
+out="$(run_engine "$retired_source" retired-paths --target alpha/one 2>&1)"
+assert_exit 'retired-paths succeeds' 0 "$?"
+assert_eq 'retired-paths lists a managed component previous destination' 'legacy/policy' "$out"
+out="$(run_engine "$retired_source" retired-paths --target beta/two 2>&1)"
+assert_eq 'retired-paths excludes a locally-owned component' '' "$out"
+out="$(run_engine "$retired_source" retired-paths --target unknown/repo 2>&1)"
+assert_exit 'retired-paths unknown target is a successful no-op' 0 "$?"
+assert_eq 'retired-paths unknown target emits no paths' '' "$out"
+
+target_repo="$tmp_root/target-retired"
+make_target "$target_repo"
+mkdir -p "$target_repo/legacy"
+printf 'old\n' >"$target_repo/legacy/policy"
+git -C "$target_repo" add legacy/policy
+git -C "$target_repo" commit -m old -q
+out="$(run_engine "$retired_source" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+assert_exit 'apply with a tracked previous destination succeeds' 0 "$?"
+assert_eq 'apply writes the new path and removes the old one' \
+  $'synced policy.txt -> .policy (100644)\nremoved previous destination legacy/policy' "$out"
+assert_file_exists 'relocated destination written' "$target_repo/.policy"
+assert_file_absent 'tracked previous destination deleted' "$target_repo/legacy/policy"
+
+git -C "$target_repo" add -A
+git -C "$target_repo" commit -m sync -q
+out="$(run_engine "$retired_source" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+assert_exit 'a converged target applies again' 0 "$?"
+assert_not_contains 'an absent previous destination is not reported' "$out" 'removed'
+
+target_repo="$tmp_root/target-retired-untracked"
+make_target "$target_repo"
+mkdir -p "$target_repo/legacy"
+printf 'local\n' >"$target_repo/legacy/policy"
+out="$(run_engine "$retired_source" apply --target alpha/one --target-root "$target_repo" 2>&1)"
+assert_nonzero 'an untracked previous destination is refused' "$?"
+assert_contains 'untracked previous destination diagnostic' "$out" \
+  'refusing to delete untracked previous destination: legacy/policy'
+assert_file_exists 'the untracked file survives' "$target_repo/legacy/policy"
+assert_file_absent 'the refusal comes before any write' "$target_repo/.policy"
+
+target_repo="$tmp_root/target-retired-locally-owned"
+make_target "$target_repo" beta/two
+mkdir -p "$target_repo/legacy"
+printf 'theirs\n' >"$target_repo/legacy/policy"
+git -C "$target_repo" add legacy/policy
+git -C "$target_repo" commit -m theirs -q
+run_engine "$retired_source" apply --target beta/two --target-root "$target_repo" >/dev/null 2>&1
+assert_exit 'a locally-owned component apply succeeds' 0 "$?"
+assert_file_exists 'a locally-owned component previous destination is kept' \
+  "$target_repo/legacy/policy"
+
+bad="${manifest/'      - legacy/policy'/'      - .policy'}"
+invalid_case 'previous destination equal to a current destination' "$bad" \
+  "previous destination '.policy' in 'base' overlaps current destination '.policy' in 'base'" engine
+bad="${manifest/'      - legacy/policy'/'      - consumer.txt/old'}"
+invalid_case 'previous destination under a current destination' "$bad" \
+  "overlaps current destination 'consumer.txt' in 'consumer'" engine
+bad="${manifest/'      - legacy/policy'/'      - ../policy'}"
+invalid_case 'unsafe previous destination' "$bad" \
+  "component 'base' has unsafe previous destination '../policy'" engine
+bad="${manifest/'      - legacy/policy'/$'      - legacy/z\n      - legacy/a'}"
+invalid_case 'unsorted previous destinations' "$bad" \
+  "component 'base' previous-destinations must be sorted" engine
+bad="${manifest/'    files:'$'\n''      consumer.txt: consumer.txt'/$'    files:\n      consumer.txt: consumer.txt\n    previous-destinations:\n      - legacy/policy'}"
+invalid_case 'previous destination listed by two components' "$bad" \
+  "previous destination 'legacy/policy' is listed by both 'base' and 'consumer'" engine
+
 node "$root/distribution/control-char-equivalence.mjs" ||
   { echo 'control-character equivalence test failed' >&2; exit 1; }
 

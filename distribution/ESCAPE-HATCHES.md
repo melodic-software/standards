@@ -32,7 +32,7 @@ filters at all. The filters below narrow which targets a run then acts on:
   comma-separated allowlist; empty (or omitted) selects every target in
   manifest order. Use it to dry-run one repository's plan without walking the
   fleet.
-- `--target OWNER/REPO`, for `mappings`, `dest-paths`, and `apply`: the single
+- `--target OWNER/REPO`, for `mappings`, `dest-paths`, `retired-paths`, and `apply`: the single
   target the command operates on. `apply` additionally verifies the checkout's
   `origin` URL actually identifies that repository before writing anything.
 - `--target-root DIR`, for `apply` only: the local, disposable target checkout

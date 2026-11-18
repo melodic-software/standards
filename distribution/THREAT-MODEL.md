@@ -22,8 +22,9 @@ requirements to protect source integrity, provenance, and release inputs.
   non-regular, unmerged, or directory-shaped destination.
 - All destinations pass preflight before the first copy, and locally owned
   files are never materialized.
-- The engine does not delete, stage, commit, push, authenticate, or infer
-  adoption from repository access.
+- The engine does not stage, commit, push, authenticate, or infer adoption
+  from repository access. It deletes only a managed component's tracked
+  `previous-destinations` (see the relocation limitation below).
 
 Protected assets are canonical component bytes and executable modes, manifest
 ownership and dependency declarations, downstream locally owned content,
@@ -114,6 +115,13 @@ They are not duplicated here.
 - Deselecting a component never deletes its old downstream files. This protects
   locally owned data but leaves stale-file discovery and coordinated retirement
   to a reviewed one-time change.
+- A relocation deletes downstream files: `apply` removes each path a managed
+  component lists under `previous-destinations`. The list is reviewed manifest
+  data, and the deletion is limited to a path the target tracks as a stage-0
+  regular file and that no component currently writes; an untracked, symlinked
+  or non-regular file there stops the apply before any write. A wrong entry
+  still deletes a tracked file in every target managing that component, so a
+  sync PR that deletes needs the same review as one that writes.
 - The target origin is identity evidence, not proof that GitHub served or
   authenticated the checkout. The target index proves only tracked path shape;
   neither establishes that the downstream revision is current, protected, or
