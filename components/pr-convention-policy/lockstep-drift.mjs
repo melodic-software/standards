@@ -81,6 +81,7 @@ export const CONSUMER_REPOSITORIES = [
   "architecture",
   "ci-runner",
   "ci-workflows",
+  "claude-code-account-rotation",
   "claude-code-plugins",
   "claude-code-proxy",
   "codex-plugins",
