@@ -33,22 +33,18 @@ for t in "${tests[@]+"${tests[@]}"}"; do
     printf 'FAIL  %s (not found)\n' "$rel"
     continue
   fi
-  if out="$(bash "$t" 2>&1)"; then
-    if grep -q '^FAIL: ' <<<"$out"; then
-      failed=$((failed + 1))
-      printf 'FAIL  %s\n' "$rel"
-      printf '%s\n' "$out" | sed 's/^/      | /'
-    elif grep -q '^SKIP: ' <<<"$out" && ! grep -q '^PASS: ' <<<"$out"; then
-      skipped=$((skipped + 1))
-      printf 'SKIP  %s\n' "$rel"
-    else
-      passed=$((passed + 1))
-      printf 'ok    %s\n' "$rel"
-    fi
-  else
+  out="$(bash "$t" 2>&1)"
+  rc=$?
+  if [[ $rc -ne 0 ]] || grep -q '^FAIL: ' <<<"$out"; then
     failed=$((failed + 1))
     printf 'FAIL  %s\n' "$rel"
     printf '%s\n' "$out" | sed 's/^/      | /'
+  elif grep -q '^SKIP: ' <<<"$out" && ! grep -q '^PASS: ' <<<"$out"; then
+    skipped=$((skipped + 1))
+    printf 'SKIP  %s\n' "$rel"
+  else
+    passed=$((passed + 1))
+    printf 'ok    %s\n' "$rel"
   fi
 done
 

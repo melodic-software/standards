@@ -80,9 +80,8 @@ raw_prefix="'^https?://raw\\.githubusercontent\\.com/${org_re}/("
 # extract_group <prefix> — the alternation body of the single exclude entry
 # that starts with <prefix>; errors on zero or several matches.
 extract_group() {
-  local prefix="$1" matches
+  local prefix="$1" matches count
   matches="$(grep -F -- "$prefix" "$config" || true)"
-  local count
   count="$(printf '%s' "$matches" | grep -c . || true)"
   [[ "$count" -eq 1 ]] || die "expected exactly one exclude entry starting with ${prefix}, found ${count}"
   local rest="${matches#*"$prefix"}"
@@ -91,12 +90,17 @@ extract_group() {
 
 # group_to_lines <alternation> — one repository name per line, regex unescaped.
 group_to_lines() {
-  printf '%s' "$1" | tr '|' '\n' | sed 's/\\\././g' | sed '/^$/d'
+  printf '%s' "$1" | tr '|' '\n' | sed -e 's/\\\././g' -e '/^$/d'
 }
 
 # lines_to_group — sorted, unique, regex-escaped alternation from stdin lines.
 lines_to_group() {
-  LC_ALL=C sort -u | sed '/^$/d' | sed 's/\./\\./g' | paste -sd '|' -
+  LC_ALL=C sort -u | sed -e '/^$/d' -e 's/\./\\./g' | paste -sd '|' -
+}
+
+# sorted_set <lines> — the non-empty lines, sorted and unique.
+sorted_set() {
+  printf '%s\n' "$1" | LC_ALL=C sort -u | sed '/^$/d'
 }
 
 github_group="$(extract_group "$github_prefix")"
@@ -194,7 +198,7 @@ else
   public="$(query_public)"
 fi
 if [[ -n "$public" ]]; then
-  wrongly_excluded="$(LC_ALL=C comm -12 <(printf '%s\n' "$inventory") <(printf '%s\n' "$public" | LC_ALL=C sort -u))"
+  wrongly_excluded="$(LC_ALL=C comm -12 <(printf '%s\n' "$inventory") <(sorted_set "$public"))"
   for name in $wrongly_excluded; do
     problem "${name} is public but excluded as private"
   done
@@ -215,7 +219,7 @@ if [[ -n "$private_list" ]]; then
 fi
 
 if [[ -z "$private_list" ]]; then
-  unverified="$(LC_ALL=C comm -23 <(printf '%s\n' "$inventory") <(printf '%s\n' "$wrongly_excluded" | LC_ALL=C sort -u | sed '/^$/d'))"
+  unverified="$(LC_ALL=C comm -23 <(printf '%s\n' "$inventory") <(sorted_set "$wrongly_excluded"))"
   if [[ -n "$unverified" ]]; then
     printf 'NOTE: not verifiable with the credentials given (assumed still private): %s\n' \
       "$(printf '%s' "$unverified" | tr '\n' ' ')"
@@ -224,11 +228,8 @@ fi
 
 if [[ "$status" -ne 0 ]]; then
   regenerated="$(
-    {
-      printf '%s\n' "$inventory"
-      printf '%s\n' "$missing"
-    } | LC_ALL=C sort -u | sed '/^$/d' \
-      | LC_ALL=C comm -23 - <(printf '%s\n' "$wrongly_excluded" | LC_ALL=C sort -u | sed '/^$/d') \
+    sorted_set "$inventory"$'\n'"$missing" \
+      | LC_ALL=C comm -23 - <(sorted_set "$wrongly_excluded") \
       | lines_to_group
   )"
   printf 'Regenerated exclude entries for %s:\n' "$config" >&2

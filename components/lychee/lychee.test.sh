@@ -43,33 +43,25 @@ trap cleanup EXIT
 # cleanup on one path instead of duplicating it per signal.
 trap 'exit 130' INT
 trap 'exit 143' TERM
-mkdir -p \
-  "$path_fixture_root/components/lychee/fixtures" \
-  "$path_fixture_root/components/lychee/fixtures-old" \
-  "$path_fixture_root/notcomponents/lychee/fixtures" \
-  "$path_fixture_root/components/lychee/nested/fixtures" \
-  "$path_fixture_root/nested/components/lychee/fixtures"
-printf '%s\n' '<https://www.rfc-editor.org/rfc/rfc3986?boundary=intended>' \
-  >"$path_fixture_root/components/lychee/fixtures/PathBoundary.md"
-printf '%s\n' '<https://www.rfc-editor.org/rfc/rfc3986?boundary=fixtures-old>' \
-  >"$path_fixture_root/components/lychee/fixtures-old/PathBoundary.md"
-printf '%s\n' '<https://www.rfc-editor.org/rfc/rfc3986?boundary=notcomponents>' \
-  >"$path_fixture_root/notcomponents/lychee/fixtures/PathBoundary.md"
-printf '%s\n' '<https://www.rfc-editor.org/rfc/rfc3986?boundary=nested-middle>' \
-  >"$path_fixture_root/components/lychee/nested/fixtures/PathBoundary.md"
-printf '%s\n' '<https://www.rfc-editor.org/rfc/rfc3986?boundary=nested-prefix>' \
-  >"$path_fixture_root/nested/components/lychee/fixtures/PathBoundary.md"
+# Each case is <directory>:<boundary tag>; the tag names the link it holds.
+boundary_cases=(
+  components/lychee/fixtures:intended
+  components/lychee/fixtures-old:fixtures-old
+  notcomponents/lychee/fixtures:notcomponents
+  components/lychee/nested/fixtures:nested-middle
+  nested/components/lychee/fixtures:nested-prefix
+)
+for boundary in "${boundary_cases[@]}"; do
+  mkdir -p "$path_fixture_root/${boundary%%:*}"
+  printf '<https://www.rfc-editor.org/rfc/rfc3986?boundary=%s>\n' "${boundary#*:}" \
+    >"$path_fixture_root/${boundary%%:*}/PathBoundary.md"
+done
 
 fixture_path_rule='^(\./)?components[\\/][^\\/]+[\\/]fixtures([\\/]|$)'
 path_dump="$(
   cd "$path_fixture_root" || exit 1
-  for input in \
-    components/lychee/fixtures/PathBoundary.md \
-    components/lychee/fixtures-old/PathBoundary.md \
-    notcomponents/lychee/fixtures/PathBoundary.md \
-    components/lychee/nested/fixtures/PathBoundary.md \
-    nested/components/lychee/fixtures/PathBoundary.md; do
-    lychee --dump --exclude-path "$fixture_path_rule" -- "$input"
+  for boundary in "${boundary_cases[@]}"; do
+    lychee --dump --exclude-path "$fixture_path_rule" -- "${boundary%%:*}/PathBoundary.md"
   done 2>&1
 )"
 rc=$?
@@ -338,11 +330,13 @@ else
   assert_contains 'status fixture URL is checked, not silently excluded' \
     "$status_dump" "http://127.0.0.1:$http_port/$status_probe/429"
 
+  # probe <lychee args...> — a real run against the fixture server, stderr merged.
+  probe() { lychee --no-progress --config "$config" --include "$status_probe" "$@" 2>&1; }
+
   # Exit 0 alone is also what checking nothing looks like; the OK count proves a
   # request was made and its status was accepted.
   for code in 200 429 500 503 599; do
-    status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
-      "$http_fixture_root/Status$code.md" 2>&1)"
+    status_out="$(probe "$http_fixture_root/Status$code.md")"
     rc=$?
     assert_exit "$code passes the run" 0 "$rc"
     assert_contains "$code is counted as a checked OK link" "$status_out" '1 OK'
@@ -353,8 +347,7 @@ else
     "$(<"$http_fixture_root/hits")" 1 "/$status_probe/429\$"
 
   for code in 404 410; do
-    status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
-      "$http_fixture_root/Status$code.md" 2>&1)"
+    status_out="$(probe "$http_fixture_root/Status$code.md")"
     rc=$?
     assert_nonzero "dead link $code fails the run" "$rc"
     # An unreachable server also exits non-zero; naming the status keeps the
@@ -365,15 +358,13 @@ else
 
   # A short timeout and no retries keep the case fast; the timeout is still
   # reported, it just does not fail the run.
-  status_out="$(lychee --no-progress --config "$config" --include "$status_probe" \
-    --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" 2>&1)"
+  status_out="$(probe --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md")"
   rc=$?
   assert_exit 'timeout passes the run' 0 "$rc"
   assert_contains 'timeout is still reported' "$status_out" '1 Timeouts'
   # Control: the same request without accept_timeouts fails, so the pass above
   # comes from the config key.
-  lychee --no-progress --config "$config" --include "$status_probe" --accept-timeouts=false \
-    --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" >/dev/null 2>&1
+  probe --accept-timeouts=false --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" >/dev/null
   rc=$?
   assert_nonzero 'without accept_timeouts a timeout fails the run' "$rc"
 fi

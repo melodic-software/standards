@@ -43,7 +43,9 @@ disagree, when the copy differs, when the resolver does not print the pattern
 from a tracked file, or when the hook accepts or rejects the wrong subjects.
 
 A repository that needs a different convention moves the component to
-`locally-owned` in its manifest target block and tracks its own convention,
+`locally-owned` in its manifest target block, per
+[Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component),
+and tracks its own convention,
 either at the same path or in `docs/conventions/source-control.yaml`, which the
 guardrails resolver reads first. claude-code-plugins does the latter.
 

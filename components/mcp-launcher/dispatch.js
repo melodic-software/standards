@@ -34,7 +34,8 @@ function escapeCmdShimArg(arg) {
 function runNpx(npxArgs) {
   const isWindows = process.platform === "win32";
   const nodeDir = path.dirname(process.execPath);
-  const npxBinary = isWindows ? path.join(nodeDir, "npx.cmd") : path.join(nodeDir, "npx");
+  const npxBinary = path.join(nodeDir, isWindows ? "npx.cmd" : "npx");
+  let child;
   if (isWindows) {
     // On Windows, spawn `cmd /d /s /c` with the entire command line pre-quoted:
     //   cmd /d /s /c ""C:\Program Files\nodejs\npx.cmd" ^^^"arg1^^^" ..."
@@ -48,25 +49,27 @@ function runNpx(npxArgs) {
     // `{ shell: true }` + args array (Node ≥22 warns; CVE-2024-27980 fix
     // path).
     const inner = `"${npxBinary}" ${npxArgs.map(escapeCmdShimArg).join(" ")}`;
-    attachLifecycle(
-      spawn("cmd.exe", ["/d", "/s", "/c", `"${inner}"`], {
-        stdio: "inherit",
-        windowsVerbatimArguments: true,
-      }),
-      "mcp-launcher-npx",
-    );
-    return;
+    child = spawn("cmd.exe", ["/d", "/s", "/c", `"${inner}"`], {
+      stdio: "inherit",
+      windowsVerbatimArguments: true,
+    });
+  } else {
+    child = spawn(npxBinary, npxArgs, { stdio: "inherit" });
   }
-  attachLifecycle(spawn(npxBinary, npxArgs, { stdio: "inherit" }), "mcp-launcher-npx");
+  attachLifecycle(child, "mcp-launcher-npx");
+}
+
+function gitRevParse(flag) {
+  return execSync(`git rev-parse ${flag}`, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
 }
 
 function resolveWorktreeRoot() {
   let gitCommonDir;
   try {
-    gitCommonDir = execSync("git rev-parse --git-common-dir", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    gitCommonDir = gitRevParse("--git-common-dir");
   } catch {
     process.stderr.write("mcp-launcher: not inside a git repository\n");
     process.exit(1);
@@ -76,10 +79,7 @@ function resolveWorktreeRoot() {
   // Standard clone: repo root. Bare-clone hub: the specific worktree CWD is in.
   // This keeps each worktree isolated — MCP servers resolve from their own checkout.
   try {
-    return execSync("git rev-parse --show-toplevel", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    return gitRevParse("--show-toplevel");
   } catch {
     // Fallback for edge cases (bare repo CWD, detached worktree)
     return path.resolve(gitCommonDir, "..");
@@ -102,9 +102,8 @@ function runRepo(relDir, command, cmdArgs) {
   }
 
   const safeRelDir = assertRepoRelativeDir(relDir);
-  const worktreeRoot = resolveWorktreeRoot();
-  const serverDir = path.resolve(worktreeRoot, safeRelDir);
-  const worktreeResolved = path.resolve(worktreeRoot);
+  const worktreeResolved = path.resolve(resolveWorktreeRoot());
+  const serverDir = path.resolve(worktreeResolved, safeRelDir);
   if (serverDir !== worktreeResolved && !serverDir.startsWith(`${worktreeResolved}${path.sep}`)) {
     process.stderr.write(`mcp-launcher: repo path escapes worktree root: ${relDir}\n`);
     process.exit(1);

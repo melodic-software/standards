@@ -57,9 +57,7 @@ while IFS= read -r match; do
   lineno="${rest%%:*}"
   content="${rest#*:}"
 
-  scan_rc=0
-  scan_out="$(chp::scan_text "$content")" || scan_rc=$?
-  if [[ "$scan_rc" -eq 0 ]]; then
+  if scan_out="$(chp::scan_text "$content")"; then
     continue
   fi
 

@@ -37,6 +37,7 @@ import {
   checkCompositeBehavior,
   checkHookBehavior,
   parseCompositeIssueRef,
+  unquoteAwk,
 } from "./lockstep-behavior.mjs";
 import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
@@ -70,20 +71,27 @@ export const COPY_SOURCES = {
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
 };
 
-// Every repository in the fleet, whether or not it is gated today.
+// Every repository whose gate caller the scan checks. A repository listed here
+// with no gate caller is a drift finding, so add a repository once it runs the
+// gate and the standards-sync App installation can read it.
 export const CONSUMER_REPOSITORIES = [
   ".github",
+  "agent-automations",
   "agent-plugins",
+  "architecture",
   "ci-runner",
   "ci-workflows",
+  "claude-code-account-rotation",
   "claude-code-plugins",
   "claude-code-proxy",
   "codex-plugins",
   "cursor-plugins",
   "dotfiles",
   "github-iac",
+  "knowledge-corpus",
   "medley",
   "provisioning",
+  "songwriting",
   "standards",
 ];
 
@@ -486,10 +494,6 @@ export function assertCompositeVerdictReads(runShText, location) {
   }
 }
 
-// The awk program is single-quoted bash, so an apostrophe inside it is spelled
-// `'"'"'`; read it back as the apostrophe awk sees.
-const unquoteAwk = (text) => text.replaceAll(`'"'"'`, "'");
-
 export function parseValidatorNegation(shellText, location) {
   // The last N words: a forward pass keeps them with `first = n - N`; the
   // bounded scan walks backward until it holds N (`${#words[@]} < N`).
@@ -870,41 +874,68 @@ function assertMentionsAnyRendered(text, terms, location) {
   }
 }
 
+// The composite's contract checks, in the order both callers report them.
+// `labeled` adds each static check's own suffix to `location`, as the copy
+// check names its findings; a pin reports them all under its one location.
+function compositeChecks(policy, runShText, actionYmlText, location, { labeled }) {
+  const label = (suffix) => (labeled ? `${location} (${suffix})` : location);
+  return {
+    sections: () =>
+      assertExactSections(
+        parseCompositeSections(runShText, location),
+        policy.body.requiredSections,
+        location,
+      ),
+    patterns: () =>
+      assertPatternsEnforce(
+        parseCompositePatterns(runShText, location),
+        policy,
+        label("enforcement patterns"),
+        { lowercaseProbe: true },
+      ),
+    types: () =>
+      assertAllowedTypes(
+        parseCompositeTypes(actionYmlText, location),
+        policy.title.allowedTypes,
+        label("title types"),
+      ),
+    requireScope: () =>
+      assertRequireScope(
+        parseCompositeRequireScope(actionYmlText, location),
+        policy.title.requireScope,
+        label("require-scope"),
+      ),
+    nonClosing: () =>
+      assertNonClosing(
+        parseCompositeNonClosing(runShText, label("non-closing markers")),
+        policy,
+        label("non-closing markers"),
+      ),
+    negation: () =>
+      assertNegation(
+        parseCompositeNegation(runShText, label("negated closers")),
+        policy,
+        label("negated closers"),
+      ),
+    issueRefDefault: () => assertCompositeIssueRefDefault(runShText, actionYmlText, location),
+    behavior: () => checkCompositeBehavior(runShText, policy, `${location} (behavior)`, location),
+    verdictReads: () => assertCompositeVerdictReads(runShText, `${location} (verdict)`),
+  };
+}
+
 // One drift verdict per copy; every check runs so a single invocation reports
 // the whole divergence set instead of the first hit.
 export function checkCopies(policy, texts) {
   const errors = [];
   const sections = policy.body.requiredSections;
   const run = (fn) => collect(errors, fn);
-  run(() =>
-    assertExactSections(
-      parseCompositeSections(texts.gateRun, "gate composite"),
-      sections,
-      "gate composite",
-    ),
-  );
-  run(() =>
-    assertPatternsEnforce(
-      parseCompositePatterns(texts.gateRun, "gate composite"),
-      policy,
-      "gate composite (enforcement patterns)",
-      { lowercaseProbe: true },
-    ),
-  );
-  run(() =>
-    assertAllowedTypes(
-      parseCompositeTypes(texts.gateAction, "gate composite"),
-      policy.title.allowedTypes,
-      "gate composite (title types)",
-    ),
-  );
-  run(() =>
-    assertRequireScope(
-      parseCompositeRequireScope(texts.gateAction, "gate composite"),
-      policy.title.requireScope,
-      "gate composite (require-scope)",
-    ),
-  );
+  const gate = compositeChecks(policy, texts.gateRun, texts.gateAction, "gate composite", {
+    labeled: true,
+  });
+  run(gate.sections);
+  run(gate.patterns);
+  run(gate.types);
+  run(gate.requireScope);
   run(() =>
     assertExactSections(
       parseValidatorSections(texts.hookValidator, "hook validator"),
@@ -967,20 +998,8 @@ export function checkCopies(policy, texts) {
       { lowercaseProbe: true },
     ),
   );
-  run(() =>
-    assertNonClosing(
-      parseCompositeNonClosing(texts.gateRun, "gate composite (non-closing markers)"),
-      policy,
-      "gate composite (non-closing markers)",
-    ),
-  );
-  run(() =>
-    assertNegation(
-      parseCompositeNegation(texts.gateRun, "gate composite (negated closers)"),
-      policy,
-      "gate composite (negated closers)",
-    ),
-  );
+  run(gate.nonClosing);
+  run(gate.negation);
   run(() =>
     assertNonClosing(
       parseValidatorNonClosing(texts.hookValidator, "hook validator (non-closing markers)"),
@@ -995,11 +1014,9 @@ export function checkCopies(policy, texts) {
       "hook validator (negated closers)",
     ),
   );
-  run(() => assertCompositeIssueRefDefault(texts.gateRun, texts.gateAction, "gate composite"));
-  run(() =>
-    checkCompositeBehavior(texts.gateRun, policy, "gate composite (behavior)", "gate composite"),
-  );
-  run(() => assertCompositeVerdictReads(texts.gateRun, "gate composite (verdict)"));
+  run(gate.issueRefDefault);
+  run(gate.behavior);
+  run(gate.verdictReads);
   run(() => checkHookBehavior(texts.hookValidator, policy, "hook validator (behavior)"));
   return errors;
 }
@@ -1040,38 +1057,10 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
 export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText) {
   const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
-  const run = (fn) => collect(errors, fn);
-  run(() =>
-    assertExactSections(
-      parseCompositeSections(runShText, location),
-      policy.body.requiredSections,
-      location,
-    ),
-  );
-  run(() =>
-    assertPatternsEnforce(parseCompositePatterns(runShText, location), policy, location, {
-      lowercaseProbe: true,
-    }),
-  );
-  run(() =>
-    assertAllowedTypes(
-      parseCompositeTypes(actionYmlText, location),
-      policy.title.allowedTypes,
-      location,
-    ),
-  );
-  run(() =>
-    assertRequireScope(
-      parseCompositeRequireScope(actionYmlText, location),
-      policy.title.requireScope,
-      location,
-    ),
-  );
-  run(() => assertNonClosing(parseCompositeNonClosing(runShText, location), policy, location));
-  run(() => assertNegation(parseCompositeNegation(runShText, location), policy, location));
-  run(() => assertCompositeIssueRefDefault(runShText, actionYmlText, location));
-  run(() => checkCompositeBehavior(runShText, policy, `${location} (behavior)`, location));
-  run(() => assertCompositeVerdictReads(runShText, `${location} (verdict)`));
+  const checks = compositeChecks(policy, runShText, actionYmlText, location, { labeled: false });
+  for (const check of Object.values(checks)) {
+    collect(errors, check);
+  }
   return errors;
 }
 

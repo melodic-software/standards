@@ -231,13 +231,7 @@ function isPullRequestTriggered(workflow) {
 function topLevelConcurrency(workflow) {
   const concurrency = workflow.concurrency;
   if (concurrency === undefined) {
-    return {
-      present: false,
-      malformed: false,
-      group: undefined,
-      cancelInProgress: undefined,
-      keys: [],
-    };
+    return { present: false, malformed: false, keys: [] };
   }
   if (typeof concurrency === "string") {
     return {
@@ -257,13 +251,7 @@ function topLevelConcurrency(workflow) {
       keys: Object.keys(concurrency),
     };
   }
-  return {
-    present: true,
-    malformed: true,
-    group: undefined,
-    cancelInProgress: undefined,
-    keys: [],
-  };
+  return { present: true, malformed: true, keys: [] };
 }
 
 function concurrencyFindings(file, workflow) {
@@ -449,10 +437,9 @@ export async function auditRepository({
           "concurrency-policy exception names a workflow that does not exist",
         ),
       );
-    } else if (record.error) {
-      // The workflow exists but could not be parsed; the unparsable finding
-      // already fired. Leave the exception unconsumed without a second report.
-    } else {
+    } else if (!record.error) {
+      // A workflow that could not be parsed already has its unparsable finding,
+      // so its exception is left unconsumed without a second report.
       findings.push(
         finding(
           "exception-inventory-drift",
@@ -471,11 +458,9 @@ export async function auditRepository({
       uniqueFindings.set(key, item);
     }
   }
-  return [...uniqueFindings.values()].sort((left, right) =>
-    [left.file, left.rule, left.message]
-      .join("\0")
-      .localeCompare([right.file, right.rule, right.message].join("\0")),
-  );
+  return [...uniqueFindings]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, item]) => item);
 }
 
 export function parseArguments(argv) {

@@ -41,18 +41,14 @@ test("every id is listed once", () => {
   );
 });
 
+const listed = (id) => list.actors.some((actor) => actor.id === id);
+
 test("github-actions[bot] is not trusted", () => {
-  assert.equal(
-    list.actors.some((actor) => actor.id === 41898282),
-    false,
-  );
+  assert.equal(listed(41898282), false);
 });
 
 test("chatgpt-codex-connector[bot] is not trusted", () => {
-  assert.equal(
-    list.actors.some((actor) => actor.id === 199175422),
-    false,
-  );
+  assert.equal(listed(199175422), false);
 });
 
 // The code-review callers pass the list's people as pr-review's

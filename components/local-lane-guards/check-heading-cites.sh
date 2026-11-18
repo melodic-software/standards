@@ -121,16 +121,8 @@ function index_anchors(path, line,   a, rest, p) {
   if (substr(line, 1, 1) == "#") {
     if (match(line, /^#+/) && RLENGTH <= 6 && substr(line, RLENGTH + 1, 1) == " ")
       a = trim(substr(line, RLENGTH + 2))
-  } else if (match(line, /^[-*+] \*\*/)) {
+  } else if (match(line, /^([-*+] |\| )?\*\*/)) {
     rest = substr(line, RLENGTH + 1)
-    p = index(rest, "**")
-    if (p > 1) a = substr(rest, 1, p - 1)
-  } else if (substr(line, 1, 2) == "**") {
-    rest = substr(line, 3)
-    p = index(rest, "**")
-    if (p > 1) a = substr(rest, 1, p - 1)
-  } else if (substr(line, 1, 4) == "| **") {
-    rest = substr(line, 5)
     p = index(rest, "**")
     if (p > 1) a = substr(rest, 1, p - 1)
   }
@@ -172,13 +164,9 @@ function extract_prose_cites(path, lineno, line,   work, m, t, sp, url_pos) {
     sp = index(m, " \"")
     if (sp < 1) continue
     t = substr(m, 1, sp - 1)
-    if (t ~ /^https?:\/\// || t ~ /^\/\//) {
-      continue
-    }
+    if (t ~ /^https?:\/\// || t ~ /^\/\//) continue
     url_pos = index(line, t " \"")
-    if (url_pos > 3 && substr(line, url_pos - 3, 3) == "://") {
-      continue
-    }
+    if (url_pos > 3 && substr(line, url_pos - 3, 3) == "://") continue
     work = add_cite_from_match(path, lineno, t, m, work)
   }
 }
@@ -186,21 +174,24 @@ function extract_prose_cites(path, lineno, line,   work, m, t, sp, url_pos) {
 # chained anchor continuations. Shared by extract_cites and
 # extract_prose_cites, which differ only in how they derive `t` (the target)
 # and `m` (the matched text) before calling in.
-function add_cite_from_match(path, lineno, t, m, work,   q1) {
-  q1 = index(m, "\"")
-  add_cite(path, lineno, t, substr(m, q1 + 1, length(m) - q1 - 1))
+function add_cite_from_match(path, lineno, t, m, work) {
+  add_cite(path, lineno, t, quoted(m))
   return extract_chained(path, lineno, t, work)
 }
 # Chained continuation anchors: `file.md` "A" + "B" [+ "C" ...] — each anchor
 # verified against the same target.
-function extract_chained(path, lineno, t, work,   m, q1) {
+function extract_chained(path, lineno, t, work,   m) {
   while (match(work, /^ \+ "[^"]+"/)) {
     m = substr(work, RSTART, RLENGTH)
     work = substr(work, RSTART + RLENGTH)
-    q1 = index(m, "\"")
-    add_cite(path, lineno, t, substr(m, q1 + 1, length(m) - q1 - 1))
+    add_cite(path, lineno, t, quoted(m))
   }
   return work
+}
+# The text between the first double quote of m and its final character.
+function quoted(m,   q1) {
+  q1 = index(m, "\"")
+  return substr(m, q1 + 1, length(m) - q1 - 1)
 }
 function add_cite(path, lineno, t, a) {
   if (substr(t, 1, 1) == "<") return

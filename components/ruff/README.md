@@ -17,7 +17,9 @@ documented fallback applies instead of repository policy.
 Managed consumers do not edit `ruff.toml`. A nested Python project may use
 Ruff's native `extend` plus `extend-select` and
 `extend-per-file-ignores` for additive policy. A repository requiring a
-different root policy opts out and owns the whole component locally.
+different root policy
+[opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component)
+and owns the whole component locally.
 
 `fixtures/` and `ruff.test.sh` prove lint, format, banned-API, and timezone-aware
 datetime rules. Fixtures and tests stay in this source slice and are not

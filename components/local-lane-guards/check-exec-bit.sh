@@ -43,6 +43,15 @@ candidates="$work/grep"
 errfile="$work/err"
 shebangs="$work/shebangs"
 index="$work/index"
+# fail_closed <command> <exit code> <scan noun> <stderr group label>
+fail_closed() {
+  echo "::error::git $1 failed (exit $2) — refusing to pass the exec-bit gate without a full $3 scan."
+  echo "::group::git $4 stderr"
+  cat "$errfile"
+  echo "::endgroup::"
+  exit 1
+}
+
 grep_rc=0
 # stderr to its own file: $candidates is parsed as path-NUL-lineno-NUL-line
 # records, so a stderr line merged in would corrupt an adjacent record and
@@ -51,11 +60,7 @@ grep_rc=0
 git -c core.quotePath=false grep --cached -z -nIE '^#!' -- "${paths[@]}" \
   >"$candidates" 2>"$errfile" || grep_rc=$?
 if [[ "$grep_rc" -ne 0 && "$grep_rc" -ne 1 ]]; then
-  echo "::error::git grep failed (exit $grep_rc) — refusing to pass the exec-bit gate without a full candidate scan."
-  echo "::group::git grep stderr"
-  cat "$errfile"
-  echo "::endgroup::"
-  exit 1
+  fail_closed grep "$grep_rc" candidate grep
 fi
 
 # Line-1 `^#!` hits are the shebang files. Combined `-z -n` writes
@@ -85,11 +90,7 @@ ls_rc=0
 git -c core.quotePath=false ls-files --stage -z -- "${paths[@]}" \
   >"$index" 2>"$errfile" || ls_rc=$?
 if [[ "$ls_rc" -ne 0 ]]; then
-  echo "::error::git ls-files --stage failed (exit $ls_rc) — refusing to pass the exec-bit gate without a full index scan."
-  echo "::group::git ls-files stderr"
-  cat "$errfile"
-  echo "::endgroup::"
-  exit 1
+  fail_closed 'ls-files --stage' "$ls_rc" index ls-files
 fi
 
 # RS is a single character in POSIX awk; NUL is that character. Associative
@@ -113,7 +114,6 @@ FNR == NR {
   sp = index(meta, " ")
   if (sp == 0) next
   mode = substr(meta, 1, sp - 1)
-  if (mode != "100644" && mode != "100755") next
   if (mode == "100644") {
     printf "::error file=%s::%s has a shebang but git index mode is 100644; run: git update-index --chmod=+x -- \"%s\"\n", path, path, path
     found = 1

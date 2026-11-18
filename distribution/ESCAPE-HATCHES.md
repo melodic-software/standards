@@ -1,9 +1,9 @@
 # Escape hatches
 
 The sanctioned ways a consuming repository steps outside a synced default.
-This document is the consumer-facing index; the [Lifecycle](README.md#lifecycle)
-table in the distribution README records the same moves from the manifest's
-perspective.
+This document owns the opt-out and customization procedure; the
+[Lifecycle](README.md#lifecycle) table in the distribution README orders the
+manifest moves and cites it.
 
 ## Opting a repository out of a managed component
 

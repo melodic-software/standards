@@ -103,16 +103,13 @@ echo $(($(<"$COUNT_DIR/awk") + 1)) >"$COUNT_DIR/awk"
 exec "$REAL_AWK" "$@"
 SH
 chmod +x "$awk_dir/bin/awk"
-i=1
-while [[ "$i" -le 8 ]]; do
+for i in {1..8}; do
   COUNT_DIR="$awk_dir" REAL_AWK="$real_awk" PATH="$awk_dir/bin:$PATH" \
     chp::scan_text "# TODO item $i" >/dev/null || true
-  i=$((i + 1))
 done
 assert_eq 'single-line scan_text does not spawn awk' '0' "$(cat "$awk_dir/awk")"
 COUNT_DIR="$awk_dir" REAL_AWK="$real_awk" PATH="$awk_dir/bin:$PATH" \
   chp::scan_text "$bad" >/dev/null || true
 assert_eq 'multi-line scan_text uses one awk' '1' "$(cat "$awk_dir/awk")"
-rm -rf "$awk_dir"
 
 [[ $FAILED -eq 0 ]] || exit 1

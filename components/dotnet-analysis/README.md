@@ -15,8 +15,9 @@ analyzers included in the SDK and adds no analyzer package dependency.
 
 The `dotnet-build` and `dotnet-format` actions in `ci-workflows` own execution.
 Managed consumers do not edit the payload; a repository with an established
-`Directory.Build.props` either imports the component intact or owns its complete
-.NET analysis policy locally.
+`Directory.Build.props` either imports the component intact or
+[opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component)
+and owns its complete .NET analysis policy locally.
 
 `fixtures/` and `dotnet-analysis.test.sh` prove code-quality, code-style, whitespace, and
 System-first import ordering. Contract fixtures are not distributed.

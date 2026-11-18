@@ -180,18 +180,22 @@ test("duplicate JSON object members fail closed", () => {
   );
 });
 
-test("closing keyword validation follows policy-authored keywords", () => {
-  const customPolicy = validatePolicy({
+function docsOnlyPolicy(closingKeywords) {
+  return validatePolicy({
     schemaVersion: 2,
     title: { allowedTypes: ["docs"], requireScope: false },
     body: {
       requiredSections: ["Related"],
-      closingKeywords: ["Completes"],
+      closingKeywords,
       noIssueMarkers: ["No linked issue"],
       nonClosingMarkers: POLICY.body.nonClosingMarkers,
       negatedClosers: POLICY.body.negatedClosers,
     },
   });
+}
+
+test("closing keyword validation follows policy-authored keywords", () => {
+  const customPolicy = docsOnlyPolicy(["Completes"]);
   const accepted = `Completes #42
 
 ## Related
@@ -206,17 +210,7 @@ test("closing keyword validation follows policy-authored keywords", () => {
 });
 
 test("title validation follows policy-authored allowed types", () => {
-  const customPolicy = validatePolicy({
-    schemaVersion: 2,
-    title: { allowedTypes: ["docs"], requireScope: false },
-    body: {
-      requiredSections: ["Related"],
-      closingKeywords: ["Closes"],
-      noIssueMarkers: ["No linked issue"],
-      nonClosingMarkers: POLICY.body.nonClosingMarkers,
-      negatedClosers: POLICY.body.negatedClosers,
-    },
-  });
+  const customPolicy = docsOnlyPolicy(["Closes"]);
   assert.deepEqual(rules(validateTitle("docs: update readme", customPolicy)), []);
   assert.deepEqual(rules(validateTitle("feat: add feature", customPolicy)), [
     "title:title-not-conventional",

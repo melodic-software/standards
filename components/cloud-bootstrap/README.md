@@ -84,7 +84,7 @@ One lever per mode, the same tri-mode the distribution README defines:
 - **Customize**: move the component to `locally-owned` for that repository
   in `distribution/sync-manifest.yml` (upstream first, then edit the copy
   downstream), per the
-  [distribution lifecycle](../../distribution/README.md). The repo then owns
+  [escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component). The repo then owns
   the whole file.
 
 ## Bash compatibility

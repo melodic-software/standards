@@ -78,6 +78,13 @@ async function repository({ workflows = {}, actions = [] }) {
   return root;
 }
 
+const runAnalyzer = (analyzer, args) =>
+  new Promise((resolve) => {
+    execFile(process.execPath, [analyzer, ...args], (error, stdout, stderr) =>
+      resolve({ code: error === null ? 0 : error.code, stdout, stderr }),
+    );
+  });
+
 const summary = (findings) => findings.map(({ level, rule, file }) => `${level} ${rule} ${file}`);
 
 test("a repository that follows the conventions has no findings in enforcing mode", async () => {
@@ -156,13 +163,7 @@ test("advisory mode reports the same findings as warnings and exits 0", async ()
   assert.deepEqual(summary(findings), ["warning workflow-filename .github/workflows/ci.yml"]);
 
   const run = (mode) =>
-    new Promise((resolve) => {
-      execFile(
-        process.execPath,
-        [ANALYZER, "--root", root, "--mode", mode, "--format", "github"],
-        (error, stdout) => resolve({ code: error === null ? 0 : error.code, stdout }),
-      );
-    });
+    runAnalyzer(ANALYZER, ["--root", root, "--mode", mode, "--format", "github"]);
   const advisory = await run("advisory");
   assert.equal(advisory.code, 0);
   assert.match(advisory.stdout, /^::warning file=\.github\/workflows\/ci\.yml,line=1,/mu);
@@ -192,7 +193,13 @@ const NAME_EXEMPTION = {
   expectedName: "release-deployx",
   reason: "Test fixture: a recorded workflow-name exception.",
 };
-const exempting = { ...vocabulary, exemptions: [NAME_EXEMPTION] };
+const lintExempting = (root, repository = "melodic-software/github-iac") =>
+  lintRepository({
+    root,
+    vocabulary: { ...vocabulary, exemptions: [NAME_EXEMPTION] },
+    mode: "enforcing",
+    repository,
+  });
 
 test("a recorded workflow-name exception applies only in its repository", async () => {
   const root = await repository({
@@ -200,21 +207,8 @@ test("a recorded workflow-name exception applies only in its repository", async 
       "release-deploy-oidc-negative-test.yml": workflow({ raw: "release-deployx" }, ["test"]),
     },
   });
-  assert.deepEqual(
-    await lintRepository({
-      root,
-      vocabulary: exempting,
-      mode: "enforcing",
-      repository: "melodic-software/github-iac",
-    }),
-    [],
-  );
-  const elsewhere = await lintRepository({
-    root,
-    vocabulary: exempting,
-    mode: "enforcing",
-    repository: "melodic-software/medley",
-  });
+  assert.deepEqual(await lintExempting(root), []);
+  const elsewhere = await lintExempting(root, "melodic-software/medley");
   assert.deepEqual(summary(elsewhere), [
     "error workflow-name .github/workflows/release-deploy-oidc-negative-test.yml",
   ]);
@@ -231,12 +225,7 @@ test("the recorded exception is exact: neither the stem nor a Title Case form pa
         "release-deploy-oidc-negative-test.yml": workflow({ raw: name }, ["test"]),
       },
     });
-    const findings = await lintRepository({
-      root,
-      vocabulary: exempting,
-      mode: "enforcing",
-      repository: "melodic-software/github-iac",
-    });
+    const findings = await lintExempting(root);
     assert.deepEqual(
       summary(findings),
       ["error workflow-name .github/workflows/release-deploy-oidc-negative-test.yml"],
@@ -546,13 +535,7 @@ test("a missing vocabulary schema exits 2, not 1", async () => {
     await writeFile(path.join(copy, name), await readFile(path.join(HERE, name)));
   }
   await symlink(path.join(HERE, "node_modules"), path.join(copy, "node_modules"), "dir");
-  const result = await new Promise((resolve) => {
-    execFile(
-      process.execPath,
-      [path.join(copy, "naming-lint.mjs"), "--root", copy],
-      (error, _stdout, stderr) => resolve({ code: error === null ? 0 : error.code, stderr }),
-    );
-  });
+  const result = await runAnalyzer(path.join(copy, "naming-lint.mjs"), ["--root", copy]);
   assert.equal(result.code, 2);
   assert.match(result.stderr, /vocabulary\.schema\.json/u);
 });

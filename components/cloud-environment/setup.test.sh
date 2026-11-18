@@ -16,6 +16,27 @@ trap 'exit 143' TERM
 
 script="$root/components/cloud-environment/setup.sh"
 readme="$root/components/cloud-environment/README.md"
+script_text="$(cat "$script")"
+readme_text="$(cat "$readme")"
+
+# setup_value <name> [<value-re>]: the value setup.sh assigns to <name> in a
+# single-quoted top-level line, the first one matching <value-re> (a basic sed
+# regex, default any).
+setup_value() {
+  sed -n "s/^$1='\(${2:-.*}\)'\$/\1/p" "$script" | head -n 1
+}
+
+# declared <name> <value-re> <label> <placeholder>: sets decl to
+# setup_value <name> <value-re> and records <label> as passing only when there
+# is one; the failure names <name>='<placeholder>'.
+declared() {
+  decl="$(setup_value "$1" "$2")"
+  if [[ -n "$decl" ]]; then
+    pass "$3"
+  else
+    fail "$3" "no $1='$4' assignment found"
+  fi
+}
 
 bash -n "$script" 2>/dev/null
 rc=$?
@@ -43,15 +64,10 @@ fi
 # diligence. (The .NET fallback list has no in-repo manifest to check against;
 # it stays a documented manual obligation.)
 node_pin_repo="$(tr -d '[:space:]' <"$root/.node-version")"
-node_pin_script="$(sed -n "s/^NODE_FALLBACK_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
-if [[ -n "$node_pin_script" ]]; then
-  pass "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')"
-else
-  fail "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')" \
-    "no NODE_FALLBACK_VERSION='<version>' assignment found"
-fi
+declared NODE_FALLBACK_VERSION '[0-9][0-9.]*' \
+  "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')" '<version>'
 assert_eq 'setup.sh Node fallback pin matches the repo .node-version' \
-  "$node_pin_repo" "$node_pin_script"
+  "$node_pin_repo" "$decl"
 
 # CWD-independence contract: the bootstrap and plugin steps must key off an
 # explicitly resolved repo root, never a relative path from the build's CWD —
@@ -123,30 +139,20 @@ rm -rf "$cat_tmp"
 
 assert_eq 'setup.sh derives the fleet list from the published catalog' \
   'https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/.claude-plugin/marketplace.json' \
-  "$(sed -n "s/^FLEET_CATALOG_URL='\(.*\)'\$/\1/p" "$script")"
-fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$script")"
-if [[ -n "$fleet_path" ]]; then
-  pass 'setup.sh declares the snapshot path for the fleet list'
-else
-  fail 'setup.sh declares the snapshot path for the fleet list' "no FLEET_PLUGINS='...' assignment found"
-fi
+  "$(setup_value FLEET_CATALOG_URL)"
+declared FLEET_PLUGINS '.*' 'setup.sh declares the snapshot path for the fleet list' '...'
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh falls back when the snapshot path for the fleet list is unwritable' \
-  "$(cat "$script")" 'fleet_list_from_catalog "$catalog_file" "$FLEET_PLUGINS_FALLBACK"'
+  "$script_text" 'fleet_list_from_catalog "$catalog_file" "$FLEET_PLUGINS_FALLBACK"'
 assert_contains 'README documents the fleet list snapshot path' \
-  "$(cat "$readme")" "$fleet_path"
+  "$readme_text" "$decl"
 assert_contains 'README documents the catalog the fleet list derives from' \
-  "$(cat "$readme")" '.claude-plugin/marketplace.json'
+  "$readme_text" '.claude-plugin/marketplace.json'
 
 # README/script drift guards.
-stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$script")"
-if [[ -n "$stamp_path" ]]; then
-  pass 'setup.sh declares a stamp path'
-else
-  fail 'setup.sh declares a stamp path' "no STAMP='...' assignment found"
-fi
+declared STAMP '.*' 'setup.sh declares a stamp path' '...'
 assert_contains 'README documents the stamp path the script writes' \
-  "$(cat "$readme")" "$stamp_path"
+  "$readme_text" "$decl"
 
 # gh install contract: the fleet runs one gh across three lanes (this script,
 # the ci-runner image, dotfiles/mise). Ubuntu's archive gh is years stale, so
@@ -156,55 +162,34 @@ grep -q 'apt-get install -y gh' "$script"
 rc=$?
 assert_exit 'setup.sh does not install gh from the Ubuntu archive' 1 "$rc"
 
-gh_pin="$(sed -n "s/^GH_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
-if [[ -n "$gh_pin" ]]; then
-  pass "setup.sh declares a gh pin (GH_VERSION='<version>')"
-else
-  fail "setup.sh declares a gh pin (GH_VERSION='<version>')" \
-    "no GH_VERSION='<version>' assignment found"
-fi
+declared GH_VERSION '[0-9][0-9.]*' "setup.sh declares a gh pin (GH_VERSION='<version>')" '<version>'
+gh_pin="$decl"
 
-gh_sha="$(sed -n "s/^GH_SHA256='\([0-9a-f]\{64\}\)'\$/\1/p" "$script" | head -n 1)"
-if [[ -n "$gh_sha" ]]; then
-  pass 'setup.sh declares a 64-hex gh asset checksum (GH_SHA256)'
-else
-  fail 'setup.sh declares a 64-hex gh asset checksum (GH_SHA256)' \
-    "no GH_SHA256='<64 hex chars>' assignment found"
-fi
+declared GH_SHA256 '[0-9a-f]\{64\}' 'setup.sh declares a 64-hex gh asset checksum (GH_SHA256)' '<64 hex chars>'
 
 # shellcheck disable=SC2016 # the ${GH_VERSION} is literal text being searched for
 assert_contains 'setup.sh fetches gh from the pinned upstream release asset' \
-  "$(cat "$script")" 'https://github.com/cli/cli/releases/download/v${GH_VERSION}/'
+  "$script_text" 'https://github.com/cli/cli/releases/download/v${GH_VERSION}/'
 assert_contains 'setup.sh verifies the gh asset before installing it' \
-  "$(cat "$script")" 'sha256sum --check --strict'
+  "$script_text" 'sha256sum --check --strict'
 assert_contains 'README documents the gh version the script installs' \
-  "$(cat "$readme")" "$gh_pin"
+  "$readme_text" "$gh_pin"
 
 # shfmt install contract: guardrails refuses every Bash call without shfmt, so
 # this script installs it for repos whose own bootstrap does not.
-shfmt_pin="$(sed -n "s/^SHFMT_VERSION='\([0-9][0-9.]*\)'\$/\1/p" "$script" | head -n 1)"
-if [[ -n "$shfmt_pin" ]]; then
-  pass "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')"
-else
-  fail "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')" \
-    "no SHFMT_VERSION='<version>' assignment found"
-fi
-if grep -Eq "^SHFMT_SHA256='[0-9a-f]{64}'\$" "$script"; then
-  pass 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)'
-else
-  fail 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)' \
-    "no SHFMT_SHA256='<64 hex chars>' assignment found"
-fi
+declared SHFMT_VERSION '[0-9][0-9.]*' "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')" '<version>'
+shfmt_pin="$decl"
+declared SHFMT_SHA256 '[0-9a-f]\{64\}' 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)' '<64 hex chars>'
 # shellcheck disable=SC2016 # the ${SHFMT_VERSION} is literal text being searched for
 assert_contains 'setup.sh fetches shfmt from the pinned upstream release asset' \
-  "$(cat "$script")" 'https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/'
+  "$script_text" 'https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/'
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh verifies the shfmt asset before installing it' \
-  "$(cat "$script")" 'printf '"'"'%s  %s\n'"'"' "$SHFMT_SHA256" "$SHFMT_ASSET"'
+  "$script_text" 'printf '"'"'%s  %s\n'"'"' "$SHFMT_SHA256" "$SHFMT_ASSET"'
 assert_contains 'README documents the shfmt version the script installs' \
-  "$(cat "$readme")" "$shfmt_pin"
+  "$readme_text" "$shfmt_pin"
 assert_contains 'README bootstrap URL matches the component path' \
-  "$(cat "$readme")" \
+  "$readme_text" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
 
 # This script installs from the fleet list alone. A repo's enabledPlugins block
@@ -214,10 +199,10 @@ assert_contains 'README bootstrap URL matches the component path' \
 # source.
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_not_contains 'setup.sh does not install from the checkout settings block' \
-  "$(cat "$script")" 'install_plugins_from "$settings"'
+  "$script_text" 'install_plugins_from "$settings"'
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_not_contains 'setup.sh does not resolve the checkout settings block for install' \
-  "$(cat "$script")" 'settings="$REPO_ROOT/.claude/settings.json"'
+  "$script_text" 'settings="$REPO_ROOT/.claude/settings.json"'
 
 # Ordering contract: the fleet install must precede the repo bootstrap. The
 # repo bootstrap applies the repo's deltas as an overlay on the fleet list and
@@ -244,29 +229,29 @@ cat >"$plug_tmp/bin/claude" <<STUB
 #!/usr/bin/env bash
 COUNT_DIR="${plug_tmp}/counts"
 mkdir -p "\$COUNT_DIR"
+bump() { echo \$(( \$(cat "\$COUNT_DIR/\$1" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/\$1"; }
 case "\$1 \$2 \$3" in
   "plugin marketplace list")
-    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    bump marketplace-list
     printf '[{"name":"stub-market"}]\n'
     ;;
   "plugin list "*)
-    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    bump plugin-list
     printf '[{"id":"alpha@stub-market"}]\n'
     ;;
   "plugin marketplace add")
-    echo \$(( \$(cat "\$COUNT_DIR/marketplace-add" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-add"
+    bump marketplace-add
     ;;
   "plugin install "*)
-    echo \$(( \$(cat "\$COUNT_DIR/plugin-install" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-install"
+    bump plugin-install
     ;;
   *) exit 0 ;;
 esac
 STUB
 chmod +x "$plug_tmp/bin/claude"
-echo 0 >"$plug_tmp/counts/marketplace-list"
-echo 0 >"$plug_tmp/counts/plugin-list"
-echo 0 >"$plug_tmp/counts/marketplace-add"
-echo 0 >"$plug_tmp/counts/plugin-install"
+for count in marketplace-list plugin-list marketplace-add plugin-install; do
+  echo 0 >"$plug_tmp/counts/$count"
+done
 cat >"$plug_tmp/fleet.json" <<'JSON'
 {
   "extraKnownMarketplaces": { "stub-market": { "source": { "source": "github", "repo": "example/stub" } } },
@@ -306,10 +291,10 @@ floor_src="$root/$floor_rel"
 assert_file_exists 'the claude-permissions floor exists in this repository' "$floor_src"
 assert_eq 'setup.sh fetches the permission floor from its published path' \
   "https://raw.githubusercontent.com/melodic-software/standards/main/$floor_rel" \
-  "$(sed -n "s/^CLAUDE_PERMISSIONS_URL='\(.*\)'\$/\1/p" "$script")"
+  "$(setup_value CLAUDE_PERMISSIONS_URL)"
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh composes the fetched floor into the user settings file' \
-  "$(cat "$script")" 'compose_permissions_floor "$floor_file" "$user_settings"'
+  "$script_text" 'compose_permissions_floor "$floor_file" "$user_settings"'
 
 perm_tmp="$(mktemp -d "$TEST_TMPDIR/perm_tmp.XXXXXX")"
 fresh="$perm_tmp/fresh/.claude/settings.json"
@@ -409,17 +394,17 @@ vault_exec_rel='components/cloud-environment/vault-exec'
 vault_exec_src="$root/$vault_exec_rel"
 assert_eq 'setup.sh fetches vault-exec from its published path' \
   "https://raw.githubusercontent.com/melodic-software/standards/main/$vault_exec_rel" \
-  "$(sed -n "s/^VAULT_EXEC_URL='\(.*\)'\$/\1/p" "$script")"
-vault_marker="$(sed -n "s/^VAULT_EXEC_MARKER='\(.*\)'\$/\1/p" "$script")"
+  "$(setup_value VAULT_EXEC_URL)"
+vault_marker="$(setup_value VAULT_EXEC_MARKER)"
 grep -qxF "$vault_marker" "$vault_exec_src"
 rc=$?
 assert_exit 'vault-exec carries the marker setup.sh installs by' 0 "$rc"
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh installs vault-exec under the user home' \
-  "$(cat "$script")" 'vault_exec_dest="$HOME/.local/bin/vault-exec"'
+  "$script_text" 'vault_exec_dest="$HOME/.local/bin/vault-exec"'
 # shellcheck disable=SC2088 # the ~ is literal README text
 assert_contains 'README documents the vault-exec install path' \
-  "$(cat "$readme")" '~/.local/bin/vault-exec'
+  "$readme_text" '~/.local/bin/vault-exec'
 
 ve_tmp="$(mktemp -d "$TEST_TMPDIR/ve_tmp.XXXXXX")"
 ve_dest="$ve_tmp/home/.local/bin/vault-exec"
@@ -462,17 +447,17 @@ pp_rel='components/cloud-environment/pages-publish'
 pp_src="$root/$pp_rel"
 assert_eq 'setup.sh fetches pages-publish from its published path' \
   "https://raw.githubusercontent.com/melodic-software/standards/main/$pp_rel" \
-  "$(sed -n "s/^PAGES_PUBLISH_URL='\(.*\)'\$/\1/p" "$script")"
-pp_marker="$(sed -n "s/^PAGES_PUBLISH_MARKER='\(.*\)'\$/\1/p" "$script")"
+  "$(setup_value PAGES_PUBLISH_URL)"
+pp_marker="$(setup_value PAGES_PUBLISH_MARKER)"
 grep -qxF "$pp_marker" "$pp_src"
 rc=$?
 assert_exit 'pages-publish carries the marker setup.sh installs by' 0 "$rc"
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh installs pages-publish under the user home' \
-  "$(cat "$script")" 'pages_publish_dest="$HOME/.local/bin/pages-publish"'
+  "$script_text" 'pages_publish_dest="$HOME/.local/bin/pages-publish"'
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'setup.sh names a foreign pages-publish in its WARN' \
-  "$(cat "$script")" 'WARN pages-publish: $pages_publish_dest is not ours; left untouched'
+  "$script_text" 'WARN pages-publish: $pages_publish_dest is not ours; left untouched'
 
 pp_tmp="$(mktemp -d "$TEST_TMPDIR/pp_tmp.XXXXXX")"
 pp_dest="$pp_tmp/home/.local/bin/pages-publish"
@@ -501,8 +486,8 @@ rm -rf "$pp_tmp"
 rv_rel='components/cloud-environment/rendered-views-sync'
 assert_eq 'setup.sh fetches rendered-views-sync from its published path' \
   "https://raw.githubusercontent.com/melodic-software/standards/main/$rv_rel" \
-  "$(sed -n "s/^RENDERED_VIEWS_SYNC_URL='\(.*\)'\$/\1/p" "$script")"
-rv_marker="$(sed -n "s/^RENDERED_VIEWS_SYNC_MARKER='\(.*\)'\$/\1/p" "$script")"
+  "$(setup_value RENDERED_VIEWS_SYNC_URL)"
+rv_marker="$(setup_value RENDERED_VIEWS_SYNC_MARKER)"
 grep -qxF "$rv_marker" "$root/$rv_rel"
 rc=$?
 assert_exit 'rendered-views-sync carries the marker setup.sh installs by' 0 "$rc"
@@ -559,7 +544,7 @@ assert_contains 'a set PAGES_PUBLISH_* names its replacement' "$ri_log" \
   'PAGES_PUBLISH_PRIVATE_ENDPOINT is set but ignored; pages-publish reads its config from Key Vault secret pages-publish-config'
 assert_eq 'one line per set retired input' 2 "$(wc -l <"$LOG" | tr -d ' ')"
 assert_not_contains 'the log never echoes a retired value' "$ri_log" 'secret-value'
-assert_contains 'setup.sh logs retired inputs after the start line' "$(cat "$script")" \
+assert_contains 'setup.sh logs retired inputs after the start line' "$script_text" \
   $'log "start version=$SCRIPT_VERSION"\nlog_retired_inputs'
 rm -rf "$ri_tmp"
 

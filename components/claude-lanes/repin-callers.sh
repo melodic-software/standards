@@ -458,10 +458,7 @@ repin::fenced() {
 # directory) and, unlike a recursive tree read, never truncates. Any failure
 # but a 404 is fatal: it says nothing about the path.
 repin::path_state() {
-  local path="$1" sha="$2" err
-  err="$(mktemp)"
-  # shellcheck disable=SC2064
-  trap "rm -f '$err'" RETURN
+  local path="$1" sha="$2" err="${REPIN_CACHE}/path-state.err"
   if gh api "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" --silent 2>"$err"; then
     echo present
   elif grep -q 'HTTP 404' "$err"; then
@@ -570,6 +567,7 @@ repin::apply() {
   local root found refs fenced pinned decided moved file path pin_sha decision
   local expected before after old_tags new_major old_major old_tag note ahead_list kept_list delim
   local path_map from to renamed moved_paths
+  local tagged_re="uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$"
   local -a targets ahead excludes sed_args
 
   if [[ ! "$release_date" =~ $DATE_RE ]]; then
@@ -577,18 +575,10 @@ repin::apply() {
     return 2
   fi
 
-  if [[ -n "$dir" ]]; then
-    root="$(git -C "$dir" rev-parse --show-toplevel)"
-  else
-    root="$(git rev-parse --show-toplevel)"
-  fi
+  root="$(git -C "${dir:-.}" rev-parse --show-toplevel)"
   cd "$root"
 
-  if [[ -n "$dir" ]]; then
-    found="$(repin::targets "$dir")"
-  else
-    found="$(repin::targets)"
-  fi
+  found="$(repin::targets ${dir:+"$dir"})"
   if [[ -z "$found" ]]; then
     echo "::error::No caller file under ${root} pins a ${UPSTREAM_REPO} action." >&2
     return 1
@@ -655,7 +645,7 @@ repin::apply() {
   expected="$(awk -F'\t' -v s="$sha" -v t="$tag" 'NR == FNR { if ($0 != "") m[$0] = 1; next }
     (($2 "\t" $3) in m) && !($3 == s && $4 == t)' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | wc -l)"
-  before="$(grep -hoE "uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  before="$(grep -hoE "$tagged_re" "${targets[@]}" | wc -l || true)"
   old_tags="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m) && $4 ~ /^v/ { print $4 }' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | sort -u | paste -sd, - || true)"
 
@@ -675,7 +665,7 @@ repin::apply() {
   done <<< "$moved"
   sed -i -E "${sed_args[@]}" "${targets[@]}"
 
-  after="$(grep -hoE "uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$" "${targets[@]}" | wc -l || true)"
+  after="$(grep -hoE "$tagged_re" "${targets[@]}" | wc -l || true)"
   if [[ "$expected" -eq 0 || "$((after - before))" -ne "$expected" ]]; then
     echo "::error::Expected ${expected} ci-workflows pins to newly carry '@${sha} # ${tag}'; $((after - before)) do." >&2
     return 1

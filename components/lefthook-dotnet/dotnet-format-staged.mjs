@@ -19,8 +19,7 @@ function isWindowsShapedAbsolute(value) {
 function isRelativeInside(pathApi, root, candidate) {
   const relative = pathApi.relative(root, candidate);
   return (
-    !pathApi.isAbsolute(relative) &&
-    (relative === "" || (!relative.startsWith(`..${pathApi.sep}`) && relative !== ".."))
+    !pathApi.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${pathApi.sep}`)
   );
 }
 
@@ -38,6 +37,10 @@ export function isInside(root, candidate) {
 
 function portableRelative(root, candidate) {
   return path.relative(root, candidate).split(path.sep).join("/");
+}
+
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function hasControlCharacter(value) {
@@ -85,7 +88,7 @@ function validateWorkspaceValue(candidate) {
 
 export function loadDotnetFormatConfig({ root = process.cwd() } = {}) {
   const resolvedRoot = realpathSync(root);
-  const resolvedConfig = resolveRepositoryPath(resolvedRoot, DEFAULT_CONFIG_PATH, "config path");
+  const resolvedConfig = path.resolve(resolvedRoot, DEFAULT_CONFIG_PATH);
   if (!existsSync(resolvedConfig)) {
     throw new Error(`missing required ${DEFAULT_CONFIG_PATH}`);
   }
@@ -97,9 +100,7 @@ export function loadDotnetFormatConfig({ root = process.cwd() } = {}) {
   try {
     value = JSON.parse(readFileSync(configRealPath, "utf8"));
   } catch (error) {
-    throw new Error(
-      `${DEFAULT_CONFIG_PATH} must contain valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`${DEFAULT_CONFIG_PATH} must contain valid JSON: ${messageOf(error)}`);
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${DEFAULT_CONFIG_PATH} must contain an object`);
@@ -136,8 +137,7 @@ export function buildDotnetInvocation({ root = process.cwd(), workspace, files =
     throw new Error(`workspace must name a .sln, .slnx, or .csproj file: ${workspaceValue}`);
   }
 
-  const includedFiles = [];
-  const seen = new Set();
+  const includedFiles = new Set();
   for (const file of files) {
     const resolved = resolveRepositoryPath(resolvedRoot, file, "staged file");
     if (!existsSync(resolved)) {
@@ -150,11 +150,7 @@ export function buildDotnetInvocation({ root = process.cwd(), workspace, files =
     if (!statSync(fileRealPath).isFile() || path.extname(fileRealPath).toLowerCase() !== ".cs") {
       throw new Error(`staged file must name an existing C# source file: ${file}`);
     }
-    const normalized = portableRelative(resolvedRoot, resolved);
-    if (!seen.has(normalized)) {
-      includedFiles.push(normalized);
-      seen.add(normalized);
-    }
+    includedFiles.add(portableRelative(resolvedRoot, resolved));
   }
 
   return {
@@ -164,10 +160,10 @@ export function buildDotnetInvocation({ root = process.cwd(), workspace, files =
       "whitespace",
       portableRelative(resolvedRoot, resolvedWorkspace),
       "--verify-no-changes",
-      ...(includedFiles.length > 0 ? ["--include", ...includedFiles] : []),
+      ...(includedFiles.size > 0 ? ["--include", ...includedFiles] : []),
     ],
     cwd: resolvedRoot,
-    skip: includedFiles.length === 0,
+    skip: includedFiles.size === 0,
   };
 }
 
@@ -201,9 +197,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
     process.exitCode = runDotnetFormat();
   } catch (error) {
-    process.stderr.write(
-      `dotnet-format-staged: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
+    process.stderr.write(`dotnet-format-staged: ${messageOf(error)}\n`);
     process.exitCode = 2;
   }
 }

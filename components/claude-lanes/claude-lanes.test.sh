@@ -35,6 +35,16 @@ consumer_checkout() {
   git -C "$dir" remote add origin "https://github.com/$target.git"
 }
 
+# lint_clean <dir> <exit-label> <silent-label>: actionlint over <dir> exits 0
+# and prints nothing.
+lint_clean() {
+  local out rc
+  out="$(cd "$1" && actionlint -no-color 2>&1)"
+  rc=$?
+  assert_exit "$2" 0 "$rc"
+  assert_silent "$3" "$out"
+}
+
 # component<TAB>source<TAB>destination for every lane caller, and the targets
 # that manage one. Filtering happens in bash so the yq expressions stay plain
 # traversal. Derived from the manifest rather than hardcoded: managed-target
@@ -82,10 +92,8 @@ for entry in "${lane_files[@]}"; do
   cp "$source" "$standalone/$destination"
   cp "$config" "$standalone/$config"
   assert_file_exists "$component materializes at $destination" "$standalone/$destination"
-  out="$(cd "$standalone" && actionlint -no-color 2>&1)"
-  rc=$?
-  assert_exit "$component lints clean at $destination" 0 "$rc"
-  assert_silent "$component emits no findings at $destination" "$out"
+  lint_clean "$standalone" "$component lints clean at $destination" \
+    "$component emits no findings at $destination"
 done
 
 # Every target receiving a lane caller, materialized the way its own sync PR
@@ -119,10 +127,7 @@ for target in "${lane_targets[@]}"; do
   assert_nonzero "$target ran a destination assertion" "$destinations"
 
   [[ -f "$consumer/$config" ]] || cp "$config" "$consumer/$config"
-  out="$(cd "$consumer" && actionlint -no-color 2>&1)"
-  rc=$?
-  assert_exit "$target lints clean after sync" 0 "$rc"
-  assert_silent "$target sync emits no findings" "$out"
+  lint_clean "$consumer" "$target lints clean after sync" "$target sync emits no findings"
 done
 
 [[ $FAILED -eq 0 ]] || exit 1

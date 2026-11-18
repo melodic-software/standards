@@ -16,6 +16,7 @@ import {
 
 const contract = await loadContract();
 const clone = () => structuredClone(contract);
+const byText = (a, b) => a.localeCompare(b);
 
 test("the committed contract is valid", () => {
   assert.deepEqual(validateContract(contract), []);
@@ -68,10 +69,10 @@ test("a type with no form generates no form file and skips the floor rule", () =
   assert.equal(contract.types["decomposed-item"].form, null);
   const forms = Object.keys(renderAll(contract));
   assert.deepEqual(
-    forms.sort((a, b) => a.localeCompare(b)),
+    forms.sort(byText),
     Object.values(contract.types)
       .flatMap((type) => (type.form === null ? [] : [type.form]))
-      .sort((a, b) => a.localeCompare(b)),
+      .sort(byText),
   );
 });
 
@@ -94,7 +95,6 @@ test("drift reports an edited, a missing and an extra form", async () => {
   await writeFile(path.join(dir, first), `${forms[first]}# hand edit\n`);
   for (const name of rest) await writeFile(path.join(dir, name), forms[name]);
   await writeFile(path.join(dir, "extra.yml"), "name: Extra\n");
-  const byText = (a, b) => a.localeCompare(b);
   assert.deepEqual(
     (await diffForms(contract, dir)).sort(byText),
     [

@@ -3,10 +3,7 @@
 Managed Code Review gives every review agent this file's contents as the
 repository's review instructions. Its citations, the
 `standards/review/<file>.md#<heading>` paths in parentheses, are not include
-lines, so Managed Code Review does not read the cited files and sees only the
-words printed below (see "Depth"). A self-hosted or local review running the
-`review` plugin also follows each citation into the `standards` repository
-for the full criterion behind the line.
+lines; "Depth" says which reviews follow them.
 
 Review in this organization splits into two mutually exclusive scopes, so a
 finding belongs to exactly one and is never reported twice. The **code-review lane**

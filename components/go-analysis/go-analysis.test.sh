@@ -110,33 +110,36 @@ else
   skip_case 'go test -race requires cgo and the configured C compiler'
 fi
 
-(cd "$good" && golangci-lint run --config "$config" ./... >/dev/null 2>&1)
+# lint_module <dir> — golangci-lint every package of the module at <dir>.
+lint_module() { (cd "$1" && golangci-lint run --config "$config" ./... 2>&1); }
+
+lint_module "$good" >/dev/null
 rc=$?
 assert_exit 'golangci-lint: good fixture and explained suppression pass' 0 "$rc"
 
-out="$(cd "$bad_analyzer" && golangci-lint run --config "$config" ./... 2>&1)"
+out="$(lint_module "$bad_analyzer")"
 rc=$?
 assert_nonzero 'golangci-lint: analyzer violations fail' "$rc"
 for linter in errcheck ineffassign staticcheck unused; do
   assert_contains "golangci-lint: $linter diagnostic is visible" "$out" "($linter)"
 done
 
-out="$(cd "$bad_vet" && golangci-lint run --config "$config" ./... 2>&1)"
+out="$(lint_module "$bad_vet")"
 rc=$?
 assert_nonzero 'golangci-lint: govet violation fails' "$rc"
 assert_contains 'golangci-lint: govet diagnostic is visible' "$out" '(govet)'
 
-out="$(cd "$bad_suppression_blanket" && golangci-lint run --config "$config" ./... 2>&1)"
+out="$(lint_module "$bad_suppression_blanket")"
 rc=$?
 assert_nonzero 'nolintlint: blanket suppression fails' "$rc"
 assert_contains 'nolintlint: blanket diagnostic is visible' "$out" '(nolintlint)'
 
-out="$(cd "$bad_suppression_reason" && golangci-lint run --config "$config" ./... 2>&1)"
+out="$(lint_module "$bad_suppression_reason")"
 rc=$?
 assert_nonzero 'nolintlint: unexplained suppression fails' "$rc"
 assert_contains 'nolintlint: explanation diagnostic is visible' "$out" '(nolintlint)'
 
-out="$(cd "$bad_suppression_unused" && golangci-lint run --config "$config" ./... 2>&1)"
+out="$(lint_module "$bad_suppression_unused")"
 rc=$?
 assert_nonzero 'nolintlint: unused suppression fails' "$rc"
 assert_contains 'nolintlint: unused diagnostic is visible' "$out" '(nolintlint)'
