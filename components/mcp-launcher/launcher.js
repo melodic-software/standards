@@ -67,16 +67,9 @@ function findVaultExec() {
 }
 
 function fnmOnPath() {
-  if (process.platform === "win32") {
-    const result = spawnSync("where", ["fnm"], { encoding: "utf8", stdio: "pipe" });
-    return result.status === 0;
-  }
-  const result = spawnSync("command", ["-v", "fnm"], {
-    encoding: "utf8",
-    stdio: "pipe",
-    shell: true,
-  });
-  return result.status === 0;
+  const [command, args, shell] =
+    process.platform === "win32" ? ["where", ["fnm"], false] : ["command", ["-v", "fnm"], true];
+  return spawnSync(command, args, { encoding: "utf8", stdio: "pipe", shell }).status === 0;
 }
 
 function run(forwardArgs) {
@@ -105,9 +98,11 @@ function run(forwardArgs) {
   }
 }
 
+const nameOf = (spec) => spec.split("=")[0];
+const tried = process.env[TRIED] === "1";
 const { specs, rest } = parseVault(process.argv.slice(2));
-const missing = specs.filter((spec) => !isSet(spec.split("=")[0]));
-const resolver = missing.length > 0 && process.env[TRIED] !== "1" ? findVaultExec() : null;
+const missing = specs.filter((spec) => !isSet(nameOf(spec)));
+const resolver = missing.length > 0 && !tried ? findVaultExec() : null;
 
 if (resolver) {
   // One vault-exec round: the child carries TRIED=1, so it never re-enters here.
@@ -129,10 +124,9 @@ if (resolver) {
     "mcp-launcher-vault",
   );
 } else {
-  const names = missing.map((spec) => spec.split("=")[0]);
+  const names = missing.map(nameOf);
   if (names.length > 0) {
-    const why =
-      process.env[TRIED] === "1" ? "unset after vault-exec" : "unset and vault-exec not found";
+    const why = tried ? "unset after vault-exec" : "unset and vault-exec not found";
     warn(`${names.join(", ")} ${why}; starting keyless`);
   }
   // A literal `${NAME}` must not reach the server as its key.
