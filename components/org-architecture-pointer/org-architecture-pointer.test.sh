@@ -36,30 +36,33 @@ repo near-miss AGENTS.md 'melodic-software/architectures-of-others and melodic-s
 repo bare-line AGENTS.md 'See melodic-software/architecture'
 
 # --- file ------------------------------------------------------------------
-out="$(bash "$script" file --root "$work/fleet/in-agents" 2>&1)"
+# check_file <fixture repo> — `file` mode over one fixture, stderr merged.
+check_file() { bash "$script" file --root "$work/fleet/$1" 2>&1; }
+
+out="$(check_file in-agents)"
 assert_exit 'file passes when AGENTS.md names the repo' 0 $?
 assert_contains 'file reports the match' "$out" 'OK:'
 
-out="$(bash "$script" file --root "$work/fleet/in-claude" 2>&1)"
+out="$(check_file in-claude)"
 assert_exit 'file passes when only CLAUDE.md names the repo' 0 $?
 
-out="$(bash "$script" file --root "$work/fleet/agents-without" 2>&1)"
+out="$(check_file agents-without)"
 assert_exit 'file fails when AGENTS.md lacks the substring' 1 $?
 assert_contains 'the missing substring is named' "$out" 'melodic-software/architecture'
 
-out="$(bash "$script" file --root "$work/fleet/shim-only" 2>&1)"
+out="$(check_file shim-only)"
 assert_exit 'file fails when only a CLAUDE.md shim exists' 1 $?
 
-out="$(bash "$script" file --root "$work/fleet/neither" 2>&1)"
+out="$(check_file neither)"
 assert_exit 'file ignores other files that name the repo' 1 $?
 
-out="$(bash "$script" file --root "$work/fleet/empty" 2>&1)"
+out="$(check_file empty)"
 assert_exit 'file fails when neither file exists' 1 $?
 
-out="$(bash "$script" file --root "$work/fleet/near-miss" 2>&1)"
+out="$(check_file near-miss)"
 assert_exit 'file fails on a longer repository name sharing the prefix' 1 $?
 
-out="$(bash "$script" file --root "$work/fleet/bare-line" 2>&1)"
+out="$(check_file bare-line)"
 assert_exit 'file passes when the name ends the line' 0 $?
 
 # --- fleet -----------------------------------------------------------------

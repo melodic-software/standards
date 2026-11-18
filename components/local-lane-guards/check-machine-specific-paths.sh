@@ -45,24 +45,19 @@ fi
 
 run_check() {
   local label=$1 pattern=$2
-  local line rest content n=0 found=0
+  local line rest content n=0
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     rest="${line#*:}"
     content="${rest#*:}"
     # Unquoted `$pattern`: bash 3.2 =~ treats a quoted RHS as a literal.
     if [[ "$content" =~ $pattern ]]; then
-      if [[ $found -eq 0 ]]; then
-        echo "Machine-specific path detected (${label}):" >&2
-        found=1
-      fi
-      if [[ $n -lt 20 ]]; then
-        echo "$line" >&2
-        n=$((n + 1))
-      fi
+      [[ $n -eq 0 ]] && echo "Machine-specific path detected (${label}):" >&2
+      [[ $n -lt 20 ]] && echo "$line" >&2
+      n=$((n + 1))
     fi
   done <<<"$all_matches"
-  if [[ $found -eq 1 ]]; then
+  if [[ $n -gt 0 ]]; then
     echo "" >&2
     failed=1
   fi

@@ -26,12 +26,12 @@ assert_exit 'unknown guard exits 2' 2 "$?"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
-make_repo() {
-  local dir="$1"
-  mkdir -p "$dir"
-  git -C "$dir" init -q
-  git -C "$dir" config user.email 'local-lane-guards-test@example.com'
-  git -C "$dir" config user.name 'local-lane-guards-test'
+# guard_in <repo dir> <guard> — run one dispatcher guard from inside <repo dir>.
+guard_in() {
+  (
+    cd "$1" || exit 1
+    bash "$DISPATCH" "$2"
+  )
 }
 
 # --- exec-bit ---
@@ -40,10 +40,7 @@ printf '#!/usr/bin/env bash\necho ok\n' >"$tmpdir/exec-clean/ok.sh"
 git -C "$tmpdir/exec-clean" add ok.sh
 git -C "$tmpdir/exec-clean" update-index --chmod=+x -- ok.sh
 git -C "$tmpdir/exec-clean" commit -qm 'clean shebang'
-(
-  cd "$tmpdir/exec-clean" || exit 1
-  bash "$DISPATCH" exec-bit >/dev/null
-)
+guard_in "$tmpdir/exec-clean" exec-bit >/dev/null
 assert_exit 'exec-bit passes a 100755 shebang' 0 "$?"
 
 make_repo "$tmpdir/exec-bad"
@@ -51,10 +48,7 @@ printf '#!/usr/bin/env bash\necho bad\n' >"$tmpdir/exec-bad/bad.sh"
 git -C "$tmpdir/exec-bad" add bad.sh
 # leave mode 100644
 git -C "$tmpdir/exec-bad" commit -qm 'bad shebang'
-(
-  cd "$tmpdir/exec-bad" || exit 1
-  bash "$DISPATCH" exec-bit >/dev/null 2>&1
-)
+guard_in "$tmpdir/exec-bad" exec-bit >/dev/null 2>&1
 assert_exit 'exec-bit fails a 100644 shebang' 1 "$?"
 
 # Pin the `git grep -z -n` record git-grep(1) under-specifies: `-z` is
@@ -78,22 +72,17 @@ make_repo "$tmpdir/exec-not-byte0"
 printf 'example:\n```\n#!/usr/bin/env bash\necho demo\n```\n' >"$tmpdir/exec-not-byte0/README.md"
 git -C "$tmpdir/exec-not-byte0" add README.md
 git -C "$tmpdir/exec-not-byte0" commit -qm 'embedded shebang example'
-(
-  cd "$tmpdir/exec-not-byte0" || exit 1
-  bash "$DISPATCH" exec-bit >/dev/null
-)
+guard_in "$tmpdir/exec-not-byte0" exec-bit >/dev/null
 assert_exit 'exec-bit ignores a #! that is not at byte 0' 0 "$?"
 
 # Spawn census: N shebang files must not spawn N git ls-files / cat-file.
 # Drift-immune counter, same PATH-shim method as distribution/sync-manifest.test.sh.
 spawn_dir="$tmpdir/exec-spawn"
 make_repo "$spawn_dir"
-i=1
-while [[ "$i" -le 8 ]]; do
+for i in {1..8}; do
   printf '#!/usr/bin/env bash\necho %s\n' "$i" >"$spawn_dir/s$i.sh"
   git -C "$spawn_dir" add "s$i.sh"
   git -C "$spawn_dir" update-index --chmod=+x -- "s$i.sh"
-  i=$((i + 1))
 done
 git -C "$spawn_dir" commit -qm 'eight shebang files'
 mkdir -p "$spawn_dir/bin"
@@ -142,10 +131,7 @@ make_repo "$tmpdir/path-clean"
 printf 'root = <repo-root>/src\n' >"$tmpdir/path-clean/config.ini"
 git -C "$tmpdir/path-clean" add config.ini
 git -C "$tmpdir/path-clean" commit -qm 'portable path'
-(
-  cd "$tmpdir/path-clean" || exit 1
-  bash "$DISPATCH" machine-specific-paths >/dev/null
-)
+guard_in "$tmpdir/path-clean" machine-specific-paths >/dev/null
 assert_exit 'machine-specific-paths passes a portable placeholder' 0 "$?"
 
 make_repo "$tmpdir/path-bad"
@@ -158,10 +144,7 @@ printf 'root = %s/project/src\n' "$home_root" >"$tmpdir/path-bad/config.ini"
 git -C "$tmpdir/path-bad" add config.ini
 git -C "$tmpdir/path-bad" commit -qm 'machine path'
 path_bad_rc=0
-path_bad_out="$(
-  cd "$tmpdir/path-bad" || exit 1
-  bash "$DISPATCH" machine-specific-paths 2>&1
-)" || path_bad_rc=$?
+path_bad_out="$(guard_in "$tmpdir/path-bad" machine-specific-paths 2>&1)" || path_bad_rc=$?
 assert_exit 'machine-specific-paths fails a Linux home path' 1 "$path_bad_rc"
 assert_contains 'machine-specific-paths labels a Linux home hit' "$path_bad_out" 'Linux user path'
 
@@ -172,10 +155,7 @@ printf '%s/project/src\n' "$home_root" >"$tmpdir/path-bol/notes.txt"
 git -C "$tmpdir/path-bol" add notes.txt
 git -C "$tmpdir/path-bol" commit -qm 'bol machine path'
 path_bol_rc=0
-path_bol_out="$(
-  cd "$tmpdir/path-bol" || exit 1
-  bash "$DISPATCH" machine-specific-paths 2>&1
-)" || path_bol_rc=$?
+path_bol_out="$(guard_in "$tmpdir/path-bol" machine-specific-paths 2>&1)" || path_bol_rc=$?
 assert_exit 'machine-specific-paths fails a start-of-line Linux home path' 1 "$path_bol_rc"
 assert_contains 'start-of-line Linux home still labeled' "$path_bol_out" 'Linux user path'
 
@@ -184,11 +164,9 @@ assert_contains 'start-of-line Linux home still labeled' "$path_bol_out" 'Linux 
 # the exec-bit census above.
 path_spawn="$tmpdir/path-spawn"
 make_repo "$path_spawn"
-i=1
-while [[ "$i" -le 8 ]]; do
+for i in {1..8}; do
   printf 'root = %s/p%s/src\n' "$home_root" "$i" >"$path_spawn/c$i.ini"
   git -C "$path_spawn" add "c$i.ini"
-  i=$((i + 1))
 done
 git -C "$path_spawn" commit -qm 'eight machine paths'
 mkdir -p "$path_spawn/bin"
@@ -228,20 +206,14 @@ make_repo "$tmpdir/ch-clean"
 printf '# A plain explanatory comment.\necho ok\n' >"$tmpdir/ch-clean/clean.sh"
 git -C "$tmpdir/ch-clean" add clean.sh
 git -C "$tmpdir/ch-clean" commit -qm 'clean comment'
-(
-  cd "$tmpdir/ch-clean" || exit 1
-  bash "$DISPATCH" comment-hygiene >/dev/null
-)
+guard_in "$tmpdir/ch-clean" comment-hygiene >/dev/null
 assert_exit 'comment-hygiene passes a clean comment' 0 "$?"
 
 make_repo "$tmpdir/ch-bad"
 printf '# TODO: replace this stub\necho bad\n' >"$tmpdir/ch-bad/bad.sh"
 git -C "$tmpdir/ch-bad" add bad.sh
 git -C "$tmpdir/ch-bad" commit -qm 'todo comment'
-(
-  cd "$tmpdir/ch-bad" || exit 1
-  bash "$DISPATCH" comment-hygiene >/dev/null 2>&1
-)
+guard_in "$tmpdir/ch-bad" comment-hygiene >/dev/null 2>&1
 assert_exit 'comment-hygiene fails a TODO comment' 1 "$?"
 
 # Spawn census: N git-grep comment hits must not spawn N awk (single-line
@@ -249,11 +221,9 @@ assert_exit 'comment-hygiene fails a TODO comment' 1 "$?"
 # the exec-bit census above.
 ch_spawn="$tmpdir/ch-spawn"
 make_repo "$ch_spawn"
-i=1
-while [[ "$i" -le 8 ]]; do
+for i in {1..8}; do
   printf '# TODO: item %s\necho %s\n' "$i" "$i" >"$ch_spawn/c$i.sh"
   git -C "$ch_spawn" add "c$i.sh"
-  i=$((i + 1))
 done
 git -C "$ch_spawn" commit -qm 'eight todo comments'
 mkdir -p "$ch_spawn/bin"
@@ -280,10 +250,7 @@ printf '# Target\n\nBody.\n' >"$tmpdir/ref-clean/target.md"
 printf 'See `target.md` "Target" for details.\n' >"$tmpdir/ref-clean/source.md"
 git -C "$tmpdir/ref-clean" add target.md source.md
 git -C "$tmpdir/ref-clean" commit -qm 'resolving cite'
-(
-  cd "$tmpdir/ref-clean" || exit 1
-  bash "$DISPATCH" reference-integrity >/dev/null
-)
+guard_in "$tmpdir/ref-clean" reference-integrity >/dev/null
 assert_exit 'reference-integrity passes a resolving cite' 0 "$?"
 
 make_repo "$tmpdir/ref-bad"
@@ -292,10 +259,7 @@ printf '# Target\n\nBody.\n' >"$tmpdir/ref-bad/target.md"
 printf 'See `target.md` "Missing Anchor" for details.\n' >"$tmpdir/ref-bad/source.md"
 git -C "$tmpdir/ref-bad" add target.md source.md
 git -C "$tmpdir/ref-bad" commit -qm 'broken cite'
-(
-  cd "$tmpdir/ref-bad" || exit 1
-  bash "$DISPATCH" reference-integrity >/dev/null 2>&1
-)
+guard_in "$tmpdir/ref-bad" reference-integrity >/dev/null 2>&1
 assert_exit 'reference-integrity fails an unresolved cite' 1 "$?"
 
 # Dispatcher `all` on a clean repo succeeds end-to-end.
@@ -308,10 +272,7 @@ printf '# Heading\n\nSee `doc.md` "Heading".\n' >"$tmpdir/all-clean/doc.md"
 git -C "$tmpdir/all-clean" add ok.sh note.sh cfg.ini doc.md
 git -C "$tmpdir/all-clean" update-index --chmod=+x -- ok.sh note.sh
 git -C "$tmpdir/all-clean" commit -qm 'all clean'
-(
-  cd "$tmpdir/all-clean" || exit 1
-  bash "$DISPATCH" all >/dev/null
-)
+guard_in "$tmpdir/all-clean" all >/dev/null
 assert_exit 'dispatcher all passes a clean repo' 0 "$?"
 
 [[ $FAILED -eq 0 ]] || exit 1

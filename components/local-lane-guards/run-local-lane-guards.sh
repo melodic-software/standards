@@ -41,7 +41,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 guard="$1"
-shift || true
+shift
 
 case "$guard" in
   --help | -h)

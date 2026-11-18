@@ -49,13 +49,15 @@ canonical_group='${{ github.workflow }}-${{ github.event.pull_request.number || 
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
 
+mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
+
 # Each target's managed destinations, through the engine the guard runs.
 declare -A target_dest_paths=()
 dest_paths_failures=''
-while read -r t; do
+for t in "${all_targets[@]}"; do
   target_dest_paths["$t"]="$(bash distribution/sync-manifest.sh dest-paths --source-root "$root" --target "$t")" ||
     dest_paths_failures+="$t "
-done < <(yq -r '.targets | keys[]' "$manifest")
+done
 assert_eq 'the engine lists dest-paths for every target' '' "$dest_paths_failures"
 
 # managed_union <caller destination>: every destination managed by a target
@@ -86,13 +88,15 @@ title_case() {
 }
 
 check_shape() {
-  local source="$1" component="$2" runs_on="$3" destination="$4" p="$1:" stem
+  local source="$1" component="$2" runs_on="$3" destination="$4" p="$1:" stem header
+  local job='.jobs["pr-check-managed-files"]'
   q() { yq -r "$1" "$source"; }
 
   assert_file_exists "$p the caller component exists" "$source"
-  assert_contains "$p header marks the file sync-managed" "$(head -n 12 "$source")" 'SYNC-MANAGED FILE'
-  assert_contains "$p header names the standards source path" "$(head -n 12 "$source")" "$source"
-  assert_contains "$p header names the manifest component" "$(head -n 12 "$source")" "$component"
+  header="$(head -n 12 "$source")"
+  assert_contains "$p header marks the file sync-managed" "$header" 'SYNC-MANAGED FILE'
+  assert_contains "$p header names the standards source path" "$header" "$source"
+  assert_contains "$p header names the manifest component" "$header" "$component"
 
   stem="${destination##*/}"
   assert_eq "$p workflow name is the destination stem in Title Case" "$(title_case "${stem%.yml}")" "$(q '.name')"
@@ -121,10 +125,10 @@ check_shape() {
   assert_eq "$p exactly one job" '1' "$(q '.jobs | length')"
   assert_eq "$p the job is named pr-check-managed-files" 'pr-check-managed-files' "$(q '.jobs | keys | .[0]')"
   assert_eq "$p the job display name is the Title Case of its id (check context is PR Check Managed Files)" \
-    'PR Check Managed Files' "$(q '.jobs["pr-check-managed-files"].name')"
+    'PR Check Managed Files' "$(q "$job.name")"
   assert_eq "$p the job runs on $runs_on directly" "$runs_on" \
-    "$(q '.jobs["pr-check-managed-files"]["runs-on"]')"
-  assert_eq "$p the job has a 10-minute timeout" '10' "$(q '.jobs["pr-check-managed-files"]["timeout-minutes"]')"
+    "$(q "$job"'["runs-on"]')"
+  assert_eq "$p the job has a 10-minute timeout" '10' "$(q "$job"'["timeout-minutes"]')"
   assert_eq "$p no job calls a reusable workflow" '0' "$(q '[.jobs[] | select(has("uses"))] | length')"
   assert_eq "$p runs-on is a literal, not an expression" '0' \
     "$(q '[.jobs[]["runs-on"] | select(test("\\$\\{\\{"))] | length')"
@@ -133,10 +137,10 @@ check_shape() {
 
   # The action checks out the repository itself (ci-workflows#881), so the
   # caller carries no checkout and no third-party pin.
-  assert_eq "$p one step: the guard" '1' "$(q '.jobs["pr-check-managed-files"].steps | length')"
+  assert_eq "$p one step: the guard" '1' "$(q "$job.steps | length")"
 
   local guard_uses
-  guard_uses="$(q '.jobs["pr-check-managed-files"].steps[0].uses')"
+  guard_uses="$(q "$job.steps[0].uses")"
   assert_contains "$p the step calls the ci-workflows check-managed-files action" "$guard_uses" "${action_path}@"
   if [[ "$guard_uses" =~ ^${action_path}@[0-9a-f]{40}$ ]]; then
     pass "$p guard action is pinned to a full 40-character SHA (org policy)"
@@ -146,9 +150,9 @@ check_shape() {
   assert_eq "$p guard action pin line is unique in the file" '1' \
     "$(grep -c "uses: ${action_path}@" "$source")"
   assert_eq "$p standards-ref is main for the soak" 'main' \
-    "$(q '.jobs["pr-check-managed-files"].steps[0].with["standards-ref"]')"
+    "$(q "$job"'.steps[0].with["standards-ref"]')"
   assert_eq "$p the guard step passes standards-ref and nothing else" 'standards-ref' \
-    "$(q '.jobs["pr-check-managed-files"].steps[0].with | keys | join(",")')"
+    "$(q "$job"'.steps[0].with | keys | join(",")')"
 }
 
 check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"
@@ -188,7 +192,6 @@ assert_nonzero 'manifest carries at least one fleet-routed lane caller' "${#lane
 declare -A is_lane_component=()
 for c in "${lane_components[@]}"; do is_lane_component["$c"]=1; done
 
-mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
 hosted_targets=()
 fleet_targets=()
 locally_owned_targets=()
@@ -241,17 +244,12 @@ else
   skip_case 'actionlint not installed; the materialized callers are not linted'
 fi
 
-consumer_checkout() {
-  local target="$1" dir="$2"
-  make_repo "$dir"
-  git -C "$dir" remote add origin "https://github.com/$target.git"
-}
-
 # materialize <target> <expected source> <expected destination> <absent destination>
 materialize() {
   local target="$1" source="$2" destination="$3" absent="$4" consumer out rc
   consumer="$scratch/${target##*/}"
-  consumer_checkout "$target" "$consumer"
+  make_repo "$consumer"
+  git -C "$consumer" remote add origin "https://github.com/$target.git"
   bash distribution/sync-manifest.sh apply --target "$target" --target-root "$consumer" >/dev/null
   assert_exit "$target materializes" 0 "$?"
   assert_file_absent "$target receives no $absent" "$consumer/$absent"
