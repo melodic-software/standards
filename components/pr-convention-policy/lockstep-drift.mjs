@@ -79,6 +79,7 @@ export const CONSUMER_REPOSITORIES = [
   "agent-automations",
   "agent-plugins",
   "architecture",
+  "azure-iac",
   "ci-runner",
   "ci-workflows",
   "claude-code-account-rotation",
