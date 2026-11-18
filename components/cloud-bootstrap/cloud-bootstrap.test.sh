@@ -21,6 +21,7 @@ script="$root/components/cloud-bootstrap/cloud-bootstrap.sh"
 materialized="$root/.claude/cloud-bootstrap.sh"
 readme="$root/components/cloud-bootstrap/README.md"
 env_setup="$root/components/cloud-environment/setup.sh"
+script_text="$(cat "$script")"
 
 # The cloud-mode runs below execute the real script, which may write
 # `git config --global`; point it at a scratch file so the suite never touches
@@ -47,70 +48,57 @@ else
 fi
 
 assert_contains 'cloud-only guard present (CLAUDE_CODE_REMOTE)' \
-  "$(cat "$script")" 'CLAUDE_CODE_REMOTE'
+  "$script_text" 'CLAUDE_CODE_REMOTE'
 assert_contains 'enrich seam runs .claude/cloud-bootstrap.local.sh' \
-  "$(cat "$script")" '.claude/cloud-bootstrap.local.sh'
+  "$script_text" '.claude/cloud-bootstrap.local.sh'
 assert_contains 'SessionStart hook output JSON is emitted' \
-  "$(cat "$script")" 'hookSpecificOutput'
+  "$script_text" 'hookSpecificOutput'
 
 # The catalog inventory line reads a machine-global marketplace listing to
 # answer a repo-scoped question. Without narrowing it to what this repo
 # declares, a machine carrying another repo's user-scoped marketplace reports
 # that whole catalog as undeclared on every session.
 assert_contains 'catalog inventory is scoped to declared marketplaces' \
-  "$(cat "$script")" 'declared_mps'
+  "$script_text" 'declared_mps'
+
+# setup_decl <name> <label> — sets decl to the single-quoted value setup.sh
+# assigns to <name>, and records <label> as passing only when there is one.
+setup_decl() {
+  decl="$(sed -n "s/^$1='\(.*\)'\$/\1/p" "$env_setup")"
+  if [[ -n "$decl" ]]; then
+    pass "$2"
+  else
+    fail "$2" "no $1='...' assignment found"
+  fi
+}
 
 # Cross-component lockstep: the environment stamp this script reports is the
 # stamp path the cloud-environment component declares and writes.
-stamp_path="$(sed -n "s/^STAMP='\(.*\)'\$/\1/p" "$env_setup")"
-if [[ -n "$stamp_path" ]]; then
-  pass 'cloud-environment setup.sh declares a stamp path'
-else
-  fail 'cloud-environment setup.sh declares a stamp path' \
-    "no STAMP='...' assignment found"
-fi
+setup_decl STAMP 'cloud-environment setup.sh declares a stamp path'
 assert_contains 'bootstrap reads the stamp path cloud-environment writes' \
-  "$(cat "$script")" "$stamp_path"
-fallback_path="$(sed -n "s/^STAMP_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
-if [[ -n "$fallback_path" ]]; then
-  pass 'cloud-environment setup.sh declares a fallback stamp path'
-else
-  fail 'cloud-environment setup.sh declares a fallback stamp path' \
-    "no STAMP_FALLBACK='...' assignment found"
-fi
+  "$script_text" "$decl"
+setup_decl STAMP_FALLBACK 'cloud-environment setup.sh declares a fallback stamp path'
 assert_contains 'bootstrap reads the fallback stamp path cloud-environment writes' \
-  "$(cat "$script")" "$fallback_path"
+  "$script_text" "$decl"
 
 # Cross-component lockstep: the fleet plugin list this script installs from is
 # the snapshot path the cloud-environment component writes at cache build, and
 # the repo declaration stays as the deltas overlay on top of it.
-fleet_path="$(sed -n "s/^FLEET_PLUGINS='\(.*\)'\$/\1/p" "$env_setup")"
-if [[ -n "$fleet_path" ]]; then
-  pass 'cloud-environment setup.sh declares a fleet list snapshot path'
-else
-  fail 'cloud-environment setup.sh declares a fleet list snapshot path' \
-    "no FLEET_PLUGINS='...' assignment found"
-fi
+setup_decl FLEET_PLUGINS 'cloud-environment setup.sh declares a fleet list snapshot path'
 assert_contains 'bootstrap reads the fleet list path cloud-environment writes' \
-  "$(cat "$script")" "$fleet_path"
+  "$script_text" "$decl"
 # The fallback copy the environment still writes when the snapshot path is
 # unwritable at cache build is deliberately NOT read here: it lands in a
 # world-writable directory at a predictable path, so any code running in a
 # session could plant a list there and have the next drift-repair run install
 # and enable a plugin with no settings diff. Such a snapshot gets the
 # repo-declaration-only path instead.
-fleet_fallback="$(sed -n "s/^FLEET_PLUGINS_FALLBACK='\(.*\)'\$/\1/p" "$env_setup")"
-if [[ -n "$fleet_fallback" ]]; then
-  pass 'cloud-environment setup.sh declares a fleet list fallback path'
-else
-  fail 'cloud-environment setup.sh declares a fleet list fallback path' \
-    "no FLEET_PLUGINS_FALLBACK='...' assignment found"
-fi
+setup_decl FLEET_PLUGINS_FALLBACK 'cloud-environment setup.sh declares a fleet list fallback path'
 assert_not_contains 'bootstrap does not read the world-writable fleet list fallback path' \
-  "$(cat "$script")" "$fleet_fallback"
+  "$script_text" "$decl"
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_contains 'bootstrap keeps the repo enabledPlugins block as the deltas overlay' \
-  "$(cat "$script")" 'install_plugins_from "$settings"'
+  "$script_text" 'install_plugins_from "$settings"'
 
 # Runtime behavior of the catalog inventory with the repo settings file
 # absent: the fleet list alone must still name the catalog gap. Driven with a
@@ -133,25 +121,31 @@ cat >"$inv_tmp/bin/claude" <<STUB
 #!/usr/bin/env bash
 COUNT_DIR="${inv_tmp}/counts"
 mkdir -p "\$COUNT_DIR"
+bump() { echo \$(( \$(cat "\$COUNT_DIR/\$1" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/\$1"; }
 case "\$1 \$2 \$3" in
   "plugin marketplace list")
-    echo \$(( \$(cat "\$COUNT_DIR/marketplace-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/marketplace-list"
+    bump marketplace-list
     printf '[{"name":"stub-market","installLocation":"%s"}]\n' "$inv_tmp/mp"
     ;;
   "plugin list "*)
-    echo \$(( \$(cat "\$COUNT_DIR/plugin-list" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-list"
+    bump plugin-list
     printf '[{"id":"alpha@stub-market"},{"id":"beta@stub-market"}]\n'
     ;;
   "plugin install "*)
-    echo \$(( \$(cat "\$COUNT_DIR/plugin-install" 2>/dev/null || echo 0) + 1 )) >"\$COUNT_DIR/plugin-install"
+    bump plugin-install
     ;;
   *) exit 0 ;;
 esac
 STUB
 chmod +x "$inv_tmp/bin/claude"
-inv_out="$(cd "$inv_tmp/repo" && git init -q . && PATH="$inv_tmp/bin:$PATH" \
-  CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/repo" \
-  CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/fleet.json" bash "$script" 2>&1 >/dev/null)"
+# run_inv <repo> <fleet-file> — the script in cloud mode at <repo>, the stub
+# `claude` first on PATH; callers redirect its streams.
+run_inv() {
+  (cd "$1" && PATH="$inv_tmp/bin:$PATH" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$1" \
+    CLOUD_BOOTSTRAP_FLEET_LIST="$2" bash "$script")
+}
+git init -q "$inv_tmp/repo"
+inv_out="$(run_inv "$inv_tmp/repo" "$inv_tmp/fleet.json" 2>&1 >/dev/null)"
 assert_contains 'fleet list installs are summarized when the repo settings file is absent' \
   "$inv_out" 'fleet list'
 assert_contains 'catalog gap is still named from the fleet list alone' \
@@ -173,22 +167,18 @@ mkdir -p "$inv_tmp/degrade/.claude"
 cat >"$inv_tmp/degrade/.claude/settings.json" <<'JSON'
 { "enabledPlugins": { "gamma@stub-market": true } }
 JSON
-(cd "$inv_tmp/degrade" && git init -q .)
+git init -q "$inv_tmp/degrade"
 degrade_case() {
   # degrade_case <label> <fleet-file> <expected-stderr-fragment>
   # The fleet file must be a non-empty path: an empty value would fall through
   # the seam's default and read the host's real snapshot list.
   local label="$1" fleet="$2" expected="$3" out hook_out
   rm -f "$inv_tmp/counts/plugin-install"
-  out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
-    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
-    CLOUD_BOOTSTRAP_FLEET_LIST="$fleet" bash "$script" 2>&1 >/dev/null)"
+  out="$(run_inv "$inv_tmp/degrade" "$fleet" 2>&1 >/dev/null)"
   # Ending the plugin stage must not end the hook: the toolchain steps and the
   # repo's own cloud-bootstrap.local.sh ran before it and may have
   # materialized skills, so the re-scan request still has to reach stdout.
-  hook_out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
-    CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
-    CLOUD_BOOTSTRAP_FLEET_LIST="$fleet" bash "$script" 2>/dev/null)"
+  hook_out="$(run_inv "$inv_tmp/degrade" "$fleet" 2>/dev/null)"
   assert_contains "$label still emits the SessionStart reloadSkills output" \
     "$hook_out" '"reloadSkills":true'
   assert_contains "$label is refused with a reason" "$out" "$expected"
@@ -221,9 +211,7 @@ degrade_case 'a fleet list that is a bare array' "$inv_tmp/bare-array.json" \
 # carry is installed.
 printf '%s\n' '{"extraKnownMarketplaces":{}}' >"$inv_tmp/no-enabled.json"
 rm -f "$inv_tmp/counts/plugin-install"
-empty_out="$(cd "$inv_tmp/degrade" && PATH="$inv_tmp/bin:$PATH" \
-  CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$inv_tmp/degrade" \
-  CLOUD_BOOTSTRAP_FLEET_LIST="$inv_tmp/no-enabled.json" bash "$script" 2>&1 >/dev/null)"
+empty_out="$(run_inv "$inv_tmp/degrade" "$inv_tmp/no-enabled.json" 2>&1 >/dev/null)"
 assert_not_contains 'a fleet list with no enabledPlugins is not refused' \
   "$empty_out" 'is not a settings-shaped object'
 assert_contains 'a fleet list with no enabledPlugins is summarized as a source' \
@@ -249,7 +237,7 @@ cat >"$author_tmp/bin/gh" <<'STUB'
 printf '%s' "$GH_STUB_USER" | jq -r "$4"
 STUB
 chmod +x "$author_tmp/bin/gh"
-(cd "$author_tmp/repo" && git init -q .)
+git init -q "$author_tmp/repo"
 author_case() {
   # author_case <label> <remote> <gh user json, empty = gh fails> [stale]
   # A fourth argument seeds a stale author from an earlier run first.

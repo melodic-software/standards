@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-11-03.1'
+SCRIPT_VERSION='2026-11-17.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -73,6 +73,11 @@ RENDERED_VIEWS_SYNC_URL='https://raw.githubusercontent.com/melodic-software/stan
 RENDERED_VIEWS_SYNC_MARKER='# melodic-software/standards cloud-environment rendered-views-sync'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
+# fetch_to <url> <file>: download <url> to <file>, curl's output to $LOG.
+fetch_to() { curl -fsSL --proto '=https' --retry 2 --retry-delay 3 "$1" -o "$2" >>"$LOG" 2>&1; }
+# scratch_file <name>: a fresh temp file, or /tmp/melodic-<name>.<pid> when
+# mktemp fails.
+scratch_file() { mktemp 2>/dev/null || echo "/tmp/melodic-$1.$$"; }
 
 # Plugin CLI listings are fetched once, lazily, on the first source that
 # actually installs. `install_plugins_from` used to call `marketplace list`
@@ -152,6 +157,30 @@ fleet_list_from_catalog() {
   return 1
 }
 
+# rewrite_settings <settings json> <tag> <jq args>...: replace <settings> with
+# the output of `jq -n <jq args>` reading it as input (no input when it is
+# missing), through a copy at <settings>.<tag>.<pid> that carries the
+# original's mode and owner and is renamed over it. Returns non-zero and leaves
+# <settings> untouched when jq fails or prints nothing, or any write fails.
+rewrite_settings() {
+  local settings="$1" src="$1" tmp="$1.$2.$$"
+  shift 2
+  mkdir -p "${settings%/*}" || return 1
+  if [[ -e "$settings" ]]; then
+    cp -p "$settings" "$tmp" || {
+      rm -f "$tmp"
+      return 1
+    }
+  else
+    src=/dev/null
+  fi
+  if jq -n "$@" "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
 # compose_permissions_floor <floor json> <settings json>: union the floor's
 # claudePermissions.allow and .deny into a Claude Code settings file, then drop
 # the floor's withdraw tombstones from allow, the same shape the dotfiles
@@ -163,24 +192,16 @@ fleet_list_from_catalog() {
 # is written to a copy carrying the original's mode and owner, then renamed
 # over it.
 compose_permissions_floor() {
-  local floor="$1" settings="$2" src="$2" tmp="$2.compose.$$"
+  local floor="$1"
   jq -e '.claudePermissions | .schemaVersion == 1
     and (.allow | type == "array") and (.deny | type == "array" and length > 0)
     and ([.allow[], .deny[]] | all(type == "string" and length > 0))' \
     "$floor" >/dev/null || return 1
-  mkdir -p "${settings%/*}" || return 1
-  if [[ -e "$settings" ]]; then
-    cp -p "$settings" "$tmp" || {
-      rm -f "$tmp"
-      return 1
-    }
-  else
-    src=/dev/null
-  fi
   # The merge validates the floor again in the parse it merges from. The check
   # above reports on the last document of a multi-document file, so only this
   # one guarantees the document checked is the document merged.
-  if jq -n --slurpfile f "$floor" '($f | if length == 1 then .[0].claudePermissions
+  # shellcheck disable=SC2016 # a jq program: $f and $p are jq variables
+  rewrite_settings "$2" compose --slurpfile f "$floor" '($f | if length == 1 then .[0].claudePermissions
         else error("floor is not a single JSON document") end) as $p
       | if ($p | type) == "object" and $p.schemaVersion == 1
           and ($p.allow | type) == "array" and ($p.deny | type) == "array"
@@ -192,12 +213,7 @@ compose_permissions_floor() {
         elif ($docs | length) == 1 and ($docs[0] | type) == "object" then $docs[0]
         else error("settings file is not a single JSON object") end
       | .permissions.allow = ((((.permissions.allow // []) + $p.allow) | unique) - ($p.withdraw // []))
-      | .permissions.deny = (((.permissions.deny // []) + $p.deny) | unique)' \
-    "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then
-    return 0
-  fi
-  rm -f "$tmp"
-  return 1
+      | .permissions.deny = (((.permissions.deny // []) + $p.deny) | unique)'
 }
 
 # install_marked <marker> <fetched script> <dest>: install the fetched script
@@ -231,17 +247,8 @@ install_rendered_views_sync() { install_marked "$RENDERED_VIEWS_SYNC_MARKER" "$@
 # when its hooks or hooks.SessionStart has the wrong type, or when a write
 # fails. Written like compose_permissions_floor: a copy, then a rename.
 register_session_hook() {
-  local settings="$1" cmd="$2" src="$1" tmp="$1.hook.$$"
-  mkdir -p "${settings%/*}" || return 1
-  if [[ -e "$settings" ]]; then
-    cp -p "$settings" "$tmp" || {
-      rm -f "$tmp"
-      return 1
-    }
-  else
-    src=/dev/null
-  fi
-  if jq -n --arg cmd "$cmd" '[inputs] as $docs
+  # shellcheck disable=SC2016 # a jq program: $docs and $cmd are jq variables
+  rewrite_settings "$1" hook --arg cmd "$2" '[inputs] as $docs
       | if ($docs | length) == 0 then {}
         elif ($docs | length) == 1 and ($docs[0] | type) == "object" then $docs[0]
         else error("settings file is not a single JSON object") end
@@ -252,12 +259,7 @@ register_session_hook() {
             then .hooks |= map(select(.command != $cmd)) else . end
           | select(.hooks != [])]
         + [{matcher: "startup|resume",
-            hooks: [{type: "command", command: $cmd, timeout: 30}]}])' \
-    "$src" >"$tmp" && [[ -s "$tmp" ]] && mv -f "$tmp" "$settings"; then
-    return 0
-  fi
-  rm -f "$tmp"
-  return 1
+            hooks: [{type: "command", command: $cmd, timeout: 30}]}])'
 }
 
 # log_retired_inputs: one log line per retired setup input that is still set,
@@ -382,9 +384,9 @@ SHFMT_ASSET='/tmp/shfmt'
 # subshell-locally, so the log() calls and command output inside a track all
 # land in its file); the tracks are concatenated into $LOG after the wait
 # barrier so concurrent output never interleaves.
-track_a_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-a.$$")"
-track_b_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-b.$$")"
-track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
+track_a_log="$(scratch_file env-track-a)"
+track_b_log="$(scratch_file env-track-b)"
+track_c_log="$(scratch_file env-track-c)"
 
 # Track A: gh CLI (pinned upstream release tarball) + shfmt (pinned upstream
 # release asset) + PowerShell (apt;
@@ -403,9 +405,9 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
   # amd64 only, mirroring ci-runner's Dockerfile: the pin above is the hash of
   # that one asset, and substituting an unverified hash for another
   # architecture would defeat the check it exists to perform.
-  gh_arch="$(uname -m)"
-  if [[ "$gh_arch" != 'x86_64' ]]; then
-    log "WARN gh install skipped: no pinned asset for $gh_arch (amd64 only)"
+  arch="$(uname -m)"
+  if [[ "$arch" != 'x86_64' ]]; then
+    log "WARN gh install skipped: no pinned asset for $arch (amd64 only)"
   elif ! curl --fail --location --proto '=https' --tlsv1.2 \
     --output "$GH_TARBALL" \
     "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
@@ -426,8 +428,8 @@ track_c_log="$(mktemp 2>/dev/null || echo "/tmp/melodic-env-track-c.$$")"
   # guardrails reads each Bash call from shfmt's parse tree and refuses the call
   # when shfmt is missing, so every fleet repo needs it, not only a repo whose
   # own bootstrap installs it. amd64 only, for the same reason as gh.
-  if [[ "$(uname -m)" != 'x86_64' ]]; then
-    log "WARN shfmt install skipped: no pinned asset for $(uname -m) (amd64 only)"
+  if [[ "$arch" != 'x86_64' ]]; then
+    log "WARN shfmt install skipped: no pinned asset for $arch (amd64 only)"
   elif ! curl --fail --location --proto '=https' --tlsv1.2 \
     --output "$SHFMT_ASSET" \
     "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
@@ -535,9 +537,8 @@ else
   # build: the next rebuild fetches again, and a session on a snapshot without
   # the list installs nothing rather than guessing at a set.
   rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
-  catalog_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-fleet-catalog.$$")"
-  if curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$FLEET_CATALOG_URL" -o "$catalog_file" >>"$LOG" 2>&1 &&
+  catalog_file="$(scratch_file fleet-catalog)"
+  if fetch_to "$FLEET_CATALOG_URL" "$catalog_file" &&
     fleet_list_from_catalog "$catalog_file" "$FLEET_PLUGINS_FALLBACK"; then
     fleet_file="$FLEET_PLUGINS_FALLBACK"
     if cp "$FLEET_PLUGINS_FALLBACK" "$FLEET_PLUGINS" 2>/dev/null; then
@@ -595,8 +596,7 @@ elif [[ -z "${CLAUDE_CONFIG_DIR:-${HOME:-}}" ]]; then
   log 'WARN permissions floor: neither CLAUDE_CONFIG_DIR nor HOME is set; no floor composed'
 else
   user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$CLAUDE_PERMISSIONS_URL" -o "$floor_file" >>"$LOG" 2>&1; then
+  if ! fetch_to "$CLAUDE_PERMISSIONS_URL" "$floor_file"; then
     log 'WARN permissions floor: fetch failed; no floor composed this build'
   elif compose_permissions_floor "$floor_file" "$user_settings" >>"$LOG" 2>&1; then
     log "permissions floor composed into $user_settings ($(jq -r \
@@ -617,9 +617,8 @@ if [[ -z "${HOME:-}" ]]; then
   log 'WARN vault-exec: HOME is not set; not installed'
 else
   vault_exec_dest="$HOME/.local/bin/vault-exec"
-  vault_exec_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-vault-exec.$$")"
-  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$VAULT_EXEC_URL" -o "$vault_exec_file" >>"$LOG" 2>&1; then
+  vault_exec_file="$(scratch_file vault-exec)"
+  if ! fetch_to "$VAULT_EXEC_URL" "$vault_exec_file"; then
     log 'WARN vault-exec: fetch failed; not installed this build'
   elif install_vault_exec "$vault_exec_file" "$vault_exec_dest" >>"$LOG" 2>&1; then
     log "vault-exec installed to $vault_exec_dest"
@@ -631,9 +630,8 @@ else
   # Page uploader, the same way. A pages-publish someone else put there is
   # left alone with a WARN that names it.
   pages_publish_dest="$HOME/.local/bin/pages-publish"
-  pages_publish_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-pages-publish.$$")"
-  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$PAGES_PUBLISH_URL" -o "$pages_publish_file" >>"$LOG" 2>&1; then
+  pages_publish_file="$(scratch_file pages-publish)"
+  if ! fetch_to "$PAGES_PUBLISH_URL" "$pages_publish_file"; then
     log 'WARN pages-publish: fetch failed; not installed this build'
   else
     install_pages_publish "$pages_publish_file" "$pages_publish_dest" >>"$LOG" 2>&1
@@ -650,9 +648,8 @@ else
   # into. Registered only when this build installed it, so no session runs a
   # hook whose script is missing or someone else's.
   rv_sync_dest="$HOME/.local/bin/rendered-views-sync"
-  rv_sync_file="$(mktemp 2>/dev/null || echo "/tmp/melodic-rendered-views-sync.$$")"
-  if ! curl -fsSL --proto '=https' --retry 2 --retry-delay 3 \
-    "$RENDERED_VIEWS_SYNC_URL" -o "$rv_sync_file" >>"$LOG" 2>&1; then
+  rv_sync_file="$(scratch_file rendered-views-sync)"
+  if ! fetch_to "$RENDERED_VIEWS_SYNC_URL" "$rv_sync_file"; then
     log 'WARN rendered-views-sync: fetch failed; not installed this build'
   elif ! install_rendered_views_sync "$rv_sync_file" "$rv_sync_dest" >>"$LOG" 2>&1; then
     log "WARN rendered-views-sync: install refused (fetched file invalid, $rv_sync_dest is not ours, or a failed write); no hook registered"

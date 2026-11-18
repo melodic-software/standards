@@ -68,7 +68,6 @@ for arg in "$@"; do
   fi
   case "$arg" in
     -H) skip_value=true ;;
-    --silent) silent=true ;;
     -*) continue ;;
     *) path="$arg"; break ;;
   esac
@@ -119,10 +118,7 @@ case "$path" in
     # repins that the older cases assume. STUB_CALL_LOG, when set, records
     # each compare route.
     [[ -z "${STUB_CALL_LOG:-}" ]] || printf '%s\n' "$path" >> "$STUB_CALL_LOG"
-    if [[ "${STUB_COMPARE_STATUS:-}" == 'fail' ]]; then
-      echo 'gh: Not Found (HTTP 404)' >&2
-      exit 1
-    fi
+    [[ "${STUB_COMPARE_STATUS:-}" != 'fail' ]] || not_found
     relation="${STUB_COMPARE_STATUS:-behind}"
     compared="${path##*/compare/}"
     for entry in ${STUB_COMPARE_STATUS_FOR:-}; do
@@ -341,6 +337,13 @@ assert_nonzero 'resolve: missing GITHUB_OUTPUT fails' "$rc"
 
 # ------------------------------------------------------------- apply: fixtures
 
+# commit_all <dir> <message> — stage everything and commit, ignoring ambient
+# signing and hooks the way make_repo does.
+commit_all() {
+  git -C "$1" add -A
+  git -C "$1" -c commit.gpgsign=false -c core.hooksPath= commit -qm "$2"
+}
+
 # lane_repo <dir> <pinned-sha> <pinned-tag> — a scratch repository carrying two
 # callers that each pin one ci-workflows action AND this repository's REAL
 # zizmor fixture corpus, whose first-party action pin a repository-wide rewrite
@@ -376,8 +379,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/claude-lane-outcome@${pin_sha} # ${pin_tag}
 YAML
-  git -C "$dir" add -A
-  git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'lane callers'
+  commit_all "$dir" 'lane callers'
 }
 
 # seed_hosted_lanes <dir>: the hosted lane callers are enumerated extras, so a
@@ -484,8 +486,7 @@ jobs:
 YAML
 cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
 seed_hosted_lanes "$repo"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'mixed pins'
+commit_all "$repo" 'mixed pins'
 # Fallback pin is contained by the release (compare `behind`); date is
 # ignored. Tag-form extras do not call compare.
 export STUB_COMPARE_STATUS=behind
@@ -517,6 +518,24 @@ unset STUB_COMPARE_STATUS
 
 # ------------------------------------------ apply: a pin ahead of the release
 
+# guard_repo <dir> <guard-date> <message> — a lane_repo plus the three
+# .github/workflows extras at the old tag-form pin and both guard callers at a
+# fallback-form pin dated <guard-date>, with the hosted lanes, committed.
+guard_repo() {
+  local dir="$1" extra
+  lane_repo "$dir" "$old_sha" 'v0.9.1'
+  mkdir -p "$dir/.github/workflows" "$dir/components/managed-files-guard"
+  for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
+    printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
+      "${extra#*:}" "$old_sha" > "$dir/.github/workflows/${extra%%:*}"
+  done
+  printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f %s\n' \
+    "$guard_sha" "$2" > "$dir/$guard_caller"
+  cp "$dir/$guard_caller" "$dir/$guard_fleet_caller"
+  seed_hosted_lanes "$dir"
+  commit_all "$dir" "$3"
+}
+
 # THE DOWNGRADE FENCE. A fallback-form pin names a commit the GitHub compare
 # API reports as `ahead` or `diverged` of the release SHA: rewriting it would
 # move the pin BACKWARDS. Day-level pin comment dates are not consulted —
@@ -525,30 +544,7 @@ unset STUB_COMPARE_STATUS
 # byte-identical.
 export STUB_COMPARE_STATUS_FOR="${guard_sha}=ahead"
 repo="$scratch/repo-ahead"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
-  cat > "$repo/.github/workflows/${extra%%:*}" <<YAML
-name: extra
-on: pull_request
-jobs:
-  job:
-    steps:
-      - uses: melodic-software/ci-workflows/.github/actions/${extra#*:}@${old_sha} # v0.9.1
-YAML
-done
-cat > "$repo/$guard_caller" <<YAML
-name: managed-files-guard
-on: pull_request
-jobs:
-  managed-files-guard:
-    steps:
-      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@${guard_sha} # c3d4e5f 2026-08-30
-YAML
-cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
-seed_hosted_lanes "$repo"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned ahead of the release'
+guard_repo "$repo" 2026-08-30 'guard pinned ahead of the release'
 out_file="$scratch/out-apply-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: an ahead pin exits 0' 0 "$rc"
@@ -568,18 +564,7 @@ assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 # Same-day dates do not prove containment. When compare says the pin is
 # ahead of the release, apply must leave it — this is the Codex P2 on #511.
 repo="$scratch/repo-same-day-ahead"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
-  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
-    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
-done
-printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
-  "$guard_sha" > "$repo/$guard_caller"
-cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
-seed_hosted_lanes "$repo"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, not contained'
+guard_repo "$repo" 2026-08-21 'guard pinned the day of the release, not contained'
 out_file="$scratch/out-apply-same-day-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: a same-day ahead pin exits 0' 0 "$rc"
@@ -590,18 +575,7 @@ unset STUB_COMPARE_STATUS_FOR
 # When compare says the release contains the pin (`behind`), same-day is
 # irrelevant and the pin advances to the tag form.
 repo="$scratch/repo-same-day-behind"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
-  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
-    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
-done
-printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
-  "$guard_sha" > "$repo/$guard_caller"
-cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
-seed_hosted_lanes "$repo"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'guard pinned the day of the release, contained'
+guard_repo "$repo" 2026-08-21 'guard pinned the day of the release, contained'
 export STUB_COMPARE_STATUS=behind
 out_file="$scratch/out-apply-same-day-behind"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
@@ -612,18 +586,7 @@ assert_contains 'apply: a same-day contained pin advances to the tag form' \
 
 # A failed compare must not rewrite: guessing "not ahead" is the downgrade.
 repo="$scratch/repo-compare-fail"
-lane_repo "$repo" "$old_sha" 'v0.9.1'
-mkdir -p "$repo/.github/workflows" "$repo/components/managed-files-guard"
-for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
-  printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
-    "${extra#*:}" "$old_sha" > "$repo/.github/workflows/${extra%%:*}"
-done
-printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f 2026-08-21\n' \
-  "$guard_sha" > "$repo/$guard_caller"
-cp "$repo/$guard_caller" "$repo/$guard_fleet_caller"
-seed_hosted_lanes "$repo"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'compare lookup fails'
+guard_repo "$repo" 2026-08-21 'compare lookup fails'
 export STUB_COMPARE_STATUS=fail
 out_file="$scratch/out-apply-compare-fail"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
@@ -638,8 +601,7 @@ export STUB_COMPARE_STATUS=ahead
 repo="$scratch/repo-all-ahead"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 sed -i -E "s|# v0\.9\.1\$|# c136b27 2026-09-09|" "$repo"/components/claude-lanes/*.yml
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'every lane pinned ahead'
+commit_all "$repo" 'every lane pinned ahead'
 out_file="$scratch/out-apply-all-ahead"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: every caller ahead exits 0' 0 "$rc"
@@ -702,8 +664,7 @@ jobs:
 YAML
 printf 'jobs:\n  only:\n    uses: melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml@%s # v0.9.1\n' \
   "$old_sha" > "$repo/components/claude-lanes-hosted/reusable-only.yml"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'reusable refs beside an action pin'
+commit_all "$repo" 'reusable refs beside an action pin'
 out_file="$scratch/out-apply-reusable"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'narrowing: a release run beside reusable refs exits 0' 0 "$rc"
@@ -827,8 +788,7 @@ printf '    # %s %s\n' \
   "uses: melodic-software/ci-workflows/.github/actions/a@$old_sha" \
   "uses: melodic-software/ci-workflows/.github/actions/b@$old_sha" \
   >> "$repo/components/claude-lanes/claude-review.yml"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'two pins on one line'
+commit_all "$repo" 'two pins on one line'
 out_file="$scratch/out-apply-partial"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a partially-rewritten caller set fails' "$rc"
@@ -883,8 +843,7 @@ runs:
 YAML
   printf 'uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
     "$old_sha" > "$dir/docs/example.yml"
-  git -C "$dir" add -A
-  git -C "$dir" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'consumer callers'
+  commit_all "$dir" 'consumer callers'
 }
 
 # run_apply_root <dir> <outfile>: apply v0.65.13 against <dir> through --root,
@@ -1004,7 +963,7 @@ repo="$scratch/repo-consumer-two-shas"
 consumer_repo "$repo"
 sed -i "s/report-lane-outcome@${old_sha} # v0.65.12/report-lane-outcome@${other_sha} # v0.65.11/" \
   "$repo/.github/actions/lane/action.yml"
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'second pinned SHA'
+commit_all "$repo" 'second pinned SHA'
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
 : > "$STUB_CALL_LOG"
 rc=0; out="$(run_apply_root "$repo" "$scratch/out-consumer-two-shas")" || rc=$?
@@ -1022,8 +981,7 @@ repo="$scratch/repo-consumer-managed"
 consumer_repo "$repo"
 printf 'jobs:\n  s:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
   "$old_sha" > "$repo/.github/workflows/steps.yml"
-git -C "$repo" add -A
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qm 'unmanaged step caller'
+commit_all "$repo" 'unmanaged step caller'
 git -C "$repo" remote add origin https://github.com/melodic-software/consumer.git
 cat > "$scratch/sync-manifest-stub.sh" <<'STUB'
 #!/usr/bin/env bash
@@ -1058,7 +1016,7 @@ repo="$scratch/repo-lane-relabel"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 sed -i -E "s|ci-status@${old_sha} # v0\.9\.1|ci-status@${new_sha} # a1b2c3d 2026-08-21|" \
   "$repo/components/claude-lanes/claude-review.yml"
-git -C "$repo" -c commit.gpgsign=false -c core.hooksPath= commit -qam 'fallback pin to the release commit'
+commit_all "$repo" 'fallback pin to the release commit'
 export STUB_COMPARE_FILES=''
 out_file="$scratch/out-lane-relabel"
 rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
