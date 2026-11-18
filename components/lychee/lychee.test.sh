@@ -216,8 +216,8 @@ assert_contains 'stale personal-owner URL remains checked' \
 assert_contains 'public raw-content sibling remains checked' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/ci-runner/'
 
-# Expected rows are the fixture URLs with the fragment cut by hand, the rule the
-# remap comment in the config states; the second group proves each rule is
+# Expected rows are the fixture URLs with the fragment cut by hand, as the
+# remap rule in components/lychee/README.md states; the second group proves each rule is
 # scoped and does not strip every fragment on its host.
 remap_dump="$(lychee --dump --config "$config" components/lychee/fixtures/good/Remap.md 2>&1)"
 rc=$?
@@ -257,7 +257,7 @@ assert_contains 'bad fixture flags the missing file' "$out" 'does-not-exist.md'
 # Status handling only takes effect against a real response, so nothing above can
 # reach it. A local server answers the status code named by the path's last
 # segment (`hang` sleeps past the client timeout) and records every request
-# path. The expected outcomes are the owner's rule the config comment states: a
+# path. The expected outcomes are the rule components/lychee/README.md states: a
 # 429, a 5xx or a timeout passes the run, a 404 or 410 fails it, and a 200 still
 # passes because the default 2xx range is restated.
 python3 - "$http_fixture_root/port" "$http_fixture_root/hits" \
@@ -341,7 +341,7 @@ else
     assert_exit "$code passes the run" 0 "$rc"
     assert_contains "$code is counted as a checked OK link" "$status_out" '1 OK'
   done
-  # The cost the config comment names: an accepted 429 is final on the first
+  # The cost components/lychee/README.md names: an accepted 429 is final on the first
   # reply, so lychee does not retry it.
   assert_row_count 'accepted 429 is requested once, not retried' \
     "$(<"$http_fixture_root/hits")" 1 "/$status_probe/429\$"
