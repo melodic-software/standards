@@ -263,4 +263,41 @@ for shell in Bash PowerShell; do
   done
 done
 
+# Sessions run git as `git -C <dir> <subcommand>`, which no `Bash(git
+# <subcommand> ...)` row matches, so each such deny row needs its
+# `Bash(git -C * <subcommand> ...)` twin or a -C spelling escapes it. No allow
+# row takes that form: the `*` after `-C` also spans git's global options
+# (`-c core.hooksPath=`, `-c core.sshCommand=`), so a -C allow would approve
+# more than its plain row, and -C commands go to the classifier instead.
+missing_twins="$(jq -r '.claudePermissions.deny | . as $deny
+  | .[] | select(test("^Bash\\(git [a-z][a-z-]*"))
+  | sub("^Bash\\(git "; "Bash(git -C * ") | select(. as $t | $deny | index($t) | not)' "$config")"
+if [[ -n "$missing_twins" ]]; then
+  fail 'every Bash git deny row has its git -C twin' "add these rows: $missing_twins"
+else
+  pass 'every Bash git deny row has its git -C twin'
+fi
+c_allows="$(jq -r '[.claudePermissions.allow[] | select(startswith("Bash(git -C "))] | join("\n")' "$config")"
+if [[ -n "$c_allows" ]]; then
+  fail 'allow has no git -C rows' "its * spans git global options: $c_allows"
+else
+  pass 'allow has no git -C rows'
+fi
+for cmd in 'git -C /repo worktree add -B b /tmp/wt' 'git -C /repo push --force origin b' \
+  'git -C /repo -c core.hooksPath=/dev/null commit -m x' 'git -C /repo -c core.sshCommand=x fetch origin' \
+  'git -C /repo --config-env=core.sshCommand=E push origin b' 'git -C /repo --exec-path=/tmp/x pull'; do
+  if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash denies: $cmd"
+  else
+    fail "Bash denies: $cmd" 'no deny row matches the -C form'
+  fi
+done
+for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo switch -c feature'; do
+  if [[ -z "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash leaves to the classifier: $cmd"
+  else
+    fail "Bash leaves to the classifier: $cmd" 'a deny row matches a routine -C form'
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
