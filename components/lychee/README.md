@@ -38,7 +38,28 @@ exceptions are scoped to the exact URL, not the host: every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside
 the private-repo entries in [`lychee.toml`](../../lychee.toml)'s `exclude`
 list. Lychee documents `exclude` values as URL regular expressions in its
-[link-exclusion recipe][1].
+[link-exclusion recipe][1]. Each `exclude` entry is a checker-side limit on a
+link verified live, never a dead link silenced; the commit that adds an entry
+records that verification.
+
+## Status handling and fragment remaps
+
+An online run accepts a 429, any 5xx and a timeout (`accept`,
+`accept_timeouts`): none says whether the link is dead, while a 404, a 410 and
+every other 4xx still fail. `accept` replaces Lychee's default set, so it
+restates `100..=103` and `200..=299`. The cost: an accepted 429 or 5xx is final
+on the first reply, so it is not retried and its fragment is not checked; the
+online run's job summary lists those links, so a host that stays down is
+noticed. Revisit accepting 5xx when
+[lycheeverse/lychee#2324](https://github.com/lycheeverse/lychee/pull/2324)
+ships in a release. The offline lane sends no request, so neither key changes it.
+
+`remap` drops a fragment that exists only after the page's JavaScript runs
+(GitHub comment and review anchors, PyPI's `#files`, docs.github.com GraphQL
+reference entries), which Lychee reports as missing
+([#1729](https://github.com/lycheeverse/lychee/issues/1729),
+[#2128](https://github.com/lycheeverse/lychee/issues/2128)); the page itself is
+still checked, and the first matching rule wins.
 
 ## Run the online check
 

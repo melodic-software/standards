@@ -47,7 +47,7 @@ assert_contains 'scansion lower names the fixture token' "$lower_out" "$lower_to
 # --isolated prevents the repo-root _typos.toml (which still has DUM) from winning.
 parent_config="$(mktemp)"
 trap 'rm -f "$parent_config"' EXIT
-sed '/Scansion vocalization/,/^DUM = "DUM"$/d' "$config" > "$parent_config"
+sed '/^DUM = "DUM"$/d' "$config" > "$parent_config"
 typos --isolated --config "$parent_config" components/typos/fixtures/good/Scansion.txt >/dev/null 2>&1
 rc=$?
 assert_exit 'parent config rejects uppercase DUM' 2 "$rc"

@@ -6,7 +6,8 @@ reusable `.github/workflows/maintenance-check-links-online.yml`
 target's Markdown with its managed [`lychee.toml`](../lychee/README.md) and
 its own `.lycheeignore`, writes the report to the job summary, fails red on a
 broken link, and holds only the `GITHUB_TOKEN`. A 429, a 5xx or a timeout does
-not fail the run (the `accept` comment in the managed `lychee.toml` says why).
+not fail the run ([status handling](../lychee/README.md#status-handling-and-fragment-remaps)
+says why).
 It opens no issue and posts no comment, and it is not part of any `ci-status`.
 
 ## Opt-in

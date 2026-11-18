@@ -27,7 +27,7 @@ surface's three markers:
 | Important | 🔴 Important |
 | Suggestion | 🟡 Nit |
 
-🟣 Pre-existing is not an SSOT severity: it is this surface's own <!-- ai-slop-ignore: severity-marker vocabulary, load-bearing -->
+The 🟣 Pre-existing marker is not an SSOT severity: it is this surface's own
 detection-time judgment of whether a finding predates the diff, orthogonal
 to the three severities above, and no criterion assigns it.
 
