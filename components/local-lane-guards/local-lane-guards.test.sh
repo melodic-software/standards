@@ -57,8 +57,8 @@ assert_exit 'exec-bit fails a 100644 shebang' 1 "$?"
 # Capture via a pipe — a bash variable cannot hold NUL. `tr` is the
 # identity that makes the two NULs visible to assert_eq.
 layout_vis="$(
-  git -C "$tmpdir/exec-bad" -c core.quotePath=false grep --cached -z -nIE '^#!' -- . \
-    | tr '\0' '|'
+  git -C "$tmpdir/exec-bad" -c core.quotePath=false grep --cached -z -nIE '^#!' -- . |
+    tr '\0' '|'
 )"
 assert_eq 'git grep -z -n is path NUL lineno NUL text LF' \
   'bad.sh|1|#!/usr/bin/env bash' \

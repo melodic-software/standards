@@ -119,10 +119,10 @@ cp components/markdownlint/fixtures/bad/Violations.md "$home/notes/Violations.md
 mkdir -p "$home/bin"
 cp components/markdownlint/fixtures/bad/Violations.md "$home/bin/Violations.md"
 
-( cd "$home" && ml 'notes/Clean.md' >/dev/null 2>&1 )
+(cd "$home" && ml 'notes/Clean.md' >/dev/null 2>&1)
 assert_exit 'auto-discovered config passes the good fixture' 0 "$?"
 
-out="$( cd "$home" && ml 'notes/Violations.md' 2>&1 )"
+out="$(cd "$home" && ml 'notes/Violations.md' 2>&1)"
 assert_exit 'auto-discovered config fails the bad fixture' 1 "$?"
 
 # Prove discovery actually applied THIS ruleset rather than stock defaults:
@@ -131,7 +131,7 @@ assert_contains 'discovered ruleset flags list-bullet style (MD004)' "$out" 'MD0
 assert_contains 'discovered ruleset flags emphasis style (MD049)' "$out" 'MD049'
 assert_not_contains 'discovered ruleset keeps MD013 disabled' "$out" 'MD013'
 
-out="$( cd "$home" && ml 'bin/Violations.md' 2>&1 )"
+out="$(cd "$home" && ml 'bin/Violations.md' 2>&1)"
 assert_not_contains 'authored markdown under bin/ is linted, not excluded' \
   "$out" 'Linting: 0 file(s)'
 

@@ -84,7 +84,7 @@ require_output_file() {
     echo '::error::GITHUB_OUTPUT is not set; nothing can report a result.' >&2
     exit 2
   fi
-  : >> "$GITHUB_OUTPUT"
+  : >>"$GITHUB_OUTPUT"
 }
 
 # repin::resolve <owner/repo>
@@ -127,7 +127,7 @@ repin::resolve() {
   # green while it has silently stopped checking anything is worse than no job
   # at all.
   if ! releases="$(gh api --paginate "repos/${upstream}/releases" \
-    --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' 2> "$err")"; then
+    --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' 2>"$err")"; then
     echo "::error::Could not read the published ${upstream} releases." >&2
     cat "$err" >&2
     return 1
@@ -136,7 +136,7 @@ repin::resolve() {
   # The benign "nothing published yet" case: 200 with an empty body.
   if [[ -z "${releases//[[:space:]]/}" ]]; then
     echo "::notice::${upstream} has no published release to re-pin against."
-    echo 'resolved=false' >> "$GITHUB_OUTPUT"
+    echo 'resolved=false' >>"$GITHUB_OUTPUT"
     return 0
   fi
 
@@ -146,7 +146,7 @@ repin::resolve() {
   # release means a stray non-SemVer release no longer decides the pin — but a
   # published set containing nothing else still fails loudly below rather than
   # silently re-pinning to an older version.
-  tag="$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' <<< "$releases" | sort -V | tail -n1 || true)"
+  tag="$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' <<<"$releases" | sort -V | tail -n1 || true)"
   if [[ -z "$tag" ]]; then
     echo "::error::No ${upstream} release carries a full-SemVer (vX.Y.Z) tag; the pin comment has no form for any of them:" >&2
     printf '%s\n' "$releases" >&2
@@ -193,7 +193,7 @@ repin::resolve() {
     echo "tag=${tag}"
     echo "sha=${sha}"
     echo "date=${date}"
-  } >> "$GITHUB_OUTPUT"
+  } >>"$GITHUB_OUTPUT"
 }
 
 # repin::compare <current-sha> <release-sha>
@@ -212,7 +212,7 @@ repin::compare() {
   local current="$1" release="$2" cached="${REPIN_CACHE}/compare-$1.json" status
   if [[ ! -f "$cached" ]]; then
     if ! gh api "repos/${UPSTREAM_REPO}/compare/${current}...${release}" \
-      > "${cached}.part" 2> "${cached}.err"; then
+      >"${cached}.part" 2>"${cached}.err"; then
       echo "::error::Could not compare ${current}...${release} on ${UPSTREAM_REPO}." >&2
       cat "${cached}.err" >&2
       return 1
@@ -249,7 +249,7 @@ repin::changed_files() {
 repin::source() {
   local path="$1" sha="$2" err="${REPIN_CACHE}/source.err"
   if gh api -H 'Accept: application/vnd.github.raw' \
-    "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" 2> "$err"; then
+    "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" 2>"$err"; then
     return 0
   fi
   if grep -q 'HTTP 404' "$err"; then
@@ -278,8 +278,8 @@ repin::refs_in() {
         text="$(repin::source "${path}/action.yaml" "$sha")"
       fi
     fi
-    { grep -oE "$COMMIT_RELATIVE_RE" <<< "$text" || true; } \
-      | sed -E 's|^uses:[[:space:]]*.?[$.]/||; s|/+$||' | sort -u > "$cached"
+    { grep -oE "$COMMIT_RELATIVE_RE" <<<"$text" || true; } |
+      sed -E 's|^uses:[[:space:]]*.?[$.]/||; s|/+$||' | sort -u >"$cached"
   fi
   cat "$cached"
 }
@@ -300,7 +300,7 @@ repin::reach() {
       [[ -n "$ref" && "$seen" != *$'\n'"${ref}"$'\n'* ]] || continue
       seen+="${ref}"$'\n'
       queue+=("$ref")
-    done <<< "$refs"
+    done <<<"$refs"
   done
   printf '%s' "${seen#$'\n'}"
 }
@@ -318,8 +318,8 @@ repin::touches() {
       if [[ "$file" == "$path" || "$file" == "$path"/* ]]; then
         return 0
       fi
-    done <<< "$2"
-  done <<< "$1"
+    done <<<"$2"
+  done <<<"$1"
   return 1
 }
 
@@ -349,7 +349,7 @@ repin::decide() {
     echo current
     return 0
   fi
-  if grep -qxF -- "$sha" <<< "$fenced"; then
+  if grep -qxF -- "$sha" <<<"$fenced"; then
     echo ahead
     return 0
   fi
@@ -393,12 +393,12 @@ repin::decide() {
         covered=true
         break
       fi
-    done <<< "$pinned"
+    done <<<"$pinned"
     if [[ "$covered" == false ]]; then
       echo move
       return 0
     fi
-  done <<< "$files"
+  done <<<"$files"
   echo keep
 }
 
@@ -443,7 +443,7 @@ repin::fenced() {
       behind | diverged) echo "$sha" ;;
       *) ;;
     esac
-  done < <(cut -f3 <<< "$1" | sort -u)
+  done < <(cut -f3 <<<"$1" | sort -u)
 }
 
 # repin::targets [<dir>]
@@ -514,7 +514,7 @@ repin::apply() {
     echo "::error::No caller file under ${root} pins a ${UPSTREAM_REPO} action." >&2
     return 1
   fi
-  mapfile -t targets <<< "$found"
+  mapfile -t targets <<<"$found"
 
   refs="$(repin::refs "${targets[@]}")"
   if [[ -z "$refs" ]]; then
@@ -522,7 +522,7 @@ repin::apply() {
     return 1
   fi
   fenced="$(repin::fenced "$refs" "$sha")"
-  pinned="$(cut -f2 <<< "$refs" | sort -u)"
+  pinned="$(cut -f2 <<<"$refs" | sort -u)"
 
   # One decision per distinct path@sha; every occurrence of it shares it.
   decided=''
@@ -533,14 +533,14 @@ repin::apply() {
     fi
     decision="$(repin::decide "$path" "$pin_sha" "$sha" "$fenced" "$pinned")"
     decided+="${path}"$'\t'"${pin_sha}"$'\t'"${decision}"$'\n'
-  done < <(cut -f2,3 <<< "$refs" | sort -u)
+  done < <(cut -f2,3 <<<"$refs" | sort -u)
 
   # A pin already on the release still takes the tag form when its comment
   # is not `# <tag>`, as a fallback-form pin to the release commit is.
   moved="$(
     {
-      awk -F'\t' '$3 == "move" { print $1 "\t" $2 }' <<< "$decided"
-      awk -F'\t' -v s="$sha" -v t="$tag" '$3 == s && $4 != t { print $2 "\t" $3 }' <<< "$refs"
+      awk -F'\t' '$3 == "move" { print $1 "\t" $2 }' <<<"$decided"
+      awk -F'\t' -v s="$sha" -v t="$tag" '$3 == s && $4 != t { print $2 "\t" $3 }' <<<"$refs"
     } | awk '$0 != "" && !seen[$0]++'
   )"
 
@@ -559,15 +559,15 @@ repin::apply() {
     [[ -n "$path" ]] || continue
     echo "::notice::${tag} changes nothing ${path}@${pin_sha:0:7} runs; that pin stays."
     kept_list+="\`${path}\`, "
-  done < <(awk -F'\t' '$3 == "keep" { print $1 "\t" $2 }' <<< "$decided")
+  done < <(awk -F'\t' '$3 == "keep" { print $1 "\t" $2 }' <<<"$decided")
 
   if [[ -z "$moved" ]]; then
-    if ! awk -F'\t' '$3 != "ahead" && $3 != "" { found = 1 } END { exit !found }' <<< "$decided"; then
+    if ! awk -F'\t' '$3 != "ahead" && $3 != "" { found = 1 } END { exit !found }' <<<"$decided"; then
       echo "::notice::Every enumerated caller is ahead of ${tag}; nothing to propose."
     else
       echo "::notice::No pin needs ${tag}; nothing to propose."
     fi
-    echo 'changed=false' >> "$GITHUB_OUTPUT"
+    echo 'changed=false' >>"$GITHUB_OUTPUT"
     return 0
   fi
 
@@ -583,7 +583,7 @@ repin::apply() {
   sed_args=()
   while IFS=$'\t' read -r path pin_sha; do
     sed_args+=(-e "s|(uses: ${UPSTREAM_REPO}/)${path//./\\.}@${pin_sha}([^0-9a-fA-F].*)?\$|\1${path}@${sha} # ${tag}|I")
-  done <<< "$moved"
+  done <<<"$moved"
   sed -i -E "${sed_args[@]}" "${targets[@]}"
 
   after="$(grep -hoE "$tagged_re" "${targets[@]}" | wc -l || true)"
@@ -606,7 +606,7 @@ repin::apply() {
 
   if git diff --quiet -- "${targets[@]}"; then
     echo "::notice::The callers already pin ${tag}; nothing to propose."
-    echo 'changed=false' >> "$GITHUB_OUTPUT"
+    echo 'changed=false' >>"$GITHUB_OUTPUT"
     return 0
   fi
 
@@ -628,7 +628,7 @@ repin::apply() {
   # shellcheck disable=SC2016  # markdown code spans, not shell expansions
   note+="
 
-Moved because ${tag} changed what they run: $(cut -f1 <<< "$moved" | sort -u | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')."
+Moved because ${tag} changed what they run: $(cut -f1 <<<"$moved" | sort -u | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')."
   if [[ -n "$kept_list" ]]; then
     note+="
 
@@ -651,13 +651,16 @@ Left untouched because their pinned commit is not an ancestor of ${tag} (${sha})
     echo "version-note<<${delim}"
     echo "$note"
     echo "$delim"
-  } >> "$GITHUB_OUTPUT"
+  } >>"$GITHUB_OUTPUT"
 }
 
 main() {
   case "${1:-}" in
     resolve)
-      [[ $# -eq 2 ]] || { usage; exit 2; }
+      [[ $# -eq 2 ]] || {
+        usage
+        exit 2
+      }
       require_output_file
       repin::resolve "$2"
       ;;

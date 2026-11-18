@@ -325,12 +325,12 @@ main() {
     # fails closed, rather than yielding an empty corpus that passes the
     # gate green.
     if [[ -n "$EXCLUDE" ]]; then
-      git -C "$root" ls-files -- $GLOBS | tr -d '\r' \
-        | { grep -vE "$EXCLUDE" || true; } \
-        | LC_ALL=C sort -u >"$corpus"
+      git -C "$root" ls-files -- $GLOBS | tr -d '\r' |
+        { grep -vE "$EXCLUDE" || true; } |
+        LC_ALL=C sort -u >"$corpus"
     else
-      git -C "$root" ls-files -- $GLOBS | tr -d '\r' \
-        | LC_ALL=C sort -u >"$corpus"
+      git -C "$root" ls-files -- $GLOBS | tr -d '\r' |
+        LC_ALL=C sort -u >"$corpus"
     fi
     set +f
   fi
