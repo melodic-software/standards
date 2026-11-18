@@ -375,48 +375,6 @@ test("display-name findings report at displayNameLevel; action names are errors"
   }
 });
 
-test("every target name in the approved rename map passes the vocabulary", async () => {
-  const map = await readJson("rename-map.json");
-  const byRepo = Map.groupBy(map, (entry) => entry.repo);
-  for (const [repo, entries] of byRepo) {
-    const workflows = {};
-    const actions = [];
-    for (const entry of entries) {
-      if (entry.to.startsWith("(")) {
-        continue;
-      }
-      if (entry.kind === "action") {
-        actions.push(entry.to.replace(/^\.github\/actions\//u, ""));
-        continue;
-      }
-      const jobs = entry.job_renames.map((rename) => rename.to);
-      if (entry.to.endsWith("/pr-require-checks.yml")) {
-        jobs.push("ci-status");
-      }
-      // A recorded name exception is written as given; any other target name
-      // is a stem, written in its Title Case form.
-      const exception = vocabulary.exemptions.some(
-        (item) =>
-          item.repository === `melodic-software/${repo}` &&
-          item.path === entry.to &&
-          item.expectedName === entry.to_name,
-      );
-      workflows[path.basename(entry.to)] = workflow(
-        exception ? { raw: entry.to_name } : entry.to_name,
-        jobs.length > 0 ? jobs : ["test"],
-      );
-    }
-    const root = await repository({ workflows, actions });
-    const findings = await lintRepository({
-      root,
-      vocabulary,
-      mode: "enforcing",
-      repository: `melodic-software/${repo}`,
-    });
-    assert.deepEqual(findings, [], `${repo}: ${JSON.stringify(findings)}`);
-  }
-});
-
 test("slot names the pull request pipeline model relies on parse as stage plus function", () => {
   // cant-fail-ok: these names are the contract the Automation Lanes pipeline
   // model refers to; dropping one breaks that model.
@@ -470,19 +428,14 @@ test("activity names follow the grammar", () => {
   assert.match(checkActivityName("Fix_Docs", vocabulary), /does not match/u);
 });
 
-test("vocabulary.json and rename-map.json match their schemas", async () => {
+test("vocabulary.json matches its schema", async () => {
   const ajv = new Ajv2020({ strict: true, validateFormats: false });
-  for (const [data, schema] of [
-    ["vocabulary.json", "vocabulary.schema.json"],
-    ["rename-map.json", "rename-map.schema.json"],
-  ]) {
-    const validate = ajv.compile(await readJson(schema));
-    assert.equal(
-      validate(await readJson(data)),
-      true,
-      `${data}: ${ajv.errorsText(validate.errors)}`,
-    );
-  }
+  const validate = ajv.compile(await readJson("vocabulary.schema.json"));
+  assert.equal(
+    validate(await readJson("vocabulary.json")),
+    true,
+    `vocabulary.json: ${ajv.errorsText(validate.errors)}`,
+  );
 });
 
 test("the vocabulary loader rejects cross-field drift the schema cannot express", async () => {

@@ -10,8 +10,6 @@ another component already owns are linked under
 | --- | --- |
 | [`vocabulary.json`](vocabulary.json) | Stages, function words per stage, verbs, tool and engine names, the activity grammar, display words and proper nouns, exemptions and Apps |
 | [`vocabulary.schema.json`](vocabulary.schema.json) | Draft 2020-12 schema for the vocabulary |
-| [`rename-map.json`](rename-map.json) | Every workflow and composite action rename across the active repositories, with job id renames and couplings |
-| [`rename-map.schema.json`](rename-map.schema.json) | Draft 2020-12 schema for the rename map |
 | [`naming-lint.mjs`](naming-lint.mjs) | The analyzer |
 | [`naming-lint.test.mjs`](naming-lint.test.mjs) | Behavioral tests, schema validation, and the check that this README's stage table matches the vocabulary |
 
@@ -145,12 +143,9 @@ renaming, find each of these and change it in the same rollout:
    The old id stays reachable through the API as `deleted` while it has runs;
    delete those runs once no branch or open pull request still carries the old
    file.
-
-[`rename-map.json`](rename-map.json) records the approved renames and the
-couplings each one touches. The tests check that every target passes the
-lint. They cannot check that the map is complete, because the other
-repositories are not available to them: run naming-lint in enforcing mode on
-each repository, and every blocking finding must have an entry in the map.
+6. **Action pins.** repin-callers moves a pin's SHA, never its path: when a
+   ci-workflows composite action moves, update every caller's `uses:` path in
+   the same rollout.
 
 ## Lane configuration
 
@@ -254,10 +249,7 @@ closed the advisory period.
   `ci-status`.
 - **Other consumers:** adopt it by adding a job that runs
   `melodic-software/ci-workflows/.github/actions/check-workflow-naming` and
-  aggregating that job into `ci-status`. Rename every blocking finding first,
-  with its entry in [`rename-map.json`](rename-map.json); the last one among
-  the public repositories, claude-code-plugins' `release-plugins.yml`, was
-  renamed to `release-publish-plugins.yml` before the switch.
+  aggregating that job into `ci-status`. Rename every blocking finding first.
 - **Rollback:** set the composite's `mode: advisory`, which reports every
   finding as a warning and passes, or remove the lane.
 

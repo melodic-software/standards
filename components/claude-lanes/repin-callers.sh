@@ -48,14 +48,9 @@ readonly -a CALLER_DIRS=(
 readonly PIN_RE='uses: melodic-software/ci-workflows/\.github/actions/[^@[:space:]]+@[0-9a-fA-F]{40}'
 readonly DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 readonly UPSTREAM_REPO='melodic-software/ci-workflows'
-# Old -> new upstream paths. Its `repo: ci-workflows` entries with a path
-# `to` are the only renames apply follows; it keeps no copy of its own.
-# Resolved beside this script, so a run against another repository root
-# reads the same map.
-RENAME_MAP="$(cd "$(dirname "${BASH_SOURCE[0]}")/../github-actions-conventions" && pwd)/rename-map.json"
-readonly RENAME_MAP
-# The sync engine, resolved beside this script like RENAME_MAP. --root mode
-# asks it which files the standards sync manages in the consumer.
+# The sync engine, resolved beside this script, so a run against another
+# repository root reads the same engine. --root mode asks it which files the
+# standards sync manages in the consumer.
 SYNC_MANIFEST="${SYNC_MANIFEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../distribution" && pwd)/sync-manifest.sh}"
 readonly SYNC_MANIFEST
 readonly UPSTREAM_PATH_RE='^[A-Za-z0-9._/-]+$'
@@ -451,69 +446,6 @@ repin::fenced() {
   done < <(cut -f3 <<< "$1" | sort -u)
 }
 
-# repin::path_state <path> <sha>
-#
-# Prints `present` or `absent` for <path> on the upstream at <sha>, through
-# the contents API, which answers for one exact path and ref (a file or a
-# directory) and, unlike a recursive tree read, never truncates. Any failure
-# but a 404 is fatal: it says nothing about the path.
-repin::path_state() {
-  local path="$1" sha="$2" err="${REPIN_CACHE}/path-state.err"
-  if gh api "repos/${UPSTREAM_REPO}/contents/${path}?ref=${sha}" --silent 2>"$err"; then
-    echo present
-  elif grep -q 'HTTP 404' "$err"; then
-    echo absent
-  else
-    echo "::error::Could not probe ${path} at ${sha} on ${UPSTREAM_REPO}." >&2
-    cat "$err" >&2
-    return 1
-  fi
-}
-
-# repin::path_map <sha> <path>...
-#
-# Prints `from<TAB>to` for each upstream <path>... that
-# RENAME_MAP renames and that <sha> carries only under its new name. A
-# release cut before the rename still has the old path, so it maps nothing.
-# A pinned path absent under both names is fatal: no rewrite could be right.
-repin::path_map() {
-  local sha="$1" entries pinned from to old_state new_state
-  shift
-  if [[ ! -f "$RENAME_MAP" ]]; then
-    echo "::error::${RENAME_MAP} is missing; renamed upstream paths cannot be resolved." >&2
-    return 1
-  fi
-  # Called through command substitution, where bash clears errexit: every
-  # failure below returns explicitly.
-  entries="$(jq -r '.[] | select(.repo == "ci-workflows" and (.to | startswith(".github/actions/")))
-    | [.from, .to] | @tsv' "$RENAME_MAP")" || return 1
-  pinned="$(printf '%s\n' "$@" | sort -u)"
-  while IFS=$'\t' read -r from to; do
-    if [[ -z "$from" ]] || ! grep -qxF -- "$from" <<<"$pinned"; then
-      continue
-    fi
-    if [[ ! "$from" =~ $UPSTREAM_PATH_RE || ! "$to" =~ $UPSTREAM_PATH_RE ]]; then
-      echo "::error::${RENAME_MAP} maps '${from}' to '${to}', which is not a plain repository path." >&2
-      return 1
-    fi
-    old_state="$(repin::path_state "$from" "$sha")"
-    case "$old_state" in
-      present) continue ;;
-      absent) ;;
-      *) return 1 ;;
-    esac
-    new_state="$(repin::path_state "$to" "$sha")"
-    case "$new_state" in
-      present) printf '%s\t%s\n' "$from" "$to" ;;
-      absent)
-        echo "::error::Neither ${from} nor its renamed path ${to} exists at ${sha}." >&2
-        return 1
-        ;;
-      *) return 1 ;;
-    esac
-  done <<<"$entries"
-}
-
 # repin::targets [<dir>]
 #
 # Prints the caller files apply may rewrite, one per line, relative to the
@@ -566,7 +498,6 @@ repin::apply() {
   local tag="$1" sha="$2" release_date="$3" dir="${4:-}"
   local root found refs fenced pinned decided moved file path pin_sha decision
   local expected before after old_tags new_major old_major old_tag note ahead_list kept_list delim
-  local path_map from to renamed moved_paths
   local tagged_re="uses: ${UPSTREAM_REPO}/\.github/actions/[^@[:space:]]+@${sha}[[:space:]]+# ${tag}\$"
   local -a targets ahead excludes sed_args
 
@@ -649,19 +580,9 @@ repin::apply() {
   old_tags="$(awk -F'\t' 'NR == FNR { if ($0 != "") m[$0] = 1; next } (($2 "\t" $3) in m) && $4 ~ /^v/ { print $4 }' \
     <(printf '%s\n' "$moved") <(printf '%s\n' "$refs") | sort -u | paste -sd, - || true)"
 
-  moved_paths="$(cut -f1 <<< "$moved" | sort -u)"
-  # shellcheck disable=SC2086  # one argument per moved path, none with whitespace
-  path_map="$(repin::path_map "$sha" $moved_paths)"
-  renamed=''
-  while IFS=$'\t' read -r from to; do
-    [[ -n "$from" ]] || continue
-    echo "::notice::${tag} carries ${from} as ${to}; the pins follow the rename."
-    renamed+="\`${from}\` to \`${to}\`, "
-  done <<< "$path_map"
   sed_args=()
   while IFS=$'\t' read -r path pin_sha; do
-    to="$(awk -F'\t' -v p="$path" '$1 == p { print $2 }' <<< "$path_map")"
-    sed_args+=(-e "s|(uses: ${UPSTREAM_REPO}/)${path//./\\.}@${pin_sha}([^0-9a-fA-F].*)?\$|\1${to:-$path}@${sha} # ${tag}|I")
+    sed_args+=(-e "s|(uses: ${UPSTREAM_REPO}/)${path//./\\.}@${pin_sha}([^0-9a-fA-F].*)?\$|\1${path}@${sha} # ${tag}|I")
   done <<< "$moved"
   sed -i -E "${sed_args[@]}" "${targets[@]}"
 
@@ -712,11 +633,6 @@ Moved because ${tag} changed what they run: $(cut -f1 <<< "$moved" | sort -u | s
     note+="
 
 Left where they are because ${tag} changes nothing they run: ${kept_list%, }."
-  fi
-  if [[ -n "$renamed" ]]; then
-    note+="
-
-Renamed upstream at ${tag}, so these pins moved path as well as SHA: ${renamed%, }."
   fi
   if [[ "${#ahead[@]}" -gt 0 ]]; then
     ahead_list="$(printf "\`%s\`, " "${ahead[@]}")"
