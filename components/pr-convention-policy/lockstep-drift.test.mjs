@@ -64,7 +64,9 @@ const POLICY = parseUniqueJson(
 // still run), the same run.sh from ci-workflows
 // cc7613fbf8bacca72700d6498c32145c05fe1f09 (ci-workflows#815, the gsub
 // keyword pass and bounded backward negation scan, with the same awk
-// comment), and the hook validator from
+// comment), the same run.sh from ci-workflows
+// cb6945d4906ef5e6c6d6281d98c96e79a45349f5 (ci-workflows#1129, one report loop
+// with a case per kind, with the same awk comment), and the hook validator from
 // claude-code-plugins 53d5c6a09dfb5890b9767b447a28ca10ba922173. The `.txt`
 // suffix keeps the shell lint lanes off code this repository does not own.
 // Refresh them when either upstream changes shape the tests depend on.
@@ -73,6 +75,7 @@ const readFixture = (name) =>
 const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
 const LITERAL_REF_COMPOSITE_RUN = await readFixture("check-contract-run-literal-ref.sh.txt");
 const BOUNDED_SCAN_COMPOSITE_RUN = await readFixture("check-contract-run-bounded-scan.sh.txt");
+const SINGLE_LOOP_COMPOSITE_RUN = await readFixture("check-contract-run-1129.sh.txt");
 const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
 const BOUNDED_SCAN_VALIDATOR = await readFixture("pr-linkage-validator-bounded-scan.sh.txt");
 
@@ -429,6 +432,46 @@ test("a composite pin with the bounded negation scan passes", () => {
     checkCopies(POLICY, { ...goodTexts(), gateRun: BOUNDED_SCAN_COMPOSITE_RUN }),
     [],
   );
+});
+
+test("a composite with one report loop and a case per kind passes", () => {
+  assert.deepEqual(checkCopies(POLICY, { ...goodTexts(), gateRun: SINGLE_LOOP_COMPOSITE_RUN }), []);
+});
+
+test("a single-loop composite that stops acting on the report is drift", () => {
+  for (const [from, to, expected] of [
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '      negated) negated_quoted+="${negated_quoted:+, }',
+      '      negated) : "',
+      /a `negated` report is a linkage error/,
+    ],
+    [
+      '    esac\n  done <"$analysis"',
+      "    esac\n  done </dev/null",
+      /a missing or empty section report/,
+    ],
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      'section-empty) linkage_errors+=("The \\"## ${text}\\" section is empty.") ;;',
+      "section-empty) : ;;",
+      /a missing or empty section report/,
+    ],
+    [
+      "grep -qxE 'closing|non-closing|no-issue'",
+      "grep -qxE 'closing|no-issue'",
+      /a `non-closing` report satisfies linkage/,
+    ],
+    ["jq -r .body <", "jq -r .title <", /the PR body is written to the analyzer's input/],
+  ]) {
+    const mutated = SINGLE_LOOP_COMPOSITE_RUN.replace(from, to);
+    assert.notEqual(mutated, SINGLE_LOOP_COMPOSITE_RUN, `mutation did not apply: ${from}`);
+    const errors = checkCopies(POLICY, { ...goodTexts(), gateRun: mutated });
+    assert.ok(
+      errors.some((e) => e.startsWith("gate composite (verdict): ") && expected.test(e)),
+      `${from}: ${errors.join("; ")}`,
+    );
+  }
 });
 
 test("a hook validator with the bounded negation scan passes", () => {

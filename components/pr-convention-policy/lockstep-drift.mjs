@@ -461,7 +461,7 @@ export function assertCompositeVerdictReads(runShText, location) {
   const links = [
     [
       "the PR body is written to the analyzer's input",
-      /jq -r '\.body \/\/ ""' <"\$pr_json" >"\$scratch\/body\.txt"/,
+      /jq -r (?:'\.body \/\/ ""'|\.body) <"\$pr_json" >"\$scratch\/body\.txt"/,
     ],
     [
       "analyze_body writes the report run.sh reads",
@@ -470,17 +470,29 @@ export function assertCompositeVerdictReads(runShText, location) {
     ["nothing else writes the report", { test: () => reportWrites.length === 1 }],
     // Each consumer below is bound to its input (the report) and to the error
     // it raises, so redirecting a loop or dropping its error is caught.
+    // Two shapes are live: one loop per report kind (ci-workflows up to
+    // v0.75.0) and one loop over the report with a case per kind (#1129).
     [
       "a missing or empty section report is a linkage error",
-      /while IFS=\$'\\t' read -r kind name _rest; do\s*\n\s*case "\$kind" in\s*\n\s*section-missing\)\s*\n\s*linkage_errors\+=\("Missing a \\"## \$\{name\}\\" section\.[^\n]*\n\s*;;\s*\n\s*section-empty\)\s*\n\s*linkage_errors\+=\("The \\"## \$\{name\}\\" section is empty\."\)\s*\n\s*;;\s*\n\s*\*\) ;;\s*\n\s*esac\s*\n\s*done <"\$analysis"\n/,
+      new RegExp(
+        [
+          String.raw`while IFS=\$'\\t' read -r kind name _rest; do\s*\n\s*case "\$kind" in\s*\n\s*section-missing\)\s*\n\s*linkage_errors\+=\("Missing a \\"## \$\{name\}\\" section\.[^\n]*\n\s*;;\s*\n\s*section-empty\)\s*\n\s*linkage_errors\+=\("The \\"## \$\{name\}\\" section is empty\."\)\s*\n\s*;;\s*\n\s*\*\) ;;\s*\n\s*esac\s*\n\s*done <"\$analysis"\n`,
+          String.raw`while IFS=\$'\\t' read -r kind text trigger; do\s*\n\s*case "\$kind" in\s*\n\s*section-missing\) linkage_errors\+=\("Missing a \\"## \$\{text\}\\" section\.[^\n]*\n\s*section-empty\) linkage_errors\+=\("The \\"## \$\{text\}\\" section is empty\."\) ;;\s*\n(?:\s*negated\)[^\n]*\n)?\s*\*\) ;;\s*\n\s*esac\s*\n\s*done <"\$analysis"\n`,
+        ].join("|"),
+      ),
     ],
     [
       "a `non-closing` report satisfies linkage",
-      /if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"; then\s*\n\s*linkage_errors\+=\((?:'Missing a native|"Missing a \$\{keyword_kind\}) closing keyword/,
+      /(?:if ! grep -qx 'closing' "\$analysis" &&\s*! grep -qx 'non-closing' "\$analysis" &&\s*! grep -qx 'no-issue' "\$analysis"|if ! grep -qxE 'closing\|non-closing\|no-issue' "\$analysis"); then\s*\n\s*linkage_errors\+=\((?:'Missing a native|"Missing a \$\{keyword_kind\}) closing keyword/,
     ],
     [
       "a `negated` report is a linkage error",
-      /negated_quoted=""\s*\n\s*while IFS=\$'\\t' read -r kind text trigger; do\s*\n\s*\[\[ "\$kind" == negated \]\] \|\| continue\n(?:(?!\bdone\b)[\s\S])*?done <"\$analysis"\n\s*\n\s*if \[\[ -n "\$negated_quoted" \]\]; then\s*\n\s*linkage_errors\+=\("Negated closing reference/,
+      new RegExp(
+        [
+          String.raw`negated_quoted=""\s*\n\s*while IFS=\$'\\t' read -r kind text trigger; do\s*\n\s*\[\[ "\$kind" == negated \]\] \|\| continue\n(?:(?!\bdone\b)[\s\S])*?done <"\$analysis"\n\s*\n\s*if \[\[ -n "\$negated_quoted" \]\]; then\s*\n\s*linkage_errors\+=\("Negated closing reference`,
+          String.raw`negated_quoted=""\s*\n\s*while IFS=\$'\\t' read -r kind text trigger; do\s*\n\s*case "\$kind" in\s*\n(?:(?!\bdone\b)[\s\S])*?\n\s*negated\) negated_quoted\+=[^\n]*\n(?:(?!\bdone\b)[\s\S])*?done <"\$analysis"\n\s*\n\s*if \[\[ -n "\$negated_quoted" \]\]; then\s*\n\s*linkage_errors\+=\("Negated closing reference`,
+        ].join("|"),
+      ),
     ],
     [
       "a linkage error fails the check",
