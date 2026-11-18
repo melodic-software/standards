@@ -80,31 +80,27 @@ function escapeRegExp(value) {
 }
 
 export function buildTitlePattern(policy) {
-  const types = policy.title.allowedTypes.map((type) => escapeRegExp(type));
+  const types = policy.title.allowedTypes.map(escapeRegExp);
   const scope = policy.title.requireScope ? "\\([^)]+\\)" : "(?:\\([^)]+\\))?";
-  const breaking = "!?";
-  return new RegExp(`^(${types.join("|")})${scope}${breaking}: .+$`, "u");
+  return new RegExp(`^(${types.join("|")})${scope}!?: .+$`, "u");
 }
 
 export function validateTitle(title, policy) {
-  const findings = [];
   const trimmed = title.trim();
   if (trimmed.length === 0) {
-    findings.push(finding("title-empty", "title", "PR title must not be empty."));
-    return findings;
+    return [finding("title-empty", "title", "PR title must not be empty.")];
   }
-  const pattern = buildTitlePattern(policy);
-  if (!pattern.test(trimmed)) {
-    const allowed = policy.title.allowedTypes.join(", ");
-    findings.push(
-      finding(
-        "title-not-conventional",
-        "title",
-        `PR title must follow Conventional Commits with an allowed type (${allowed}).`,
-      ),
-    );
+  if (buildTitlePattern(policy).test(trimmed)) {
+    return [];
   }
-  return findings;
+  const allowed = policy.title.allowedTypes.join(", ");
+  return [
+    finding(
+      "title-not-conventional",
+      "title",
+      `PR title must follow Conventional Commits with an allowed type (${allowed}).`,
+    ),
+  ];
 }
 
 export function stripRenderedHtmlComments(text) {
@@ -218,8 +214,7 @@ function extractSection(text, heading) {
 }
 
 function buildNoIssuePattern(markers) {
-  const escaped = markers.map((marker) => escapeRegExp(marker));
-  return new RegExp(`\\b(?:${escaped.join("|")})\\b`, "iu");
+  return new RegExp(`\\b(?:${markers.map(escapeRegExp).join("|")})\\b`, "iu");
 }
 
 function buildClosingKeywordPattern(keywords) {
@@ -310,10 +305,8 @@ async function loadPolicy(policyPath) {
   } catch (error) {
     throw new ConfigurationError(`policy could not be read at ${policyPath}: ${error.message}`);
   }
-  return validatePolicy(
-    parseUniqueJson(source, `policy at ${policyPath}`),
-    `policy at ${policyPath}`,
-  );
+  const location = `policy at ${policyPath}`;
+  return validatePolicy(parseUniqueJson(source, location), location);
 }
 
 async function main() {

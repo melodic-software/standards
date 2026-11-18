@@ -411,43 +411,20 @@ test("a composite that stops lowercasing the line is drift, not a pass", () => {
   assert.match(errors[1], /^gate composite \(behavior\): .*"Closes #12" should be closing/);
 });
 
+// The composite's findings at one codex-plugins pin, with the good action.yml.
+const checkCodexPin = (runSh) =>
+  checkPinnedComposite(POLICY, "codex-plugins", "d".repeat(40), runSh, GOOD_COMPOSITE_ACTION);
+
 test("a composite at a consumer pin passes when it matches policy", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      GOOD_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(GOOD_COMPOSITE_RUN), []);
 });
 
 test("a composite pin that still inlines the #N reference passes", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      LITERAL_REF_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(LITERAL_REF_COMPOSITE_RUN), []);
 });
 
 test("a composite pin with the bounded negation scan passes", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      BOUNDED_SCAN_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(BOUNDED_SCAN_COMPOSITE_RUN), []);
   assert.deepEqual(
     checkCopies(POLICY, { ...goodTexts(), gateRun: BOUNDED_SCAN_COMPOSITE_RUN }),
     [],
@@ -504,13 +481,7 @@ test("an issue-ref-pattern composite that loses its default is drift", () => {
       "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
     ]);
     // Three checks read the default; a consumer pin reports the finding once.
-    const pinned = checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      GOOD_COMPOSITE_RUN.replace(from, to),
-      GOOD_COMPOSITE_ACTION,
-    );
+    const pinned = checkCodexPin(GOOD_COMPOSITE_RUN.replace(from, to));
     assert.equal(pinned.length, 1, pinned.join("; "));
     assert.match(pinned[0], /^caller codex-plugins pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
   }
@@ -1532,13 +1503,9 @@ test("a commented-out call site is not a call site", () => {
 // The ci-workflows rename moves the gate from `ci.yml` to
 // `pr-require-checks.yml`. The scan reads that file before any other, so a
 // repository calling the composite from there costs one read.
-test("a composite called from pr-require-checks.yml is found on the first read", async () => {
+// Resolves ci-workflows over the given workflow files, recording each one read.
+async function resolveWorkflows(files) {
   const reads = [];
-  const files = {
-    "build.yml": "jobs:\n  build:\n    runs-on: ubuntu-24.04\n",
-    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
-    "lint.yml": "jobs:\n  lint:\n    runs-on: ubuntu-24.04\n",
-  };
   const found = await resolveConsumerArtifact(
     "ci-workflows",
     async (url) => {
@@ -1548,25 +1515,24 @@ test("a composite called from pr-require-checks.yml is found on the first read",
     },
     async () => Object.keys(files),
   );
+  return { found, reads };
+}
+
+test("a composite called from pr-require-checks.yml is found on the first read", async () => {
+  const { found, reads } = await resolveWorkflows({
+    "build.yml": "jobs:\n  build:\n    runs-on: ubuntu-24.04\n",
+    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
+    "lint.yml": "jobs:\n  lint:\n    runs-on: ubuntu-24.04\n",
+  });
   assert.deepEqual(found, { kind: "composite", sha: "main", local: true });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 
 test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", async () => {
-  const reads = [];
-  const files = {
+  const { found, reads } = await resolveWorkflows({
     "ci.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
     "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
-  };
-  const found = await resolveConsumerArtifact(
-    "ci-workflows",
-    async (url) => {
-      const name = url.match(/\.github\/workflows\/([^?]+)/)[1];
-      reads.push(name);
-      return files[name];
-    },
-    async () => Object.keys(files),
-  );
+  });
   assert.deepEqual(found, { kind: "composite", sha: "main", local: true });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });

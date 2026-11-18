@@ -228,7 +228,7 @@ export function linkageMatrix(policy) {
     add(`This ${firstTrigger}e ${lower} #12`, { closing: true });
     add(`This can${firstTrigger} ${lower} #12`, { closing: true });
     add(`${firstTrigger} ${outside.replace(" ", "-")} ${closer} #12`, { closing: true });
-    const references = fillers(wordWindow).map((_, index) => `#${index + 1}`);
+    const references = Array.from({ length: wordWindow }, (_, index) => `#${index + 1}`);
     add(`${firstTrigger} ${references.join(" ")} ${closer} #12`, { negated: firstTrigger });
     add(`${firstTrigger}\n${closer} #12`, { closing: true });
     for (const delimiter of CLAUSE_DELIMITERS) {
@@ -374,6 +374,10 @@ function run(command, args, options, location, what) {
 // The composite: its analyzer is the awk program inside `analyze_body`.
 // ---------------------------------------------------------------------------
 
+// The awk program is single-quoted bash, so an apostrophe inside it is spelled
+// `'"'"'`; read it back as the apostrophe awk sees.
+export const unquoteAwk = (text) => text.replaceAll(`'"'"'`, "'");
+
 export function extractCompositeAnalyzer(runShText, location) {
   const match = runShText.match(/^analyze_body\(\) \{\n {2}awk '\n([\s\S]*?)\n'\n\}$/m);
   if (!match) {
@@ -381,8 +385,7 @@ export function extractCompositeAnalyzer(runShText, location) {
       `${location}: run.sh has no \`analyze_body() { awk '...' }\` analyzer to execute`,
     );
   }
-  // Single-quoted bash spells an apostrophe `'"'"'`; awk sees the apostrophe.
-  return match[1].replaceAll(`'"'"'`, "'");
+  return unquoteAwk(match[1]);
 }
 
 // From ci-workflows#733 on, the analyzer reads its issue-reference grammar
@@ -516,6 +519,8 @@ export function checkHookBehavior(shellText, policy, location) {
       `${location}: the validator harness exited ${result.status ?? result.signal} after ${records.length - 1} of ${matrix.length} sample bodies: ${result.stderr.trim()}`,
     );
   }
+  const show = (v) =>
+    `${v.linked ? "linked" : "unlinked"}${v.negated ? ` + negated by "${v.negated}"` : ""}`;
   const mismatches = [];
   matrix.forEach(({ line, expect }, index) => {
     const actual = hookVerdict(records[index]);
@@ -523,8 +528,6 @@ export function checkHookBehavior(shellText, policy, location) {
       linked: expect.closing || expect.nonClosing || expect.noIssue,
       negated: expect.negated,
     };
-    const show = (v) =>
-      `${v.linked ? "linked" : "unlinked"}${v.negated ? ` + negated by "${v.negated}"` : ""}`;
     if (show(actual) !== show(expected)) {
       mismatches.push({ line, expected: show(expected), actual: show(actual) });
     }
