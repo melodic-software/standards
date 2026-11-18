@@ -58,11 +58,17 @@ out="$(assert_command_fails "cf" true 2>&1)"
 assert_contains "assert_command_fails fails when the command succeeds" "$out" "FAIL:"
 # errexit immunity: the failing subject must not abort a `set -e` caller before
 # the assertion records (regression guard for the run-bare refactor).
-out="$(set -e; assert_command_fails "errexit-safe" false)"
+out="$(
+  set -e
+  assert_command_fails "errexit-safe" false
+)"
 assert_contains "assert_command_fails is safe under set -e" "$out" "PASS:"
 
 # --- skip_case (unlike skip_suite, control must continue past it) ---
-out="$(skip_case "one case skipped" 2>&1; printf 'continued\n')"
+out="$(
+  skip_case "one case skipped" 2>&1
+  printf 'continued\n'
+)"
 assert_contains "skip_case emits a SKIP marker" "$out" "SKIP:"
 assert_contains "skip_case does not exit" "$out" "continued"
 
@@ -71,15 +77,18 @@ out="$(require_min_version tool 1.2.3 1.2.0 2>&1)"
 assert_silent "require_min_version is silent when have > min" "$out"
 out="$(require_min_version tool 1.2.0 1.2.0 2>&1)"
 assert_silent "require_min_version allows the exact minimum" "$out"
-out="$(require_min_version tool 1.2.0 1.10.0 2>&1)"; rc=$?
+out="$(require_min_version tool 1.2.0 1.10.0 2>&1)"
+rc=$?
 assert_contains "require_min_version skips when have < min" "$out" "SKIP:"
 assert_exit "skip_suite exits 0 so the runner counts a skip, not a failure" 0 "$rc"
 out="$(require_min_version tool 1.9.0 1.10.0 2>&1)"
 assert_contains "require_min_version compares by version, not lexically" "$out" "SKIP:"
-out="$(require_min_version tool "" 1.0.0 2>&1)"; rc=$?
+out="$(require_min_version tool "" 1.0.0 2>&1)"
+rc=$?
 assert_contains "require_min_version errors on an unparsable (empty) version" "$out" "ERROR:"
 assert_nonzero "require_min_version exits non-zero on an empty version" "$rc"
-out="$(require_min_version tool nightly 1.0.0 2>&1)"; rc=$?
+out="$(require_min_version tool nightly 1.0.0 2>&1)"
+rc=$?
 assert_contains "require_min_version errors on a non-numeric version token" "$out" "ERROR:"
 assert_nonzero "require_min_version exits non-zero on a non-numeric version" "$rc"
 

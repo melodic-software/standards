@@ -515,7 +515,8 @@ assert_contains 'manifest FIFO diagnostic identifies worktree shape' \
 
 # Batched index reads attribute exact recorded paths even when a shared
 # directory prefix would also select descendants under ls-files pathspec rules.
-nested_manifest="$(cat <<'YAML'
+nested_manifest="$(
+  cat <<'YAML'
 version: 2
 
 components:
@@ -1117,6 +1118,9 @@ invalid_case 'previous destination listed by two components' "$bad" \
   "previous destination 'legacy/policy' is listed by both 'base' and 'consumer'" engine
 
 node "$root/distribution/control-char-equivalence.mjs" ||
-  { echo 'control-character equivalence test failed' >&2; exit 1; }
+  {
+    echo 'control-character equivalence test failed' >&2
+    exit 1
+  }
 
 [[ $FAILED -eq 0 ]] || exit 1

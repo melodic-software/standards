@@ -59,12 +59,30 @@ esac
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --config) config="${2:?--config needs a path}"; shift 2 ;;
-    --org) org="${2:?--org needs an owner}"; shift 2 ;;
-    --public-list) public_list="${2:?--public-list needs a path}"; shift 2 ;;
-    --private-list) private_list="${2:?--private-list needs a path}"; shift 2 ;;
-    --write) write=true; shift ;;
-    -h | --help) usage; exit 0 ;;
+    --config)
+      config="${2:?--config needs a path}"
+      shift 2
+      ;;
+    --org)
+      org="${2:?--org needs an owner}"
+      shift 2
+      ;;
+    --public-list)
+      public_list="${2:?--public-list needs a path}"
+      shift 2
+      ;;
+    --private-list)
+      private_list="${2:?--private-list needs a path}"
+      shift 2
+      ;;
+    --write)
+      write=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
     *) die "unknown option: $1" ;;
   esac
 done
@@ -123,13 +141,13 @@ read_list() {
 }
 
 query_public() {
-  gh api --paginate "orgs/${org}/repos?type=public&per_page=100" --jq '.[].name' \
-    || die "could not list public repositories of ${org}"
+  gh api --paginate "orgs/${org}/repos?type=public&per_page=100" --jq '.[].name' ||
+    die "could not list public repositories of ${org}"
 }
 
 query_private() {
-  gh repo list "$org" --visibility private --limit 1000 --json name --jq '.[].name' \
-    || die "could not list private repositories of ${org} (needs a credential that can read them)"
+  gh repo list "$org" --visibility private --limit 1000 --json name --jq '.[].name' ||
+    die "could not list private repositories of ${org} (needs a credential that can read them)"
 }
 
 # render <alternation> — the two exclude entries as they belong in the file.
@@ -228,9 +246,9 @@ fi
 
 if [[ "$status" -ne 0 ]]; then
   regenerated="$(
-    sorted_set "$inventory"$'\n'"$missing" \
-      | LC_ALL=C comm -23 - <(sorted_set "$wrongly_excluded") \
-      | lines_to_group
+    sorted_set "$inventory"$'\n'"$missing" |
+      LC_ALL=C comm -23 - <(sorted_set "$wrongly_excluded") |
+      lines_to_group
   )"
   printf 'Regenerated exclude entries for %s:\n' "$config" >&2
   render "$regenerated" >&2

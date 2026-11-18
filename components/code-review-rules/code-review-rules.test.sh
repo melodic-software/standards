@@ -53,9 +53,19 @@ repo pointer-outside "$(printf '# Repo\n\n## Code Review Rules\n\n%s\n\n## Next\
 fence='```'
 repo pointer-fenced "$(section "$intro" "$(printf '%smarkdown\n%s\n%s' "$fence" "$synced" "$fence")")" review
 repo heading-fenced "$(printf '# Repo\n\n%smarkdown\n## Code Review Rules\n\n%s\n\n%s\n%s\n' "$fence" "$intro" "$synced" "$fence")" review
-repo unclosed-fence "$(printf '# Repo\n\n%s\nsnippet\n\n' "$fence"; section "$intro" "$synced")" review
-repo mixed-fences "$(printf '# Repo\n\n~~~text\n%s\n~~~\n\n' "$fence"; section "$intro" "$synced")" review
-repo nested-fence "$(printf '# Repo\n\n%s`markdown\n%s\n' "$fence" "$fence"; section "$intro" "$synced"; printf '%s`\n' "$fence")" review
+repo unclosed-fence "$(
+  printf '# Repo\n\n%s\nsnippet\n\n' "$fence"
+  section "$intro" "$synced"
+)" review
+repo mixed-fences "$(
+  printf '# Repo\n\n~~~text\n%s\n~~~\n\n' "$fence"
+  section "$intro" "$synced"
+)" review
+repo nested-fence "$(
+  printf '# Repo\n\n%s`markdown\n%s\n' "$fence" "$fence"
+  section "$intro" "$synced"
+  printf '%s`\n' "$fence"
+)" review
 
 # --- file ------------------------------------------------------------------
 # check_file <fixture repo> — `file` mode over one fixture, stderr merged.

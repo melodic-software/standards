@@ -19,7 +19,10 @@ command -v jq >/dev/null 2>&1 || {
   exit 2
 }
 
-[[ -f "$base" ]] || { echo "missing base settings: $base" >&2; exit 1; }
+[[ -f "$base" ]] || {
+  echo "missing base settings: $base" >&2
+  exit 1
+}
 
 jq empty "$base" >/dev/null 2>&1 || {
   echo "check-claude-settings-targets: base is not valid JSON: $base" >&2

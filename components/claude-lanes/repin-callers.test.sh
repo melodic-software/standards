@@ -46,7 +46,7 @@ done
 stub_gh() {
   local dir="$1"
   mkdir -p "$dir"
-  cat > "$dir/gh" <<'STUB'
+  cat >"$dir/gh" <<'STUB'
 #!/usr/bin/env bash
 # Test double for the gh CLI. Only `gh api [flags] <path> --jq <expr>` is
 # supported; the subject calls nothing else.
@@ -163,7 +163,7 @@ stub_gh "$stub_bin"
 # Prints combined output; returns the subject's exit code.
 run_resolve() {
   local outfile="$1"
-  : > "$outfile"
+  : >"$outfile"
   PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$outfile" bash "$script" resolve "$upstream" 2>&1
 }
 
@@ -173,7 +173,8 @@ run_resolve() {
 # at the commit, so no second dereference happens.
 out_file="$scratch/out-lightweight"
 export STUB_RELEASES_STATUS=200 STUB_TAG_NAME='v0.9.1' STUB_REF_TYPE='commit' STUB_REF_SHA="$old_sha"
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: lightweight tag exits 0' 0 "$rc"
 assert_contains 'resolve: lightweight tag reports the commit object' "$out" 'commit object'
 assert_contains 'resolve: lightweight tag emits resolved=true' "$(cat "$out_file")" 'resolved=true'
@@ -185,7 +186,8 @@ assert_contains 'resolve: lightweight tag emits the commit date as YYYY-MM-DD' "
 # the shape a fallback-form pin comment records — apply compares the two.
 out_file="$scratch/out-date"
 export STUB_COMMIT_DATE='2026-08-21T08:17:24Z'
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: commit date exits 0' 0 "$rc"
 assert_contains 'resolve: commit date is truncated to the day' "$(cat "$out_file")" 'date=2026-08-21'
 assert_not_contains 'resolve: commit date carries no time component' "$(cat "$out_file")" 'T08:17'
@@ -194,7 +196,8 @@ assert_not_contains 'resolve: commit date carries no time component' "$(cat "$ou
 # consume; it must fail loudly rather than emit a date apply then misreads.
 out_file="$scratch/out-bad-date"
 export STUB_COMMIT_DATE='not-a-date'
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_nonzero 'resolve: an unparsable commit date fails' "$rc"
 assert_contains 'resolve: an unparsable commit date raises an error' "$out" '::error::'
 assert_not_contains 'resolve: an unparsable commit date never emits resolved=true' "$(cat "$out_file")" 'resolved=true'
@@ -205,7 +208,8 @@ unset STUB_COMMIT_DATE
 out_file="$scratch/out-annotated"
 tag_object='0000111122223333444455556666777788889999'
 export STUB_RELEASES_STATUS=200 STUB_TAG_NAME='v1.4.0' STUB_REF_TYPE='tag' STUB_REF_SHA="$tag_object" STUB_TAG_OBJECT_SHA="$new_sha"
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: annotated tag exits 0' 0 "$rc"
 assert_contains 'resolve: annotated tag reports the tag object' "$out" 'tag object'
 assert_contains 'resolve: annotated tag dereferences to the commit' "$(cat "$out_file")" "sha=$new_sha"
@@ -224,7 +228,8 @@ export STUB_RELEASES_STATUS=200 STUB_REF_TYPE='commit' STUB_REF_SHA="$new_sha"
 export STUB_RELEASE_TAGS='v0.9.1
 v0.14.0
 v0.12.0'
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: a multi-release set exits 0' 0 "$rc"
 assert_contains 'resolve: the highest SemVer release wins' "$(cat "$out_file")" 'tag=v0.14.0'
 assert_not_contains 'resolve: a lower release never wins' "$(cat "$out_file")" 'tag=v0.12.0'
@@ -234,7 +239,8 @@ assert_not_contains 'resolve: a lower release never wins' "$(cat "$out_file")" '
 out_file="$scratch/out-semver-order"
 export STUB_RELEASE_TAGS='v0.9.1
 v0.10.0'
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: SemVer ordering exits 0' 0 "$rc"
 assert_contains 'resolve: v0.10.0 outranks v0.9.1' "$(cat "$out_file")" 'tag=v0.10.0'
 
@@ -244,7 +250,8 @@ out_file="$scratch/out-mixed-shapes"
 export STUB_RELEASE_TAGS='nightly
 v0.12.0
 v1.4'
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: a mixed-shape release set exits 0' 0 "$rc"
 assert_contains 'resolve: non-SemVer releases are skipped' "$(cat "$out_file")" 'tag=v0.12.0'
 
@@ -252,7 +259,8 @@ assert_contains 'resolve: non-SemVer releases are skipped' "$(cat "$out_file")" 
 # list endpoint reports as 200 rather than 404.
 out_file="$scratch/out-empty-list"
 export STUB_RELEASE_TAGS=''
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: an empty published release set exits 0' 0 "$rc"
 assert_contains 'resolve: an empty release set emits resolved=false' "$(cat "$out_file")" 'resolved=false'
 assert_contains 'resolve: an empty release set is a notice' "$out" '::notice::'
@@ -267,7 +275,8 @@ unset STUB_RELEASE_TAGS
 # `releases/latest` endpoint returned.
 out_file="$scratch/out-no-release"
 export STUB_RELEASES_STATUS=200 STUB_RELEASE_TAGS='' STUB_REPO_STATUS=200 STUB_TAG_NAME='unused' STUB_REF_TYPE='commit' STUB_REF_SHA="$old_sha"
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_exit 'resolve: no published release exits 0' 0 "$rc"
 assert_contains 'resolve: no published release emits resolved=false' "$(cat "$out_file")" 'resolved=false'
 assert_contains 'resolve: no published release is a notice' "$out" '::notice::'
@@ -281,7 +290,8 @@ unset STUB_RELEASE_TAGS
 # upstream reading as "nothing to do" forever is the failure this guards.
 out_file="$scratch/out-unreadable"
 export STUB_RELEASES_STATUS=404 STUB_REPO_STATUS=404
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_nonzero 'resolve: unreadable upstream fails loudly' "$rc"
 assert_contains 'resolve: unreadable upstream raises an error' "$out" '::error::'
 assert_not_contains 'resolve: unreadable upstream never emits resolved=false' "$(cat "$out_file")" 'resolved=false'
@@ -293,7 +303,8 @@ export STUB_REPO_STATUS=200
 # would have mistaken it for a clean no-op.
 out_file="$scratch/out-releases-404-repo-ok"
 export STUB_RELEASES_STATUS=404 STUB_REPO_STATUS=200
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_nonzero 'resolve: releases 404 with a readable repo still fails loudly' "$rc"
 assert_contains 'resolve: releases 404 with a readable repo raises an error' "$out" '::error::'
 assert_not_contains 'resolve: releases 404 with a readable repo emits no resolved=false' "$(cat "$out_file")" 'resolved=false'
@@ -303,7 +314,8 @@ export STUB_RELEASES_STATUS=200
 # a comment repin::refs cannot read back.
 out_file="$scratch/out-bad-tag"
 export STUB_RELEASES_STATUS=200 STUB_TAG_NAME='v1.4' STUB_REF_TYPE='commit' STUB_REF_SHA="$new_sha"
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_nonzero 'resolve: partial-SemVer tag fails' "$rc"
 assert_contains 'resolve: partial-SemVer tag names the convention' "$out" 'SemVer'
 
@@ -311,7 +323,8 @@ assert_contains 'resolve: partial-SemVer tag names the convention' "$out" 'SemVe
 # data, not something to guess at.
 out_file="$scratch/out-odd-object"
 export STUB_TAG_NAME='v1.4.0' STUB_REF_TYPE='blob' STUB_REF_SHA="$new_sha"
-rc=0; out="$(run_resolve "$out_file")" || rc=$?
+rc=0
+out="$(run_resolve "$out_file")" || rc=$?
 assert_nonzero 'resolve: unexpected ref object type fails' "$rc"
 
 # GITHUB_OUTPUT is the only result channel; an unset one must not read as a
@@ -347,7 +360,7 @@ lane_repo() {
     "$dir/components/managed-files-guard"
   cp -R "$fixture_corpus" "$dir/components/zizmor/fixtures"
 
-  cat > "$dir/components/claude-lanes/claude-review.yml" <<YAML
+  cat >"$dir/components/claude-lanes/claude-review.yml" <<YAML
 name: claude-review
 on: pull_request
 jobs:
@@ -355,7 +368,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/ci-status@${pin_sha} # ${pin_tag}
 YAML
-  cat > "$dir/components/claude-lanes/claude-security-review.yml" <<YAML
+  cat >"$dir/components/claude-lanes/claude-security-review.yml" <<YAML
 name: claude-security-review
 on: pull_request
 jobs:
@@ -379,7 +392,7 @@ seed_hosted_lanes() {
 # below take a fixed default so their cases stay about the rewrite itself.
 run_apply() {
   local dir="$1" outfile="$2" tag="$3" sha="$4" release_date="${5:-2026-08-21}"
-  : > "$outfile"
+  : >"$outfile"
   # Stub stays on PATH so a fallback-form pin's compare lookup never hits
   # the network; tag-form apply cases do not call gh and ignore it.
   (cd "$dir" && PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$outfile" \
@@ -391,7 +404,8 @@ run_apply() {
 repo="$scratch/repo-major"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 out_file="$scratch/out-apply-major"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
 assert_exit 'apply: major-version bump exits 0' 0 "$rc"
 assert_contains 'apply: major-version bump reports a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: major-version bump records the tag it replaced' "$(cat "$out_file")" 'old-tags=v0.9.1'
@@ -429,7 +443,7 @@ repo="$scratch/repo-mixed"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 other_sha='b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5'
 mkdir -p "$repo/.github/workflows"
-cat > "$repo/.github/workflows/maintenance-sync-standards.yml" <<YAML
+cat >"$repo/.github/workflows/maintenance-sync-standards.yml" <<YAML
 name: sync
 on: workflow_dispatch
 jobs:
@@ -437,7 +451,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/standards-sync@${other_sha} # v0.8.0
 YAML
-cat > "$repo/.github/workflows/pr-review.yml" <<YAML
+cat >"$repo/.github/workflows/pr-review.yml" <<YAML
 name: local-review
 on: pull_request
 jobs:
@@ -445,7 +459,7 @@ jobs:
     steps:
       - uses: melodic-software/ci-workflows/.github/actions/claude-review@${old_sha} # v0.9.1
 YAML
-cat > "$repo/.github/workflows/pr-review-security.yml" <<YAML
+cat >"$repo/.github/workflows/pr-review-security.yml" <<YAML
 name: local-security-review
 on: pull_request
 jobs:
@@ -460,7 +474,7 @@ guard_sha='c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6'
 guard_caller='components/managed-files-guard/managed-files-guard.yml'
 guard_fleet_caller='components/managed-files-guard/managed-files-guard-fleet.yml'
 mkdir -p "$repo/components/managed-files-guard"
-cat > "$repo/$guard_caller" <<YAML
+cat >"$repo/$guard_caller" <<YAML
 name: managed-files-guard
 on: pull_request
 jobs:
@@ -475,7 +489,8 @@ commit_all "$repo" 'mixed pins'
 # ignored. Tag-form extras do not call compare.
 export STUB_COMPARE_STATUS=behind
 out_file="$scratch/out-apply-mixed"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: mixed-SHA extras exit 0' 0 "$rc"
 assert_contains 'apply: mixed-SHA extras report a change' "$(cat "$out_file")" 'changed=true'
 assert_not_contains 'apply: mixed-SHA extras do not hard-fail outside the lane directory' "$out" 'outside'
@@ -511,10 +526,10 @@ guard_repo() {
   mkdir -p "$dir/.github/workflows" "$dir/components/managed-files-guard"
   for extra in maintenance-sync-standards.yml:standards-sync pr-review.yml:claude-review pr-review-security.yml:claude-security-review; do
     printf 'jobs:\n  job:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/%s@%s # v0.9.1\n' \
-      "${extra#*:}" "$old_sha" > "$dir/.github/workflows/${extra%%:*}"
+      "${extra#*:}" "$old_sha" >"$dir/.github/workflows/${extra%%:*}"
   done
   printf 'jobs:\n  g:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/managed-files-guard@%s # c3d4e5f %s\n' \
-    "$guard_sha" "$2" > "$dir/$guard_caller"
+    "$guard_sha" "$2" >"$dir/$guard_caller"
   cp "$dir/$guard_caller" "$dir/$guard_fleet_caller"
   seed_hosted_lanes "$dir"
   commit_all "$dir" "$3"
@@ -530,7 +545,8 @@ export STUB_COMPARE_STATUS_FOR="${guard_sha}=ahead"
 repo="$scratch/repo-ahead"
 guard_repo "$repo" 2026-08-30 'guard pinned ahead of the release'
 out_file="$scratch/out-apply-ahead"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: an ahead pin exits 0' 0 "$rc"
 assert_contains 'apply: an ahead pin still reports the lane change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: an ahead pin is reported as left as is' "$out" \
@@ -550,7 +566,8 @@ assert_eq 'apply: every other enumerated pin still advances' '7' "$ahead_pins"
 repo="$scratch/repo-same-day-ahead"
 guard_repo "$repo" 2026-08-21 'guard pinned the day of the release, not contained'
 out_file="$scratch/out-apply-same-day-ahead"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: a same-day ahead pin exits 0' 0 "$rc"
 assert_contains 'apply: a same-day ahead pin is left as is' "$out" 'left as is'
 assert_contains 'apply: a same-day ahead pin keeps its SHA' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
@@ -562,7 +579,8 @@ repo="$scratch/repo-same-day-behind"
 guard_repo "$repo" 2026-08-21 'guard pinned the day of the release, contained'
 export STUB_COMPARE_STATUS=behind
 out_file="$scratch/out-apply-same-day-behind"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: a same-day contained pin exits 0' 0 "$rc"
 assert_not_contains 'apply: a same-day contained pin is not left as is' "$out" 'left as is'
 assert_contains 'apply: a same-day contained pin advances to the tag form' \
@@ -573,7 +591,8 @@ repo="$scratch/repo-compare-fail"
 guard_repo "$repo" 2026-08-21 'compare lookup fails'
 export STUB_COMPARE_STATUS=fail
 out_file="$scratch/out-apply-compare-fail"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_nonzero 'apply: a failed compare is a hard failure' "$rc"
 assert_contains 'apply: a failed compare names the lookup' "$out" 'Could not compare'
 assert_contains 'apply: a failed compare keeps the fallback pin' "$(cat "$repo/$guard_caller")" "@${guard_sha} # c3d4e5f 2026-08-21"
@@ -587,7 +606,8 @@ lane_repo "$repo" "$old_sha" 'v0.9.1'
 sed -i -E "s|# v0\.9\.1\$|# c136b27 2026-09-09|" "$repo"/components/claude-lanes/*.yml
 commit_all "$repo" 'every lane pinned ahead'
 out_file="$scratch/out-apply-all-ahead"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
 assert_exit 'apply: every caller ahead exits 0' 0 "$rc"
 assert_contains 'apply: every caller ahead reports changed=false' "$(cat "$out_file")" 'changed=false'
 assert_contains 'apply: every caller ahead is a notice' "$out" 'ahead of v0.9.2; nothing to propose'
@@ -602,7 +622,8 @@ for relation in ahead diverged; do
   lane_repo "$repo" "$old_sha" 'v0.9.1'
   export STUB_COMPARE_STATUS="$relation"
   out_file="$scratch/out-apply-tag-form-${relation}"
-  rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
+  rc=0
+  out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha" '2026-08-21')" || rc=$?
   assert_exit "apply: a tag-form ${relation} pin exits 0" 0 "$rc"
   assert_contains "apply: a tag-form ${relation} pin reports changed=false" "$(cat "$out_file")" 'changed=false'
   assert_contains "apply: a tag-form ${relation} pin is reported as left as is" "$out" \
@@ -615,7 +636,8 @@ done
 # refused before any file is touched.
 repo="$scratch/repo-bad-date"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
-rc=0; out="$(run_apply "$repo" "$scratch/out-bad-date" 'v0.9.2' "$new_sha" '21/08/2026')" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$scratch/out-bad-date" 'v0.9.2' "$new_sha" '21/08/2026')" || rc=$?
 assert_nonzero 'apply: a malformed release date is refused' "$rc"
 assert_contains 'apply: a malformed release date is named' "$out" '21/08/2026'
 assert_silent 'apply: a malformed release date touches nothing' "$(git -C "$repo" status --porcelain)"
@@ -626,7 +648,8 @@ repo="$scratch/repo-missing-dir"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 rmdir "$repo/components/lychee-online/targets"
 out_file="$scratch/out-apply-missing-dir"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a missing caller directory is a hard failure' "$rc"
 assert_contains 'apply: the missing caller directory is named' "$out" 'components/lychee-online/targets'
 
@@ -636,7 +659,7 @@ assert_contains 'apply: the missing caller directory is named' "$out" 'component
 repo="$scratch/repo-reusable"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 mkdir -p "$repo/.github/workflows"
-cat > "$repo/.github/workflows/zizmor.yml" <<YAML
+cat >"$repo/.github/workflows/zizmor.yml" <<YAML
 jobs:
   audit:
     uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@${old_sha} # v0.9.1
@@ -647,10 +670,11 @@ jobs:
       - uses: melodic-software/ci-workflows/.github/actions/gitleaks@${old_sha} # v0.9.1
 YAML
 printf 'jobs:\n  only:\n    uses: melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml@%s # v0.9.1\n' \
-  "$old_sha" > "$repo/components/claude-lanes-hosted/reusable-only.yml"
+  "$old_sha" >"$repo/components/claude-lanes-hosted/reusable-only.yml"
 commit_all "$repo" 'reusable refs beside an action pin'
 out_file="$scratch/out-apply-reusable"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'narrowing: a release run beside reusable refs exits 0' 0 "$rc"
 assert_contains 'narrowing: the action pin moves' "$(cat "$repo/.github/workflows/zizmor.yml")" \
   "uses: melodic-software/ci-workflows/.github/actions/gitleaks@${new_sha} # v0.9.2"
@@ -666,7 +690,8 @@ assert_eq 'narrowing: a caller with only a SHA-pinned reusable stays byte-identi
 repo="$scratch/repo-minor"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 out_file="$scratch/out-apply-minor"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'apply: same-major bump exits 0' 0 "$rc"
 assert_contains 'apply: same-major bump reports a change' "$(cat "$out_file")" 'changed=true'
 assert_not_contains 'apply: same-major bump raises no jump warning' "$(cat "$out_file")" '[!WARNING]'
@@ -677,7 +702,8 @@ assert_contains 'apply: same-major bump says so' "$(cat "$out_file")" 'Same majo
 repo="$scratch/repo-nodiff"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 out_file="$scratch/out-apply-nodiff"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.1' "$old_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.1' "$old_sha")" || rc=$?
 assert_exit 'apply: no-diff run exits 0' 0 "$rc"
 assert_contains 'apply: no-diff run reports changed=false' "$(cat "$out_file")" 'changed=false'
 assert_not_contains 'apply: no-diff run never reports a change' "$(cat "$out_file")" 'changed=true'
@@ -693,7 +719,8 @@ make_repo "$repo"
 mkdir -p "$repo/components/claude-lanes" "$repo/components/claude-lanes-hosted" \
   "$repo/components/lychee-online/targets" "$repo/components/managed-files-guard"
 out_file="$scratch/out-apply-empty"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a repository with no lane callers fails' "$rc"
 assert_not_contains 'apply: a repository with no lane callers reports no change' \
   "$(cat "$out_file")" 'changed=true'
@@ -715,10 +742,11 @@ lane_repo "$repo" "$old_sha" 'v0.9.1'
 printf '    # %s %s\n' \
   "uses: melodic-software/ci-workflows/.github/actions/a@$old_sha" \
   "uses: melodic-software/ci-workflows/.github/actions/b@$old_sha" \
-  >> "$repo/components/claude-lanes/claude-review.yml"
+  >>"$repo/components/claude-lanes/claude-review.yml"
 commit_all "$repo" 'two pins on one line'
 out_file="$scratch/out-apply-partial"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v1.4.0' "$new_sha")" || rc=$?
 assert_nonzero 'apply: a partially-rewritten caller set fails' "$rc"
 assert_contains 'apply: the partial rewrite reports the count mismatch' "$out" '::error::'
 assert_not_contains 'apply: the partial rewrite reports no change' "$(cat "$out_file")" 'changed=true'
@@ -731,13 +759,17 @@ out="$( (cd "$repo" && GITHUB_OUTPUT='' bash "$script" apply 'v1.4.0' "$new_sha"
 assert_nonzero 'apply: missing GITHUB_OUTPUT fails' "$rc"
 
 # Unknown and malformed invocations are usage errors, never silent successes.
-rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" 2>&1)" || rc=$?
+rc=0
+out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" 2>&1)" || rc=$?
 assert_nonzero 'no subcommand is a usage error' "$rc"
-rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" frobnicate 2>&1)" || rc=$?
+rc=0
+out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" frobnicate 2>&1)" || rc=$?
 assert_nonzero 'an unknown subcommand is a usage error' "$rc"
-rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 2>&1)" || rc=$?
+rc=0
+out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 2>&1)" || rc=$?
 assert_nonzero 'apply with a missing argument is a usage error' "$rc"
-rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2>&1)" || rc=$?
+rc=0
+out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2>&1)" || rc=$?
 assert_nonzero 'apply without the release date is a usage error' "$rc"
 assert_contains 'apply usage names the date argument' "$out" '<date>'
 
@@ -752,17 +784,17 @@ consumer_repo() {
   make_repo "$dir"
   git -C "$dir" config core.autocrlf false
   mkdir -p "$dir/.github/workflows" "$dir/.github/actions/lane" "$dir/docs"
-  cat > "$dir/.github/workflows/intake-triage.yml" <<YAML
+  cat >"$dir/.github/workflows/intake-triage.yml" <<YAML
 jobs:
   triage:
     uses: melodic-software/ci-workflows/.github/workflows/intake-triage.yml@${old_sha} # v0.65.12
 YAML
-  cat > "$dir/.github/workflows/pr-review-cli.yml" <<YAML
+  cat >"$dir/.github/workflows/pr-review-cli.yml" <<YAML
 jobs:
   review:
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@${old_sha} # v0.65.12
 YAML
-  cat > "$dir/.github/actions/lane/action.yml" <<YAML
+  cat >"$dir/.github/actions/lane/action.yml" <<YAML
 runs:
   using: composite
   steps:
@@ -770,14 +802,14 @@ runs:
     - uses: melodic-software/ci-workflows/.github/actions/report-lane-outcome@${old_sha} # v0.65.12
 YAML
   printf 'uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
-    "$old_sha" > "$dir/docs/example.yml"
+    "$old_sha" >"$dir/docs/example.yml"
   commit_all "$dir" 'consumer callers'
 }
 
 # run_apply_root <dir> <outfile>: apply v0.65.13 against <dir> through --root,
 # from a working directory that is not <dir>, as a consumer runs it.
 run_apply_root() {
-  : > "$2"
+  : >"$2"
   (cd "$scratch" && PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$2" \
     bash "$script" apply v0.65.13 "$new_sha" 2026-10-24 --root "$1" 2>&1)
 }
@@ -793,9 +825,10 @@ repo="$scratch/repo-consumer-cli"
 consumer_repo "$repo"
 export STUB_COMPARE_FILES='.github/workflows/pr-review-cli.yml .github/actions/run-claude-cli/index.mjs'
 export STUB_CALL_LOG="$scratch/calls-consumer-cli"
-: > "$STUB_CALL_LOG"
+: >"$STUB_CALL_LOG"
 out_file="$scratch/out-consumer-cli"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a one-composite release exits 0' 0 "$rc"
 assert_contains 'selective: a one-composite release reports a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'selective: the changed composite moves' \
@@ -807,7 +840,7 @@ assert_eq 'selective: only the composite caller is modified' \
 assert_contains 'narrowing: a SHA-pinned reusable under --root keeps its pin' \
   "$(cat "$repo/.github/workflows/pr-review-cli.yml")" "$(kept_line .github/workflows/pr-review-cli.yml)"
 assert_eq 'selective: one distinct pinned SHA costs one compare call' '1' \
-  "$(wc -l < "$STUB_CALL_LOG" | tr -d ' ')"
+  "$(wc -l <"$STUB_CALL_LOG" | tr -d ' ')"
 assert_contains 'selective: the compare runs from the pin to the release' "$(cat "$STUB_CALL_LOG")" \
   "compare/${old_sha}...${new_sha}"
 # shellcheck disable=SC2016  # markdown code spans in the expected note
@@ -820,7 +853,8 @@ repo="$scratch/repo-consumer-shared"
 consumer_repo "$repo"
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml .github/scripts/lane-outcome.cjs'
 out_file="$scratch/out-consumer-shared"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a shared-script release exits 0' 0 "$rc"
 assert_eq 'selective: a shared-script change moves both action pins' '2' \
   "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
@@ -837,7 +871,8 @@ repo="$scratch/repo-consumer-composite"
 consumer_repo "$repo"
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/index.test.mjs'
 out_file="$scratch/out-consumer-composite"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a composite test-only release exits 0' 0 "$rc"
 assert_contains 'selective: the changed composite moves' \
   "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/run-claude-cli)"
@@ -851,10 +886,11 @@ consumer_repo "$repo"
 sources="$scratch/sources-reach"
 mkdir -p "$sources/.github/actions/report-lane-outcome"
 printf 'runs:\n  steps:\n    - uses: "$/.github/actions/lane-core"\n' \
-  > "$sources/.github/actions/report-lane-outcome/action.yml"
+  >"$sources/.github/actions/report-lane-outcome/action.yml"
 export STUB_SOURCES_DIR="$sources" STUB_COMPARE_FILES='.github/actions/lane-core/action.yml'
 out_file="$scratch/out-consumer-reach"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a reached composite change exits 0' 0 "$rc"
 assert_contains 'selective: a composite reaching the changed one moves' \
   "$(cat "$repo/.github/actions/lane/action.yml")" "$(moved_line .github/actions/report-lane-outcome)"
@@ -868,7 +904,8 @@ repo="$scratch/repo-consumer-inert"
 consumer_repo "$repo"
 export STUB_COMPARE_FILES='.github/scripts/pr-review-cli.test.cjs README.md docs/lanes.md .github/workflows/pr-review-cli.yml'
 out_file="$scratch/out-consumer-inert"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: an inert-only release exits 0' 0 "$rc"
 assert_contains 'selective: an inert-only release reports changed=false' "$(cat "$out_file")" 'changed=false'
 assert_silent 'selective: an inert-only release leaves the tree clean' "$(git -C "$repo" status --porcelain)"
@@ -880,7 +917,8 @@ consumer_repo "$repo"
 STUB_COMPARE_FILES="$(for i in $(seq 1 300); do printf 'docs/page-%s.md ' "$i"; done)"
 export STUB_COMPARE_FILES
 out_file="$scratch/out-consumer-cap"
-rc=0; out="$(run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'selective: a capped file list exits 0' 0 "$rc"
 assert_eq 'selective: a capped file list moves both action pins' '2' \
   "$(grep -rhoF -- "@${new_sha} # v0.65.13" "$repo/.github" | wc -l | tr -d ' ')"
@@ -893,12 +931,13 @@ sed -i "s/report-lane-outcome@${old_sha} # v0.65.12/report-lane-outcome@${other_
   "$repo/.github/actions/lane/action.yml"
 commit_all "$repo" 'second pinned SHA'
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
-: > "$STUB_CALL_LOG"
-rc=0; out="$(run_apply_root "$repo" "$scratch/out-consumer-two-shas")" || rc=$?
+: >"$STUB_CALL_LOG"
+rc=0
+out="$(run_apply_root "$repo" "$scratch/out-consumer-two-shas")" || rc=$?
 assert_exit 'selective: two pinned SHAs exit 0' 0 "$rc"
 assert_eq 'selective: two distinct pinned SHAs cost two compare calls' '2' \
   "$(sort -u "$STUB_CALL_LOG" | wc -l | tr -d ' ')"
-assert_eq 'selective: no compare repeats' "$(wc -l < "$STUB_CALL_LOG" | tr -d ' ')" \
+assert_eq 'selective: no compare repeats' "$(wc -l <"$STUB_CALL_LOG" | tr -d ' ')" \
   "$(sort -u "$STUB_CALL_LOG" | wc -l | tr -d ' ')"
 unset STUB_CALL_LOG
 
@@ -908,17 +947,18 @@ unset STUB_CALL_LOG
 repo="$scratch/repo-consumer-managed"
 consumer_repo "$repo"
 printf 'jobs:\n  s:\n    steps:\n      - uses: melodic-software/ci-workflows/.github/actions/run-claude-cli@%s # v0.65.12\n' \
-  "$old_sha" > "$repo/.github/workflows/steps.yml"
+  "$old_sha" >"$repo/.github/workflows/steps.yml"
 commit_all "$repo" 'unmanaged step caller'
 git -C "$repo" remote add origin https://github.com/melodic-software/consumer.git
-cat > "$scratch/sync-manifest-stub.sh" <<'STUB'
+cat >"$scratch/sync-manifest-stub.sh" <<'STUB'
 #!/usr/bin/env bash
 [[ "$*" == 'dest-paths --target melodic-software/consumer' ]] && echo '.github/actions/lane/action.yml'
 exit 0
 STUB
 export STUB_COMPARE_FILES='.github/actions/run-claude-cli/action.yml'
 out_file="$scratch/out-consumer-managed"
-rc=0; out="$(SYNC_MANIFEST="$scratch/sync-manifest-stub.sh" run_apply_root "$repo" "$out_file")" || rc=$?
+rc=0
+out="$(SYNC_MANIFEST="$scratch/sync-manifest-stub.sh" run_apply_root "$repo" "$out_file")" || rc=$?
 assert_exit 'managed: a consumer repin exits 0' 0 "$rc"
 assert_contains 'managed: the managed file is named as skipped' "$out" \
   'Skipping sync-managed file: .github/actions/lane/action.yml'
@@ -932,7 +972,8 @@ repo="$scratch/repo-lane-selective"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 export STUB_COMPARE_FILES='.github/actions/ci-status/action.yml'
 out_file="$scratch/out-lane-selective"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'selective: the enumerated lane set exits 0' 0 "$rc"
 assert_eq 'selective: only the changed lane caller is modified' \
   'components/claude-lanes/claude-review.yml' "$(git -C "$repo" diff --name-only)"
@@ -947,7 +988,8 @@ sed -i -E "s|ci-status@${old_sha} # v0\.9\.1|ci-status@${new_sha} # a1b2c3d 2026
 commit_all "$repo" 'fallback pin to the release commit'
 export STUB_COMPARE_FILES=''
 out_file="$scratch/out-lane-relabel"
-rc=0; out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
+rc=0
+out="$(run_apply "$repo" "$out_file" 'v0.9.2' "$new_sha")" || rc=$?
 assert_exit 'relabel: a fallback pin on the release SHA exits 0' 0 "$rc"
 assert_contains 'relabel: the fallback pin on the release SHA takes the tag form' \
   "$(cat "$repo/components/claude-lanes/claude-review.yml")" "ci-status@${new_sha} # v0.9.2"
@@ -956,7 +998,8 @@ assert_eq 'relabel: only that caller is modified' \
 unset STUB_COMPARE_FILES
 
 # --root needs a directory.
-rc=0; out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2026-10-24 --root 2>&1)" || rc=$?
+rc=0
+out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2026-10-24 --root 2>&1)" || rc=$?
 assert_nonzero 'apply with --root and no directory is a usage error' "$rc"
 
 [[ $FAILED -eq 0 ]] || exit 1

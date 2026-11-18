@@ -66,11 +66,26 @@ esac
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --root) root="${2:?--root needs a directory}"; shift 2 ;;
-    --org) org="${2:?--org needs an owner}"; shift 2 ;;
-    --repos) repos_file="${2:?--repos needs a path}"; shift 2 ;;
-    --fixtures) fixtures="${2:?--fixtures needs a directory}"; shift 2 ;;
-    -h | --help) usage; exit 0 ;;
+    --root)
+      root="${2:?--root needs a directory}"
+      shift 2
+      ;;
+    --org)
+      org="${2:?--org needs an owner}"
+      shift 2
+      ;;
+    --repos)
+      repos_file="${2:?--repos needs a path}"
+      shift 2
+      ;;
+    --fixtures)
+      fixtures="${2:?--fixtures needs a directory}"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
     *) die "unknown option: $1" ;;
   esac
 done
@@ -187,8 +202,8 @@ if [[ -n "$repos_file" ]]; then
   repos="$(sed '/^[[:space:]]*$/d' "$repos_file" | LC_ALL=C sort -u)"
 else
   repos="$(gh api --paginate "orgs/${org}/repos?type=public&per_page=100" \
-    --jq ".[] | ${audited}" | LC_ALL=C sort -u)" \
-    || die "could not list public repositories of ${org}"
+    --jq ".[] | ${audited}" | LC_ALL=C sort -u)" ||
+    die "could not list public repositories of ${org}"
 fi
 [[ -n "$repos" ]] || die 'no repositories to check'
 

@@ -11,7 +11,7 @@
 # coverage this run). A listed file that does not exist counts as a failure.
 set -uo pipefail
 
-root="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd))"
+root="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd) )"
 
 tests=()
 if [[ $# -gt 0 ]]; then
