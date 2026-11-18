@@ -582,7 +582,7 @@ assert_eq 'production validate batches tracked-source ls-files calls' '1' \
   "$(cat "$spawn_count_dir/ls-files")"
 assert_eq 'production validate batches tracked-source hash-object calls' '1' \
   "$(cat "$spawn_count_dir/hash-object")"
-assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 18 targets'
+assert_contains 'production validate reports catalog size under spawn shim' "$out" 'components, 19 targets'
 
 if ln -s policy.txt "$tmp_root/symlink-probe" 2>/dev/null; then
   rm "$tmp_root/symlink-probe"
@@ -756,7 +756,7 @@ assert_eq 'ci-runner enrolls the managed Go analyzer policy exactly once' '1' \
 assert_eq 'Go analysis covers exactly the ci-runner target' \
   '["melodic-software/ci-runner"]' "$(managing_targets go-analysis)"
 
-expected_review_instructions_targets='["melodic-software/.github","melodic-software/agent-plugins","melodic-software/ci-runner","melodic-software/ci-workflows","melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/claude-code-proxy","melodic-software/codex-plugins","melodic-software/cursor-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
+expected_review_instructions_targets='["melodic-software/.github","melodic-software/agent-plugins","melodic-software/azure-iac","melodic-software/ci-runner","melodic-software/ci-workflows","melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/claude-code-proxy","melodic-software/codex-plugins","melodic-software/cursor-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
 assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
   "$expected_review_instructions_targets" "$(managing_targets review-instructions)"
 
