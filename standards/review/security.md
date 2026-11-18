@@ -16,6 +16,11 @@ Diff-time checks for the security concerns automated tooling cannot fully catch:
 - **Transport security**: external endpoints use encrypted transport with no plaintext fallback in production.
 - **Error-detail leaking**: production error responses do not include stack traces, internal paths, or connection strings; surfaced error messages are safe to show a caller.
 - **Idempotency-key hygiene**: an idempotency key contains no sensitive data and is not predictable.
+- **Comment-claimed mitigations**: a comment asserting a security property of a deployed environment ("does not emit in production", "gated in prod") is a claim, not a control. Verify it against every configuration layer that environment loads: the base configuration plus the environment's own file, where an empty environment file means the base value applies. Important when the claim is false.
+- **Rate limiter ordered after authorization**: a limiter that runs after authorization never sees the requests authorization rejects, so the unauthenticated-failure path on a protected endpoint is unthrottled, and an anonymous or per-address partition covers only anonymous-allowed endpoints. Flag it unless a limiter ahead of authorization, or a recorded deferral, covers that path.
+- **Required-secret guard that accepts an empty value**: a startup check for a required secret rejects a missing, empty, or whitespace-only value, not only null. An empty secret is a value every caller already knows (an empty HMAC key, the hash of an empty client secret, an empty API-key comparison), so it authenticates anyone ([CWE-287](https://cwe.mitre.org/data/definitions/287.html)).
+- **Command guard matching a flattened string**: a guard that substring- or pattern-matches a flattened command line is bypassable, because the shell rewrites quoting, global options, and wrappers before the program sees its arguments. Test the guard against a quoted executable, a displaced global option (`git -C . commit`), bundled short flags, wrappers (`command`, `env`, `sh -c`), and case or path variants on Windows. A guard that cannot see variable or command-substitution expansion is a friction layer, not a boundary, and its documentation claims no more.
+- **Agent permissions broader than the task**: a change to what an AI agent may do (a tool or command allowlist, a permission rule, a hook, an instruction file that grants a capability) that grants more than the task needs or removes a guardrail. [mcp.md](mcp.md) owns scope at the tool-definition surface; this covers the agent's configuration.
 
 ## Object-level authorization
 
@@ -33,4 +38,4 @@ Every external integration, whether a package, a CI action, a plugin, a tool ser
 ## Sources
 
 - OWASP: [API1:2023 Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
-- MITRE: [CWE-639: Authorization Bypass Through User-Controlled Key](https://cwe.mitre.org/data/definitions/639.html)
+- MITRE: [CWE-639: Authorization Bypass Through User-Controlled Key](https://cwe.mitre.org/data/definitions/639.html), [CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)

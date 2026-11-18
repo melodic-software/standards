@@ -112,6 +112,10 @@ contract. This overlay owns only what a shell script should do itself.
   placement are repository-specific; a common external option is [bats-core][9].
   Rewriting past the shell threshold is the alternative when a script has outgrown
   shell. General coverage is owned by `testing.md`.
+- **Run the script under test, do not source it**: a test for a script with
+  top-level behavior invokes it as a subprocess. Sourcing it runs that
+  top-level code inside the test shell, which causes false passes and side
+  effects. Important.
 
 [1]: ../../../components/shellcheck/
 [2]: ../../../components/lefthook-shellcheck/
