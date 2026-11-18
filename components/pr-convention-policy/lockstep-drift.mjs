@@ -71,10 +71,14 @@ export const COPY_SOURCES = {
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
 };
 
-// Every repository in the fleet, whether or not it is gated today.
+// Every repository whose gate caller the scan checks. A repository listed here
+// with no gate caller is a drift finding, so add a repository once it runs the
+// gate and the standards-sync App installation can read it.
 export const CONSUMER_REPOSITORIES = [
   ".github",
+  "agent-automations",
   "agent-plugins",
+  "architecture",
   "ci-runner",
   "ci-workflows",
   "claude-code-plugins",
@@ -83,8 +87,10 @@ export const CONSUMER_REPOSITORIES = [
   "cursor-plugins",
   "dotfiles",
   "github-iac",
+  "knowledge-corpus",
   "medley",
   "provisioning",
+  "songwriting",
   "standards",
 ];
 

@@ -1662,9 +1662,17 @@ test("a repository whose fetch already failed is not double-reported", () => {
   assert.deepEqual(errors, []);
 });
 
-test("consumer roster covers all thirteen repositories", () => {
-  assert.equal(CONSUMER_REPOSITORIES.length, 13);
-  for (const repo of ["agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+test("consumer roster covers all seventeen gated repositories", () => {
+  assert.equal(CONSUMER_REPOSITORIES.length, 17);
+  for (const repo of [
+    "agent-automations",
+    "agent-plugins",
+    "architecture",
+    "claude-code-proxy",
+    "cursor-plugins",
+    "knowledge-corpus",
+    "songwriting",
+  ]) {
     assert.ok(CONSUMER_REPOSITORIES.includes(repo), `${repo} is in the roster`);
   }
 });
