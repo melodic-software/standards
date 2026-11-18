@@ -151,15 +151,15 @@ function resetIndexCache() {
   worktreeHashCache = new Map();
 }
 
-// Load Git index rows for one or more literal paths in a single ls-files call.
-// Directory-shaped pathspecs may also select descendants; only rows whose
-// recorded path exactly equals a requested path are attributed to that path.
 function useIndexCacheRoot(root) {
   if (indexCacheRoot === root) return;
   resetIndexCache();
   indexCacheRoot = root;
 }
 
+// Load Git index rows for one or more literal paths in a single ls-files call.
+// Directory-shaped pathspecs may also select descendants; only rows whose
+// recorded path exactly equals a requested path are attributed to that path.
 function prefetchIndexEntries(root, paths) {
   if (paths.length === 0) return true;
   useIndexCacheRoot(root);
