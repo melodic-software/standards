@@ -38,6 +38,7 @@ The criteria are language-agnostic by default. A stack overlay under `overlays/`
 | [accessibility.md](accessibility.md) | WCAG-aligned review and evidence for user-facing experiences |
 | [cross-platform.md](cross-platform.md) | OS, filesystem, encoding, and tooling portability |
 | [date-time.md](date-time.md) | zone vs offset, future-local-time storage, tzdata currency, monotonic elapsed time, epoch ranges |
+| [documentation.md](documentation.md) | single source of truth, upstream citations, current-state prose, agent-instruction placement |
 | [observability.md](observability.md) | tracing, metrics, logs, and correlation |
 | [testing.md](testing.md) | coverage, test quality, verification honesty |
 | [timebombs.md](timebombs.md) | unbounded growth, quota and hard-constraint exhaustion, expiry and rotation, data lifecycle, crash recovery |

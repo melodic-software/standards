@@ -23,6 +23,7 @@ Each figure carries its source and date; these decay, so re-verify against curre
 - **Hallucinated APIs**: methods, overloads, or options that do not exist in the version in use. Cross-reference unfamiliar API surface against current documentation.
 - **Hallucinated packages (slopsquatting)**: AI suggests a non-existent package name an attacker can pre-register with malicious code. Around 19.7% of AI-suggested packages were hallucinated across 16 models and 576,000 samples (USENIX Security 2025). Verify every AI-suggested dependency exists in the official registry, and check its maintainer and download history.
 - **Confidence without uncertainty**: AI emits plausible, confidently-wrong code. Verify unfamiliar usage independently; readable code that "looks right" is not enough on a high-risk path (identity, access control, state mutation). Demand behavioral evidence.
+- **Silent integration failures**: data or a signal dropped at a boundary between layers or stacks, where each layer looks correct in isolation but the end-to-end flow fails. Ask for evidence that crosses the boundary, not only per-layer tests.
 - **Runtime-assumption gaps**: code that works against test data but assumes production shapes. Missing context is the most-cited AI weakness. Ask: "what does this assume about the runtime that the tests do not verify?"
 
 ## Security-specific

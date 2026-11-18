@@ -11,6 +11,7 @@ New apps, services, long-lived tool servers, and non-trivial scripts expose insp
 - **Spans for domain-significant work**: wrap meaningful units (handlers, cross-module calls, external I/O), not every method. Set the right span kind rather than leaving the default. Over-spanning produces noise, not insight.
 - **Stable, namespaced source names**: an instrumentation source uses a unique, dotted name from its component, created once and reused. The name is the registration key downstream and must stay stable across releases.
 - **Registration is not optional and fails silently**: telemetry from an unregistered source or meter is dropped with no error. Every new source and meter name is wired into the provider, in the shared configuration path so every service inherits it. A typo yields zero telemetry, not a warning.
+- **Failure status on hand-written spans**: a span the code starts itself records an error status on its failure path; the status is not set automatically, so a failed operation exports as a success.
 - **Do not re-instrument what a library already covers**: emitting a span for inbound HTTP, an outbound client call, or a database call that the platform already instruments double-counts timing. A domain span wraps the library span as a parent and adds business context.
 
 ## Trace context propagation
@@ -21,6 +22,7 @@ New apps, services, long-lived tool servers, and non-trivial scripts expose insp
 ## Metrics
 
 - **Correct instrument type**: a monotonically increasing count uses a counter, an up-and-down value (queue depth, active requests) an up-down counter, a duration a histogram, a point-in-time reading a gauge. A counter used for a value that can decrease is a defect.
+- **Cheap observable callbacks**: an asynchronous (observable) instrument's callback only reads a cached, thread-safely published value. Callbacks run during collection, so one that blocks or does I/O stalls every instrument collected after it.
 - **Bounded tag cardinality**: tags are low-cardinality (status, size, region), never unbounded (user identities, raw URLs, request identities). Those belong in logs and traces. A reused tag key means the same thing everywhere.
 
 ## Logging
