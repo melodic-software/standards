@@ -582,8 +582,8 @@ function minimalPolicy() {
   };
 }
 
-async function auditWithPolicy(policy, entries = CONFORMANT) {
-  const root = await repository({ dependabotYaml: dependabot(entries) });
+async function auditWithPolicy(policy, entries = CONFORMANT, config) {
+  const root = await repository({ dependabotYaml: dependabot(entries), config });
   const policyPath = path.join(root, "policy.json");
   await writeFile(policyPath, JSON.stringify(policy));
   return auditRepository({ root, policyPath });
@@ -677,24 +677,17 @@ test("a policy with no interval overrides holds github-actions to the standard i
 });
 
 test("a schedule waiver on an entry its accepted intervals already cover is drift", async () => {
-  const root = await repository({
-    dependabotYaml: dependabot(actionsEntry("daily")),
-    config: {
-      schemaVersion: 1,
-      exceptions: {
-        "github-actions:/": {
-          reason: "tracks-upstream-release",
-          justification: "Daily is already accepted for this ecosystem.",
-          waives: ["schedule"],
-        },
+  const findings = await auditWithPolicy(dailyActionsPolicy(), actionsEntry("daily"), {
+    schemaVersion: 1,
+    exceptions: {
+      "github-actions:/": {
+        reason: "tracks-upstream-release",
+        justification: "Daily is already accepted for this ecosystem.",
+        waives: ["schedule"],
       },
     },
   });
-  const policyPath = path.join(root, "policy.json");
-  await writeFile(policyPath, JSON.stringify(dailyActionsPolicy()));
-  assert.deepEqual(rules(await auditRepository({ root, policyPath })), [
-    "github-actions:/:exception-inventory-drift",
-  ]);
+  assert.deepEqual(rules(findings), ["github-actions:/:exception-inventory-drift"]);
 });
 
 test("a malformed interval override fails closed", async () => {
