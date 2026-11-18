@@ -104,7 +104,7 @@ committed here.
 | Adopt | Add the component to `managed`, merge upstream, then review the generated materialization PR. |
 | Update | Change the canonical source; reconciliation proposes the complete target delta. |
 | Customize | Move `managed` to `locally-owned` upstream before editing downstream. The existing file is preserved. |
-| Opt out | Same manifest move as Customize. `locally-owned` is the sanctioned per-repository exclusion, recorded and reviewed here rather than fought out against the sync bot downstream. Once it lands, the consuming repository edits or deletes its copy in its own PR; the synchronizer never touches a `locally-owned` file. |
+| Opt out | Same manifest move as Customize, per [Opting a repository out of a managed component](ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component). |
 | Re-adopt | Move `locally-owned` to `managed`; reconciliation restores the canonical payload. |
 | Retire | Remove upstream ownership first, then delete the obsolete downstream payload in a one-time PR. |
 | Relocate | Change the destination and coordinate deletion of the old path in the downstream migration PR. |
@@ -180,9 +180,13 @@ succeed.
 Every real sync derives the expected access set from the complete, unfiltered
 manifest. Before any target-specific write token, checkout, materialization, or
 pull-request mutation, it verifies the expected active organization App
-installation is in selected-repository mode and requires two consecutive,
-fully paginated snapshots to equal that set exactly. Missing, excess, malformed,
-or changing access fails the whole run. The optional `targets` input limits
+installation is in selected-repository mode and compares two consecutive, fully
+paginated snapshots of its repository access with that set. Malformed or changing
+access, or a selected trust root, fails the whole run; a missing target fails
+only its own sync job; any other excess repository is reported as an over-grant
+warning. `standards` itself, the sync source, is expected access and is not
+reported: its re-pin job (`.github/workflows/maintenance-repin-ci-workflows.yml`)
+opens pull requests as this App. The optional `targets` input limits
 reconciliation only; it never narrows access attestation.
 
 Adding, removing, transferring, or renaming a manifest target therefore
@@ -376,7 +380,7 @@ cursor-plugins.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
-knowledge-corpus and songwriting are not sync targets. songwriting carries
+knowledge-corpus and songwriting are sync targets for `dependabot-policy` and the fleet-routed guard only, so they take neither caller. songwriting carries
 repo-local copies of the fleet callers; knowledge-corpus's lane stays deferred
 over its prompt-injection surface (see the lane comment in
 `sync-manifest.yml`).

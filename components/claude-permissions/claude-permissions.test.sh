@@ -17,6 +17,47 @@ fi
 
 config="components/claude-permissions/claude-permissions.json"
 
+# in_list <list> <row> — succeeds when .claudePermissions.<list> holds <row>.
+in_list() {
+  jq -e --arg list "$1" --arg row "$2" \
+    '.claudePermissions[$list] | index($row) != null' "$config" >/dev/null
+}
+
+# require_rows <list> <detail> <row>... — each row must be present.
+require_rows() {
+  local list="$1" detail="$2" row
+  shift 2
+  for row in "$@"; do
+    if in_list "$list" "$row"; then
+      pass "$list includes $row"
+    else
+      fail "$list includes $row" "$detail"
+    fi
+  done
+}
+
+# forbid_deny_rows <detail> <row>... — each row must be absent from deny.
+forbid_deny_rows() {
+  local detail="$1" row
+  shift
+  for row in "$@"; do
+    if in_list deny "$row"; then
+      fail "deny omits $row" "$detail"
+    else
+      pass "deny omits $row"
+    fi
+  done
+}
+
+# assert_none <label> <detail> <rows> — pass when <rows> is empty.
+assert_none() {
+  if [[ -n "$3" ]]; then
+    fail "$1" "$2: $3"
+  else
+    pass "$1"
+  fi
+}
+
 schema_version="$(jq -r '.claudePermissions.schemaVersion' "$config")"
 assert_eq "schemaVersion is the supported value" "1" "$schema_version"
 
@@ -35,49 +76,27 @@ assert_eq "every withdraw entry is a non-empty string" "0" "$empty_tombstones"
 overlap="$(jq -r '(.claudePermissions.allow // []) as $allow
   | [(.claudePermissions.withdraw // [])[] | select(. as $row | $allow | index($row))]
   | join("\n")' "$config")"
-if [[ -n "$overlap" ]]; then
-  fail 'allow and withdraw are disjoint' \
-    "rows present in both (regrant must delete its tombstone): $overlap"
-else
-  pass 'allow and withdraw are disjoint'
-fi
+assert_none 'allow and withdraw are disjoint' \
+  'rows present in both (regrant must delete its tombstone)' "$overlap"
 
 # Restore denies cover only the whole-tree discards (`.`, `:/`). Path-scoped
 # `git restore -- <path>` has no allow row, so the classifier judges it, and a
 # bare `git restore *` catch-all would also deny `git restore --staged <path>`.
-required_restore_denies=(
-  'Bash(git restore .)'
-  'Bash(git restore :/)'
-  'PowerShell(git restore .)'
-  'PowerShell(git restore :/)'
-  'PowerShell(git * restore .)'
+require_rows deny 'missing required restore discard rule' \
+  'Bash(git restore .)' \
+  'Bash(git restore :/)' \
+  'PowerShell(git restore .)' \
+  'PowerShell(git restore :/)' \
+  'PowerShell(git * restore .)' \
   'PowerShell(git * restore :/)'
-)
-for pattern in "${required_restore_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    pass "deny includes $pattern"
-  else
-    fail "deny includes $pattern" "missing required restore discard rule"
-  fi
-done
 
 # `-n` is the short form of `--no-verify`; the glob forms `commit -n` alone
 # cannot match when other arguments precede the flag.
-required_commit_n_denies=(
-  'Bash(git commit * -n *)'
-  'Bash(git commit * -n)'
-  'Bash(git commit -n *)'
+require_rows deny 'missing required --no-verify short-form rule' \
+  'Bash(git commit * -n *)' \
+  'Bash(git commit * -n)' \
+  'Bash(git commit -n *)' \
   'Bash(git commit -n)'
-)
-for pattern in "${required_commit_n_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    pass "deny includes $pattern"
-  else
-    fail "deny includes $pattern" "missing required --no-verify short-form rule"
-  fi
-done
 
 # The Bash LEFTHOOK denies anchor on the inline-env spelling (`LEFTHOOK=0 cmd`),
 # which PowerShell lacks; its bypass shapes reference the env var by name:
@@ -92,54 +111,30 @@ done
 # separator (`Env:\LEFTHOOK`), and `*SetEnvironmentVariable*LEFTHOOK*`
 # covers the .NET call. A bare `*LEFTHOOK*` row is not used: case-insensitive, it
 # also denies reading lefthook.yml. `*lefthook* uninstall*` denies removing the hooks.
-required_lefthook_denies=(
-  'Bash(LEFTHOOK*=0 *)'
-  'Bash(LEFTHOOK*=FALSE *)'
-  'Bash(LEFTHOOK*=false *)'
-  'PowerShell(*:lefthook*)'
-  'PowerShell(*SetEnvironmentVariable*LEFTHOOK*)'
-  'PowerShell(*env:*lefthook*)'
+require_rows deny 'missing required lefthook bypass rule' \
+  'Bash(LEFTHOOK*=0 *)' \
+  'Bash(LEFTHOOK*=FALSE *)' \
+  'Bash(LEFTHOOK*=false *)' \
+  'PowerShell(*:lefthook*)' \
+  'PowerShell(*SetEnvironmentVariable*LEFTHOOK*)' \
+  'PowerShell(*env:*lefthook*)' \
   'PowerShell(*lefthook* uninstall*)'
-)
-for pattern in "${required_lefthook_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    pass "deny includes $pattern"
-  else
-    fail "deny includes $pattern" "missing required lefthook bypass rule"
-  fi
-done
 
 # Worktree removal: only the double force (which overrides a claim lock) is
 # denied. A single-force deny would pre-empt the classifier, and any allow row
 # would bypass its session-created check. Both allow spellings stay tombstoned.
-required_worktree_denies=(
-  'Bash(git *worktree remove*--force --force*)'
-  'Bash(git *worktree remove*--force -f*)'
-  'Bash(git *worktree remove*-f --force*)'
-  'Bash(git *worktree remove*-f -f*)'
-  'PowerShell(git *worktree remove*--force --force*)'
-  'PowerShell(git *worktree remove*--force -f*)'
-  'PowerShell(git *worktree remove*-f --force*)'
+require_rows deny 'missing required double-force worktree rule' \
+  'Bash(git *worktree remove*--force --force*)' \
+  'Bash(git *worktree remove*--force -f*)' \
+  'Bash(git *worktree remove*-f --force*)' \
+  'Bash(git *worktree remove*-f -f*)' \
+  'PowerShell(git *worktree remove*--force --force*)' \
+  'PowerShell(git *worktree remove*--force -f*)' \
+  'PowerShell(git *worktree remove*-f --force*)' \
   'PowerShell(git *worktree remove*-f -f*)'
-)
-for pattern in "${required_worktree_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    pass "deny includes $pattern"
-  else
-    fail "deny includes $pattern" "missing required double-force worktree rule"
-  fi
-done
 
-for pattern in 'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.withdraw | index($pattern) != null' "$config" >/dev/null; then
-    pass "withdraw includes $pattern"
-  else
-    fail "withdraw includes $pattern" "worktree removal is judged by the classifier"
-  fi
-done
+require_rows withdraw 'worktree removal is judged by the classifier' \
+  'Bash(git worktree remove *)' 'PowerShell(git worktree remove *)'
 
 # The double-force rows are `git *worktree remove...`; the `git ` anchor keeps
 # unrelated commands that merely contain the text out of the deny. Claude's `*`
@@ -164,24 +159,11 @@ done < <(jq -r '.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(gi
 # A deny row with `git worktree remove` as a literal prefix is a retired
 # single-force spelling.
 single_force="$(jq -r '[.claudePermissions.deny[] | select(test("^(Bash|PowerShell)\\(git worktree remove"))] | join("\n")' "$config")"
-if [[ -n "$single_force" ]]; then
-  fail 'deny has no single-force worktree rows' "retired rows returned: $single_force"
-else
-  pass 'deny has no single-force worktree rows'
-fi
+assert_none 'deny has no single-force worktree rows' 'retired rows returned' "$single_force"
 
-forbidden_denies=(
-  'Bash(gh pr merge --auto *)'
+forbid_deny_rows 'retired deny must not return' \
+  'Bash(gh pr merge --auto *)' \
   'Bash(gh pr merge --auto)'
-)
-for pattern in "${forbidden_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    fail "deny omits $pattern" "retired deny must not return"
-  else
-    pass "deny omits $pattern"
-  fi
-done
 
 # settings.local.json is personal overrides, not a credential store, and a
 # Read deny also blocks Edit — those rows must not return.
@@ -194,20 +176,11 @@ done
 # tools. `Read()` rules are path/glob only, so no rule could keep the OAuth and
 # MCP fields denied while exposing the rest; the file is protected by operator
 # judgment rather than by a rule that could not express the distinction.
-forbidden_read_denies=(
-  'Read(**/.claude/settings.local.json)'
-  'Read(.claude/settings.local.json)'
-  'Read(**/.claude.json)'
+forbid_deny_rows 'retired Read deny must not return' \
+  'Read(**/.claude/settings.local.json)' \
+  'Read(.claude/settings.local.json)' \
+  'Read(**/.claude.json)' \
   'Read(~/.claude.json)'
-)
-for pattern in "${forbidden_read_denies[@]}"; do
-  if jq -e --arg pattern "$pattern" \
-    '.claudePermissions.deny | index($pattern) != null' "$config" >/dev/null; then
-    fail "deny omits $pattern" "retired Read deny must not return"
-  else
-    pass "deny omits $pattern"
-  fi
-done
 
 # Routine gh SDLC work is allowed in both shells, while admin, merge-commit and rebase merges, bypass_rules, repository
 # and gist deletion, and token disclosure stay denied. The allow rows must not
@@ -261,6 +234,35 @@ for shell in Bash PowerShell; do
       fail "$shell leaves to the classifier: $cmd" "allowed by: $rows"
     fi
   done
+done
+
+# Sessions run git as `git -C <dir> <subcommand>`, which no `Bash(git
+# <subcommand> ...)` row matches, so each such deny row needs its
+# `Bash(git -C * <subcommand> ...)` twin or a -C spelling escapes it. No allow
+# row takes that form: the `*` after `-C` also spans git's global options
+# (`-c core.hooksPath=`, `-c core.sshCommand=`), so a -C allow would approve
+# more than its plain row, and -C commands go to the classifier instead.
+missing_twins="$(jq -r '.claudePermissions.deny | . as $deny
+  | .[] | select(test("^Bash\\(git [a-z][a-z-]*"))
+  | sub("^Bash\\(git "; "Bash(git -C * ") | select(. as $t | $deny | index($t) | not)' "$config")"
+assert_none 'every Bash git deny row has its git -C twin' 'add these rows' "$missing_twins"
+c_allows="$(jq -r '[.claudePermissions.allow[] | select(startswith("Bash(git -C "))] | join("\n")' "$config")"
+assert_none 'allow has no git -C rows' 'its * spans git global options' "$c_allows"
+for cmd in 'git -C /repo worktree add -B b /tmp/wt' 'git -C /repo push --force origin b' \
+  'git -C /repo -c core.hooksPath=/dev/null commit -m x' 'git -C /repo -c core.sshCommand=x fetch origin' \
+  'git -C /repo --config-env=core.sshCommand=E push origin b' 'git -C /repo --exec-path=/tmp/x pull'; do
+  if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash denies: $cmd"
+  else
+    fail "Bash denies: $cmd" 'no deny row matches the -C form'
+  fi
+done
+for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo switch -c feature'; do
+  if [[ -z "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash leaves to the classifier: $cmd"
+  else
+    fail "Bash leaves to the classifier: $cmd" 'a deny row matches a routine -C form'
+  fi
 done
 
 [[ $FAILED -eq 0 ]] || exit 1

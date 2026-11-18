@@ -28,7 +28,8 @@ export function validateContract(contract) {
   }
   const forms = new Set();
   const floor = JSON.stringify(contract.floorLabels);
-  for (const [key, type] of Object.entries(contract.types ?? {})) {
+  const types = contract.types ?? {};
+  for (const [key, type] of Object.entries(types)) {
     const at = `types.${key}`;
     if (type.form !== null) {
       if (!/^[a-z0-9-]+\.yml$/.test(type.form ?? ""))
@@ -69,7 +70,7 @@ export function validateContract(contract) {
   }
   if (forms.size === 0) fail("types must declare at least one form");
   // GitHub's community profile counts no issue template when every form sets `type:`.
-  const formTypes = Object.values(contract.types ?? {}).filter((type) => type.form !== null);
+  const formTypes = Object.values(types).filter((type) => type.form !== null);
   if (formTypes.every((type) => type.nativeType !== null)) {
     fail(
       "at least one type must set nativeType null, or the community profile reports no issue templates",

@@ -8,7 +8,9 @@ The blocking `ci-workflows` action runs offline for deterministic local-file and
 fragment checks. External URLs are checked only by a manual online run, because
 network health is inherently transient.
 
-Managed consumers do not edit the config. `fixtures/` and `lychee.test.sh`
+Managed consumers do not edit the config; a repository that needs a different
+one [opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
+`fixtures/` and `lychee.test.sh`
 prove valid links and missing file/fragment failures with Lychee 0.24.2+.
 
 A repository outside the sync keeps no copy: when the caller has no root

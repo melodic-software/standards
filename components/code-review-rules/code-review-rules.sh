@@ -144,7 +144,7 @@ if [[ "$command" == file ]]; then
   fi
   has_review=false
   [[ -f "$root/REVIEW.md" ]] && has_review=true
-  found="$(problems "$(cat "$root/AGENTS.md")" "$has_review")"
+  found="$(problems "$(<"$root/AGENTS.md")" "$has_review")"
   if [[ -n "$found" ]]; then
     printf '%s\n' "$found" | sed "s|^|MISSING: ${root}/AGENTS.md: |"
     exit 1
@@ -201,7 +201,7 @@ for repo in $repos; do
     status=1
     continue
   fi
-  agents="$(cat "$scratch/content")"
+  agents="$(<"$scratch/content")"
   fetch "$repo" REVIEW.md
   found="$(problems "$agents" "$exists")"
   if [[ -n "$found" ]]; then

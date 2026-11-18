@@ -49,7 +49,7 @@ fail() {
 # platform). Prints a SKIP marker and exits 0; the runner classifies a file
 # with a SKIP marker and no PASS lines as wholly skipped.
 skip_suite() {
-  printf 'SKIP: %s\n' "$1" >&2
+  skip_case "$1"
   exit 0
 }
 
@@ -116,9 +116,7 @@ assert_not_contains() {
 
 assert_silent() {
   local label="$1" output="$2"
-  local trimmed="${output#"${output%%[![:space:]]*}"}"
-  trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-  if [[ -z "$trimmed" ]]; then
+  if [[ -z "${output//[[:space:]]/}" ]]; then
     pass "$label"
   else
     fail "$label" "expected empty/whitespace, got: $output"

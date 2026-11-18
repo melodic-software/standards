@@ -44,6 +44,9 @@ const SYNC_RUNNER_INPUT_CONTRACT = {
 // input). `FLEET_REVIEW_LABEL` is the review tier of the same fleet.
 const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
 const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
+// One job on the explicit hosted image, and one read-only job on the fleet label.
+const HOSTED_WORKFLOW = "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n";
+const FLEET_WORKFLOW = `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
 // A policy contract key: the reusable workflow path without its @ref.
@@ -238,7 +241,7 @@ test("public repository with explicit hosted image passes", async () => {
   const root = await repository({
     visibility: "public",
     selfHostedCi: false,
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   assert.deepEqual(await audit(root), []);
 });
@@ -247,7 +250,7 @@ test("GitHub visibility evidence must agree with governed inventory", async () =
   const root = await repository({
     visibility: "private",
     selfHostedCi: false,
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   await assert.rejects(
     () => audit(root, { repositoryVisibility: "public" }),
@@ -285,7 +288,7 @@ test("public repository rejects claude-review contracts listing visibility-scope
       approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
     },
     workflows: {
-      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      "ci.yml": HOSTED_WORKFLOW,
     },
   });
   const findings = await audit(root, { repositoryVisibility: "public" });
@@ -310,7 +313,7 @@ for (const workflowFile of ["pr-review.yml", "pr-review-security.yml"]) {
         },
       },
       workflows: {
-        "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+        "ci.yml": HOSTED_WORKFLOW,
       },
     });
     const findings = await audit(root, { repositoryVisibility: "public" });
@@ -332,7 +335,7 @@ test("private repository permits claude-review contracts listing visibility-scop
       approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
     },
     workflows: {
-      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      "ci.yml": HOSTED_WORKFLOW,
     },
   });
   assert.deepEqual(await audit(root, { repositoryVisibility: "private" }), []);
@@ -346,7 +349,7 @@ test("visibility-scoped reusable contract surface fails closed without CI_REPOSI
       approvedReusableWorkflowContracts: claudeReviewSensitiveContract(),
     },
     workflows: {
-      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      "ci.yml": HOSTED_WORKFLOW,
     },
   });
   const findings = await audit(root);
@@ -376,7 +379,7 @@ test("public repository rejects claude-review contracts mapping denylisted secre
       },
     },
     workflows: {
-      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      "ci.yml": HOSTED_WORKFLOW,
     },
   });
   const findings = await audit(root, { repositoryVisibility: "public" });
@@ -406,7 +409,7 @@ test("aliased denylisted secret mapping requires CI_REPOSITORY_VISIBILITY", asyn
       },
     },
     workflows: {
-      "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+      "ci.yml": HOSTED_WORKFLOW,
     },
   });
   const findings = await audit(root);
@@ -423,7 +426,7 @@ test("missing CI_REPOSITORY_VISIBILITY stays harmless when no visibility-scoped 
   const root = await repository({
     visibility: "private",
     selfHostedCi: false,
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   assert.deepEqual(await audit(root), []);
 });
@@ -471,10 +474,7 @@ test("production policy and claude-review callers stay green under visibility ev
     )}\n`,
   );
   await writeFile(path.join(root, "policy.json"), `${JSON.stringify(BASE_POLICY, null, 2)}\n`);
-  await writeFile(
-    path.join(root, ".github", "workflows", "ci.yml"),
-    "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
-  );
+  await writeFile(path.join(root, ".github", "workflows", "ci.yml"), HOSTED_WORKFLOW);
   assert.deepEqual(
     await auditRepository({
       root,
@@ -498,7 +498,7 @@ test("public repository cannot target a raw self-hosted label", async () => {
 });
 
 for (const managedLabel of [
-  "melodic-ubuntu-24.04-x64",
+  FLEET_LABEL,
   "melodic-build-ubuntu-24.04-x64",
   "kyle-ubuntu-24.04-x64",
   "kyle-build-ubuntu-24.04-x64",
@@ -542,7 +542,7 @@ test("moving ubuntu-latest alias is forbidden", async () => {
 test("an allowlisted managed fallback routes without a raw-self-hosted-label finding", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -2094,7 +2094,7 @@ test("local-routing grant structure rejects malformed permission maps and fields
 });
 
 test("GITHUB_REPOSITORY owner evidence must match reviewed inventory", async () => {
-  const workflow = `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`;
+  const workflow = FLEET_WORKFLOW;
   const root = await repository({
     repositoryOwner: "melodic-software",
     workflows: { "ci.yml": workflow },
@@ -3050,7 +3050,7 @@ test("a denylisted secret in any listed map is visibility-scoped surface", async
         },
       },
       workflows: {
-        "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+        "ci.yml": HOSTED_WORKFLOW,
       },
     });
     assert.deepEqual(
@@ -4039,7 +4039,7 @@ test("public opaque reusable call and alternate runner-label input are rejected"
   attack:
     uses: attacker/unreviewed/.github/workflows/arbitrary.yml@${SHA}
     with:
-      runner-label: melodic-ubuntu-24.04-x64
+      runner-label: ${FLEET_LABEL}
 `,
     },
   });
@@ -4059,7 +4059,7 @@ test("reviewed reusable workflow rejects inputs outside its explicit contract", 
     uses: ${REUSABLE_REFERENCE}
     with:
       runner: ubuntu-24.04
-      runner-label: melodic-ubuntu-24.04-x64
+      runner-label: ${FLEET_LABEL}
 `,
     },
   });
@@ -4116,7 +4116,7 @@ test("hosted-only reusable contract rejects a caller-added runner input", async 
   title:
     uses: ${HOSTED_REUSABLE_REFERENCE}
     with:
-      runner-label: melodic-ubuntu-24.04-x64
+      runner-label: ${FLEET_LABEL}
 `,
     },
   });
@@ -4373,7 +4373,7 @@ test("policy schema fixes the hosted sentinel label and declared marker", async 
   ]) {
     const root = await repository({
       policyOverrides,
-      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+      workflows: { "ci.yml": HOSTED_WORKFLOW },
     });
     await assert.rejects(
       () => audit(root),
@@ -4392,7 +4392,7 @@ test("failureSentinel must be an approved hosted runner label", async () => {
     },
     {
       approvedHostedRunnerLabels: ["windows-2025"],
-      fallbackLabelAllowlist: ["windows-2025", "melodic-ubuntu-24.04-x64"],
+      fallbackLabelAllowlist: ["windows-2025", FLEET_LABEL],
       governedReusableRunnerInput: {
         ...BASE_POLICY.governedReusableRunnerInput,
         default: "windows-2025",
@@ -4401,7 +4401,7 @@ test("failureSentinel must be an approved hosted runner label", async () => {
   ]) {
     const root = await repository({
       policyOverrides,
-      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+      workflows: { "ci.yml": HOSTED_WORKFLOW },
     });
     await assert.rejects(
       () => audit(root),
@@ -4430,7 +4430,7 @@ test("failureSentinelMarker cannot enter any hosted or managed runner label set"
   ]) {
     const root = await repository({
       policyOverrides,
-      workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+      workflows: { "ci.yml": HOSTED_WORKFLOW },
     });
     await assert.rejects(() => audit(root), /failureSentinelMarker must remain outside/);
   }
@@ -4456,7 +4456,7 @@ test("governed fallback default must be listed in the fallback label allowlist",
         default: "windows-2025",
       },
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   await assert.rejects(
     () => audit(root),
@@ -4475,7 +4475,7 @@ test("a hosted label removed from the approved set can no longer be the fallback
         default: "ubuntu-slim",
       },
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   await assert.rejects(
     () => audit(root),
@@ -4491,7 +4491,7 @@ test("an allowlist entry that is neither hosted-approved nor managed fails confi
     policyOverrides: {
       fallbackLabelAllowlist: [...BASE_POLICY.fallbackLabelAllowlist, "self-hosted"],
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   await assert.rejects(
     () => audit(root),
@@ -4505,7 +4505,7 @@ test("an allowlist entry that is neither hosted-approved nor managed fails confi
 test("the shipped fallback default satisfies the fallback label allowlist", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -4521,7 +4521,7 @@ test("the fallback label allowlist can be extended to admit another approved def
       },
     },
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -5215,8 +5215,8 @@ test("governed reusable runner input rejects workflow_dispatch co-trigger", asyn
     inputs:
       runner:
         type: choice
-        default: melodic-ubuntu-24.04-x64
-        options: [melodic-ubuntu-24.04-x64]
+        default: ${FLEET_LABEL}
+        options: [${FLEET_LABEL}]
 jobs:
   test:
     runs-on: \${{ inputs.runner }}
@@ -5376,7 +5376,7 @@ test("exception inventory drift fails", async () => {
         justification: "The local fleet excludes service-container workloads.",
       },
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   assert.deepEqual(
     (await audit(root)).map(({ rule }) => rule),
@@ -5394,7 +5394,7 @@ test("hosted-only repository rejects exception inventory", async () => {
         justification: "This fixed hosted job does not route to the local fleet.",
       },
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   assert.deepEqual(
     (await audit(root)).map(({ rule }) => rule),
@@ -5405,7 +5405,7 @@ test("hosted-only repository rejects exception inventory", async () => {
 test("managed label is forbidden even when listed in a matrix", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `jobs:\n  test:\n    strategy:\n      matrix:\n        runner: [ubuntu-24.04, melodic-ubuntu-24.04-x64]\n    runs-on: \${{ matrix.runner }}\n    steps: []\n`,
+      "ci.yml": `jobs:\n  test:\n    strategy:\n      matrix:\n        runner: [ubuntu-24.04, ${FLEET_LABEL}]\n    runs-on: \${{ matrix.runner }}\n    steps: []\n`,
     },
   });
   const rules = (await audit(root)).map(({ rule }) => rule);
@@ -5417,7 +5417,7 @@ test("unrecognized hosted reason is a configuration error", async () => {
     exceptions: {
       ".github/workflows/ci.yml#test": { reason: "because", justification: "No." },
     },
-    workflows: { "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n" },
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
   });
   await assert.rejects(() => audit(root), ConfigurationError);
 });
@@ -5627,7 +5627,7 @@ const FLEET_LANE_CONTRACT = {
 test("an enrolled private repository may name the governed fleet label directly", async () => {
   const root = await repository({
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   assert.deepEqual(await audit(root), []);
@@ -5648,8 +5648,8 @@ test("an unreviewed near-miss of the fleet label is not admitted on an enrolled 
     // Padded on either side. The comparison is exact, like the hosted-literal
     // one, and validatePolicy already refuses a set entry carrying whitespace,
     // so neither end of that pair can drift into accepting this.
-    " melodic-ubuntu-24.04-x64",
-    "melodic-ubuntu-24.04-x64 ",
+    ` ${FLEET_LABEL}`,
+    `${FLEET_LABEL} `,
   ]) {
     const root = await repository({
       workflows: {
@@ -5694,7 +5694,7 @@ test("approvedManagedRunnerLabels cannot admit an arbitrary or hosted target", a
   for (const [label, pattern] of [
     ["ubuntu-24.04", /is a GitHub-hosted runner label/],
     ["definitely-not-a-fleet-label", /must match a managed label pattern/],
-    [" melodic-ubuntu-24.04-x64", /must not carry surrounding whitespace/],
+    [` ${FLEET_LABEL}`, /must not carry surrounding whitespace/],
   ]) {
     const root = await repository({
       policyOverrides: {
@@ -5715,7 +5715,7 @@ test("a fleet literal on a public repository is refused as public-self-hosted-ro
     visibility: "public",
     selfHostedCi: false,
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   const rules = (await audit(root)).map(({ rule }) => rule);
@@ -5728,7 +5728,7 @@ test("a fleet literal without local-routing enrollment is refused as self-hosted
     visibility: "private",
     selfHostedCi: false,
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   const rules = (await audit(root)).map(({ rule }) => rule);
@@ -5740,7 +5740,7 @@ test("a fleet literal cannot be reached by a config that claims private under pu
     visibility: "private",
     selfHostedCi: true,
     workflows: {
-      "ci.yml": `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`,
+      "ci.yml": FLEET_WORKFLOW,
     },
   });
   // ConfigurationError, which the CLI reports as exit 2 rather than as a
@@ -5755,7 +5755,7 @@ test("a fleet literal cannot be reached by a config that claims private under pu
 
 test("a hosted literal keeps its exception rules alongside the fleet literal", async () => {
   const workflows = {
-    "ci.yml": "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n",
+    "ci.yml": HOSTED_WORKFLOW,
   };
   const enrolled = await repository({ workflows });
   assert.deepEqual(
@@ -6006,7 +6006,7 @@ test("a runner-input contract's fixedRunsOn must name known GitHub-hosted labels
       approvedReusableWorkflowContracts: {
         [pathOf(FLEET_CLAUDE_REVIEW_REFERENCE)]: {
           ...FLEET_LANE_CONTRACT,
-          fixedRunsOn: ["melodic-ubuntu-24.04-x64"],
+          fixedRunsOn: [FLEET_LABEL],
         },
       },
     },
@@ -6016,7 +6016,7 @@ test("a runner-input contract's fixedRunsOn must name known GitHub-hosted labels
     (error) =>
       error instanceof ConfigurationError &&
       error.message.includes("runner-input reusable workflow contract") &&
-      error.message.includes("unrecognized GitHub-hosted label melodic-ubuntu-24.04-x64"),
+      error.message.includes(`unrecognized GitHub-hosted label ${FLEET_LABEL}`),
   );
 });
 
@@ -6271,6 +6271,9 @@ const TARGET_VISIBILITY = new Map([
   ["melodic-software/pr-pipeline-sandbox", "public"],
   ["melodic-software/standards", "public"],
   ["melodic-software/agent-automations", "private"],
+  ["melodic-software/architecture", "private"],
+  ["melodic-software/knowledge-corpus", "private"],
+  ["melodic-software/songwriting", "private"],
   ["melodic-software/claude-code-proxy", "private"],
   ["melodic-software/dotfiles", "private"],
   ["melodic-software/github-iac", "private"],

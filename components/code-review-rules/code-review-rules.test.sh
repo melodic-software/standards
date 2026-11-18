@@ -58,73 +58,76 @@ repo mixed-fences "$(printf '# Repo\n\n~~~text\n%s\n~~~\n\n' "$fence"; section "
 repo nested-fence "$(printf '# Repo\n\n%s`markdown\n%s\n' "$fence" "$fence"; section "$intro" "$synced"; printf '%s`\n' "$fence")" review
 
 # --- file ------------------------------------------------------------------
-out="$(bash "$script" file --root "$work/fleet/synced" 2>&1)"
+# check_file <fixture repo> — `file` mode over one fixture, stderr merged.
+check_file() { bash "$script" file --root "$work/fleet/$1" 2>&1; }
+
+out="$(check_file synced)"
 assert_exit 'file passes a repo with the synced REVIEW.md pointer' 0 $?
 assert_contains 'file reports agreement' "$out" 'OK:'
 
-out="$(bash "$script" file --root "$work/fleet/remote" 2>&1)"
+out="$(check_file remote)"
 assert_exit 'file passes a repo without REVIEW.md that links the canonical copy' 0 $?
 
-out="$(bash "$script" file --root "$work/fleet/no-agents" 2>&1)"
+out="$(check_file no-agents)"
 assert_exit 'file fails without a root AGENTS.md' 1 $?
 assert_contains 'the missing file is named' "$out" 'no root AGENTS.md'
 
-out="$(bash "$script" file --root "$work/fleet/no-heading" 2>&1)"
+out="$(check_file no-heading)"
 assert_exit 'file fails without the heading' 1 $?
 assert_contains 'the missing heading is named' "$out" "no '## Code Review Rules' heading"
 
-out="$(bash "$script" file --root "$work/fleet/no-intro" 2>&1)"
+out="$(check_file no-intro)"
 assert_exit 'file fails without the inherited intro line' 1 $?
 assert_contains 'the missing intro is named' "$out" 'inherited intro line is missing'
 
-out="$(bash "$script" file --root "$work/fleet/no-pointer" 2>&1)"
+out="$(check_file no-pointer)"
 assert_exit 'file fails without the REVIEW.md pointer' 1 $?
 assert_contains 'the missing pointer is named' "$out" 'REVIEW.md pointer line is missing'
 
-out="$(bash "$script" file --root "$work/fleet/wrong-target" 2>&1)"
+out="$(check_file wrong-target)"
 assert_exit 'file fails when a repo with REVIEW.md links the remote copy' 1 $?
 assert_contains 'the expected target is named' "$out" 'must link REVIEW.md'
 
-out="$(bash "$script" file --root "$work/fleet/duplicate-stale" 2>&1)"
+out="$(check_file duplicate-stale)"
 assert_exit 'file fails when a stale pointer sits beside the correct one' 1 $?
 assert_contains 'the duplicate pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
 
-out="$(bash "$script" file --root "$work/fleet/duplicate-same" 2>&1)"
+out="$(check_file duplicate-same)"
 assert_exit 'file fails when the correct pointer appears twice' 1 $?
 assert_contains 'a repeated pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
 
-out="$(bash "$script" file --root "$work/fleet/duplicate-unlinked" 2>&1)"
+out="$(check_file duplicate-unlinked)"
 assert_exit 'file fails when a second org-wide criteria line links nothing' 1 $?
 assert_contains 'an unlinked second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
 
-out="$(bash "$script" file --root "$work/fleet/duplicate-indented" 2>&1)"
+out="$(check_file duplicate-indented)"
 assert_exit 'file fails when an indented stale pointer sits beside the correct one' 1 $?
 assert_contains 'an indented second pointer is counted' "$out" '2 org-wide criteria pointer lines, expected one'
 
-out="$(bash "$script" file --root "$work/fleet/pointer-indented" 2>&1)"
+out="$(check_file pointer-indented)"
 assert_exit 'file fails when the only pointer is indented' 1 $?
 assert_contains 'the indented pointer is named' "$out" 'pointer line must not be indented'
 
-out="$(bash "$script" file --root "$work/fleet/pointer-outside" 2>&1)"
+out="$(check_file pointer-outside)"
 assert_exit 'file fails when the pointer sits under a later heading' 1 $?
 assert_contains 'a pointer outside the section does not count' "$out" 'REVIEW.md pointer line is missing'
 
-out="$(bash "$script" file --root "$work/fleet/pointer-fenced" 2>&1)"
+out="$(check_file pointer-fenced)"
 assert_exit 'file fails when the pointer sits only in a fenced example' 1 $?
 assert_contains 'a fenced pointer does not count' "$out" 'REVIEW.md pointer line is missing'
 
-out="$(bash "$script" file --root "$work/fleet/heading-fenced" 2>&1)"
+out="$(check_file heading-fenced)"
 assert_exit 'file fails when the whole section sits in a fenced example' 1 $?
 assert_contains 'a fenced heading does not count' "$out" "no '## Code Review Rules' heading"
 
-out="$(bash "$script" file --root "$work/fleet/unclosed-fence" 2>&1)"
+out="$(check_file unclosed-fence)"
 assert_exit 'file fails when an unclosed fence above swallows the section' 1 $?
 assert_contains 'the unclosed fence is named as the cause' "$out" 'a code fence is never closed'
 
-out="$(bash "$script" file --root "$work/fleet/mixed-fences" 2>&1)"
+out="$(check_file mixed-fences)"
 assert_exit 'a backtick fence inside a tilde fence does not close it' 0 $?
 
-out="$(bash "$script" file --root "$work/fleet/nested-fence" 2>&1)"
+out="$(check_file nested-fence)"
 assert_exit 'a shorter fence inside a four-backtick fence does not close it' 1 $?
 assert_contains 'a section inside the longer fence does not count' "$out" "no '## Code Review Rules' heading"
 
@@ -166,3 +169,5 @@ bash "$script" bogus >/dev/null 2>&1
 assert_exit 'an unknown command is a usage error' 2 $?
 bash "$script" fleet --repos "$work/absent.txt" --fixtures "$work/fleet" >/dev/null 2>&1
 assert_exit 'a missing repository list is a usage error' 2 $?
+
+[[ $FAILED -eq 0 ]] || exit 1

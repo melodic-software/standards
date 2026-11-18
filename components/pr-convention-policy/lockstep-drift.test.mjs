@@ -64,7 +64,9 @@ const POLICY = parseUniqueJson(
 // still run), the same run.sh from ci-workflows
 // cc7613fbf8bacca72700d6498c32145c05fe1f09 (ci-workflows#815, the gsub
 // keyword pass and bounded backward negation scan, with the same awk
-// comment), and the hook validator from
+// comment), the same run.sh from ci-workflows
+// cb6945d4906ef5e6c6d6281d98c96e79a45349f5 (ci-workflows#1129, one report loop
+// with a case per kind, with the same awk comment), and the hook validator from
 // claude-code-plugins 53d5c6a09dfb5890b9767b447a28ca10ba922173. The `.txt`
 // suffix keeps the shell lint lanes off code this repository does not own.
 // Refresh them when either upstream changes shape the tests depend on.
@@ -73,6 +75,7 @@ const readFixture = (name) =>
 const GOOD_COMPOSITE_RUN = await readFixture("check-contract-run.sh.txt");
 const LITERAL_REF_COMPOSITE_RUN = await readFixture("check-contract-run-literal-ref.sh.txt");
 const BOUNDED_SCAN_COMPOSITE_RUN = await readFixture("check-contract-run-bounded-scan.sh.txt");
+const SINGLE_LOOP_COMPOSITE_RUN = await readFixture("check-contract-run-1129.sh.txt");
 const GOOD_VALIDATOR = await readFixture("pr-linkage-validator.sh.txt");
 const BOUNDED_SCAN_VALIDATOR = await readFixture("pr-linkage-validator-bounded-scan.sh.txt");
 
@@ -411,47 +414,64 @@ test("a composite that stops lowercasing the line is drift, not a pass", () => {
   assert.match(errors[1], /^gate composite \(behavior\): .*"Closes #12" should be closing/);
 });
 
+// The composite's findings at one codex-plugins pin, with the good action.yml.
+const checkCodexPin = (runSh) =>
+  checkPinnedComposite(POLICY, "codex-plugins", "d".repeat(40), runSh, GOOD_COMPOSITE_ACTION);
+
 test("a composite at a consumer pin passes when it matches policy", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      GOOD_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(GOOD_COMPOSITE_RUN), []);
 });
 
 test("a composite pin that still inlines the #N reference passes", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      LITERAL_REF_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(LITERAL_REF_COMPOSITE_RUN), []);
 });
 
 test("a composite pin with the bounded negation scan passes", () => {
-  assert.deepEqual(
-    checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      BOUNDED_SCAN_COMPOSITE_RUN,
-      GOOD_COMPOSITE_ACTION,
-    ),
-    [],
-  );
+  assert.deepEqual(checkCodexPin(BOUNDED_SCAN_COMPOSITE_RUN), []);
   assert.deepEqual(
     checkCopies(POLICY, { ...goodTexts(), gateRun: BOUNDED_SCAN_COMPOSITE_RUN }),
     [],
   );
+});
+
+test("a composite with one report loop and a case per kind passes", () => {
+  assert.deepEqual(checkCopies(POLICY, { ...goodTexts(), gateRun: SINGLE_LOOP_COMPOSITE_RUN }), []);
+});
+
+test("a single-loop composite that stops acting on the report is drift", () => {
+  for (const [from, to, expected] of [
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      '      negated) negated_quoted+="${negated_quoted:+, }',
+      '      negated) : "',
+      /a `negated` report is a linkage error/,
+    ],
+    [
+      '    esac\n  done <"$analysis"',
+      "    esac\n  done </dev/null",
+      /a missing or empty section report/,
+    ],
+    [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
+      'section-empty) linkage_errors+=("The \\"## ${text}\\" section is empty.") ;;',
+      "section-empty) : ;;",
+      /a missing or empty section report/,
+    ],
+    [
+      "grep -qxE 'closing|non-closing|no-issue'",
+      "grep -qxE 'closing|no-issue'",
+      /a `non-closing` report satisfies linkage/,
+    ],
+    ["jq -r .body <", "jq -r .title <", /the PR body is written to the analyzer's input/],
+  ]) {
+    const mutated = SINGLE_LOOP_COMPOSITE_RUN.replace(from, to);
+    assert.notEqual(mutated, SINGLE_LOOP_COMPOSITE_RUN, `mutation did not apply: ${from}`);
+    const errors = checkCopies(POLICY, { ...goodTexts(), gateRun: mutated });
+    assert.ok(
+      errors.some((e) => e.startsWith("gate composite (verdict): ") && expected.test(e)),
+      `${from}: ${errors.join("; ")}`,
+    );
+  }
 });
 
 test("a hook validator with the bounded negation scan passes", () => {
@@ -504,13 +524,7 @@ test("an issue-ref-pattern composite that loses its default is drift", () => {
       "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
     ]);
     // Three checks read the default; a consumer pin reports the finding once.
-    const pinned = checkPinnedComposite(
-      POLICY,
-      "codex-plugins",
-      "d".repeat(40),
-      GOOD_COMPOSITE_RUN.replace(from, to),
-      GOOD_COMPOSITE_ACTION,
-    );
+    const pinned = checkCodexPin(GOOD_COMPOSITE_RUN.replace(from, to));
     assert.equal(pinned.length, 1, pinned.join("; "));
     assert.match(pinned[0], /^caller codex-plugins pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
   }
@@ -1532,13 +1546,9 @@ test("a commented-out call site is not a call site", () => {
 // The ci-workflows rename moves the gate from `ci.yml` to
 // `pr-require-checks.yml`. The scan reads that file before any other, so a
 // repository calling the composite from there costs one read.
-test("a composite called from pr-require-checks.yml is found on the first read", async () => {
+// Resolves ci-workflows over the given workflow files, recording each one read.
+async function resolveWorkflows(files) {
   const reads = [];
-  const files = {
-    "build.yml": "jobs:\n  build:\n    runs-on: ubuntu-24.04\n",
-    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
-    "lint.yml": "jobs:\n  lint:\n    runs-on: ubuntu-24.04\n",
-  };
   const found = await resolveConsumerArtifact(
     "ci-workflows",
     async (url) => {
@@ -1548,25 +1558,24 @@ test("a composite called from pr-require-checks.yml is found on the first read",
     },
     async () => Object.keys(files),
   );
+  return { found, reads };
+}
+
+test("a composite called from pr-require-checks.yml is found on the first read", async () => {
+  const { found, reads } = await resolveWorkflows({
+    "build.yml": "jobs:\n  build:\n    runs-on: ubuntu-24.04\n",
+    "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
+    "lint.yml": "jobs:\n  lint:\n    runs-on: ubuntu-24.04\n",
+  });
   assert.deepEqual(found, { kind: "composite", sha: "main", local: true });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 
 test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", async () => {
-  const reads = [];
-  const files = {
+  const { found, reads } = await resolveWorkflows({
     "ci.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
     "pr-require-checks.yml": `jobs:\n  ci-status:\n        uses: ./${COMPOSITE_DIRECTORY}\n`,
-  };
-  const found = await resolveConsumerArtifact(
-    "ci-workflows",
-    async (url) => {
-      const name = url.match(/\.github\/workflows\/([^?]+)/)[1];
-      reads.push(name);
-      return files[name];
-    },
-    async () => Object.keys(files),
-  );
+  });
   assert.deepEqual(found, { kind: "composite", sha: "main", local: true });
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
@@ -1696,9 +1705,19 @@ test("a repository whose fetch already failed is not double-reported", () => {
   assert.deepEqual(errors, []);
 });
 
-test("consumer roster covers all thirteen repositories", () => {
-  assert.equal(CONSUMER_REPOSITORIES.length, 13);
-  for (const repo of ["agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+test("consumer roster covers all nineteen gated repositories", () => {
+  assert.equal(CONSUMER_REPOSITORIES.length, 19);
+  for (const repo of [
+    "agent-automations",
+    "agent-plugins",
+    "architecture",
+    "azure-iac",
+    "claude-code-account-rotation",
+    "claude-code-proxy",
+    "cursor-plugins",
+    "knowledge-corpus",
+    "songwriting",
+  ]) {
     assert.ok(CONSUMER_REPOSITORIES.includes(repo), `${repo} is in the roster`);
   }
 });

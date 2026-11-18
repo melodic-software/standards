@@ -74,6 +74,8 @@ pid='AbCdEfGhIjKlMnOpQrStUv'
 pid2='ZyXwVuTsRqPoNmLkJiHgFe'
 pub_ok="201:https://public.example.test/$pid/"
 priv_ok="201:https://private.example.test/$pid2/"
+pub_upload='https://public.example.test/_upload'
+priv_upload='https://private.example.test/_upload'
 
 # write_config <file> [KEY=VALUE overrides...]: a valid six-key config, mode 0600.
 write_config() {
@@ -120,7 +122,7 @@ assert_exit 'a clean public page uploads' 0 "$rc"
 assert_eq 'stdout is the JSON line built from the returned URL' \
   "{\"id\":\"$pid\",\"visibility\":\"public\",\"url\":\"https://public.example.test/$pid/\"}" "$out"
 assert_eq 'one curl call' 1 "$calls"
-assert_eq 'the PUT creates on the public origin' 'https://public.example.test/_upload' "$(url_of 1)"
+assert_eq 'the PUT creates on the public origin' "$pub_upload" "$(url_of 1)"
 assert_contains 'the method is PUT' "$(argv_of 1)" $'-X\nPUT'
 assert_contains 'Content-Type is text/html; charset=utf-8' "$argv_all" 'Content-Type: text/html; charset=utf-8'
 assert_contains 'the body is the page file' "$argv_all" "--data-binary"$'\n'"@$clean"
@@ -135,7 +137,7 @@ assert_not_contains 'a public upload resolves no Access secret' "$stdin_all" 'pr
 
 STUB_SEQ="$priv_ok" run "$clean" --visibility private
 assert_exit 'a private page uploads' 0 "$rc"
-assert_contains 'the PUT goes to the private origin' "$argv_all" 'https://private.example.test/_upload'
+assert_contains 'the PUT goes to the private origin' "$argv_all" "$priv_upload"
 assert_contains 'a private upload sends the Access client id on stdin' "$stdin_all" \
   'header = "CF-Access-Client-Id: SENTINEL-priv-access-id"'
 assert_contains 'a private upload sends the Access client secret on stdin' "$stdin_all" \
@@ -146,7 +148,7 @@ assert_contains 'stdout reports private' "$out" '"visibility":"private"'
 
 run "$clean" --visibility public --id "$pid"
 assert_exit 'a republish with --id succeeds' 0 "$rc"
-assert_eq 'the PUT replaces that id' "https://public.example.test/_upload/$pid" "$(url_of 1)"
+assert_eq 'the PUT replaces that id' "$pub_upload/$pid" "$(url_of 1)"
 
 # Input rules: exit 3, no network.
 printf '%s\n' "$stamp" >"$tmp/other/outside.html"
@@ -207,7 +209,7 @@ for form in 'leak<span>marker</span>' 'leak&#109;arker'; do
   STUB_GITLEAKS_FIND=leakmarker STUB_SEQ="$priv_ok" run "$(page leak "$form")" --visibility public
   assert_exit "a gitleaks finding only in a decoded copy ($form) uploads" 0 "$rc"
   assert_contains "a gitleaks finding only in a decoded copy ($form) is sent private" "$argv_all" \
-    'https://private.example.test/_upload'
+    "$priv_upload"
   assert_contains "a gitleaks finding only in a decoded copy ($form) is named" "$err" 'gitleaks finding'
 done
 
@@ -228,7 +230,7 @@ for sample in "${path_samples[@]}"; do
   label="${sample%%|*}"
   STUB_SEQ="$priv_ok" run "$(page path "${sample#*|}")" --visibility public
   assert_exit "a $label uploads" 0 "$rc"
-  assert_contains "a $label is sent to the private origin" "$argv_all" 'https://private.example.test/_upload'
+  assert_contains "a $label is sent to the private origin" "$argv_all" "$priv_upload"
   assert_contains "a $label is reported private" "$out" '"visibility":"private"'
 done
 
@@ -260,7 +262,7 @@ for sample in "${wide_creds[@]}"; do
   form="${sample%%|*}"
   STUB_SEQ="$priv_ok" run "$(page cred "${sample#*|}")" --visibility public
   assert_exit "a credential as a $form uploads" 0 "$rc"
-  assert_contains "a credential as a $form is sent to the private origin" "$argv_all" 'https://private.example.test/_upload'
+  assert_contains "a credential as a $form is sent to the private origin" "$argv_all" "$priv_upload"
   assert_contains "a credential as a $form names the decoded line" "$err" 'on decoded line 3'
 done
 
@@ -285,7 +287,7 @@ for sample in "${escaped_paths[@]}"; do
   label="${sample%%|*}"
   STUB_SEQ="$priv_ok" run "$(page path "${sample#*|}")" --visibility public
   assert_exit "a $label uploads" 0 "$rc"
-  assert_contains "a $label is sent to the private origin" "$argv_all" 'https://private.example.test/_upload'
+  assert_contains "a $label is sent to the private origin" "$argv_all" "$priv_upload"
 done
 
 # The path-detection bodies, run on the decoded copy, add the shapes the
@@ -333,7 +335,7 @@ STUB_SEQ="$priv_ok" run "$(page path "/home/$u/x")" --visibility public --id "$p
 assert_exit 'a forced-private republish succeeds' 0 "$rc"
 assert_eq 'a forced-private republish makes one call' 1 "$calls"
 assert_eq 'a forced-private republish creates on the private origin' \
-  'https://private.example.test/_upload' "$(url_of 1)"
+  "$priv_upload" "$(url_of 1)"
 assert_not_contains 'a forced-private republish drops the public id' "$argv_all" "$pid"
 assert_contains 'a forced-private republish returns the new id' "$out" "\"id\":\"$pid2\""
 
@@ -342,9 +344,9 @@ STUB_SEQ="409:private-required;$priv_ok" run "$clean" --visibility public --id "
 assert_exit 'a 409 private-required is retried privately' 0 "$rc"
 assert_eq 'a 409 retry makes exactly two calls' 2 "$calls"
 assert_eq 'the first try replaces the public id' \
-  "https://public.example.test/_upload/$pid" "$(url_of 1)"
+  "$pub_upload/$pid" "$(url_of 1)"
 assert_eq 'the retry creates on the private origin' \
-  'https://private.example.test/_upload' "$(url_of 2)"
+  "$priv_upload" "$(url_of 2)"
 assert_not_contains 'the retry drops the public id' "$(argv_of 2)" "$pid"
 assert_contains 'the retry carries the Access headers' "$(cat "$tmp/calls/stdin.2")" 'CF-Access-Client-Id'
 assert_contains 'the retry is reported private' "$out" "{\"id\":\"$pid2\",\"visibility\":\"private\""
@@ -375,7 +377,7 @@ STUB_SEQ='204:' run --delete "$pid" --visibility public
 assert_exit '--delete exits 0 on 204' 0 "$rc"
 assert_eq '--delete prints nothing' '' "$out"
 assert_contains '--delete sends DELETE' "$argv_all" $'-X\nDELETE'
-assert_contains '--delete targets that id' "$argv_all" "https://public.example.test/_upload/$pid"
+assert_contains '--delete targets that id' "$argv_all" "$pub_upload/$pid"
 assert_not_contains '--delete sends no body' "$argv_all" '--data-binary'
 STUB_SEQ='204:' run --delete "$pid" --visibility private
 assert_contains 'a private --delete sends the Access headers' "$stdin_all" 'CF-Access-Client-Secret: SENTINEL-priv-access-key'
@@ -396,7 +398,7 @@ HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" VAULT_EXEC_VAULT=kv-attacker \
   run "$clean" --visibility public
 assert_exit 'a config file present still uploads from Key Vault' 0 "$rc"
 assert_eq 'a config file present: the upload uses the Key Vault endpoint' \
-  'https://public.example.test/_upload' "$(url_of 1)"
+  "$pub_upload" "$(url_of 1)"
 assert_not_contains 'a config file present: curl never sees its endpoint' "$argv_all" 'decoy.example.test'
 assert_contains 'a config file present: the token is the Key Vault one' "$stdin_all" 'Bearer SENTINEL-pub-token'
 assert_not_contains 'a config file present: its token secret is never resolved' "$stdin_all" 'decoy-token'

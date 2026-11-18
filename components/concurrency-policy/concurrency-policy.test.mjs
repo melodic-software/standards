@@ -12,10 +12,15 @@ import {
   parseUniqueJson,
 } from "./concurrency-policy.mjs";
 
-const CANONICAL = `concurrency:
+const CANONICAL_GROUP = `concurrency:
   group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
+`;
+const CANONICAL = `${CANONICAL_GROUP}  cancel-in-progress: true\n`;
+const REF_BLOCK = `concurrency:
+  group: \${{ github.workflow }}-\${{ github.ref }}
   cancel-in-progress: true
 `;
+const PUSH_AND_PULL_REQUEST = "on:\n  push:\n    branches: [main]\n  pull_request:";
 const JOBS = 'jobs:\n  build:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "true"\n';
 const temporaryRoots = [];
 
@@ -23,6 +28,13 @@ const temporaryRoots = [];
 // the analyzer's copy is compared against an independent literal.
 const PREDICATE = `github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))`;
 const CONTRACT_BRANCH = `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)`;
+// One space added inside the fromJSON array literal, and separately the
+// base-edit clause dropped: the drift the byte-identity rule exists to catch.
+const SPACED_PREDICATE = PREDICATE.replace('"labeled","unlabeled"', '"labeled", "unlabeled"');
+const CLAUSE_DROPPED_PREDICATE = PREDICATE.replace(
+  "(github.event.action == 'edited' && !github.event.changes.base)",
+  "github.event.action == 'edited'",
+);
 
 // The branched group as one line, and as the folded scalar the design writes.
 // Both spellings reach the analyzer as a single string; the folded one keeps a
@@ -62,6 +74,12 @@ async function repository({ config, workflows = {} } = {}) {
     await writeFile(path.join(root, ".github", "workflows", name), source);
   }
   return root;
+}
+
+// Audits a repository whose only workflow is ci.yml.
+async function auditCi(concurrencyYaml, onYaml = "on: pull_request") {
+  const root = await repository({ workflows: { "ci.yml": workflow(onYaml, concurrencyYaml) } });
+  return auditRepository({ root });
 }
 
 // Blocking findings only. Info findings never fail the gate, so every
@@ -110,10 +128,7 @@ test("command-line parsing preserves defaults and follows strict Node syntax", (
 });
 
 test("canonical block on a pull_request workflow passes", async () => {
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", CANONICAL) },
-  });
-  const findings = await auditRepository({ root });
+  const findings = await auditCi(CANONICAL);
   assert.deepEqual(rules(findings), []);
   assert.deepEqual(fallbacks(findings), [
     ".github/workflows/ci.yml:concurrency-group-fallback:github.run_id",
@@ -125,30 +140,16 @@ test("quoted group string and extra expression whitespace still conform", async 
   group: "\${{  github.workflow  }}-\${{ github.event.pull_request.number||github.run_id }}"
   cancel-in-progress: true
 `;
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on:\n  pull_request:", quoted) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), []);
+  assert.deepEqual(rules(await auditCi(quoted, "on:\n  pull_request:")), []);
 });
 
 test("pull_request_target with the canonical block passes", async () => {
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request_target", CANONICAL) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), []);
+  assert.deepEqual(rules(await auditCi(CANONICAL, "on: pull_request_target")), []);
 });
 
 test("array and mapping on: forms are recognized as pull-request-triggered", async () => {
-  const array = await repository({
-    workflows: { "ci.yml": workflow("on: [push, pull_request]", CANONICAL) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: array })), []);
-  const mapping = await repository({
-    workflows: {
-      "ci.yml": workflow("on:\n  push:\n    branches: [main]\n  pull_request:", CANONICAL),
-    },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: mapping })), []);
+  assert.deepEqual(rules(await auditCi(CANONICAL, "on: [push, pull_request]")), []);
+  assert.deepEqual(rules(await auditCi(CANONICAL, PUSH_AND_PULL_REQUEST)), []);
 });
 
 test("non-pull-request workflows are out of scope", async () => {
@@ -171,10 +172,7 @@ test("repository with no workflows directory passes", async () => {
 
 test("the ci-perf branched group passes single-line and folded, with either fallback", async () => {
   for (const fallback of ["github.ref", "github.run_id"]) {
-    const single = await repository({
-      workflows: { "ci.yml": workflow("on: pull_request", branchedSingleLine(fallback)) },
-    });
-    const singleFindings = await auditRepository({ root: single });
+    const singleFindings = await auditCi(branchedSingleLine(fallback));
     assert.deepEqual(rules(singleFindings), []);
     assert.deepEqual(fallbacks(singleFindings), [
       `.github/workflows/ci.yml:concurrency-group-fallback:${fallback}`,
@@ -183,15 +181,7 @@ test("the ci-perf branched group passes single-line and folded, with either fall
     // The folded scalar the design writes. Its continuation lines are
     // more-indented, so the parser keeps a newline and that indent at each
     // join; only the joins and the `${{ }}` delimiters tolerate it.
-    const folded = await repository({
-      workflows: {
-        "ci.yml": workflow(
-          "on:\n  push:\n    branches: [main]\n  pull_request:",
-          branchedFolded(fallback),
-        ),
-      },
-    });
-    const foldedFindings = await auditRepository({ root: folded });
+    const foldedFindings = await auditCi(branchedFolded(fallback), PUSH_AND_PULL_REQUEST);
     assert.deepEqual(rules(foldedFindings), []);
     assert.deepEqual(fallbacks(foldedFindings), [
       `.github/workflows/ci.yml:concurrency-group-fallback:${fallback}`,
@@ -202,54 +192,28 @@ test("the ci-perf branched group passes single-line and folded, with either fall
 test("the branched group pairs with either accepted cancel-in-progress value", async () => {
   const contractOnlyCancel = `\${{ !(${PREDICATE}) }}`;
   for (const cancel of ["true", contractOnlyCancel]) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": workflow("on: pull_request", branchedFolded("github.run_id", cancel)),
-      },
-    });
-    assert.deepEqual(rules(await auditRepository({ root })), []);
+    assert.deepEqual(rules(await auditCi(branchedFolded("github.run_id", cancel))), []);
   }
 });
 
 test("a branched group whose predicate drifts by one byte is rejected", async () => {
-  // One space added inside the fromJSON array literal, and separately the
-  // base-edit clause dropped. Both are the drift the byte-identity rule exists
-  // to catch: the composite compares its own default against this text.
-  const spaced = PREDICATE.replace('"labeled","unlabeled"', '"labeled", "unlabeled"');
-  const clauseDropped = PREDICATE.replace(
-    "(github.event.action == 'edited' && !github.event.changes.base)",
-    "github.event.action == 'edited'",
-  );
+  // The composite compares its own default against this text.
   const bare = `\${{ ${PREDICATE} && ${CONTRACT_BRANCH} || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}`;
-  for (const predicate of [spaced, clauseDropped]) {
+  for (const predicate of [SPACED_PREDICATE, CLAUSE_DROPPED_PREDICATE]) {
     assert.notEqual(predicate, PREDICATE);
-    const root = await repository({
-      workflows: {
-        "ci.yml": workflow(
-          "on: pull_request",
-          branchedSingleLine("github.run_id", CONTRACT_BRANCH, predicate),
-        ),
-      },
-    });
-    assert.deepEqual(rules(await auditRepository({ root })), [
-      ".github/workflows/ci.yml:concurrency-group-drift",
-    ]);
+    assert.deepEqual(
+      rules(await auditCi(branchedSingleLine("github.run_id", CONTRACT_BRANCH, predicate))),
+      [".github/workflows/ci.yml:concurrency-group-drift"],
+    );
   }
 
   // The predicate stripped of its surrounding parentheses. `&&` binds tighter
   // than `||` in GitHub expressions, so this happens to evaluate the same way,
   // but it is not the shape the grammar admits.
-  const unparenthesized = await repository({
-    workflows: {
-      "ci.yml": workflow(
-        "on: pull_request",
-        `concurrency:\n  group: ${bare}\n  cancel-in-progress: true\n`,
-      ),
-    },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: unparenthesized })), [
-    ".github/workflows/ci.yml:concurrency-group-drift",
-  ]);
+  assert.deepEqual(
+    rules(await auditCi(`concurrency:\n  group: ${bare}\n  cancel-in-progress: true\n`)),
+    [".github/workflows/ci.yml:concurrency-group-drift"],
+  );
 });
 
 test("a fallback term other than github.ref or github.run_id is rejected", async () => {
@@ -259,10 +223,7 @@ test("a fallback term other than github.ref or github.run_id is rejected", async
     "github.ref_name",
     "github.run_number",
   ]) {
-    const root = await repository({
-      workflows: { "ci.yml": workflow("on: pull_request", branchedSingleLine(fallback)) },
-    });
-    const findings = await auditRepository({ root });
+    const findings = await auditCi(branchedSingleLine(fallback));
     assert.deepEqual(rules(findings), [".github/workflows/ci.yml:concurrency-group-drift"]);
     assert.deepEqual(fallbacks(findings), []);
   }
@@ -279,35 +240,18 @@ test("a contract branch without github.run_id is rejected", async () => {
     `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_attempt)`,
   ];
   for (const contractBranch of branches) {
-    const root = await repository({
-      workflows: {
-        "ci.yml": workflow("on: pull_request", branchedSingleLine("github.run_id", contractBranch)),
-      },
-    });
-    assert.deepEqual(rules(await auditRepository({ root })), [
+    assert.deepEqual(rules(await auditCi(branchedSingleLine("github.run_id", contractBranch))), [
       ".github/workflows/ci.yml:concurrency-group-drift",
     ]);
   }
 });
 
 test("missing top-level concurrency on a pull_request workflow is flagged", async () => {
-  const root = await repository({ workflows: { "ci.yml": workflow("on: pull_request") } });
-  assert.deepEqual(rules(await auditRepository({ root })), [
-    ".github/workflows/ci.yml:concurrency-missing",
-  ]);
+  assert.deepEqual(rules(await auditCi()), [".github/workflows/ci.yml:concurrency-missing"]);
 });
 
 test("github.ref group drifts from the canonical pull-request-number form", async () => {
-  const refBlock = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.ref }}
-  cancel-in-progress: true
-`;
-  const root = await repository({
-    workflows: {
-      "ci.yml": workflow("on:\n  push:\n    branches: [main]\n  pull_request:", refBlock),
-    },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi(REF_BLOCK, PUSH_AND_PULL_REQUEST)), [
     ".github/workflows/ci.yml:concurrency-group-drift",
   ]);
 });
@@ -317,112 +261,60 @@ test("head_ref variant is treated as drift from the standard", async () => {
   group: \${{ github.workflow }}-\${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 `;
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", headRefBlock) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi(headRefBlock)), [
     ".github/workflows/ci.yml:concurrency-group-drift",
   ]);
 });
 
 test("canonical group without cancel-in-progress is flagged", async () => {
-  const noCancel = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
-`;
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", noCancel) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi(CANONICAL_GROUP)), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
   ]);
 });
 
 test("cancel-in-progress as false or an expression is flagged, not crashed", async () => {
-  const falseCancel = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: false
-`;
-  const rootFalse = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", falseCancel) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: rootFalse })), [
-    ".github/workflows/ci.yml:concurrency-cancel-missing",
-  ]);
-  const exprCancel = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: \${{ github.event_name == 'pull_request' }}
-`;
-  const rootExpr = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", exprCancel) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: rootExpr })), [
-    ".github/workflows/ci.yml:concurrency-cancel-missing",
-  ]);
+  for (const cancel of ["false", `\${{ github.event_name == 'pull_request' }}`]) {
+    assert.deepEqual(rules(await auditCi(`${CANONICAL_GROUP}  cancel-in-progress: ${cancel}\n`)), [
+      ".github/workflows/ci.yml:concurrency-cancel-missing",
+    ]);
+  }
 });
 
 test("the ci-perf contract-only cancel expression passes, and only byte-identically", async () => {
-  const canonicalGroup = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}
-`;
-  const exact = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-`;
-  const rootExact = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", exact) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: rootExact })), []);
+  const withCancel = (predicate) =>
+    auditCi(`${CANONICAL_GROUP}  cancel-in-progress: \${{ !(${predicate}) }}\n`);
+  assert.deepEqual(rules(await withCancel(PREDICATE)), []);
 
   // One space added inside the fromJSON array literal. The composite compares
   // its own default against this text, so a reformatted copy is drift, not a
   // stylistic variant.
-  const whitespaceVariant = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
-`;
-  const rootWhitespace = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", whitespaceVariant) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: rootWhitespace })), [
+  assert.deepEqual(rules(await withCancel(SPACED_PREDICATE)), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
   ]);
 
   // The base-edit clause dropped. This one is not cosmetic: without it an
   // `edited` event that changed the base branch would be treated as
   // contract-only, so the lanes would never re-test the new merge commit.
-  const clauseVariant = `${canonicalGroup}  cancel-in-progress: \${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.action == 'edited')) }}
-`;
-  const rootClause = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", clauseVariant) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root: rootClause })), [
+  assert.deepEqual(rules(await withCancel(CLAUSE_DROPPED_PREDICATE)), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
   ]);
 });
 
 test("group-only string shorthand drifts and lacks cancellation", async () => {
-  const shorthand = "concurrency: my-static-group\n";
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", shorthand) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi("concurrency: my-static-group\n")), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
     ".github/workflows/ci.yml:concurrency-group-drift",
   ]);
 });
 
 test("array concurrency is malformed", async () => {
-  const malformed = "concurrency:\n  - group: a\n";
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", malformed) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi("concurrency:\n  - group: a\n")), [
     ".github/workflows/ci.yml:concurrency-malformed",
   ]);
 });
 
 test("an extra key on the canonical block is flagged", async () => {
-  const withQueue = `${CANONICAL}  queue: max\n`;
-  const root = await repository({
-    workflows: { "ci.yml": workflow("on: pull_request", withQueue) },
-  });
-  assert.deepEqual(rules(await auditRepository({ root })), [
+  assert.deepEqual(rules(await auditCi(`${CANONICAL}  queue: max\n`)), [
     ".github/workflows/ci.yml:concurrency-extra-keys",
   ]);
 });
@@ -462,10 +354,6 @@ test("an exception on an already-conformant workflow is unconsumed drift", async
 });
 
 test("an exception does not license a present non-canonical block", async () => {
-  const refBlock = `concurrency:
-  group: \${{ github.workflow }}-\${{ github.ref }}
-  cancel-in-progress: true
-`;
   const root = await repository({
     config: {
       schemaVersion: 1,
@@ -476,7 +364,7 @@ test("an exception does not license a present non-canonical block", async () => 
         },
       },
     },
-    workflows: { "claude-review.yml": workflow("on: pull_request", refBlock) },
+    workflows: { "claude-review.yml": workflow("on: pull_request", REF_BLOCK) },
   });
   assert.deepEqual(rules(await auditRepository({ root })), [
     ".github/workflows/claude-review.yml:concurrency-group-drift",

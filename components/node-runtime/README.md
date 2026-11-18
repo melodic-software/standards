@@ -7,7 +7,9 @@ setup-node, and other version managers.
 This component owns only the runtime floor. It does not share `package.json`,
 package-manager choices, dependencies, scripts, or repository-specific Node
 behavior. Managed consumers do not edit the pin; upgrade it here, validate the
-fleet, and let synchronization propagate the exact file.
+fleet, and let synchronization propagate the exact file. A repository that
+needs another pin
+[opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
 
 The root location is the canonical source, so this source slice needs no
 duplicate config, fixture, or test.

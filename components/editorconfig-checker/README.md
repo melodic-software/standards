@@ -11,5 +11,6 @@ End-of-line validation is disabled here because `.gitattributes` is the byte
 normalization authority; indent width and line length remain formatter-owned.
 
 Managed consumers do not edit the root config. Repository-specific path
-exclusions are additive command inputs (`-exclude`) supplied by execution.
+exclusions are additive command inputs (`-exclude`) supplied by execution; any
+other change [opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
 `fixtures/` and `editorconfig-checker.test.sh` prove both conforming and failing inputs.

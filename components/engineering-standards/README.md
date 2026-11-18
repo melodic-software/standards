@@ -60,7 +60,9 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
   `docs/standards/` file from the index.
 - **Customization**: a target relocates the team layer through
   `.claude/standards.yaml` `standards_dir`, or moves the component to
-  `locally-owned` in the manifest. The index is `managed` because the engine
+  `locally-owned` in the manifest, per
+  [Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
+  The index is `managed` because the engine
   has no seed-once mode.
 - **Rollback**: remove the component from the targets' `managed` lists and
   delete its manifest entry and `managed-files-guard` paths. The files already
