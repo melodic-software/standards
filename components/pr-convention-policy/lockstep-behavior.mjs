@@ -360,6 +360,11 @@ function run(command, args, options, location, what) {
         `${location}: the ${what} did not finish within ${TIMEOUT_MS / 1000}s on the sample bodies`,
       );
     }
+    // A child that exits before reading all its input (a harness that stops
+    // at status 90 or 91) closes the pipe mid-write; its exit status decides.
+    if (result.error.code === "EPIPE" && result.status !== null) {
+      return result;
+    }
     if (result.error.code === "ENOENT") {
       throw new BehaviorToolError(
         `${location}: behavioral lockstep needs \`${command}\` on PATH to run the ${what}; install it (the CI lane does)`,
