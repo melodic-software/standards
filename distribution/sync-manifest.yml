@@ -286,8 +286,7 @@ components:
   # non-targets:
   # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
   #   code or authored docs, and no lychee lane.
-  # - azure-iac (a trust root the sync App must not write to), and songwriting,
-  #   architecture and knowledge-corpus (targets for `dependabot-policy` and the guard only)
+  # - songwriting, architecture and knowledge-corpus (targets for `dependabot-policy` and the guard only)
   #   run the offline lane with no copy of this file: the ci-workflows
   #   lychee-offline composite falls back to the canonical copy ci-workflows
   #   carries as a target here when the caller has none. knowledge-corpus
@@ -523,6 +522,18 @@ targets:
     managed:
       - dependabot-policy
       - managed-files-guard-fleet-caller
+  melodic-software/azure-iac:
+    managed:
+      - dependabot-policy
+      - editorconfig-checker
+      - gitleaks
+      - lychee
+      - managed-files-guard-fleet-caller
+      - markdownlint
+      - repository-text
+      - review-instructions
+      - shellcheck
+      - typos
   melodic-software/ci-runner:
     managed:
       - claude-review-hosted-caller
