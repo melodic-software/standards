@@ -599,8 +599,14 @@ export function parseCompositeNegation(runShText, location) {
 // otherwise select an artifact the repository does not run and suppress the
 // one it does.
 const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
-const COMPOSITE_DIRECTORY_PATTERN = COMPOSITE_DIRECTORY.replaceAll(".", "\\.");
-// A `uses:` of the composite at `main` or a 40-hex ci-workflows SHA.
+// A caller runs `check-contract` directly or through `report-ci-status`, which
+// calls it through `$/` at the same commit, so either call site names the
+// commit whose `check-contract` gates.
+export const REPORT_DIRECTORY = ".github/actions/pr-require-checks/report-ci-status";
+const COMPOSITE_DIRECTORY_PATTERN = `(?:${[COMPOSITE_DIRECTORY, REPORT_DIRECTORY]
+  .map((directory) => directory.replaceAll(".", "\\."))
+  .join("|")})`;
+// A `uses:` of either composite at `main` or a 40-hex ci-workflows SHA.
 const COMPOSITE_PIN_PATTERN = new RegExp(
   `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_PATTERN}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
   "m",

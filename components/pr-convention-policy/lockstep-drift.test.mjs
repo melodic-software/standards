@@ -40,6 +40,7 @@ import {
   parseValidatorNonClosing,
   parseValidatorPatterns,
   parseValidatorSections,
+  REPORT_DIRECTORY,
   readGateComposite,
   requirePinScanToken,
   resolveConsumerArtifact,
@@ -1500,6 +1501,25 @@ test("a reusable consumer is detected at its pin", () => {
     kind: "reusable",
     sha: "0f8176e87e0be518f382664779655011bf95784a",
   });
+});
+
+// `report-ci-status` runs `check-contract` through `$/` at the commit the caller
+// pins, so its pin names the `check-contract` to check.
+test("a consumer on report-ci-status is detected at its pin", () => {
+  const step = `      - uses: melodic-software/ci-workflows/${REPORT_DIRECTORY}@ebd0e3bed99ae1365fcb4ef47ce97cfa745fcf2f # v0.76.0`;
+  assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${step}\n`), {
+    kind: "composite",
+    sha: "ebd0e3bed99ae1365fcb4ef47ce97cfa745fcf2f",
+  });
+});
+
+test("a self-repository `$/` reference to report-ci-status resolves to main", () => {
+  assert.deepEqual(detectArtifactPin(`        uses: $/${REPORT_DIRECTORY}\n`), {
+    kind: "composite",
+    sha: "main",
+    local: true,
+  });
+  assert.equal(detectArtifactPin(`      # - uses: $/${REPORT_DIRECTORY}\n`), null);
 });
 
 test("the composite wins when a repository carries both mid-transition", () => {
