@@ -49,6 +49,6 @@ and tracks its own convention,
 either at the same path or in `docs/conventions/source-control.yaml`, which the
 guardrails resolver reads first. claude-code-plugins does the latter.
 
-Rollback: remove the component from the targets and the manifest. The sync
-never deletes a file, so each target then deletes its copy in a repository
-pull request; until it does, the copy keeps enforcing.
+Rollback: remove the component from the targets and the manifest. Deselecting
+a component never deletes its file, so each target then deletes its copy in a
+repository pull request; until it does, the copy keeps enforcing.

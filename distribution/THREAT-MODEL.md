@@ -22,8 +22,9 @@ requirements to protect source integrity, provenance, and release inputs.
   non-regular, unmerged, or directory-shaped destination.
 - All destinations pass preflight before the first copy, and locally owned
   files are never materialized.
-- The engine does not delete, stage, commit, push, authenticate, or infer
-  adoption from repository access.
+- The engine does not stage, commit, push, authenticate, or infer adoption
+  from repository access. It deletes only a managed component's tracked
+  `previous-destinations` (see the relocation limitation below).
 
 Protected assets are canonical component bytes and executable modes, manifest
 ownership and dependency declarations, downstream locally owned content,

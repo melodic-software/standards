@@ -74,7 +74,7 @@ The contract test holds the boundary mechanically: a target that manages a
 `components/claude-lanes/`-sourced caller must manage the fleet-routed guard
 and not the hosted one, and no target manages both.
 
-The sync never deletes a file. `claude-code-proxy` managed the hosted caller
+Deselecting a component never deletes its file. `claude-code-proxy` managed the hosted caller
 before the fleet-routed one existed, so its old
 `.github/workflows/managed-files-guard.yml` stays until a one-time
 claude-code-proxy pull request deletes it. Until then both workflows there

@@ -135,9 +135,9 @@ renaming, find each of these and change it in the same rollout:
 2. **Runner policy.** The runner-policy contract is keyed by the reusable
    workflow's bare path and fails closed on an unknown path. A renamed reusable
    needs a contract under its new path before any consumer calls it.
-3. **Synced files.** The standards sync never deletes a file. When a synced
-   destination moves, the sync change for each target also deletes the old
-   path, or both copies run.
+3. **Synced files.** When a synced destination moves, list the old path under
+   the component's `previous-destinations` in `distribution/sync-manifest.yml`,
+   so each target's sync PR deletes it, or both copies run.
 4. **`workflow_run` triggers** are keyed on the triggering workflow's `name:`.
    Changing that `name:` silently stops them; update `workflows:` in the same
    change.

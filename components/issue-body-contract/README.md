@@ -18,9 +18,9 @@ slice `/work-items:decompose` publishes. Everything that writes or checks an iss
 
 Edit `contract.json`, run `node components/issue-body-contract/issue-forms.mjs write`, and commit
 both. `npm run lint:issue-forms` fails CI when the committed forms differ from what the contract
-generates; `npm run test:issue-forms` holds the generator and the contract rules. Keep each form's
-file name: the sync never deletes, so a renamed form leaves the old one in the template chooser
-until a pull request in the target removes it.
+generates; `npm run test:issue-forms` holds the generator and the contract rules. When a form's
+file name changes, list the old destination under the component's `previous-destinations` in
+`distribution/sync-manifest.yml`, or the old form stays in each target's template chooser.
 
 ## Rules the contract keeps
 
