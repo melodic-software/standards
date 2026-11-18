@@ -10,15 +10,9 @@ import Ajv2020 from "ajv/dist/2020.js";
 // distribution/sync-manifest.yml is gated by that engine.
 const schemaPath = new URL("./sync-manifest.schema.json", import.meta.url);
 const schema = JSON.parse(await readFile(schemaPath, "utf8"));
-const source = await new Promise((resolve, reject) => {
-  let value = "";
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", (chunk) => {
-    value += chunk;
-  });
-  process.stdin.on("end", () => resolve(value));
-  process.stdin.on("error", reject);
-});
+process.stdin.setEncoding("utf8");
+let source = "";
+for await (const chunk of process.stdin) source += chunk;
 
 let manifest;
 try {

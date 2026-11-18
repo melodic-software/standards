@@ -36,9 +36,9 @@ jq empty "$base" >/dev/null 2>&1 || {
 # that is not an object (jq -e then exits 5, the same code as a parse error).
 CHECK_RC=0
 check_one() {
-  local cand="$1" label="$2" jq_rc=0
+  local cand="$1" label="$2"
   CHECK_RC=0
-  jq -e --slurpfile b "$base" '
+  if jq -e --slurpfile b "$base" '
       (.extraKnownMarketplaces.["melodic-software"].source.repo
         == $b[0].extraKnownMarketplaces.["melodic-software"].source.repo)
       and ([.hooks.SessionStart[]?
@@ -52,8 +52,7 @@ check_one() {
                             | test("^bash[[:space:]]+\"\\$CLAUDE_PROJECT_DIR/\\.claude/cloud-bootstrap\\.sh\""))
                         )] | length > 0)
               )] | length > 0)
-    ' "$cand" >/dev/null 2>&1 || jq_rc=$?
-  if [[ "$jq_rc" -eq 0 ]]; then
+    ' "$cand" >/dev/null 2>&1; then
     return 0
   fi
   jq empty "$cand" >/dev/null 2>&1 || {

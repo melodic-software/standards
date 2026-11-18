@@ -76,20 +76,19 @@ function trim(value) {
   return value.replace(/^[ \t\n\v\f\r]+/, "").replace(/[ \t\n\v\f\r]+$/, "");
 }
 
+// The per-segment alphabet also rejects absolute, drive-letter, backslash,
+// empty-segment, and control-character paths.
 function isSafeRepoPath(p) {
   if (!p) return false;
-  if (p.startsWith("/")) return false;
-  if (/^[A-Za-z]:/.test(p)) return false;
-  if (p.includes("\\")) return false;
-  if (p.endsWith("/")) return false;
-  if (p.includes("//")) return false;
-  if (CONTROL_RE.test(p)) return false;
-  for (const segment of p.split("/")) {
-    if (!segment || segment === "." || segment === "..") return false;
-    if (!/^[A-Za-z0-9._-]+$/.test(segment)) return false;
-    if (segment.toLowerCase() === ".git") return false;
-  }
-  return true;
+  return p
+    .split("/")
+    .every(
+      (segment) =>
+        /^[A-Za-z0-9._-]+$/.test(segment) &&
+        segment !== "." &&
+        segment !== ".." &&
+        segment.toLowerCase() !== ".git",
+    );
 }
 
 function isDirectory(p) {
@@ -116,12 +115,19 @@ function realPath(p) {
   return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
 }
 
+// The worktree root containing dir, or null when git cannot report one.
+function gitToplevel(dir) {
+  const probe = runGit(["-C", dir, "rev-parse", "--show-toplevel"]);
+  if (probe.error || probe.status !== 0) return null;
+  return probe.stdout.replace(/\r?\n$/, "");
+}
+
 function canonicalGitRoot(requested) {
   if (!isDirectory(requested)) die(`Git root does not exist: ${requested}`);
   const physical = realPath(requested);
-  const probe = runGit(["-C", physical, "rev-parse", "--show-toplevel"]);
-  if (probe.error || probe.status !== 0) die(`not a Git worktree: ${requested}`);
-  const gitRoot = realPath(probe.stdout.replace(/\r?\n$/, ""));
+  const toplevel = gitToplevel(physical);
+  if (toplevel === null) die(`not a Git worktree: ${requested}`);
+  const gitRoot = realPath(toplevel);
   if (physical !== gitRoot) {
     die(`path must be the Git worktree root (got ${physical}, root is ${gitRoot})`);
   }
@@ -148,22 +154,22 @@ function resetIndexCache() {
 // Load Git index rows for one or more literal paths in a single ls-files call.
 // Directory-shaped pathspecs may also select descendants; only rows whose
 // recorded path exactly equals a requested path are attributed to that path.
+function useIndexCacheRoot(root) {
+  if (indexCacheRoot === root) return;
+  resetIndexCache();
+  indexCacheRoot = root;
+}
+
 function prefetchIndexEntries(root, paths) {
   if (paths.length === 0) return true;
-  if (indexCacheRoot !== root) {
-    resetIndexCache();
-    indexCacheRoot = root;
-  }
-  const want = new Set();
-  const toFetch = [];
-  for (const p of paths) {
-    if (indexEntryLoaded.has(p)) continue;
-    want.add(p);
-    toFetch.push(p);
+  useIndexCacheRoot(root);
+  const toFetch = [...new Set(paths)].filter((p) => !indexEntryLoaded.has(p));
+  for (const p of toFetch) {
     indexEntryLoaded.add(p);
     indexEntryCache.set(p, []);
   }
   if (toFetch.length === 0) return true;
+  const want = new Set(toFetch);
   const result = runGit([
     "-C",
     root,
@@ -199,17 +205,8 @@ function readExactIndexEntries(root, p) {
 
 function prefetchWorktreeHashes(root, paths) {
   if (paths.length === 0) return true;
-  if (indexCacheRoot !== root) {
-    resetIndexCache();
-    indexCacheRoot = root;
-  }
-  const toHash = [];
-  const claimed = new Set();
-  for (const p of paths) {
-    if (worktreeHashCache.has(p) || claimed.has(p)) continue;
-    claimed.add(p);
-    toHash.push(p);
-  }
+  useIndexCacheRoot(root);
+  const toHash = [...new Set(paths)].filter((p) => !worktreeHashCache.has(p));
   if (toHash.length === 0) return true;
   const result = runGit(["-C", root, "hash-object", "--no-filters", "--", ...toHash]);
   if (result.error || result.status !== 0) return false;
@@ -241,13 +238,8 @@ function assertTrackedRegularShape(root, p, purpose) {
 
 function trackedRegularMode(root, p, purpose) {
   const [mode, object] = assertTrackedRegularShape(root, p, purpose);
-  let worktreeObject = worktreeHashCache.get(p);
-  if (worktreeObject === undefined) {
-    if (!prefetchWorktreeHashes(root, [p])) {
-      die(`could not hash ${purpose} worktree file: ${p}`);
-    }
-    worktreeObject = worktreeHashCache.get(p);
-  }
+  if (!worktreeHashCache.has(p)) prefetchWorktreeHashes(root, [p]);
+  const worktreeObject = worktreeHashCache.get(p);
   if (worktreeObject === undefined) {
     die(`could not hash ${purpose} worktree file: ${p}`);
   }
@@ -372,15 +364,14 @@ function hasDuplicateMapKey(node) {
 function assertSortedUnique(label, values) {
   const seen = new Set();
   let previous = "";
-  let first = true;
   for (const value of values) {
     if (!value) die(`${label} contains an empty element`);
     if (seen.has(value)) die(`${label} contains duplicate '${value}'`);
     seen.add(value);
-    if (!first && previous > value) {
+    // previous starts empty, which sorts before every non-empty value.
+    if (previous > value) {
       die(`${label} must be sorted ('${previous}' appears before '${value}')`);
     }
-    first = false;
     previous = value;
   }
 }
@@ -410,24 +401,42 @@ const managedByTarget = new Map();
 const localByTarget = new Map();
 const automergeByTarget = new Map();
 
+// Check every node is a string scalar free of control characters (in that
+// order, across all nodes) and return the string values.
+function stringValues(label, nodes) {
+  if (!nodes.every((node) => tagOf(node) === "!!str")) die(`${label} must be strings`);
+  if (nodes.some((node) => CONTROL_RE.test(node.value))) {
+    die(`${label} may not contain control characters`);
+  }
+  return nodes.map((node) => node.value);
+}
+
+function mapKeyValues(label, mapNode) {
+  return stringValues(
+    label,
+    mapNode.items.map((item) => deref(item.key)),
+  );
+}
+
+// A non-empty, sorted, duplicate-free sequence of strings.
+function stringSeq(seqNode, shapeMessage, entriesLabel, sortedLabel) {
+  const node = deref(seqNode);
+  if (!isSeqShaped(node) || node.items.length === 0) die(shapeMessage);
+  const values = stringValues(
+    entriesLabel,
+    node.items.map((item) => deref(item)),
+  );
+  assertSortedUnique(sortedLabel, values);
+  return values;
+}
+
 function checkRecordShell(kind, name, valueNode) {
   const node = deref(valueNode);
   if (!isMapShaped(node)) die(`${kind} '${name}' must be a mapping`);
   if (node.items.some((item) => tagOf(item.key) === "!!merge")) {
     die(`${kind} '${name}' merge keys are not supported`);
   }
-  const keyNodes = node.items.map((item) => deref(item.key));
-  if (!keyNodes.every((key) => tagOf(key) === "!!str")) {
-    die(`${kind} '${name}' keys must be strings`);
-  }
-  if (!keyNodes.every((key) => !CONTROL_RE.test(key.value))) {
-    die(`${kind} '${name}' keys may not contain control characters`);
-  }
-  return { node, keys: keyNodes.map((key) => key.value) };
-}
-
-function stringSeqRows(seqNode) {
-  return mapItems(seqNode).map((item) => deref(item));
+  return { node, keys: mapKeyValues(`${kind} '${name}' keys`, node) };
 }
 
 function validateManifest(sourceRoot, manifest, manifestAbs) {
@@ -452,13 +461,12 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   if (!isMapShaped(root)) die("manifest root must be a mapping");
   if (hasDuplicateMapKey(root)) die("manifest contains a duplicate mapping key");
 
+  const rootKeys = ["version", "components", "targets"];
   for (const item of root.items) {
     const key = scalarKeyString(item.key);
-    if (key !== "version" && key !== "components" && key !== "targets") {
-      die(`manifest root contains unknown key '${key}'`);
-    }
+    if (!rootKeys.includes(key)) die(`manifest root contains unknown key '${key}'`);
   }
-  for (const key of ["version", "components", "targets"]) {
+  for (const key of rootKeys) {
     if (!mapHasKey(root, key)) die(`manifest root is missing '${key}'`);
   }
   const versionNode = deref(findMapValue(root, "version"));
@@ -473,22 +481,9 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   if (!isMapShaped(targetsNode) || targetsNode.items.length === 0) {
     die("targets must be a non-empty mapping");
   }
-  if (!componentsNode.items.every((item) => tagOf(item.key) === "!!str")) {
-    die("component names must be strings");
-  }
-  if (!componentsNode.items.every((item) => !CONTROL_RE.test(deref(item.key).value))) {
-    die("component names may not contain control characters");
-  }
-  if (!targetsNode.items.every((item) => tagOf(item.key) === "!!str")) {
-    die("target names must be strings");
-  }
-  if (!targetsNode.items.every((item) => !CONTROL_RE.test(deref(item.key).value))) {
-    die("target names may not contain control characters");
-  }
+  componentNames.push(...mapKeyValues("component names", componentsNode));
+  targetNames.push(...mapKeyValues("target names", targetsNode));
 
-  for (const item of componentsNode.items) {
-    componentNames.push(deref(item.key).value);
-  }
   assertSortedUnique("component names", componentNames);
   for (const component of componentNames) {
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(component)) {
@@ -515,13 +510,11 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
       die(`component '${component}' file paths may not contain control characters`);
     }
     const fileRows = fileEntryNodes.map(([k, v]) => [k.value, v.value]);
-    const fileSources = [];
-    for (const [source] of fileRows) {
+    const fileSources = fileRows.map(([source]) => source);
+    for (const source of fileSources) {
       if (!source) die(`component '${component}' has unsafe source path '${source}'`);
-      fileSources.push(source);
     }
     assertSortedUnique(`component '${component}' file sources`, fileSources);
-    const rows = [];
     for (const [source, destination] of fileRows) {
       if (!isSafeRepoPath(source)) {
         die(`component '${component}' has unsafe source path '${source}'`);
@@ -546,25 +539,17 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
         }
       }
       destinationOwner.set(destination, component);
-      rows.push([source, destination]);
     }
-    filesByComponent.set(component, rows);
+    filesByComponent.set(component, fileRows);
 
-    requiresByComponent.set(component, []);
+    let dependencies = [];
     if (keys.includes("requires")) {
-      const requiresNode = deref(findMapValue(node, "requires"));
-      if (!isSeqShaped(requiresNode) || requiresNode.items.length === 0) {
-        die(`component '${component}' requires must be a non-empty sequence`);
-      }
-      const depNodes = stringSeqRows(requiresNode);
-      if (!depNodes.every((dep) => tagOf(dep) === "!!str")) {
-        die(`component '${component}' dependencies must be strings`);
-      }
-      if (!depNodes.every((dep) => !CONTROL_RE.test(dep.value))) {
-        die(`component '${component}' dependencies may not contain control characters`);
-      }
-      const dependencies = depNodes.map((dep) => dep.value);
-      assertSortedUnique(`component '${component}' dependencies`, dependencies);
+      dependencies = stringSeq(
+        findMapValue(node, "requires"),
+        `component '${component}' requires must be a non-empty sequence`,
+        `component '${component}' dependencies`,
+        `component '${component}' dependencies`,
+      );
       for (const dependency of dependencies) {
         if (!componentExists.has(dependency)) {
           die(`component '${component}' requires unknown component '${dependency}'`);
@@ -572,20 +557,18 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
         if (dependency === component) {
           die(`component '${component}' may not require itself`);
         }
-        requiresByComponent.get(component).push(dependency);
       }
     }
+    requiresByComponent.set(component, dependencies);
   }
 
-  const uniqueSources = [];
-  const sourceSeen = new Set();
-  for (const component of componentNames) {
-    for (const [source] of filesByComponent.get(component)) {
-      if (sourceSeen.has(source)) continue;
-      sourceSeen.add(source);
-      uniqueSources.push(source);
-    }
-  }
+  const uniqueSources = [
+    ...new Set(
+      componentNames.flatMap((component) =>
+        filesByComponent.get(component).map(([source]) => source),
+      ),
+    ),
+  ];
   resetIndexCache();
   if (!prefetchIndexEntries(sourceRoot, [manifest, ...uniqueSources])) {
     die(`could not inspect Git index path: ${manifest}`);
@@ -626,9 +609,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   };
   for (const component of componentNames) visitComponent(component);
 
-  for (const item of targetsNode.items) {
-    targetNames.push(deref(item.key).value);
-  }
   assertSortedUnique("target names", targetNames);
   for (const target of targetNames) {
     if (!/^[a-z0-9][a-z0-9-]*\/[a-z0-9._-]+$/.test(target)) {
@@ -642,35 +622,21 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     const { node, keys } = checkRecordShell("target", target, item.value);
     validateRecordKeys(`target '${target}'`, "managed", ["locally-owned", "automerge"], keys);
 
-    const managedNode = deref(findMapValue(node, "managed"));
-    if (!isSeqShaped(managedNode) || managedNode.items.length === 0) {
-      die(`target '${target}' managed must be a non-empty sequence`);
-    }
-    const managedNodes = stringSeqRows(managedNode);
-    if (!managedNodes.every((entry) => tagOf(entry) === "!!str")) {
-      die(`target '${target}' managed entries must be strings`);
-    }
-    if (!managedNodes.every((entry) => !CONTROL_RE.test(entry.value))) {
-      die(`target '${target}' managed entries may not contain control characters`);
-    }
-    const managed = managedNodes.map((entry) => entry.value);
-    assertSortedUnique(`target '${target}' managed components`, managed);
+    const managed = stringSeq(
+      findMapValue(node, "managed"),
+      `target '${target}' managed must be a non-empty sequence`,
+      `target '${target}' managed entries`,
+      `target '${target}' managed components`,
+    );
 
     let locallyOwned = [];
     if (keys.includes("locally-owned")) {
-      const localNode = deref(findMapValue(node, "locally-owned"));
-      if (!isSeqShaped(localNode) || localNode.items.length === 0) {
-        die(`target '${target}' locally-owned must be a non-empty sequence when present`);
-      }
-      const localNodes = stringSeqRows(localNode);
-      if (!localNodes.every((entry) => tagOf(entry) === "!!str")) {
-        die(`target '${target}' locally-owned entries must be strings`);
-      }
-      if (!localNodes.every((entry) => !CONTROL_RE.test(entry.value))) {
-        die(`target '${target}' locally-owned entries may not contain control characters`);
-      }
-      locallyOwned = localNodes.map((entry) => entry.value);
-      assertSortedUnique(`target '${target}' locally-owned components`, locallyOwned);
+      locallyOwned = stringSeq(
+        findMapValue(node, "locally-owned"),
+        `target '${target}' locally-owned must be a non-empty sequence when present`,
+        `target '${target}' locally-owned entries`,
+        `target '${target}' locally-owned components`,
+      );
     }
 
     // Absent means true: automerge is opt-out policy-as-data, so a target that
@@ -694,14 +660,11 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     automergeByTarget.set(target, automergeValue);
 
     const selected = new Set();
-    managedByTarget.set(target, []);
-    localByTarget.set(target, []);
     for (const component of managed) {
       if (!componentExists.has(component)) {
         die(`target '${target}' manages unknown component '${component}'`);
       }
       selected.add(component);
-      managedByTarget.get(target).push(component);
     }
     for (const component of locallyOwned) {
       if (!componentExists.has(component)) {
@@ -711,8 +674,9 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
         die(`target '${target}' lists '${component}' as both managed and locally-owned`);
       }
       selected.add(component);
-      localByTarget.get(target).push(component);
     }
+    managedByTarget.set(target, managed);
+    localByTarget.set(target, locallyOwned);
 
     // A locally-owned implementation may satisfy a managed component's required
     // capability, but its own internal dependency closure remains downstream's.
@@ -732,21 +696,15 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   // selected component. An unreferenced definition is dead weight the catalog
   // silently carries; delete it or adopt it.
   const reachable = new Set();
-  const reachableQueue = [];
-  for (const target of targetNames) {
-    for (const component of [...managedByTarget.get(target), ...localByTarget.get(target)]) {
-      if (reachable.has(component)) continue;
-      reachable.add(component);
-      reachableQueue.push(component);
-    }
-  }
+  const reachableQueue = targetNames.flatMap((target) => [
+    ...managedByTarget.get(target),
+    ...localByTarget.get(target),
+  ]);
   while (reachableQueue.length > 0) {
     const component = reachableQueue.pop();
-    for (const dependency of requiresByComponent.get(component) ?? []) {
-      if (reachable.has(dependency)) continue;
-      reachable.add(dependency);
-      reachableQueue.push(dependency);
-    }
+    if (reachable.has(component)) continue;
+    reachable.add(component);
+    reachableQueue.push(...(requiresByComponent.get(component) ?? []));
   }
   for (const component of componentNames) {
     if (!reachable.has(component)) {
@@ -776,8 +734,7 @@ function selectTargets(filter) {
 
 function emitMatrix(selected) {
   const rows = selected.map((target) => {
-    const owner = target.slice(0, target.indexOf("/"));
-    const repo = target.slice(owner.length + 1);
+    const [owner, repo] = target.split("/");
     return `{"repo":"${target}","repo_owner":"${owner}","repo_name":"${repo}","automerge":${automergeByTarget.get(target)}}`;
   });
   process.stdout.write(`{"include":[${rows.join(",")}]}\n`);
@@ -805,11 +762,7 @@ function emitManagedDestPaths(target) {
       seen.add(destination);
     }
   }
-  const paths = [...seen].sort((a, b) => {
-    if (a < b) return -1;
-    if (a > b) return 1;
-    return 0;
-  });
+  const paths = [...seen].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   for (const destination of paths) process.stdout.write(`${destination}\n`);
 }
 
@@ -848,32 +801,30 @@ function verifyTargetIdentity(targetRoot, expected) {
     /^git@github\.com:([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/.exec(url) ??
     /^ssh:\/\/git@github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/.exec(url);
   if (!match) die(`target origin is not an approved GitHub repository URL: ${url}`);
-  let identity = `${match[1]}/${match[2]}`;
-  identity = identity.replace(/\.git$/, "");
+  const identity = `${match[1]}/${match[2]}`.replace(/\.git$/, "");
   if (identity.toLowerCase() !== expected) {
     die(`target origin identifies '${identity}', expected '${expected}'`);
   }
 }
 
+// Every ancestor directory of a safe repo path, outermost first.
+function parentPrefixes(destination) {
+  const segments = destination.split("/").slice(0, -1);
+  return segments.map((_, i) => segments.slice(0, i + 1).join("/"));
+}
+
 function preflightDestination(targetRoot, destination) {
-  const parent = destination.includes("/")
-    ? destination.slice(0, destination.lastIndexOf("/"))
-    : "";
-  if (parent) {
-    let prefix = "";
-    for (const segment of parent.split("/")) {
-      prefix = prefix ? `${prefix}/${segment}` : segment;
-      const stat = lstatOrNull(path.join(targetRoot, prefix));
-      if (stat?.isSymbolicLink()) {
-        die(`destination parent is a symlink: ${prefix}`);
-      }
-      if (stat && !stat.isDirectory()) {
-        die(`destination parent is not a directory: ${prefix}`);
-      }
-      const entries = readExactIndexEntries(targetRoot, prefix);
-      if (entries.length !== 0) {
-        die(`destination parent is a tracked non-directory entry: ${prefix}`);
-      }
+  for (const prefix of parentPrefixes(destination)) {
+    const stat = lstatOrNull(path.join(targetRoot, prefix));
+    if (stat?.isSymbolicLink()) {
+      die(`destination parent is a symlink: ${prefix}`);
+    }
+    if (stat && !stat.isDirectory()) {
+      die(`destination parent is not a directory: ${prefix}`);
+    }
+    const entries = readExactIndexEntries(targetRoot, prefix);
+    if (entries.length !== 0) {
+      die(`destination parent is a tracked non-directory entry: ${prefix}`);
     }
   }
   const stat = lstatOrNull(path.join(targetRoot, destination));
@@ -903,54 +854,27 @@ function applyTarget(sourceRoot, target, targetRootRequested) {
   verifyTargetIdentity(targetRoot, target);
   const components = managedByTarget.get(target);
 
-  const indexPaths = [];
-  const indexPathSeen = new Set();
-  const queueDestinationIndexPath = (p) => {
-    if (indexPathSeen.has(p)) return;
-    indexPathSeen.add(p);
-    indexPaths.push(p);
-  };
-  for (const component of components) {
-    for (const [, destination] of filesByComponent.get(component)) {
-      const parent = destination.includes("/")
-        ? destination.slice(0, destination.lastIndexOf("/"))
-        : "";
-      if (parent) {
-        let prefix = "";
-        for (const segment of parent.split("/")) {
-          prefix = prefix ? `${prefix}/${segment}` : segment;
-          queueDestinationIndexPath(prefix);
-        }
-      }
-      queueDestinationIndexPath(destination);
-    }
-  }
-  if (indexPaths.length > 0) {
-    if (!prefetchIndexEntries(targetRoot, indexPaths)) {
-      die(`could not inspect Git index path: ${indexPaths[0]}`);
-    }
+  const mappings = components.flatMap((component) => filesByComponent.get(component));
+  const indexPaths = [
+    ...new Set(
+      mappings.flatMap(([, destination]) => [...parentPrefixes(destination), destination]),
+    ),
+  ];
+  if (indexPaths.length > 0 && !prefetchIndexEntries(targetRoot, indexPaths)) {
+    die(`could not inspect Git index path: ${indexPaths[0]}`);
   }
   // Validate all destinations before the first mutation. A later I/O error stops
   // the workflow before PR creation, so no partial component update is published.
-  const sources = [];
-  const destinations = [];
-  const modes = [];
-  for (const component of components) {
-    for (const [source, destination] of filesByComponent.get(component)) {
-      preflightDestination(targetRoot, destination);
-      sources.push(source);
-      destinations.push(destination);
-      modes.push(sourceModes.get(source));
-    }
-  }
-  for (let i = 0; i < sources.length; i += 1) {
-    const destinationAbs = path.join(targetRoot, destinations[i]);
+  for (const [, destination] of mappings) preflightDestination(targetRoot, destination);
+  for (const [source, destination] of mappings) {
+    const mode = sourceModes.get(source);
+    const destinationAbs = path.join(targetRoot, destination);
     fs.mkdirSync(path.dirname(destinationAbs), { recursive: true });
-    fs.copyFileSync(path.join(sourceRoot, sources[i]), destinationAbs);
-    if (modes[i] === "100644") fs.chmodSync(destinationAbs, 0o644);
-    else if (modes[i] === "100755") fs.chmodSync(destinationAbs, 0o755);
-    else die(`internal error: unsupported validated mode '${modes[i]}'`);
-    process.stdout.write(`synced ${sources[i]} -> ${destinations[i]} (${modes[i]})\n`);
+    fs.copyFileSync(path.join(sourceRoot, source), destinationAbs);
+    if (mode === "100644") fs.chmodSync(destinationAbs, 0o644);
+    else if (mode === "100755") fs.chmodSync(destinationAbs, 0o755);
+    else die(`internal error: unsupported validated mode '${mode}'`);
+    process.stdout.write(`synced ${source} -> ${destination} (${mode})\n`);
   }
 }
 
@@ -973,32 +897,18 @@ function main() {
   }
 
   const scriptDir = realPath(path.dirname(fileURLToPath(import.meta.url)));
-  const rootProbe = runGit(["-C", scriptDir, "rev-parse", "--show-toplevel"]);
-  let sourceRoot =
-    rootProbe.error || rootProbe.status !== 0 ? "" : rootProbe.stdout.replace(/\r?\n$/, "");
-  let manifest = DEFAULT_MANIFEST;
-  let targetsFilter = "";
-  let target = "";
-  let targetRoot = "";
-  // if/else rather than switch: the CI-pinned biome (2.5.1) misinfers every
-  // case label on a switch over an argv-derived string as unreachable.
+  const options = {
+    "--source-root": gitToplevel(scriptDir) ?? "",
+    "--manifest": DEFAULT_MANIFEST,
+    "--targets": "",
+    "--target": "",
+    "--target-root": "",
+  };
   while (argv.length > 0) {
     const argument = argv.shift() ?? "";
-    if (argument === "--source-root") {
-      if (argv.length < 1) die("--source-root requires a value");
-      sourceRoot = argv.shift() ?? "";
-    } else if (argument === "--manifest") {
-      if (argv.length < 1) die("--manifest requires a value");
-      manifest = argv.shift() ?? "";
-    } else if (argument === "--targets") {
-      if (argv.length < 1) die("--targets requires a value");
-      targetsFilter = argv.shift() ?? "";
-    } else if (argument === "--target") {
-      if (argv.length < 1) die("--target requires a value");
-      target = argv.shift() ?? "";
-    } else if (argument === "--target-root") {
-      if (argv.length < 1) die("--target-root requires a value");
-      targetRoot = argv.shift() ?? "";
+    if (Object.hasOwn(options, argument)) {
+      if (argv.length < 1) die(`${argument} requires a value`);
+      options[argument] = argv.shift() ?? "";
     } else if (argument === "-h" || argument === "--help") {
       usage(process.stdout);
       process.exit(0);
@@ -1006,9 +916,15 @@ function main() {
       die(`unknown argument '${argument}'`);
     }
   }
+  const {
+    "--manifest": manifest,
+    "--targets": targetsFilter,
+    "--target": target,
+    "--target-root": targetRoot,
+  } = options;
 
   requireCommand("git");
-  sourceRoot = canonicalGitRoot(sourceRoot);
+  const sourceRoot = canonicalGitRoot(options["--source-root"]);
   if (!isSafeRepoPath(manifest)) die(`unsafe manifest path '${manifest}'`);
   const manifestAbs = path.join(sourceRoot, manifest);
 
@@ -1029,8 +945,6 @@ function main() {
     if (targetsFilter) die("apply does not accept --targets");
     if (!target) die("apply requires --target OWNER/REPO");
     if (!targetRoot) die("apply requires --target-root DIR");
-  } else {
-    die(`internal error: unsupported command '${command}'`);
   }
 
   validateManifest(sourceRoot, manifest, manifestAbs);
@@ -1052,8 +966,6 @@ function main() {
   } else if (command === "apply") {
     if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
     applyTarget(sourceRoot, target, targetRoot);
-  } else {
-    die(`internal error: unsupported command '${command}'`);
   }
 }
 
