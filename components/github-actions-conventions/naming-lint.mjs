@@ -76,7 +76,7 @@ export function validateVocabulary(vocabulary, location = "vocabulary") {
       `${location} does not match vocabulary.schema.json: ${error.instancePath || "/"} ${error.message}`,
     );
   }
-  const stages = vocabulary.stages.map((stage) => stage.name);
+  const stages = stageNames(vocabulary);
   if (new Set(stages).size !== stages.length) {
     throw new ConfigurationError(`${location} lists a stage twice`);
   }
@@ -136,13 +136,22 @@ function longestPrefix(candidates, text) {
     .sort((left, right) => right.length - left.length)[0];
 }
 
+function stageNames(vocabulary) {
+  return vocabulary.stages.map((entry) => entry.name);
+}
+
+function leadingStage(name, vocabulary) {
+  return longestPrefix(stageNames(vocabulary), name);
+}
+
+function scalarText(node) {
+  return isScalar(node) ? String(node.value) : undefined;
+}
+
 // Splits `<stage>-<function>[-<modifier>]`. Returns undefined members for the
 // part that does not match, so callers can say which part is wrong.
 export function parseSlotName(name, vocabulary) {
-  const stage = longestPrefix(
-    vocabulary.stages.map((entry) => entry.name),
-    name,
-  );
+  const stage = leadingStage(name, vocabulary);
   if (stage === undefined || name === stage) {
     return { stage };
   }
@@ -280,10 +289,7 @@ export function checkActivityName(name, vocabulary) {
   // Only a leading stage word repeats the slot (`pr-explainer` in slot
   // `pr-verify`). A stage word later in the name is an ordinary word, as in
   // `check-release-readiness`.
-  const stage = longestPrefix(
-    vocabulary.stages.map((entry) => entry.name),
-    activity,
-  );
+  const stage = leadingStage(activity, vocabulary);
   if (stage !== undefined) {
     return `activity \`${name}\` starts with the stage word \`${stage}\``;
   }
@@ -320,7 +326,7 @@ function checkWorkflowFilename(stem, vocabulary) {
   if (parsed.stage === undefined) {
     return (
       `file name \`${stem}\` must start with a stage word ` +
-      `(${vocabulary.stages.map((entry) => entry.name).join(", ")})`
+      `(${stageNames(vocabulary).join(", ")})`
     );
   }
   if (parsed.function === undefined) {
@@ -345,10 +351,7 @@ function checkJobId(file, id, line, vocabulary) {
   ) {
     return undefined;
   }
-  const stage = longestPrefix(
-    vocabulary.stages.map((entry) => entry.name),
-    id,
-  );
+  const stage = leadingStage(id, vocabulary);
   if (stage !== undefined) {
     return finding(
       "warning",
@@ -446,7 +449,7 @@ async function workflowFindings(root, repository, vocabulary) {
     }
 
     const nameNode = document.contents.get("name", true);
-    const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
+    const name = scalarText(nameNode);
     const nameExemption = waived("workflow-name");
     const titleCase = titleCaseName(stem, vocabulary.displayWords);
     // A recorded exception is exact: it takes neither the stem nor its Title
@@ -481,11 +484,7 @@ async function workflowFindings(root, repository, vocabulary) {
         }
         const job = isMap(pair.value) ? pair.value : undefined;
         const jobNameNode = job?.get("name", true);
-        const jobNameProblem = checkJobName(
-          id,
-          isScalar(jobNameNode) ? String(jobNameNode.value) : undefined,
-          vocabulary,
-        );
+        const jobNameProblem = checkJobName(id, scalarText(jobNameNode), vocabulary);
         if (jobNameProblem !== undefined) {
           findings.push(
             finding(
@@ -591,7 +590,7 @@ async function actionMetadataFindings(root, file, directory, vocabulary) {
   }
   const findings = [];
   const nameNode = document.contents.get("name", true);
-  const name = isScalar(nameNode) ? String(nameNode.value) : undefined;
+  const name = scalarText(nameNode);
   const expected = titleCaseName(directory, vocabulary.displayWords);
   if (name !== expected) {
     findings.push(
@@ -643,11 +642,8 @@ export async function lintRepository({
       item.level = "warning";
     }
   }
-  return findings.sort((left, right) =>
-    [left.file, String(left.line).padStart(6, "0"), left.rule]
-      .join("\0")
-      .localeCompare([right.file, String(right.line).padStart(6, "0"), right.rule].join("\0")),
-  );
+  const sortKey = (item) => [item.file, String(item.line).padStart(6, "0"), item.rule].join("\0");
+  return findings.sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
 }
 
 function escapeData(text) {

@@ -52,6 +52,22 @@ function rules(findings) {
   return findings.map((item) => `${item.entry ?? item.file}:${item.rule}`).sort();
 }
 
+const COOLDOWN = "    cooldown:\n      default-days: 3\n";
+
+// CONFORMANT with extra keys appended to its cooldown block.
+function withCooldown(extra) {
+  return CONFORMANT.replace(COOLDOWN, `${COOLDOWN}${extra}`);
+}
+
+// CONFORMANT with its groups block replaced.
+function withGroups(groups) {
+  return CONFORMANT.replace(/ {4}groups:\n[\s\S]*$/u, `    groups:\n${groups}`);
+}
+
+function rejectsConfiguration(promise, message) {
+  return assert.rejects(promise, (error) => error instanceof ConfigurationError, message);
+}
+
 test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { force: true, recursive: true })));
 });
@@ -151,37 +167,25 @@ test("a cooldown below the floor is flagged", async () => {
 });
 
 test("a match-all cooldown exclude bypasses the soak and is flagged", async () => {
-  const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 3\n",
-    '    cooldown:\n      default-days: 3\n      exclude:\n        - "*"\n',
-  );
+  const entry = withCooldown('      exclude:\n        - "*"\n');
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
 });
 
 test("a cooldown include restricts the soak and is flagged", async () => {
-  const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 3\n",
-    '    cooldown:\n      default-days: 3\n      include:\n        - "some-dep"\n',
-  );
+  const entry = withCooldown('      include:\n        - "some-dep"\n');
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-soak-bypassed"]);
 });
 
 test("a narrow first-party cooldown exclude still passes", async () => {
-  const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 3\n",
-    '    cooldown:\n      default-days: 3\n      exclude:\n        - "melodic-software/*"\n',
-  );
+  const entry = withCooldown('      exclude:\n        - "melodic-software/*"\n');
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(await auditRepository({ root }), []);
 });
 
 test("a cooldown waiver also suppresses a bypassed soak", async () => {
-  const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 3\n",
-    '    cooldown:\n      default-days: 3\n      exclude:\n        - "*"\n',
-  );
+  const entry = withCooldown('      exclude:\n        - "*"\n');
   const root = await repository({
     dependabotYaml: dependabot(entry),
     config: {
@@ -234,96 +238,44 @@ test("a zero open-pull-requests-limit disables updates and is flagged", async ()
 });
 
 test("a groups block that only applies to security updates is flagged", async () => {
-  const entry = `  - package-ecosystem: npm
-    directory: /
-    open-pull-requests-limit: 5
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 3
-    groups:
-      security-only:
+  const entry = withGroups(`      security-only:
         applies-to: security-updates
         patterns:
           - "*"
-`;
+`);
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
 });
 
 test("a groups block that explicitly applies to version updates passes", async () => {
-  const entry = `  - package-ecosystem: npm
-    directory: /
-    open-pull-requests-limit: 5
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 3
-    groups:
-      versions:
+  const entry = withGroups(`      versions:
         applies-to: version-updates
         patterns:
           - "*"
-`;
+`);
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(await auditRepository({ root }), []);
 });
 
 test("a version group that excludes every pattern is flagged", async () => {
-  const entry = `  - package-ecosystem: npm
-    directory: /
-    open-pull-requests-limit: 5
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 3
-    groups:
-      versions:
+  const entry = withGroups(`      versions:
         patterns:
           - "*"
         exclude-patterns:
           - "*"
-`;
+`);
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:groups-missing"]);
 });
 
 test("a match-all ignore rule disables updates and is flagged", async () => {
-  const entry = `  - package-ecosystem: npm
-    directory: /
-    open-pull-requests-limit: 5
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 3
-    groups:
-      npm-minor-patch:
-        update-types:
-          - minor
-          - patch
-    ignore:
-      - dependency-name: "*"
-`;
+  const entry = `${CONFORMANT}    ignore:\n      - dependency-name: "*"\n`;
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:ignore-disables-updates"]);
 });
 
 test("a narrow ignore rule still passes", async () => {
-  const entry = `  - package-ecosystem: npm
-    directory: /
-    open-pull-requests-limit: 5
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 3
-    groups:
-      npm-minor-patch:
-        update-types:
-          - minor
-          - patch
-    ignore:
-      - dependency-name: "melodic-software/ci-workflows/*"
-`;
+  const entry = `${CONFORMANT}    ignore:\n      - dependency-name: "melodic-software/ci-workflows/*"\n`;
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(await auditRepository({ root }), []);
 });
@@ -435,10 +387,7 @@ test("an unknown reason, unknown waiver, or missing justification fails closed",
       exceptions: { "npm:/": { reason: "because", justification: "x", waives: ["groups"] } },
     },
   });
-  await assert.rejects(
-    auditRepository({ root: badReason }),
-    (error) => error instanceof ConfigurationError,
-  );
+  await rejectsConfiguration(auditRepository({ root: badReason }));
   const badWaive = await repository({
     dependabotYaml: dependabot(CONFORMANT),
     config: {
@@ -448,10 +397,7 @@ test("an unknown reason, unknown waiver, or missing justification fails closed",
       },
     },
   });
-  await assert.rejects(
-    auditRepository({ root: badWaive }),
-    (error) => error instanceof ConfigurationError,
-  );
+  await rejectsConfiguration(auditRepository({ root: badWaive }));
   const noJustification = await repository({
     dependabotYaml: dependabot(CONFORMANT),
     config: {
@@ -459,10 +405,7 @@ test("an unknown reason, unknown waiver, or missing justification fails closed",
       exceptions: { "npm:/": { reason: "single-tool-ecosystem", waives: ["groups"] } },
     },
   });
-  await assert.rejects(
-    auditRepository({ root: noJustification }),
-    (error) => error instanceof ConfigurationError,
-  );
+  await rejectsConfiguration(auditRepository({ root: noJustification }));
 });
 
 test("an unknown config key fails closed", async () => {
@@ -470,12 +413,12 @@ test("an unknown config key fails closed", async () => {
     dependabotYaml: dependabot(CONFORMANT),
     config: { schemaVersion: 1, exceptions: {}, extra: true },
   });
-  await assert.rejects(auditRepository({ root }), (error) => error instanceof ConfigurationError);
+  await rejectsConfiguration(auditRepository({ root }));
 });
 
 test("a malformed dependabot.yml fails closed", async () => {
   const root = await repository({ dependabotYaml: "version: 2\nupdates: : :\n" });
-  await assert.rejects(auditRepository({ root }), (error) => error instanceof ConfigurationError);
+  await rejectsConfiguration(auditRepository({ root }));
 });
 
 test("a scalar or null update entry is flagged", async () => {
@@ -507,10 +450,7 @@ test("an update entry missing identity keys is flagged", async () => {
 });
 
 test("a semver-specific cooldown below the floor is flagged", async () => {
-  const entry = CONFORMANT.replace(
-    "    cooldown:\n      default-days: 3\n",
-    "    cooldown:\n      default-days: 3\n      semver-patch-days: 0\n",
-  );
+  const entry = withCooldown("      semver-patch-days: 0\n");
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:cooldown-below-minimum"]);
 });
@@ -525,10 +465,7 @@ test("a waiver outside the reason's scope fails closed", async () => {
       },
     },
   });
-  await assert.rejects(
-    auditRepository({ root: single }),
-    (error) => error instanceof ConfigurationError,
-  );
+  await rejectsConfiguration(auditRepository({ root: single }));
   const tracks = await repository({
     dependabotYaml: dependabot(CONFORMANT),
     config: {
@@ -538,10 +475,7 @@ test("a waiver outside the reason's scope fails closed", async () => {
       },
     },
   });
-  await assert.rejects(
-    auditRepository({ root: tracks }),
-    (error) => error instanceof ConfigurationError,
-  );
+  await rejectsConfiguration(auditRepository({ root: tracks }));
 });
 
 test("duplicate JSON members in the config fail closed", () => {
@@ -701,11 +635,7 @@ test("a malformed interval override fails closed", async () => {
   for (const [name, mutate] of cases) {
     const policy = dailyActionsPolicy();
     mutate(policy.scheduleIntervalByEcosystem["github-actions"]);
-    await assert.rejects(
-      auditWithPolicy(policy),
-      (error) => error instanceof ConfigurationError,
-      `${name} must be rejected`,
-    );
+    await rejectsConfiguration(auditWithPolicy(policy), `${name} must be rejected`);
   }
 });
 
@@ -738,51 +668,28 @@ test("a malformed cooldown class or fast-track block fails closed", async () => 
   for (const [name, mutate] of cases) {
     const policy = minimalPolicy();
     mutate(policy);
-    await assert.rejects(
-      auditWithPolicy(policy),
-      (error) => error instanceof ConfigurationError,
-      `${name} must be rejected`,
-    );
+    await rejectsConfiguration(auditWithPolicy(policy), `${name} must be rejected`);
   }
 });
 
 test("an auto-merge publisher key that is not a whole publisher fails closed", async () => {
-  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
   const review = { tier: "auto", reviewed: "2026-10-08", basis: "test" };
-  const policy = {
-    schemaVersion: 2,
-    scheduleInterval: "weekly",
-    cooldownMinimumDays: 3,
-    ...updateClasses(),
-    maxOpenPullRequests: 5,
-    requireGroups: true,
-    autoMerge: {
-      ecosystems: ["github-actions"],
-      publishers: { "actions/checkout": review },
-      reviewOnly: [],
-      excludeSemverMajor: true,
-      requiredCheck: "CI Status",
-    },
-  };
-  const policyPath = path.join(root, "policy.json");
-  await writeFile(policyPath, JSON.stringify(policy));
-  await assert.rejects(
-    auditRepository({ root, policyPath }),
-    (error) => error instanceof ConfigurationError && error.message.includes("publishers"),
-  );
-  policy.autoMerge.publishers = { "actions/*": { ...review, tier: "unknown" } };
-  await writeFile(policyPath, JSON.stringify(policy));
-  await assert.rejects(
-    auditRepository({ root, policyPath }),
-    (error) => error instanceof ConfigurationError && error.message.includes("publishers"),
-  );
+  const policy = minimalPolicy();
+  for (const publishers of [
+    { "actions/checkout": review },
+    { "actions/*": { ...review, tier: "unknown" } },
+  ]) {
+    policy.autoMerge.publishers = publishers;
+    await assert.rejects(
+      auditWithPolicy(policy),
+      (error) => error instanceof ConfigurationError && error.message.includes("publishers"),
+    );
+  }
   policy.autoMerge.publishers = { "actions/*": review };
-  await writeFile(policyPath, JSON.stringify(policy));
-  assert.deepEqual(await auditRepository({ root, policyPath }), []);
+  assert.deepEqual(await auditWithPolicy(policy), []);
 });
 
 test("a review-only dependency entry needs its scope and the control it cites", async () => {
-  const root = await repository({ dependabotYaml: dependabot(CONFORMANT) });
   const entry = {
     repository: "melodic-software/standards",
     ecosystem: "npm",
@@ -792,24 +699,9 @@ test("a review-only dependency entry needs its scope and the control it cites", 
     basis: "test",
     control: "distribution/THREAT-MODEL.md#npm-supply-chain-production-engine",
   };
-  const policy = {
-    schemaVersion: 2,
-    scheduleInterval: "weekly",
-    cooldownMinimumDays: 3,
-    ...updateClasses(),
-    maxOpenPullRequests: 5,
-    requireGroups: true,
-    autoMerge: {
-      ecosystems: ["github-actions"],
-      publishers: { "actions/*": { tier: "auto", reviewed: "2026-10-08", basis: "test" } },
-      reviewOnly: [entry],
-      excludeSemverMajor: true,
-      requiredCheck: "CI Status",
-    },
-  };
-  const policyPath = path.join(root, "policy.json");
-  await writeFile(policyPath, JSON.stringify(policy));
-  assert.deepEqual(await auditRepository({ root, policyPath }), []);
+  const policy = minimalPolicy();
+  policy.autoMerge.reviewOnly = [entry];
+  assert.deepEqual(await auditWithPolicy(policy), []);
   const { control: _control, ...withoutControl } = entry;
   for (const reviewOnly of [
     [withoutControl],
@@ -817,10 +709,6 @@ test("a review-only dependency entry needs its scope and the control it cites", 
     undefined,
   ]) {
     policy.autoMerge.reviewOnly = reviewOnly;
-    await writeFile(policyPath, JSON.stringify(policy));
-    await assert.rejects(
-      auditRepository({ root, policyPath }),
-      (error) => error instanceof ConfigurationError,
-    );
+    await rejectsConfiguration(auditWithPolicy(policy));
   }
 });

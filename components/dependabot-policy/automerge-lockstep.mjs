@@ -52,9 +52,9 @@ export function extractPublisherAllowlist(workflowText) {
 
 // Order-sensitive: the constant lists the auto-tier keys in policy.json order, so a reorder is drift.
 export function checkLockstep(dependabotPolicy, workflowText) {
-  const expected = Object.keys(dependabotPolicy.autoMerge.publishers).filter(
-    (publisher) => dependabotPolicy.autoMerge.publishers[publisher].tier === "auto",
-  );
+  const expected = Object.entries(dependabotPolicy.autoMerge.publishers)
+    .filter(([, entry]) => entry.tier === "auto")
+    .map(([publisher]) => publisher);
   const actual = extractPublisherAllowlist(workflowText);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new LockstepError(
@@ -69,8 +69,9 @@ async function fetchText(url) {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+  const attempts = 3;
   let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await fetch(url, { headers });
       if (response.ok) {
@@ -80,7 +81,7 @@ async function fetchText(url) {
     } catch (error) {
       lastError = error;
     }
-    if (attempt < 3) {
+    if (attempt < attempts) {
       await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
     }
   }
