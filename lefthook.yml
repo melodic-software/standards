@@ -19,7 +19,7 @@ remotes:
     ref: main
     refetch_frequency: 24h
     configs:
-      - plugins/guardrails/git-hooks/lefthook-remote.yml
+      - lefthook-remote.yml
 
 pre-commit:
   # Intentionally non-conforming fixtures are exercised by component contract
