@@ -34,8 +34,9 @@ discovery, so a consumer that sets either does not read this file.
 
 Managed consumers do not edit the file; the managed-files guard flags a
 downstream edit. A repository that needs an extra rule (for example
-ci-workflows' `self-repository` ignore) owns its copy as `locally-owned` and
-keeps both blocks above.
+ci-workflows' `self-repository` ignore) owns its copy as `locally-owned`, per
+[Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component),
+and keeps both blocks above.
 
 ## Verification
 

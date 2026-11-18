@@ -9,7 +9,8 @@ repo-specific allowlist.
 Managed consumers do not edit the config. Use an inline `gitleaks:allow` pragma
 for a reviewed one-line false positive or a repository-owned `.gitleaksignore`
 fingerprint for an intentional finding. A broadly valid policy change goes
-upstream; a genuinely different policy requires local component ownership.
+upstream; a genuinely different policy requires local component ownership, per
+[Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
 
 ## Execution contract
 
