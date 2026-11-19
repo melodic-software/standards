@@ -7,35 +7,14 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import Ajv2020 from "ajv/dist/2020.js";
-import { parseDocument } from "yaml";
 
-export class ConfigurationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ConfigurationError";
-  }
-}
+import {
+  ConfigurationError,
+  jsonPointerLocation,
+  parseUniqueJson,
+} from "../runner-policy/policy-input.mjs";
 
-export function parseUniqueJson(source, location) {
-  const document = parseDocument(source, {
-    maxAliasCount: 0,
-    merge: false,
-    prettyErrors: true,
-    schema: "json",
-    strict: true,
-    uniqueKeys: true,
-  });
-  if (document.errors.length > 0) {
-    throw new ConfigurationError(
-      `${location} has duplicate object members or ambiguous structure: ${document.errors[0].message}`,
-    );
-  }
-  try {
-    return JSON.parse(source);
-  } catch (error) {
-    throw new ConfigurationError(`${location} is not valid JSON: ${error.message}`);
-  }
-}
+export { ConfigurationError, parseUniqueJson };
 
 const MODULE_DIRECTORY = import.meta.dirname;
 const DEFAULT_POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
@@ -53,14 +32,6 @@ const validatePolicyStructure = SCHEMA_VALIDATOR.compile(POLICY_SCHEMA);
 
 function finding(rule, field, message) {
   return { rule, field, message };
-}
-
-function jsonPointerLocation(location, instancePath) {
-  return `${location}${instancePath
-    .split("/")
-    .slice(1)
-    .map((segment) => `.${segment.replaceAll("~1", "/").replaceAll("~0", "~")}`)
-    .join("")}`;
 }
 
 export function validatePolicy(value, location = "policy") {

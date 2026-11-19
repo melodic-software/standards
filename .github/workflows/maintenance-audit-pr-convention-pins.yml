@@ -57,10 +57,16 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-          cache-dependency-path: components/pr-convention-policy/package-lock.json
+          cache-dependency-path: |
+            components/pr-convention-policy/package-lock.json
+            components/runner-policy/package-lock.json
 
+      # pr-convention-policy.mjs imports ../runner-policy/policy-input.mjs,
+      # which resolves yaml from the runner-policy dependency root.
       - name: Install pr-convention-policy dependencies
-        run: npm ci --prefix components/pr-convention-policy --ignore-scripts
+        run: |
+          npm ci --prefix components/pr-convention-policy --ignore-scripts
+          npm ci --prefix components/runner-policy --ignore-scripts
 
       # The scan runs each pinned composite's awk analyzer under
       # `gawk --sandbox`, and the runner image's awk is not guaranteed to be

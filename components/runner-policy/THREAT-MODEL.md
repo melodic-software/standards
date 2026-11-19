@@ -1,7 +1,9 @@
 # Runner-policy threat model
 
 This model covers the read-only analyzer in
-[`runner-policy.mjs`](runner-policy.mjs), its central and repository schemas,
+[`runner-policy.mjs`](runner-policy.mjs), the strict JSON input helpers it
+imports from [`policy-input.mjs`](policy-input.mjs), its central and repository
+schemas,
 and the workflow and repository configuration it evaluates. The GitHub Actions
 control plane, reusable-workflow implementations in `ci-workflows`, and the
 self-hosted runner fleet are external systems. Their behavior is modeled where

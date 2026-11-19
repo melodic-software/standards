@@ -9,33 +9,15 @@ import { parseArgs } from "node:util";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parseDocument } from "yaml";
 
-export class ConfigurationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ConfigurationError";
-  }
-}
+import {
+  ConfigurationError,
+  isMapping,
+  parseUniqueJson,
+  readOptionalJson,
+  validateAgainstSchema,
+} from "../runner-policy/policy-input.mjs";
 
-export function parseUniqueJson(source, location) {
-  const document = parseDocument(source, {
-    maxAliasCount: 0,
-    merge: false,
-    prettyErrors: true,
-    schema: "json",
-    strict: true,
-    uniqueKeys: true,
-  });
-  if (document.errors.length > 0) {
-    throw new ConfigurationError(
-      `${location} has duplicate object members or ambiguous structure: ${document.errors[0].message}`,
-    );
-  }
-  try {
-    return JSON.parse(source);
-  } catch (error) {
-    throw new ConfigurationError(`${location} is not valid JSON: ${error.message}`);
-  }
-}
+export { ConfigurationError, parseUniqueJson };
 
 const MODULE_DIRECTORY = import.meta.dirname;
 const DEFAULT_POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
@@ -67,47 +49,8 @@ const WAIVE_BY_RULE = {
   "groups-missing": "groups",
 };
 
-function isMapping(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function finding(rule, file, entry, message) {
   return entry === undefined ? { rule, file, message } : { rule, file, entry, message };
-}
-
-function jsonPointerLocation(location, instancePath) {
-  return `${location}${instancePath
-    .split("/")
-    .slice(1)
-    .map((segment) => `.${segment.replaceAll("~1", "/").replaceAll("~0", "~")}`)
-    .join("")}`;
-}
-
-function validateStructure(value, validator, location) {
-  if (validator(value)) {
-    return value;
-  }
-  const [error] = validator.errors;
-  let errorLocation = jsonPointerLocation(location, error.instancePath);
-  if (error.keyword === "additionalProperties") {
-    errorLocation += `.${error.params.additionalProperty}`;
-  } else if (error.keyword === "propertyNames") {
-    errorLocation += `.${error.params.propertyName}`;
-  }
-  throw new ConfigurationError(`${errorLocation} ${error.message}`);
-}
-
-async function readJson(filePath, location) {
-  let source;
-  try {
-    source = await readFile(filePath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return undefined;
-    }
-    throw new ConfigurationError(`${location} could not be read at ${filePath}: ${error.message}`);
-  }
-  return parseUniqueJson(source, `${location} at ${filePath}`);
 }
 
 async function readDependabot(filePath) {
@@ -307,8 +250,8 @@ export async function auditRepository({
   const resolvedRoot = path.resolve(root);
   const resolve = (candidate) =>
     path.isAbsolute(candidate) ? candidate : path.join(resolvedRoot, candidate);
-  const policy = validateStructure(
-    await readJson(resolve(policyPath), "dependabot policy"),
+  const policy = validateAgainstSchema(
+    await readOptionalJson(resolve(policyPath), "dependabot policy"),
     validatePolicyStructure,
     "policy",
   );
@@ -319,11 +262,11 @@ export async function auditRepository({
       `policy.cooldownMinimumDays (${policy.cooldownMinimumDays}) must equal policy.cooldownDays.patch (${policy.cooldownDays.patch})`,
     );
   }
-  const rawConfig = await readJson(resolve(configPath), "repository dependabot policy");
+  const rawConfig = await readOptionalJson(resolve(configPath), "repository dependabot policy");
   const config =
     rawConfig === undefined
       ? { schemaVersion: 1, exceptions: {} }
-      : validateStructure(rawConfig, validateConfigStructure, "dependabot policy");
+      : validateAgainstSchema(rawConfig, validateConfigStructure, "dependabot policy");
   const exceptions = config.exceptions ?? {};
 
   const dependabot = await readDependabot(resolve(dependabotPath));
