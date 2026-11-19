@@ -31,14 +31,12 @@ uses the same shape: the variable, "when present and not an empty string
 presence, so `NO_COLOR=false` still turns color off; that is the reason for the
 value rule above.
 
-Mixed value rules cause wrong settings. On Claude Code's
-[environment variables page](https://code.claude.com/docs/en/env-vars),
-`DISABLE_ERROR_REPORTING` opts out on any non-empty value ("Setting it to `0`
-or `false` still opts out"), while `DO_NOT_TRACK` is read "as a standard
-boolean, so `0` leaves telemetry on". `DISABLE_UPDATES` shows the negative name
-but is set with `1`. The page accepts `1`, `true`, `yes` or `on` for most
-switches; this standard is deliberately narrower so one reading fits every
-switch.
+Mixed value rules cause wrong settings: a tool that reads some switches by
+presence and others as booleans lets `0` mean on for one and off for another.
+Claude Code's
+[environment variables page](https://code.claude.com/docs/en/env-vars) shows
+the hazard; read it for the current behavior of each variable. One value rule
+for every switch removes the guesswork.
 
 Code booleans follow the .NET
 [Framework Design Guidelines](https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/names-of-type-members):
