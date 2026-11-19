@@ -265,4 +265,37 @@ for cmd in 'git -C /repo commit -F msg.txt' 'git -C /repo switch -c feature'; do
   fi
 done
 
+# `git worktree add --force` checks out a branch another worktree already holds,
+# or reuses a registered path, which can clobber a peer session's worktree.
+for shell in Bash PowerShell; do
+  for cmd in 'git worktree add --force /tmp/wt b' 'git worktree add -f /tmp/wt b' \
+    'git worktree add /tmp/wt b --force' 'git worktree add /tmp/wt -f b' \
+    'git worktree add -ff /tmp/wt b' 'git worktree add -fb newbranch /tmp/wt' \
+    'git worktree add /tmp/wt -fd b' 'git worktree add -df /tmp/wt b' 'git worktree add -qf /tmp/wt b' \
+    'git worktree add -qdf /tmp/wt b' 'git worktree add /tmp/wt -dqf b' \
+    'git worktree add --forc /tmp/wt b' 'git worktree add /tmp/wt b --f'; do
+    if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
+      pass "$shell denies: $cmd"
+    else
+      fail "$shell denies: $cmd" 'no deny row matches worktree add with force'
+    fi
+  done
+done
+for cmd in 'git -C /repo worktree add --force /tmp/wt b' 'git -C /repo worktree add /tmp/wt -f b' \
+  'git -C /repo worktree add -ff /tmp/wt b'; do
+  if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash denies: $cmd"
+  else
+    fail "Bash denies: $cmd" 'no deny row matches the -C form'
+  fi
+done
+for cmd in 'git worktree add -b feature /tmp/wt origin/main' 'git worktree add -b fix-x /tmp/wt-fix' \
+  'git -C /repo worktree add --detach /tmp/wt'; do
+  if [[ -z "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash leaves a plain worktree add alone: $cmd"
+  else
+    fail "Bash leaves a plain worktree add alone: $cmd" 'a force deny row matches a worktree add without force'
+  fi
+done
+
 [[ $FAILED -eq 0 ]] || exit 1
