@@ -12,6 +12,8 @@ Three escape hatches keep verbosity reasonable:
 - **Keep a short form only when it is industry-standard and instantly recognized**: `HTTP`, `JSON`, `URL`, `API`, `CI`, `CVE`, `OS`, `ID`. Project-local shorthand is not industry-standard; expand it.
 - **Repeated inline markers** (opt-out tokens, annotations appearing many times in body text) may use a terse form derived from the verbose name.
 
+An on/off switch (environment variable, CI variable, settings key) also follows [`configuration-switch-naming.md`](configuration-switch-naming.md).
+
 ## Name by current behavior, not current scope
 
 Pick a name that tracks what the artifact does today, not an assumption about how widely it is used. When a scope assumption ("this only checks one file") is baked into the name, later expansion forces a rename. Name by behavior; rename when behavior changes.
