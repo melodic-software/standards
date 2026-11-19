@@ -269,7 +269,9 @@ done
 # or reuses a registered path, which can clobber a peer session's worktree.
 for shell in Bash PowerShell; do
   for cmd in 'git worktree add --force /tmp/wt b' 'git worktree add -f /tmp/wt b' \
-    'git worktree add /tmp/wt b --force' 'git worktree add /tmp/wt -f b'; do
+    'git worktree add /tmp/wt b --force' 'git worktree add /tmp/wt -f b' \
+    'git worktree add -ff /tmp/wt b' 'git worktree add -fb newbranch /tmp/wt' \
+    'git worktree add /tmp/wt -fd b' 'git worktree add -df /tmp/wt b' 'git worktree add -qf /tmp/wt b'; do
     if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
       pass "$shell denies: $cmd"
     else
@@ -277,17 +279,21 @@ for shell in Bash PowerShell; do
     fi
   done
 done
-for cmd in 'git -C /repo worktree add --force /tmp/wt b' 'git -C /repo worktree add /tmp/wt -f b'; do
+for cmd in 'git -C /repo worktree add --force /tmp/wt b' 'git -C /repo worktree add /tmp/wt -f b' \
+  'git -C /repo worktree add -ff /tmp/wt b'; do
   if [[ -n "$(matching_rows deny Bash "$cmd")" ]]; then
     pass "Bash denies: $cmd"
   else
     fail "Bash denies: $cmd" 'no deny row matches the -C form'
   fi
 done
-if [[ -z "$(matching_rows deny Bash 'git worktree add -b feature /tmp/wt origin/main')" ]]; then
-  pass 'Bash leaves a plain worktree add alone'
-else
-  fail 'Bash leaves a plain worktree add alone' 'a force deny row matches a worktree add without force'
-fi
+for cmd in 'git worktree add -b feature /tmp/wt origin/main' 'git worktree add -b fix-x /tmp/wt-fix' \
+  'git -C /repo worktree add --detach /tmp/wt'; do
+  if [[ -z "$(matching_rows deny Bash "$cmd")" ]]; then
+    pass "Bash leaves a plain worktree add alone: $cmd"
+  else
+    fail "Bash leaves a plain worktree add alone: $cmd" 'a force deny row matches a worktree add without force'
+  fi
+done
 
 [[ $FAILED -eq 0 ]] || exit 1
