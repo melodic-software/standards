@@ -271,7 +271,9 @@ for shell in Bash PowerShell; do
   for cmd in 'git worktree add --force /tmp/wt b' 'git worktree add -f /tmp/wt b' \
     'git worktree add /tmp/wt b --force' 'git worktree add /tmp/wt -f b' \
     'git worktree add -ff /tmp/wt b' 'git worktree add -fb newbranch /tmp/wt' \
-    'git worktree add /tmp/wt -fd b' 'git worktree add -df /tmp/wt b' 'git worktree add -qf /tmp/wt b'; do
+    'git worktree add /tmp/wt -fd b' 'git worktree add -df /tmp/wt b' 'git worktree add -qf /tmp/wt b' \
+    'git worktree add -qdf /tmp/wt b' 'git worktree add /tmp/wt -dqf b' \
+    'git worktree add --forc /tmp/wt b' 'git worktree add /tmp/wt b --f'; do
     if [[ -n "$(matching_rows deny "$shell" "$cmd")" ]]; then
       pass "$shell denies: $cmd"
     else
