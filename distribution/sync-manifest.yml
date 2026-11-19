@@ -518,11 +518,13 @@ targets:
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
   # Takes the Dependabot policy copy, which the auto-merge lane reads to arm
-  # the organization's own releases, and the fleet-routed guard every target carries.
+  # the organization's own releases, the fleet-routed guard every target carries,
+  # and the typos config its spelling hook reads (its CI typos lane stays off).
   melodic-software/architecture:
     managed:
       - dependabot-policy
       - managed-files-guard-fleet-caller
+      - typos
   melodic-software/azure-iac:
     managed:
       - dependabot-policy
