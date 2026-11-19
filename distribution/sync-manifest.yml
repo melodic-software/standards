@@ -210,6 +210,7 @@ components:
       components/engineering-standards/standards-index.md: docs/standards/README.md
       standards/engineering/bulk-mutation.md: docs/standards/bulk-mutation.md
       standards/engineering/concise-prose.md: docs/standards/concise-prose.md
+      standards/engineering/configuration-switch-naming.md: docs/standards/configuration-switch-naming.md
       standards/engineering/design-for-change.md: docs/standards/design-for-change.md
       standards/engineering/deterministic-work-execution.md: docs/standards/deterministic-work-execution.md
       standards/engineering/documentation-and-citations.md: docs/standards/documentation-and-citations.md
