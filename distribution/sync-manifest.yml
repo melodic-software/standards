@@ -406,6 +406,7 @@ components:
     files:
       components/runner-policy/package-lock.json: .github/standards/runner-policy/package-lock.json
       components/runner-policy/package.json: .github/standards/runner-policy/package.json
+      components/runner-policy/policy-input.mjs: .github/standards/runner-policy/policy-input.mjs
       components/runner-policy/policy.json: .github/standards/runner-policy/policy.json
       components/runner-policy/policy.schema.json: .github/standards/runner-policy/policy.schema.json
       components/runner-policy/repository-policy.schema.json: .github/standards/runner-policy/repository-policy.schema.json

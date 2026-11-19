@@ -9,33 +9,14 @@ import { parseArgs } from "node:util";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parseDocument } from "yaml";
 
-export class ConfigurationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ConfigurationError";
-  }
-}
+import {
+  ConfigurationError,
+  parseUniqueJson,
+  readOptionalJson,
+  validateAgainstSchema,
+} from "../runner-policy/policy-input.mjs";
 
-export function parseUniqueJson(source, location) {
-  const document = parseDocument(source, {
-    maxAliasCount: 0,
-    merge: false,
-    prettyErrors: true,
-    schema: "json",
-    strict: true,
-    uniqueKeys: true,
-  });
-  if (document.errors.length > 0) {
-    throw new ConfigurationError(
-      `${location} has duplicate object members or ambiguous structure: ${document.errors[0].message}`,
-    );
-  }
-  try {
-    return JSON.parse(source);
-  } catch (error) {
-    throw new ConfigurationError(`${location} is not valid JSON: ${error.message}`);
-  }
-}
+export { ConfigurationError, parseUniqueJson };
 
 const MODULE_DIRECTORY = import.meta.dirname;
 const DEFAULT_CONFIG_PATH = ".github/concurrency-policy.json";
@@ -149,41 +130,6 @@ function classifyGroup(group) {
 
 export function hasBlockingFindings(findings) {
   return findings.some((item) => item.level !== "info");
-}
-
-function jsonPointerLocation(location, instancePath) {
-  return `${location}${instancePath
-    .split("/")
-    .slice(1)
-    .map((segment) => `.${segment.replaceAll("~1", "/").replaceAll("~0", "~")}`)
-    .join("")}`;
-}
-
-function validateConfig(value, location) {
-  if (validateConfigStructure(value)) {
-    return value;
-  }
-  const [error] = validateConfigStructure.errors;
-  let errorLocation = jsonPointerLocation(location, error.instancePath);
-  if (error.keyword === "additionalProperties") {
-    errorLocation += `.${error.params.additionalProperty}`;
-  } else if (error.keyword === "propertyNames") {
-    errorLocation += `.${error.params.propertyName}`;
-  }
-  throw new ConfigurationError(`${errorLocation} ${error.message}`);
-}
-
-async function readJson(filePath, location) {
-  let source;
-  try {
-    source = await readFile(filePath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return undefined;
-    }
-    throw new ConfigurationError(`${location} could not be read at ${filePath}: ${error.message}`);
-  }
-  return parseUniqueJson(source, `${location} at ${filePath}`);
 }
 
 function parseWorkflow(source) {
@@ -377,11 +323,11 @@ export async function auditRepository({
   const resolvedConfig = path.isAbsolute(configPath)
     ? configPath
     : path.join(resolvedRoot, configPath);
-  const rawConfig = await readJson(resolvedConfig, "repository concurrency policy");
+  const rawConfig = await readOptionalJson(resolvedConfig, "repository concurrency policy");
   const config =
     rawConfig === undefined
       ? { schemaVersion: 1, exceptions: {} }
-      : validateConfig(rawConfig, "concurrency policy");
+      : validateAgainstSchema(rawConfig, validateConfigStructure, "concurrency policy");
   const exceptions = config.exceptions ?? {};
 
   const records = await repositoryWorkflowIndex(resolvedRoot);

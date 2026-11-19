@@ -26,6 +26,11 @@ Draft 2020-12 structural authorities. Ajv compiles them in strict mode; the
 runtime retains only cross-record semantics and workflow/path checks that JSON
 Schema cannot express.
 
+[`policy-input.mjs`](policy-input.mjs) holds the strict JSON parsing and
+schema-error helpers. It ships in the same directory so the distributed
+runtime stays self-contained; the concurrency, dependabot and pr-convention
+policy analyzers import it from here.
+
 The security boundaries, fail-closed behavior, and required review triggers are
 documented in the component [threat model](THREAT-MODEL.md).
 

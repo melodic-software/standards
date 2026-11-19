@@ -605,7 +605,7 @@ fi
 actual_manifest="$root/distribution/sync-manifest.yml"
 assert_eq 'runner-policy requires the shared Node runtime pin' 'node-runtime' \
   "$(yq -r '.components.runner-policy.requires | join(",")' "$actual_manifest")"
-assert_eq 'runner-policy materializes exactly six runtime files' '6' \
+assert_eq 'runner-policy materializes exactly seven runtime files' '7' \
   "$(yq -r '.components.runner-policy.files | length' "$actual_manifest")"
 
 # assert_component_mappings <component> <source=destination>...
@@ -622,6 +622,7 @@ assert_component_mappings() {
 
 assert_component_mappings runner-policy \
   'components/runner-policy/runner-policy.mjs=.github/standards/runner-policy/runner-policy.mjs' \
+  'components/runner-policy/policy-input.mjs=.github/standards/runner-policy/policy-input.mjs' \
   'components/runner-policy/policy.json=.github/standards/runner-policy/policy.json' \
   'components/runner-policy/policy.schema.json=.github/standards/runner-policy/policy.schema.json' \
   'components/runner-policy/repository-policy.schema.json=.github/standards/runner-policy/repository-policy.schema.json' \
@@ -630,6 +631,15 @@ assert_component_mappings runner-policy \
 
 runner_policy_source='components/runner-policy/runner-policy.mjs'
 runner_policy_destination='.github/standards/runner-policy/runner-policy.mjs'
+
+# The runtime runs on its own at the consumer, so every module it imports by
+# relative path must travel with it.
+while IFS= read -r sibling_module; do
+  assert_eq "runner-policy syncs its sibling import $sibling_module" \
+    ".github/standards/runner-policy/$sibling_module" \
+    "$(SOURCE_PATH="components/runner-policy/$sibling_module" yq -r '.components.runner-policy.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
+done < <(sed -nE 's/^.*from "\.\/([^"]+)";$/\1/p' "$root/$runner_policy_source")
+
 lefthook_dotnet_source='components/lefthook-dotnet/dotnet-format-staged.mjs'
 lefthook_dotnet_destination='.lefthook/dotnet-format-staged.mjs'
 assert_eq 'runner-policy production CLI source is executable in the Git index' '100755' \

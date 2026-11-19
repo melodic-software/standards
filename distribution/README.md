@@ -214,11 +214,12 @@ public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 - `melodic-software/pr-pipeline-sandbox`
 - `melodic-software/provisioning`
 
-It includes `runner-policy.mjs`, `policy.json`, both Draft 2020-12 policy schema
-files, and the component-local npm manifest and lockfile. The component requires
-`node-runtime`, so `.node-version` is part of each target's managed
-materialization as well. The runtime loads both schemas directly; omitting them
-would make the supposedly atomic payload fail on a clean consumer checkout.
+It includes `runner-policy.mjs`, the `policy-input.mjs` module it imports,
+`policy.json`, both Draft 2020-12 policy schema files, and the component-local
+npm manifest and lockfile. The component requires `node-runtime`, so
+`.node-version` is part of each target's managed materialization as well. The
+runtime loads both schemas and its imported module directly; omitting any of
+them would make the supposedly atomic payload fail on a clean consumer checkout.
 
 The `runner-policy-contract` component carries only `policy.json` and
 `policy.schema.json`, to `.github/standards/runner-policy-contract/`. Its one
