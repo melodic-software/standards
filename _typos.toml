@@ -15,7 +15,6 @@ axe = "axe"
 calibre = "calibre"
 canva = "canva"
 recomendations = "recomendations"
-# British forms the en-us dictionary accepts; each maps to its American spelling.
 ageing = "aging"
 amidst = "amid"
 amongst = "among"
