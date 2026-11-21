@@ -6623,42 +6623,65 @@ ${secrets.length > 0 ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
   assert.equal(asserted, 6);
 });
 
-// The hosted lane callers (components/claude-lanes-hosted/) are the public
-// shape of the fleet callers: same bytes except comments and a hosted
-// `runner`, managed only for public targets, and never beside the fleet
+// The hosted lane callers (components/claude-lanes-hosted/) call the hosted-only
+// pr-review-cli.yml reusable (lane `code` / `security`, API-key-first secret
+// contract), managed only for public targets, and never beside the fleet
 // variant of the same lane (distribution/sync-manifest.yml, the public-shape
 // note).
 const HOSTED_LANE_DIR = "components/claude-lanes-hosted/";
 
-function withoutComments(body) {
-  return body
-    .split("\n")
-    .filter((line) => !/^\s*#/u.test(line))
-    .map((line) => line.replace(/\s+#.*$/u, ""))
-    .join("\n");
-}
-
 // The workflow `name:` is each destination's stem in Title Case, so the hosted
-// file's name is its fleet sibling's plus ` Hosted`; the job ids, and so the
-// check contexts, stay the same.
-test("each hosted claude lane caller equals its fleet sibling except for comments, runner and the Hosted name", async () => {
+// file's name is its fleet sibling's plus ` Hosted`; the job ids stay the same
+// (`pr-review` / `pr-review-security`).
+test("each hosted claude lane caller calls pr-review-cli with the expected lane, secrets and Hosted name", async () => {
   const hosted = await claudeLaneCallerComponents(HOSTED_LANE_DIR);
   assert.equal(hosted.length, 2, "expected a hosted code-review and security-review caller");
   for (const { source, body } of hosted) {
     const fleetSource = source.replace(HOSTED_LANE_DIR, "components/claude-lanes/");
     const fleet = await readFile(new URL(`../../${fleetSource}`, import.meta.url), "utf8");
-    assert.match(body, /^ {6}runner: ubuntu-24\.04$/mu, `${source} must run on ubuntu-24.04`);
     const fleetName = fleet.match(/^name: (.+)$/mu)?.[1];
     assert.ok(fleetName, `${fleetSource} has no workflow name`);
     assert.match(body, new RegExp(`^name: ${fleetName} Hosted$`, "mu"), `${source} name`);
-    const normalize = (text) =>
-      withoutComments(text)
-        .replace(/^( {6}runner:) \S+$/mu, "$1")
-        .replace(/^name: .+$/mu, "name:");
+    const parsed = parse(body);
+    const fleetParsed = parse(fleet);
+    assert.deepEqual(
+      Object.keys(parsed.jobs),
+      Object.keys(fleetParsed.jobs),
+      `${source} job ids must match ${fleetSource}`,
+    );
+    const [jobId] = Object.keys(parsed.jobs);
+    const job = parsed.jobs[jobId];
+    const expectedLane = source.endsWith("claude-security-review.yml") ? "security" : "code";
     assert.equal(
-      normalize(body),
-      normalize(fleet),
-      `${source} drifted from ${fleetSource} beyond comments, runner and name`,
+      job.uses,
+      "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main",
+      `${source} must call pr-review-cli.yml@main`,
+    );
+    assert.equal(job.with?.lane, expectedLane, `${source} lane input`);
+    assert.equal(job.with?.publish, "comments", `${source} publish input`);
+    assert.equal(
+      job.with?.runner,
+      undefined,
+      `${source} must not pass runner to pr-review-cli.yml`,
+    );
+    assert.deepEqual(
+      job.permissions,
+      {
+        actions: "read",
+        checks: "read",
+        contents: "read",
+        "pull-requests": "write",
+      },
+      `${source} caller permissions`,
+    );
+    assert.deepEqual(
+      job.secrets,
+      {
+        CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}`,
+        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}`,
+        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
+      },
+      `${source} review secrets`,
     );
   }
 });
