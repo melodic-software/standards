@@ -576,9 +576,8 @@ jobs:
       DOTNET_INSTALL_DIR: ~/.dotnet
       # Inline install — the fixtures suite asserts specific rule codes fire on
       # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
-      # actions only pass/fail). Keep in lockstep with the action defaults in
-      # ci-workflows and with medley.
-      DOTNET_VERSION: 10.0.301
+      # actions only pass/fail). Keep in lockstep with ci-workflows and medley.
+      DOTNET_VERSION: 11.0.100
     steps:
       - name: Detect relevant changes
         id: changes
@@ -605,9 +604,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The fixture tests run first, while DOTNET_VERSION is the only SDK in
-      # DOTNET_INSTALL_DIR. The build and format actions then install the SDK
-      # passed below, which is newer, so each step runs the SDK it ran alone.
+      # The fixture tests run first on DOTNET_VERSION. The build and format
+      # actions below pass the same pin explicitly because this repo carries no
+      # root global.json.
       - name: Set up .NET
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -640,13 +639,13 @@ jobs:
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-build@d7ba00151fa8429aa9a94fb919f1e517c2e74368 # v0.78.0
         with:
-          dotnet-version: 10.0.400
+          dotnet-version: ${{ env.DOTNET_VERSION }}
           project: components/dotnet-analysis/fixtures/good/good.csproj
       - name: Verify .NET whitespace
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-format@d7ba00151fa8429aa9a94fb919f1e517c2e74368 # v0.78.0
         with:
-          dotnet-version: 10.0.400
+          dotnet-version: ${{ env.DOTNET_VERSION }}
           project: components/dotnet-analysis/fixtures/good/good.csproj
 
   check-go:
