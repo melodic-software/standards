@@ -4,16 +4,17 @@ This module is the enforceable contract for local GitHub Actions routing. It
 parses workflow YAML; it does not use text matching to infer job structure.
 
 In this source repository, run it from the repository root with explicit local
-repository identity evidence:
+repository identity and visibility evidence:
 
 ```sh
-GITHUB_REPOSITORY=melodic-software/standards \
+CI_REPOSITORY_VISIBILITY=public GITHUB_REPOSITORY=melodic-software/standards \
   node components/runner-policy/runner-policy.mjs --root .
 ```
 
 PowerShell equivalent:
 
 ```powershell
+$env:CI_REPOSITORY_VISIBILITY = "public"
 $env:GITHUB_REPOSITORY = "melodic-software/standards"
 node components/runner-policy/runner-policy.mjs --root .
 ```
@@ -94,7 +95,7 @@ repository's `/components/runner-policy` Dependabot entry plus standards-sync.
 Dependabot directory entries drive version updates only; security alerts still
 report the nested lockfile without a consumer entry.
 
-Each adopting repository carries `.github/runner-policy.json`:
+Each adopting private repository carries `.github/runner-policy.json`:
 
 ```json
 {
@@ -110,6 +111,14 @@ Each adopting repository carries `.github/runner-policy.json`:
   }
 }
 ```
+
+A public repository with no `repositoryOwner` check may omit
+`.github/runner-policy.json`: when the default config path is absent (and not a
+dangling symlink) and `CI_REPOSITORY_VISIBILITY` or `--repository-visibility` is
+`public`, the analyzer applies the built-in public hosted-only default
+(`schemaVersion: 1`, `visibility: "public"`, `selfHostedCi: false`,
+`exceptions: {}`). Private repositories, explicit `--config` paths, and runs
+without `public` visibility evidence still fail closed when the file is missing.
 
 `repositoryOwner`, `visibility`, and `selfHostedCi` are governed inventory, not
 runtime switches. `repositoryOwner` is inventory and a mismatch tripwire only;
