@@ -6891,3 +6891,60 @@ test("every online link-check caller audits clean on every target that manages i
     }
   }
 });
+
+test("the hosted dependabot-automerge caller audits clean on every public target and is rejected on an enrolled private consumer", async () => {
+  const { component, source, body, manifest } = await managedFilesGuardCaller(
+    "dependabot-automerge-caller",
+  );
+  const managedTargets = Object.entries(manifest.targets)
+    .filter(([, definition]) => (definition.managed ?? []).includes(component))
+    .map(([target]) => target);
+  assert.ok(managedTargets.length > 0, `expected at least one target to manage ${component}`);
+  for (const target of managedTargets) {
+    assert.ok(isPublicTarget(target), `${source} is managed for ${target}, which is private`);
+    const root = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
+    assert.deepEqual(
+      await auditRepository({ root, githubRepository: target }),
+      [],
+      `${source} is managed for ${target} (public) but does not audit clean there`,
+    );
+  }
+  const privateRoot = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+  const findings = await auditRepository({
+    root: privateRoot,
+    githubRepository: "melodic-software/dotfiles",
+  });
+  assert.ok(
+    findings.length > 0,
+    `${source} must not audit clean without an exception on an enrolled private consumer`,
+  );
+});
+
+test("the fleet-routed dependabot-automerge caller audits clean on every private target and is rejected on a public consumer", async () => {
+  const { component, source, body, manifest } = await managedFilesGuardCaller(
+    "dependabot-automerge-fleet-caller",
+  );
+  const managedTargets = Object.entries(manifest.targets)
+    .filter(([, definition]) => (definition.managed ?? []).includes(component))
+    .map(([target]) => target);
+  assert.ok(managedTargets.length > 0, `expected at least one target to manage ${component}`);
+  for (const target of managedTargets) {
+    assert.ok(!isPublicTarget(target), `${source} is managed for ${target}, which is public`);
+    const root = await consumerCarrying({ body, visibility: "private", selfHostedCi: true });
+    assert.deepEqual(
+      await auditRepository({ root, githubRepository: target }),
+      [],
+      `${source} is managed for ${target} (private, enrolled) but does not audit clean there`,
+    );
+  }
+  const publicRoot = await consumerCarrying({ body, visibility: "public", selfHostedCi: false });
+  const rules = new Set(
+    (
+      await auditRepository({
+        root: publicRoot,
+        githubRepository: "melodic-software/claude-code-account-rotation",
+      })
+    ).map(({ rule }) => rule),
+  );
+  assert.ok(rules.has("public-self-hosted-routing"), `${source} is expected to be private-only`);
+});
