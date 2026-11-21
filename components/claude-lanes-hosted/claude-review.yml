@@ -26,8 +26,10 @@ name: PR Review Hosted
 # standards `runner-policy` component admits on a public repository. It is the
 # hosted sibling of components/claude-lanes/claude-review.yml. The workflow
 # `name:` is the destination file's stem in Title Case and the job id stays
-# `pr-review`, keeping the `PR Review / Publish Review` check context on every
-# target. A target manages one of the two, never both.
+# `pr-review`; this hosted caller reports `PR Review / Publish Review` (the
+# fleet sibling still reports `PR Review / Claude` until private callers
+# migrate, and the org's review-lane check lists accept both). A target manages
+# one of the two, never both.
 #
 # This lane is advisory (github-iac ADR 0011: no organization ruleset may make
 # an agentic review a merge prerequisite).

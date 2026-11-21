@@ -6651,6 +6651,30 @@ test("each hosted claude lane caller calls pr-review-cli with the expected lane,
     );
     const [jobId] = Object.keys(parsed.jobs);
     const job = parsed.jobs[jobId];
+    const fleetJob = fleetParsed.jobs[jobId];
+    assert.deepEqual(parsed.on, fleetParsed.on, `${source} triggers must match ${fleetSource}`);
+    assert.deepEqual(
+      parsed.permissions,
+      fleetParsed.permissions,
+      `${source} top-level permissions must match ${fleetSource}`,
+    );
+    assert.deepEqual(
+      parsed.concurrency,
+      fleetParsed.concurrency,
+      `${source} concurrency must match ${fleetSource}`,
+    );
+    assert.equal(job.name, fleetJob.name, `${source} job name must match ${fleetSource}`);
+    assert.equal(job.if, fleetJob.if, `${source} job condition must match ${fleetSource}`);
+    assert.equal(
+      job.with?.["allowed-bot-sender-ids"],
+      fleetJob.with?.["allowed-bot-sender-ids"],
+      `${source} allowed-bot-sender-ids must match ${fleetSource}`,
+    );
+    assert.equal(
+      job.with?.["allowed-author-ids"],
+      fleetJob.with?.["allowed-author-ids"],
+      `${source} allowed-author-ids must match ${fleetSource}`,
+    );
     const expectedLane = source.endsWith("claude-security-review.yml") ? "security" : "code";
     assert.equal(
       job.uses,
@@ -6659,6 +6683,13 @@ test("each hosted claude lane caller calls pr-review-cli with the expected lane,
     );
     assert.equal(job.with?.lane, expectedLane, `${source} lane input`);
     assert.equal(job.with?.publish, "comments", `${source} publish input`);
+    if (expectedLane === "security") {
+      assert.equal(
+        job.with?.["docs-only-paths"],
+        "docs/**/*.md\n**/README.md\n**/CHANGELOG.md\n",
+        `${source} docs-only-paths must preserve legacy security default`,
+      );
+    }
     assert.equal(
       job.with?.runner,
       undefined,
