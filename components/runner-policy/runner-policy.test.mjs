@@ -6981,7 +6981,7 @@ test("missing .github/runner-policy.json defaults to public hosted-only when vis
   assert.ok(rules.has("raw-self-hosted-label"));
 });
 
-test("missing .github/runner-policy.json fails closed without public visibility evidence, on private repos, on explicit --config, or on a broken symlink", async () => {
+test("missing .github/runner-policy.json fails closed without public visibility evidence, on private repos, or on explicit --config", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "runner-policy-missing-fail-closed-"));
   temporaryRoots.push(root);
   await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
@@ -7018,11 +7018,27 @@ test("missing .github/runner-policy.json fails closed without public visibility 
       error instanceof ConfigurationError &&
       /repository runner config could not be read/u.test(error.message),
   );
+});
 
-  await symlink(
-    path.join(root, ".github", "does-not-exist.json"),
-    path.join(root, ".github", "runner-policy.json"),
-  );
+test("dangling .github/runner-policy.json symlink fails closed even with public visibility evidence", async (context) => {
+  const root = await mkdtemp(path.join(tmpdir(), "runner-policy-dangling-symlink-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github", "workflows", "ci.yml"), HOSTED_WORKFLOW);
+
+  try {
+    await symlink(
+      path.join(root, ".github", "does-not-exist.json"),
+      path.join(root, ".github", "runner-policy.json"),
+      "file",
+    );
+  } catch (error) {
+    if (new Set(["EPERM", "EACCES", "ENOTSUP"]).has(error.code)) {
+      context.skip(`symlink creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
   await assert.rejects(
     () => auditRepository({ root, repositoryVisibility: "public" }),
     (error) =>
