@@ -339,12 +339,9 @@ in `ci-workflows`; only the caller files are managed bytes.
 
 What stays consumer-owned:
 
-- The `CLAUDE_CODE_OAUTH_TOKEN` secret and the observer key, per the
-  runner-policy consumer handoff above. The `CI_RUNNER_*` selector variables
-  are gone: the selector that read them was deleted (ci-workflows#569), and
-  github-iac's Phase 7 step 5 apply (2026-09-08) deleted the variables and
-  their Pulumi declarations. `CI_RUNNER_OBSERVER_CLIENT_ID` matches that glob
-  but was never one of them; it is the observer key named above and it stays.
+- The `CLAUDE_CODE_OAUTH_TOKEN` secret. The `CI_RUNNER_*` selector variables and
+  the `melodic-ci-runner-observer` App's `CI_RUNNER_OBSERVER_*` credentials are
+  retired.
 
 The security lane has no path gating: it reviews every non-draft
 same-repository PR whose actor is not a bot (or is a bot whose sender id the
