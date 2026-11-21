@@ -10,9 +10,16 @@ cd "$root" || exit 1
 
 ruff_cfg='ruff.toml'
 good='components/ruff/fixtures/good/example.py'
-bad='components/ruff/fixtures/bad/violations.py'
+# Stored with a .txt suffix so shared Python formatter hooks leave the
+# deliberately malformed fixture untouched; materialized as .py below.
+bad_src='components/ruff/fixtures/bad/violations.py.txt'
 
 command -v ruff >/dev/null 2>&1 || skip_suite 'ruff not installed'
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+cp "$bad_src" "$tmp/violations.py"
+bad="$tmp/violations.py"
 
 ruff check --config "$ruff_cfg" "$good" >/dev/null 2>&1
 assert_exit 'good fixture lints clean' 0 "$?"

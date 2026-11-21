@@ -60,13 +60,20 @@ assert_exit 'golangci-lint accepts the v2 config' 0 "$rc"
 assert_silent 'config verification has no diagnostics' "$out"
 
 good="$root/components/go-analysis/fixtures/good"
-bad_format="$root/components/go-analysis/fixtures/bad/format/violations.go"
+# Stored with a .txt suffix so shared Go formatter hooks leave the deliberately
+# unformatted fixture untouched; materialized as .go below.
+bad_format_src="$root/components/go-analysis/fixtures/bad/format/violations.go.txt"
 bad_tidy="$root/components/go-analysis/fixtures/bad/tidy"
 bad_vet="$root/components/go-analysis/fixtures/bad/vet"
 bad_analyzer="$root/components/go-analysis/fixtures/bad/analyzer"
 bad_suppression_blanket="$root/components/go-analysis/fixtures/bad/suppression-blanket"
 bad_suppression_reason="$root/components/go-analysis/fixtures/bad/suppression-reason"
 bad_suppression_unused="$root/components/go-analysis/fixtures/bad/suppression-unused"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+cp "$bad_format_src" "$tmp/violations.go"
+bad_format="$tmp/violations.go"
 
 out="$(gofmt -l "$good")"
 assert_silent 'gofmt: good fixture is formatted' "$out"
