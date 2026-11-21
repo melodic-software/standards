@@ -9,8 +9,8 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 config='.markdownlint-cli2.jsonc'
 
-if [[ -x node_modules/.bin/markdownlint-cli2 ]]; then
-  ml() { node_modules/.bin/markdownlint-cli2 "$@"; }
+if [[ -x "$root/node_modules/.bin/markdownlint-cli2" ]]; then
+  ml() { "$root/node_modules/.bin/markdownlint-cli2" "$@"; }
 elif command -v markdownlint-cli2 >/dev/null 2>&1; then
   ml() { markdownlint-cli2 "$@"; }
 else
@@ -21,7 +21,13 @@ ml --config "$config" components/markdownlint/fixtures/good/Clean.md >/dev/null 
 rc=$?
 assert_exit 'good fixture exits 0' 0 "$rc"
 
-out="$(ml --config "$config" components/markdownlint/fixtures/bad/Violations.md 2>&1)"
+# Stored with a .txt suffix so shared Markdown formatter hooks leave the
+# deliberately malformed fixture untouched; materialized as .md below.
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+cp components/markdownlint/fixtures/bad/Violations.md.txt "$tmp/Violations.md"
+
+out="$(cd "$tmp" && ml --config "$root/$config" Violations.md 2>&1)"
 rc=$?
 assert_exit 'bad fixture exits 1' 1 "$rc"
 # Assert specific configured style rules fired, not merely that some rule did,

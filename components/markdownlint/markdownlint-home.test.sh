@@ -111,13 +111,13 @@ trap 'rm -rf "$home"' EXIT
 cp "$source_path" "$home/$deployed_name"
 mkdir -p "$home/notes"
 cp components/markdownlint/fixtures/good/Clean.md "$home/notes/Clean.md"
-cp components/markdownlint/fixtures/bad/Violations.md "$home/notes/Violations.md"
+cp components/markdownlint/fixtures/bad/Violations.md.txt "$home/notes/Violations.md"
 
 # A home directory is not a repository checkout: `bin/` under $HOME holds authored
 # markdown, not a build tree, so the home config must not inherit the repository
 # config's traversal exclusions. This fixture is the regression guard for that.
 mkdir -p "$home/bin"
-cp components/markdownlint/fixtures/bad/Violations.md "$home/bin/Violations.md"
+cp components/markdownlint/fixtures/bad/Violations.md.txt "$home/bin/Violations.md"
 
 (cd "$home" && ml 'notes/Clean.md' >/dev/null 2>&1)
 assert_exit 'auto-discovered config passes the good fixture' 0 "$?"
