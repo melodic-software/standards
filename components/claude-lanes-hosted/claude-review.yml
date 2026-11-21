@@ -1,6 +1,6 @@
 name: PR Review Hosted
 
-# SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
+# SYNC-MANAGED FILE — DO NOT EDIT IN THE CONSUMING REPOSITORY.
 # Source of truth: melodic-software/standards,
 # components/claude-lanes-hosted/claude-review.yml (the
 # `claude-review-hosted-caller` component in distribution/sync-manifest.yml).
@@ -8,31 +8,28 @@ name: PR Review Hosted
 # upstream, or move the component to `locally-owned` in the manifest to
 # customize.
 #
-# Thin caller for the org's reusable code-review lane. The reusable workflow
-# owns the action pin, model, and the secret-handling model; per its header,
-# this caller owns the triggers, concurrency, and the GITHUB_TOKEN permission
-# grant (a called workflow can only downgrade the caller's grant, never
-# elevate it).
+# Thin caller for the org's pr-review-cli reusable, lane `code`. The reusable
+# workflow owns the launcher, the credential order (the reviews role's API key,
+# then its subscription token after a handoff, then the central fallback
+# subscription), and the secret-handling model; per its header, this caller
+# owns the triggers, concurrency, and the GITHUB_TOKEN permission grant (a
+# called workflow can only downgrade the caller's grant, never elevate it).
 #
-# The reusable skips fork PRs (they receive no secrets and a read-only token)
-# and every `[bot]` actor whose sender id is not in `allowed-bot-sender-ids`
-# (below), so neither is reviewed by design. On a public repository that means
-# the lane reviews only pull requests from branches of this repository: fork
-# and Dependabot pull requests get no secrets.
+# The reusable skips fork PRs (they receive no secrets and a read-only token),
+# Dependabot, and every `[bot]` actor whose sender id is not in
+# `allowed-bot-sender-ids` (below), so none is reviewed by design. On a public
+# repository that means the lane reviews only pull requests from branches of
+# this repository: fork and Dependabot pull requests get no secrets.
 #
-# RUNNER PLACEMENT: hosted shape. This file runs the lane on the GitHub-hosted
-# `ubuntu-24.04` runner, which the standards `runner-policy` component admits
-# on a public repository. It is the hosted sibling of
-# components/claude-lanes/claude-review.yml, which names the private fleet
-# review label, and differs from it only in these comments, `runner` and the
-# workflow `name:`, which is each file's stem in Title Case. The job id is the same, so
-# the check context is the same on every target. A target manages one of the
-# two, never both.
-#
-# INTERIM: this per-visibility pair is removed when the runner choice moves
-# inside the ci-workflows reusable and runner-policy gains a cross-repo
-# routing kind, so one caller serves both visibilities
-# (distribution/sync-manifest.yml, the claude lane caller note).
+# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml runs on
+# GitHub-hosted `ubuntu-24.04` (it takes no `runner` input), which the
+# standards `runner-policy` component admits on a public repository. It is the
+# hosted sibling of components/claude-lanes/claude-review.yml. The workflow
+# `name:` is the destination file's stem in Title Case and the job id stays
+# `pr-review`; this hosted caller reports `PR Review / Publish Review` (the
+# fleet sibling still reports `PR Review / Claude` until private callers
+# migrate, and the org's review-lane check lists accept both). A target manages
+# one of the two, never both.
 #
 # This lane is advisory (github-iac ADR 0011: no organization ruleset may make
 # an agentic review a merge prerequisite).
@@ -77,16 +74,14 @@ jobs:
     # ready_for_review trigger above is what delivers one when it is ready.
     if: github.event.pull_request.draft == false
     permissions:
+      actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
+      checks: read           # Publish Review reads its earlier runs' cost notices
       contents: read         # checkout + read the diff
-      pull-requests: write   # post review, tracking comment and the lane's
-                             # reviewed-head marker comment
-      id-token: write        # OIDC, mints the Claude GitHub App token (required
-                             # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review.yml@main
+      pull-requests: write   # post review, comments, and the lane's reviewed-head marker comment
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:
-      # Names (never the value) the fallback secret in the lane-outcome record.
-      fallback-credential-name: FALLBACK_CLAUDE_CODE_OAUTH_TOKEN
-      runner: ubuntu-24.04
+      lane: code
+      publish: comments
       # Bot senders this lane reviews, by numeric user id: the
       # automation-lanes App, so a commit it pushes to a pull request is
       # reviewed. Where the repository does not set this variable the value is
@@ -102,9 +97,9 @@ jobs:
       allowed-author-ids: '153232337'
     # Pass only the named secrets (least privilege) rather than
     # `secrets: inherit`, which would forward every parent secret to the
-    # called workflow.
+    # called workflow. The reviews role's API key runs first, then its
+    # subscription token after a handoff, then the central fallback subscription.
     secrets:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      # The central fallback subscription: the review retries once on it after
-      # a usage limit on the token above.
+      CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}
       FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}

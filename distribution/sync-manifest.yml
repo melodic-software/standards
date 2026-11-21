@@ -75,15 +75,18 @@ components:
   #   review lane over untrusted third-party content — and then for a security
   #   or content-scanning lane, not for claude-review as written.
   #
-  # PUBLIC SHAPE, ACCEPTED AS AN INTERIM (#622): `claude-review-hosted-caller`
-  # and `claude-security-review-hosted-caller`, sourced from
-  # `components/claude-lanes-hosted/`. Each file equals its fleet sibling
-  # except for comments and `runner: ubuntu-24.04`, which runner-policy admits
-  # on a public repository and GitHub recommends there (self-hosted runners
-  # "should almost never be used for public repositories",
-  # docs.github.com/en/actions/reference/security/secure-use). Same job ids,
-  # so the check contexts match the fleet callers. The destinations differ
-  # (`.github/workflows/pr-review-hosted.yml`,
+  # PUBLIC SHAPE (`claude-review-hosted-caller` and
+  # `claude-security-review-hosted-caller`), sourced from
+  # `components/claude-lanes-hosted/`: both call `pr-review-cli.yml@main`
+  # (`lane: code` / `lane: security`), which is hosted-only (`ubuntu-24.04`
+  # inside the reusable, no `runner` input) and runs the reviews role's API key
+  # first, then its subscription token, then `FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`
+  # (melodic-software/control-hub#13). runner-policy admits `pr-review-cli.yml`
+  # on public repositories, matching GitHub's recommendation against self-hosted
+  # runners on public repos
+  # (docs.github.com/en/actions/reference/security/secure-use). Same job ids as
+  # the fleet callers (`pr-review` / `pr-review-security`). The destinations
+  # differ (`.github/workflows/pr-review-hosted.yml`,
   # `.github/workflows/pr-review-security-hosted.yml`) because a destination
   # has exactly one owning component; each workflow `name:` is its stem in Title Case. The files live outside
   # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on

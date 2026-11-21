@@ -371,14 +371,17 @@ differently for each lane:
   advisory lanes. Public repos, `claude-code-plugins` and `ci-workflows`
   among them, remain ineligible for the fleet-routed shape.
 
-Public targets take a hosted pair instead, as an interim (#622):
+Public targets take the hosted pair:
 `claude-review-hosted-caller` and `claude-security-review-hosted-caller`,
 sourced from `components/claude-lanes-hosted/` and materialized at
 `.github/workflows/pr-review-hosted.yml` and
-`.github/workflows/pr-review-security-hosted.yml`. Each file equals its
-fleet sibling except for comments, `runner: ubuntu-24.04` and the workflow
-`name:`, which is each file's stem in Title Case; the job ids match, so the check
-contexts do too. The destinations differ because
+`.github/workflows/pr-review-security-hosted.yml`. Both call
+`ci-workflows`' hosted-only `pr-review-cli.yml@main` (`lane: code` /
+`lane: security`, running on GitHub-hosted `ubuntu-24.04` with API-key-first
+routing via `REVIEWS_CLAUDE_API_KEY`, `REVIEWS_CLAUDE_CODE_OAUTH_TOKEN`, and
+`FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`), with the workflow `name:` set to each
+destination file's stem in Title Case and the same job ids (`pr-review` /
+`pr-review-security`). The destinations differ because
 a destination has one owning component. They are `managed` for .github,
 agent-plugins, ci-runner, claude-code-account-rotation, codex-plugins and
 cursor-plugins.
@@ -404,9 +407,10 @@ constraint, now stated over the fleet literal rather than the retired selector:
 "fleet-routed claude lane callers are not managed for a public sync target",
 "claude lane caller components pass runner policy for a private self-hosted
 consumer", and "a fleet-routed claude lane caller is rejected outright on a
-public consumer". Three more hold the hosted pair: it equals its fleet sibling
-except for comments, `runner` and the `-hosted` name, every target managing it is public and
-audits clean, and no target manages both variants of one lane.
+public consumer". Three more hold the hosted pair: each calls `pr-review-cli.yml@main` with the
+expected lane, permissions, org review secrets, job id and `Hosted` workflow
+name, every target managing it is public and audits clean, and no target
+manages both variants of one lane.
 
 Public/shared-shape removal trigger: moving the runner indirection inside the
 `ci-workflows` reusable is necessary but not sufficient for one managed

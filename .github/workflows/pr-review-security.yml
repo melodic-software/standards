@@ -1,23 +1,26 @@
 name: PR Review Security
 
-# Automated PR security review via the ci-workflows reusable workflow, the
-# security sibling of pr-review.yml. Advisory: never add any check in this
-# file to required status checks (github-iac ADR 0011).
+# Automated PR security review via the ci-workflows pr-review-cli reusable
+# workflow (lane `security`), the security sibling of pr-review.yml. Advisory:
+# never add any check in this file to required status checks (github-iac
+# ADR 0011).
 #
-# Repo-local rather than the sync-managed `claude-security-review-caller`
-# component (components/claude-lanes/claude-security-review.yml): this
+# Repo-local rather than the sync-managed `claude-security-review-hosted-caller`
+# component (components/claude-lanes-hosted/claude-security-review.yml): this
 # repository is the manifest SOURCE, not a sync target. It tracks that
-# component except for the runner note below.
+# component except that it passes no `allowed-bot-sender-ids`.
 #
-# Every non-draft same-repository PR is reviewed; the reusable skips fork PRs
-# (they receive no secrets and a read-only token) and every `[bot]` actor.
+# Every non-draft same-repository PR is reviewed on GitHub-hosted
+# `ubuntu-24.04` (this repository is PUBLIC); the reusable skips fork PRs
+# (they receive no secrets and a read-only token), Dependabot, and every
+# `[bot]` actor.
 #
 # NEVER add workflow-level `paths:`/`paths-ignore:`: a check whose workflow
 # never triggers stays Pending forever.
 
 on:
   pull_request:
-    # NO `merge_group:`: the pinned action cannot serve that event; see
+    # NO `merge_group:`: the reusable runs only on `pull_request`; see
     # melodic-software/ci-workflows#272 before enabling a merge queue.
     types: [opened, synchronize, ready_for_review, reopened]
 
@@ -36,23 +39,21 @@ jobs:
     # A draft does not spend a review; ready_for_review delivers one.
     if: github.event.pull_request.draft == false
     permissions:
+      actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
+      checks: read           # Publish Review reads its earlier runs' cost notices
       contents: read         # checkout + read the diff
-      pull-requests: write   # post the security review + tracking comment
-      id-token: write        # OIDC, mints the Claude GitHub App token (required
-                             # even with an OAuth/API-key credential)
-    uses: melodic-software/ci-workflows/.github/workflows/pr-review-security.yml@main
+      pull-requests: write   # post the security review, comments, and the lane's reviewed-head marker comment
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:
-      # Names (never the value) the fallback secret in the lane-outcome record.
-      fallback-credential-name: FALLBACK_CLAUDE_CODE_OAUTH_TOKEN
-      # DEVIATION from the component, which names the managed fleet label:
-      # this repository is PUBLIC, and runner-policy admits a managed label
-      # only for an enrolled private consumer (`components/runner-policy/README.md`),
-      # so this caller pins the approved hosted label directly.
-      runner: ubuntu-24.04
+      lane: security
+      publish: comments
+      docs-only-paths: |
+        docs/**/*.md
+        **/README.md
+        **/CHANGELOG.md
     # Pass only the named secrets (least privilege) rather than `secrets:
     # inherit`, which would forward every parent secret to the called workflow.
     secrets:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      # The central fallback subscription: the review retries once on it after
-      # a usage limit on the token above.
+      CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}
       FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}
