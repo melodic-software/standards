@@ -100,7 +100,6 @@ if [[ "$command" == file ]]; then
   exit 1
 fi
 
-# ---- fleet ---------------------------------------------------------------
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 

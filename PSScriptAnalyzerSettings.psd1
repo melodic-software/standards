@@ -36,8 +36,6 @@
     )
 
     Rules = @{
-        # --- Formatting: OTBS (One True Brace Style) ---
-
         PSPlaceOpenBrace = @{
             Enable             = $true
             OnSameLine         = $true
@@ -98,8 +96,6 @@
         # 5.1 target and silent with 7.4/7.6. Re-add with TargetVersions if
         # a consumer ever needs a floor below the newest syntax-bearing
         # PowerShell release.
-
-        # --- Best practices ---
 
         PSAvoidUsingCmdletAliases = @{
             Enable    = $true

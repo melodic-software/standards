@@ -37,8 +37,6 @@ for tool in git sed grep sort paste cmp jq; do
     fail 'required tool present' "$tool is missing; this environment cannot run the subject"
 done
 
-# ---------------------------------------------------------------- gh stubbing
-
 # stub_gh <dir> — a `gh` that answers the four endpoints repin::resolve calls,
 # driven entirely by STUB_* variables the caller exports. It reproduces gh's
 # real 404 shape (`gh: Not Found (HTTP 404)` on stderr, non-zero exit) because
@@ -167,8 +165,6 @@ run_resolve() {
   PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$outfile" bash "$script" resolve "$upstream" 2>&1
 }
 
-# ------------------------------------------------------------ resolve: shapes
-
 # Lightweight tag — the shape ci-workflows cuts today. The ref points straight
 # at the commit, so no second dereference happens.
 out_file="$scratch/out-lightweight"
@@ -215,8 +211,6 @@ assert_contains 'resolve: annotated tag reports the tag object' "$out" 'tag obje
 assert_contains 'resolve: annotated tag dereferences to the commit' "$(cat "$out_file")" "sha=$new_sha"
 assert_not_contains 'resolve: annotated tag never emits the tag object SHA' "$(cat "$out_file")" "$tag_object"
 unset STUB_TAG_OBJECT_SHA
-
-# ------------------------------------------- resolve: highest SemVer wins
 
 # THE SOURCE-OF-TRUTH RULE. The subject picks the highest-SemVer published
 # release, not the first entry and not the one the `releases/latest` endpoint
@@ -266,8 +260,6 @@ assert_contains 'resolve: an empty release set emits resolved=false' "$(cat "$ou
 assert_contains 'resolve: an empty release set is a notice' "$out" '::notice::'
 assert_not_contains 'resolve: an empty release set raises no error' "$out" '::error::'
 unset STUB_RELEASE_TAGS
-
-# ------------------------------------------------- resolve: 404 vs 404
 
 # Benign: the repository reads, it simply has no published release. A clean
 # no-op, because there is nothing to re-pin against yet. Under the LIST
@@ -334,8 +326,6 @@ rc=0
 out="$(PATH="$stub_bin:$PATH" GITHUB_OUTPUT='' bash "$script" resolve "$upstream" 2>&1)" || rc=$?
 assert_nonzero 'resolve: missing GITHUB_OUTPUT fails' "$rc"
 
-# ------------------------------------------------------------- apply: fixtures
-
 # commit_all <dir> <message> — stage everything and commit, ignoring ambient
 # signing and hooks the way make_repo does.
 commit_all() {
@@ -398,8 +388,6 @@ run_apply() {
   (cd "$dir" && PATH="$stub_bin:$PATH" GITHUB_OUTPUT="$outfile" \
     bash "$script" apply "$tag" "$sha" "$release_date" 2>&1)
 }
-
-# ------------------------------------------- apply: rewrite scope + major jump
 
 repo="$scratch/repo-major"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
@@ -514,8 +502,6 @@ assert_contains 'apply: mixed-SHA extras include the guard caller component' "$m
 assert_contains 'apply: mixed-SHA extras include the fleet guard caller component' "$mixed_paths" \
   "$guard_fleet_caller"
 unset STUB_COMPARE_STATUS
-
-# ------------------------------------------ apply: a pin ahead of the release
 
 # guard_repo <dir> <guard-date> <message> — a lane_repo plus the three
 # .github/workflows extras at the old tag-form pin and both guard callers at a
@@ -685,8 +671,6 @@ assert_contains 'narrowing: an @main reusable is untouched' "$(cat "$repo/.githu
 assert_eq 'narrowing: a caller with only a SHA-pinned reusable stays byte-identical' \
   "$(git -C "$repo" diff --name-only -- components/claude-lanes-hosted/reusable-only.yml)" ''
 
-# ------------------------------------------------- apply: same major, no diff
-
 repo="$scratch/repo-minor"
 lane_repo "$repo" "$old_sha" 'v0.9.1'
 out_file="$scratch/out-apply-minor"
@@ -709,8 +693,6 @@ assert_contains 'apply: no-diff run reports changed=false' "$(cat "$out_file")" 
 assert_not_contains 'apply: no-diff run never reports a change' "$(cat "$out_file")" 'changed=true'
 assert_contains 'apply: no-diff run is a notice' "$out" '::notice::'
 assert_silent 'apply: no-diff run leaves the tree clean' "$(git -C "$repo" status --porcelain)"
-
-# ------------------------------------------------------------ apply: controls
 
 # A repository with no lane callers must fail rather than report a clean no-op
 # — silently re-pinning nothing is how this job would rot after a rename.
@@ -772,8 +754,6 @@ rc=0
 out="$(GITHUB_OUTPUT="$scratch/out-usage" bash "$script" apply v1.0.0 "$new_sha" 2>&1)" || rc=$?
 assert_nonzero 'apply without the release date is a usage error' "$rc"
 assert_contains 'apply usage names the date argument' "$out" '<date>'
-
-# ------------------------------------------- apply: only the paths a release changed
 
 # consumer_repo <dir>: a consumer-shaped checkout whose callers live under
 # .github/ alone: two reusable workflows still SHA-pinned (never moved; they

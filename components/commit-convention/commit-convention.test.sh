@@ -49,7 +49,6 @@ $1" "$yaml_package" "${@:2}"
 # Comma-joined, sorted types.
 sorted_csv() { tr ',' '\n' | sed '/^$/d' | LC_ALL=C sort | paste -sd, -; }
 
-# --- The file itself ---
 parsed="$(node_eval 'const d = yaml.parse(fs.readFileSync(process.argv[2], "utf8"));
 process.stdout.write(JSON.stringify([d.dialect, d.subject_pattern, d.pr_title_pattern]));' "$source_file")"
 rc=$?
@@ -73,7 +72,6 @@ git -C "$root" ls-files --error-unmatch -- "$well_known" >/dev/null 2>&1
 rc=$?
 assert_exit "this repository tracks $well_known" 0 "$rc"
 
-# --- Types lockstep ---
 file_types="$(sed -E -n 's/^\^\(\(([a-z|]+)\).*/\1/p' <<<"$pattern" | tr '|' ',' | sorted_csv)"
 if [[ -n "$file_types" ]]; then
   pass 'the type alternation is extractable from subject_pattern'
@@ -110,7 +108,6 @@ else
   fail "fetched check-contract action.yml at ${contract_pin:0:7}" 'fetch-error: the contents API read failed'
 fi
 
-# --- The resolver reads the tracked file at the well-known path ---
 repo="$TEST_TMPDIR/consumer"
 make_repo "$repo"
 mkdir -p "$repo/${well_known%/*}"
@@ -136,7 +133,6 @@ rc=$?
 assert_exit 'resolver resolves subject_pattern in this repository' 0 "$rc"
 assert_eq "this repository's resolved pattern is the component's" "$pattern" "$out"
 
-# --- The commit-msg hook accepts and rejects ---
 check_subject() {
   local subject="$1" msg="$TEST_TMPDIR/msg"
   printf '%s\n' "$subject" >"$msg"

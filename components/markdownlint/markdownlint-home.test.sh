@@ -30,8 +30,6 @@ fi
 manifest='distribution/sync-manifest.yml'
 component='markdownlint-home'
 
-# --- The manifest mapping is what the rest of this test depends on ------------
-
 # Read the manifest with the `yaml` package `npm ci` already installs, NOT `yq`:
 # this job installs only Node dependencies, and the pinned `yq` lives in other,
 # isolated jobs — a `yq` call here would exit 127 on a clean runner and fail the
@@ -102,8 +100,6 @@ esac
 
 deployed_name=".${dest_path#dot_}"
 assert_eq 'dot_ rename yields the discoverable filename' '.markdownlint-cli2.jsonc' "$deployed_name"
-
-# --- Discovery: no --config, config found by name in the working directory ----
 
 home="$(mktemp -d)"
 trap 'rm -rf "$home"' EXIT

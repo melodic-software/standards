@@ -295,10 +295,6 @@ test("a composite that stops lowercasing the line is drift, not a pass", () => {
 
 // The composite's findings at one codex-plugins pin, with the good action.yml.
 
-// ---------------------------------------------------------------------------
-// Which artifact a consumer runs.
-// ---------------------------------------------------------------------------
-
 const COMPOSITE_DIRECTORY = ".github/actions/pr-require-checks/check-contract";
 const COMPOSITE_STEP = `      - uses: melodic-software/ci-workflows/${COMPOSITE_DIRECTORY}@1234567890abcdef1234567890abcdef12345678 # v0.34.0`;
 const REUSABLE_CALL =
@@ -457,10 +453,6 @@ test("a gate composite missing from ci-workflows main is a fetch error", async (
   );
 });
 
-// ---------------------------------------------------------------------------
-// The fleet, mid-transition.
-// ---------------------------------------------------------------------------
-
 function fleetResolutions(overrides = {}) {
   const resolutions = new Map();
   for (const repo of CONSUMER_REPOSITORIES) {
@@ -613,9 +605,7 @@ test("a global probe does not go stateful across repeated keyword probes", () =>
   }
 });
 
-// ---------------------------------------------------------------------------
 // Mode selection: the copy check and the pin scan run separately.
-// ---------------------------------------------------------------------------
 
 test("the CLI takes exactly one known mode", () => {
   assert.deepEqual(MODES, ["copies", "pins"]);

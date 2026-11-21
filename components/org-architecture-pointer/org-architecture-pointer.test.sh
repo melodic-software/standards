@@ -35,7 +35,6 @@ mkdir -p "$work/fleet/empty"
 repo near-miss AGENTS.md 'melodic-software/architectures-of-others and melodic-software/architecture-x'
 repo bare-line AGENTS.md 'See melodic-software/architecture'
 
-# --- file ------------------------------------------------------------------
 # check_file <fixture repo> — `file` mode over one fixture, stderr merged.
 check_file() { bash "$script" file --root "$work/fleet/$1" 2>&1; }
 
@@ -65,7 +64,6 @@ assert_exit 'file fails on a longer repository name sharing the prefix' 1 $?
 out="$(check_file bare-line)"
 assert_exit 'file passes when the name ends the line' 0 $?
 
-# --- fleet -----------------------------------------------------------------
 printf '%s\n' in-agents in-claude in-both bare-line >"$work/ok.txt"
 out="$(bash "$script" fleet --repos "$work/ok.txt" --fixtures "$work/fleet" 2>&1)"
 assert_exit 'fleet passes when every repo conforms' 0 $?
@@ -80,7 +78,6 @@ assert_contains 'fleet names a longer-name near miss' "$out" 'MISSING: near-miss
 assert_contains 'fleet names a repo with neither file' "$out" 'MISSING: empty:'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: in-agents'
 
-# --- names -----------------------------------------------------------------
 # The listing filter both fleet listings apply: sandbox anywhere in the
 # topics, archived, the architecture repo itself, and absent or null topics.
 listing='[
@@ -98,7 +95,6 @@ assert_eq 'names keeps only audited repositories' "$expected" "$out"
 out="$(printf '%s\n' "$listing" | jq -c '.[]' | bash "$script" names 2>&1)"
 assert_eq 'names reads a stream of objects, as gh --jq emits' "$expected" "$out"
 
-# --- usage -----------------------------------------------------------------
 bash "$script" bogus >/dev/null 2>&1
 assert_exit 'an unknown command is a usage error' 2 $?
 bash "$script" fleet --repos "$work/absent.txt" --fixtures "$work/fleet" >/dev/null 2>&1

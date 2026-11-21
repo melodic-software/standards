@@ -21,12 +21,10 @@ import {
   POLICY,
 } from "./lockstep-fixtures.mjs";
 
-// ---------------------------------------------------------------------------
 // Non-closing references and negated closers (#647). Static extractors diff
 // the declared data; the behavioral layer runs the vendored copies on a
 // policy-generated matrix, so every mutation below that breaks behavior must
 // surface as a `(behavior)` finding whatever source shape it takes.
-// ---------------------------------------------------------------------------
 
 test("non-closing and negation parsers read the policy's values from both copies", () => {
   const expectedMarkers = POLICY.body.nonClosingMarkers.map((marker) => marker.toLowerCase());

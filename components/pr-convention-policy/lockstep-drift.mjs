@@ -138,12 +138,10 @@ function collect(errors, fn) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // The `check-contract` composite (the live gate, and every migrated consumer).
 //
 // `run.sh` states the section list as data: the analyzer's END block calls
 // `section_report("<name>")` once per required section, in contract order.
-// ---------------------------------------------------------------------------
 export function parseCompositeSections(runShText, location) {
   const names = [...runShText.matchAll(/section_report\("([^"]+)"\)/g)].map((m) => m[1]);
   if (names.length === 0) {
@@ -283,14 +281,12 @@ export function assertCompositeIssueRefDefault(runShText, actionYmlText, locatio
   }
 }
 
-// ---------------------------------------------------------------------------
 // The `pr-issue-linkage.yml` reusable (the predecessor, still pinned by every
 // consumer that has not taken its Phase 3 pull request yet).
 //
 // The reusable declares its contract as a `requiredSections` array of
 // `{ name: "...", guidance: "..." }` literals inside an actions/github-script
 // step. The array literal is the narrowest stable surface to parse.
-// ---------------------------------------------------------------------------
 export function parseGateSections(workflowText, location) {
   const arrayMatch = workflowText.match(/const requiredSections = \[([\s\S]*?)\n\s*\];/);
   if (!arrayMatch) {
@@ -331,10 +327,6 @@ export function parseGatePatterns(workflowText, location) {
     marker: new RegExp(marker[1], probeFlags(marker[2])),
   };
 }
-
-// ---------------------------------------------------------------------------
-// The other two remote copies.
-// ---------------------------------------------------------------------------
 
 // The hook validator declares `REQUIRED_SECTIONS=(Summary Fix ...)`.
 export function parseValidatorSections(shellText, location) {
@@ -396,7 +388,6 @@ export function parseValidatorPatterns(shellText, location) {
   return { keyword: ereToJs(keyword[1]), marker: ereToJs(marker[1]) };
 }
 
-// ---------------------------------------------------------------------------
 // Non-closing references and negated closers (`body.nonClosingMarkers` and
 // `body.negatedClosers`). Two layers: the static extractors below diff the
 // DATA each copy declares (marker alternation, trigger words, suffix,
@@ -405,7 +396,6 @@ export function parseValidatorPatterns(shellText, location) {
 // generated from policy, which proves the rule is wired from declaration to
 // verdict whatever shape the code takes. The behavioral layer replaced a chain
 // of source-shape regexes that every review round found one more gap in.
-// ---------------------------------------------------------------------------
 
 // The marker alternation is the first group of the pattern, after the `^`
 // anchor and the hook's `{0,3}` indent allowance (the composite strips that
@@ -587,10 +577,6 @@ export function parseCompositeNegation(runShText, location) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Which artifact a consumer runs.
-// ---------------------------------------------------------------------------
-
 // Every pattern below anchors on a `uses:` entry with no `#` earlier on the
 // line, so only a live call site counts. The same paths appear elsewhere in
 // ci-workflows' own `ci.yml` as a lint `paths:` list and as a
@@ -648,10 +634,6 @@ export function parseCallerPin(workflowText, location) {
   }
   return match[1];
 }
-
-// ---------------------------------------------------------------------------
-// Comparisons.
-// ---------------------------------------------------------------------------
 
 function assertPatternsEnforce(patterns, policy, location, { lowercaseProbe = false } = {}) {
   const probe = (text) => (lowercaseProbe ? text.toLowerCase() : text);
@@ -1120,10 +1102,6 @@ export function checkFleet(policy, resolutions) {
   }
   return errors;
 }
-
-// ---------------------------------------------------------------------------
-// Live mode.
-// ---------------------------------------------------------------------------
 
 function apiHeaders(accept) {
   const token = process.env.LOCKSTEP_GITHUB_TOKEN || process.env.GITHUB_TOKEN;

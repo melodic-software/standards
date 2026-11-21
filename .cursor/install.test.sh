@@ -13,8 +13,6 @@ cd "$root" || exit 1
 # shellcheck source=.cursor/install.sh
 CURSOR_INSTALL_LIBONLY=1 source "$root/.cursor/install.sh"
 
-# --- PATH-link helpers ------------------------------------------------------
-
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
@@ -49,8 +47,6 @@ assert_exit 'self-link into the nvm bin dir does not abort' 0 "$self_link_rc"
 PATH="$nvm_bin:/exec-daemon:$other_bin:/usr/bin"
 found="$(cursor_install::choose_link_dir "$nvm_bin")"
 assert_eq 'a writable dir after exec-daemon is not selected' '' "$found"
-
-# --- Engine pin lockstep with ci-workflows ----------------------------------
 
 parse_install_pin() {
   local name="$1"
