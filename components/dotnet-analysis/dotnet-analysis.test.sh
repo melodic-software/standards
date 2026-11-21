@@ -51,7 +51,7 @@ cat >"$work/scratch.csproj" <<XML
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="$root/components/dotnet-analysis/Directory.Build.props" />
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

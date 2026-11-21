@@ -36,7 +36,7 @@
 # interleaves; the main shell's LOG is untouched by design.
 set -u
 
-SCRIPT_VERSION='2026-11-17.1'
+SCRIPT_VERSION='2026-11-21.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
 # Fleet plugin list: every plugin in the melodic-software marketplace catalog
@@ -335,7 +335,7 @@ fi
 # is unresolved). Each repo's cloud-bootstrap still installs its exact pins
 # repo-locally — the env copy is a warm cache, the bootstrap the
 # correctness guarantee.
-DOTNET_FALLBACK_VERSIONS='10.0.400 10.0.401'
+DOTNET_FALLBACK_VERSIONS='11.0.100'
 NODE_FALLBACK_VERSION='24.21.0'
 dotnet_versions="$DOTNET_FALLBACK_VERSIONS"
 if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/global.json" ]]; then

@@ -10,5 +10,5 @@ test-cmd: "bash harness/shell/run-tests.sh components/dotnet-analysis/dotnet-ana
 check-cmd: null
 fix-cmd: null
 code-fix-cmd: null
-install-hint: "Install the .NET 10 SDK from https://dot.net (CI runs the contract test on 10.0.301 and builds and formats the good fixture on 10.0.400)"
+install-hint: "Install the .NET 11 SDK from https://dot.net (CI pins 11.0.100 for the contract test, build, and format checks)"
 notes: "No anchor: there is no solution, and the bad fixture project fails analysis on purpose. The contract suite exits 0 with a skipped count when the SDK is missing (harness/shell/lib.sh skip_suite): a skipped count is not a pass."
