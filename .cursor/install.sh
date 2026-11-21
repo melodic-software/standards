@@ -83,7 +83,6 @@ cd -- "$repo_root"
 
 log() { printf 'cursor-install: %s\n' "$*"; }
 
-# --- Node from .node-version (via nvm) --------------------------------------
 node_pin="$(tr -d '[:space:]' <.node-version)"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
@@ -105,7 +104,6 @@ if [[ ! -x "$node_bin_dir/node" ]]; then
   exit 1
 fi
 
-# --- Make the pinned node win on PATH ---------------------------------------
 # Link node/npm/npx into the first writable PATH directory that comes before
 # /exec-daemon, whose bundled node would otherwise shadow the pinned one.
 link_dir="$(cursor_install::choose_link_dir "$node_bin_dir")"
@@ -119,7 +117,6 @@ fi
 
 log "node $(node --version) / npm $(npm --version)"
 
-# --- npm dependency roots ---------------------------------------------------
 for lock in package-lock.json components/*/package-lock.json distribution/package-lock.json; do
   [[ -f "$lock" ]] || continue
   dir="$(dirname -- "$lock")"
@@ -139,12 +136,9 @@ if [[ "$hooks_skipped" == false ]]; then
   npm run prepare || log 'npm run prepare failed; git hooks are not installed'
 fi
 
-# --- Always-on hygiene engines (Lefthook pre-commit) ------------------------
 bin_dir=/usr/local/bin
 stamp_dir=/usr/local/share/melodic-cursor
 
-# put_bin <source-path> <dest-name>: install an executable into bin_dir, using
-# sudo only when the directory is not directly writable.
 put_bin() {
   if [[ -w "$bin_dir" ]]; then
     install -m 0755 "$1" "$bin_dir/$2"
@@ -153,7 +147,6 @@ put_bin() {
   fi
 }
 
-# write_stamp <dest-name> <version>: record the installed version for idempotence.
 write_stamp() {
   if [[ -w "$stamp_dir" ]] || { [[ ! -e "$stamp_dir" ]] && [[ -w "$(dirname -- "$stamp_dir")" ]]; }; then
     mkdir -p "$stamp_dir"
@@ -164,7 +157,6 @@ write_stamp() {
   fi
 }
 
-# install_engine <dest> <version> <url> <sha256> <member-in-archive>
 install_engine() {
   dest="$1"
   version="$2"

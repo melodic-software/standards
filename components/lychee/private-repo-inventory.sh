@@ -188,7 +188,6 @@ if [[ "$command" == generate ]]; then
   exit 0
 fi
 
-# ---- check ---------------------------------------------------------------
 status=0
 problem() {
   printf 'DRIFT: %s\n' "$*" >&2

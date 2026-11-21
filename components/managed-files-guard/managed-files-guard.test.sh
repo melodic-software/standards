@@ -71,9 +71,6 @@ managed_union() {
   done | LC_ALL=C sort -u
 }
 
-# ------------------------------------------------------------------ 1. shape
-
-# check_shape <source> <component> <runs-on> <destination>: the locked design, per file.
 title_case() {
   local words word title=''
   IFS=- read -r -a words <<<"$1"
@@ -172,8 +169,6 @@ else
     "$(diff <(strip "$hosted_source") <(strip "$fleet_source"))"
 fi
 
-# ------------------------------------------------------- 2. manifest wiring
-
 for pair in "$hosted_component:$hosted_source:$hosted_destination" \
   "$fleet_component:$fleet_source:$fleet_destination"; do
   IFS=: read -r c s d <<<"$pair"
@@ -235,8 +230,6 @@ assert_eq 'ci-workflows owns the guard locally (it runs the action from its own 
 assert_eq 'every sync target is covered: hosted, fleet-routed, or locally-owned' \
   '' "$(printf '%s\n' "${unaccounted[@]-}" | paste -sd, -)"
 
-# ------------------------------------------------------ 3. materialization
-
 have_actionlint=0
 if command -v actionlint >/dev/null 2>&1; then
   have_actionlint=1
@@ -244,7 +237,6 @@ else
   skip_case 'actionlint not installed; the materialized callers are not linted'
 fi
 
-# materialize <target> <expected source> <expected destination> <absent destination>
 materialize() {
   local target="$1" source="$2" destination="$3" absent="$4" consumer out rc
   consumer="$scratch/${target##*/}"

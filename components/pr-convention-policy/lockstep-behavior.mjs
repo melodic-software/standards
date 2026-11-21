@@ -375,9 +375,7 @@ function run(command, args, options, location, what) {
   return result;
 }
 
-// ---------------------------------------------------------------------------
 // The composite: its analyzer is the awk program inside `analyze_body`.
-// ---------------------------------------------------------------------------
 
 // The awk program is single-quoted bash, so an apostrophe inside it is spelled
 // `'"'"'`; read it back as the apostrophe awk sees.
@@ -466,11 +464,9 @@ export function checkCompositeBehavior(runShText, policy, location, wiringLocati
   reportMismatches(compositeMismatchCache.get(key), location);
 }
 
-// ---------------------------------------------------------------------------
 // The hook: a sourced bash library whose aggregate verdict is
 // `linkage::problems`, which fills LINKAGE_PROBLEMS. The harness feeds it the
 // matrix NUL-separated and prints each body's problems, NUL-terminated.
-// ---------------------------------------------------------------------------
 
 const HOOK_HARNESS = [
   "export LC_ALL=C",

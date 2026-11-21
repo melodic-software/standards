@@ -139,7 +139,6 @@ function canonicalGitRoot(requested) {
   return physical;
 }
 
-// --- Git index plumbing -------------------------------------------------------
 // One batched ls-files call and one batched hash-object call per root: the
 // spawn-count contract in the suite asserts exactly one of each during a
 // production validate.
@@ -253,8 +252,6 @@ function trackedRegularMode(root, p, purpose) {
   }
   return mode;
 }
-
-// --- YAML node helpers ----------------------------------------------------------
 
 let manifestSource = "";
 let manifestDoc = null;
@@ -392,8 +389,6 @@ function validateRecordKeys(label, required, optional, keys) {
   }
   if (!found) die(`${label} is missing required key '${required}'`);
 }
-
-// --- Manifest validation --------------------------------------------------------
 
 const componentNames = [];
 const targetNames = [];
@@ -770,8 +765,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
   }
 }
 
-// --- Selection and emitters -------------------------------------------------------
-
 function selectTargets(filter) {
   if (!filter) return [...targetNames];
   const requested = new Set();
@@ -845,8 +838,6 @@ function emitPlan(selected) {
     }
   }
 }
-
-// --- Apply --------------------------------------------------------------------------
 
 function verifyTargetIdentity(targetRoot, expected) {
   const result = runGit(["-C", targetRoot, "remote", "get-url", "--all", "origin"]);
@@ -966,8 +957,6 @@ function applyTarget(sourceRoot, target, targetRootRequested) {
     process.stdout.write(`removed previous destination ${retiredPath}\n`);
   }
 }
-
-// --- CLI ----------------------------------------------------------------------------
 
 function main() {
   const argv = process.argv.slice(2);

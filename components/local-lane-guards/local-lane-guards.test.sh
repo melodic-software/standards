@@ -34,7 +34,6 @@ guard_in() {
   )
 }
 
-# --- exec-bit ---
 make_repo "$tmpdir/exec-clean"
 printf '#!/usr/bin/env bash\necho ok\n' >"$tmpdir/exec-clean/ok.sh"
 git -C "$tmpdir/exec-clean" add ok.sh
@@ -126,7 +125,6 @@ else
   pass 'exec-bit stays bash-3.2-safe (no declare -A)'
 fi
 
-# --- machine-specific-paths ---
 make_repo "$tmpdir/path-clean"
 printf 'root = <repo-root>/src\n' >"$tmpdir/path-clean/config.ini"
 git -C "$tmpdir/path-clean" add config.ini
@@ -201,7 +199,6 @@ chmod +x "$path_spawn/bin/git" "$path_spawn/bin/head"
 assert_eq 'machine-specific-paths greps the index once' '1' "$(cat "$path_spawn/grep")"
 assert_eq 'machine-specific-paths does not spawn head to cap output' '0' "$(cat "$path_spawn/head")"
 
-# --- comment-hygiene ---
 make_repo "$tmpdir/ch-clean"
 printf '# A plain explanatory comment.\necho ok\n' >"$tmpdir/ch-clean/clean.sh"
 git -C "$tmpdir/ch-clean" add clean.sh
@@ -243,7 +240,6 @@ chmod +x "$ch_spawn/bin/awk"
 )
 assert_eq 'comment-hygiene does not spawn awk per git-grep hit' '0' "$(cat "$ch_spawn/awk")"
 
-# --- reference-integrity ---
 make_repo "$tmpdir/ref-clean"
 printf '# Target\n\nBody.\n' >"$tmpdir/ref-clean/target.md"
 # shellcheck disable=SC2016 # backticks are markdown cite syntax, not shell expansion

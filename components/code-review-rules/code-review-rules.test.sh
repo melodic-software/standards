@@ -67,7 +67,6 @@ repo nested-fence "$(
   printf '%s`\n' "$fence"
 )" review
 
-# --- file ------------------------------------------------------------------
 # check_file <fixture repo> — `file` mode over one fixture, stderr merged.
 check_file() { bash "$script" file --root "$work/fleet/$1" 2>&1; }
 
@@ -141,7 +140,6 @@ out="$(check_file nested-fence)"
 assert_exit 'a shorter fence inside a four-backtick fence does not close it' 1 $?
 assert_contains 'a section inside the longer fence does not count' "$out" "no '## Code Review Rules' heading"
 
-# --- fleet -----------------------------------------------------------------
 printf '%s\n' synced remote >"$work/ok.txt"
 out="$(bash "$script" fleet --repos "$work/ok.txt" --fixtures "$work/fleet" 2>&1)"
 assert_exit 'fleet passes when every repo conforms' 0 $?
@@ -155,7 +153,6 @@ assert_contains 'fleet names a repo with the wrong pointer' "$out" 'MISSING: wro
 assert_contains 'fleet names a repo with a duplicate pointer' "$out" 'MISSING: duplicate-stale: 2 org-wide criteria pointer lines'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: synced'
 
-# --- names -----------------------------------------------------------------
 # The listing filter both fleet listings apply, over repository objects shaped
 # like the GitHub API's: sandbox anywhere in the topics, archived, and absent
 # or null topics.
@@ -174,7 +171,6 @@ assert_eq 'names keeps only audited repositories' "$(printf '%s\n' kept no-topic
 out="$(printf '%s\n' "$listing" | jq -c '.[]' | bash "$script" names 2>&1)"
 assert_eq 'names reads a stream of objects, as gh --jq emits' "$(printf '%s\n' kept no-topics null-topics sandboxed-word)" "$out"
 
-# --- usage -----------------------------------------------------------------
 bash "$script" bogus >/dev/null 2>&1
 assert_exit 'an unknown command is a usage error' 2 $?
 bash "$script" fleet --repos "$work/absent.txt" --fixtures "$work/fleet" >/dev/null 2>&1

@@ -83,8 +83,6 @@ else
   [[ -z "$page_id" || "$page_id" =~ $id_re ]] || usage "invalid id '$page_id'"
 fi
 
-# ---------------------------------------------------------------- config
-
 declare -A cfg=()
 keys=(PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET
   PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET)
@@ -132,8 +130,6 @@ load_config() {
 }
 
 load_config
-
-# ---------------------------------------------------------------- upload
 
 # send <visibility> <method> <path> [<file>]: one request to that visibility's
 # upload origin. Sets status and body. The bearer token, and for the private
@@ -187,15 +183,11 @@ if [[ -n "$delete_id" ]]; then
   exit 0
 fi
 
-# ---------------------------------------------------------------- input
-
 tmp_root="$(realpath -e -- "${TMPDIR:-/tmp}" 2>/dev/null)" || die 3 "temp dir ${TMPDIR:-/tmp} does not exist"
 real="$(realpath -e -- "$file" 2>/dev/null)" || die 3 "$file does not exist"
 [[ -f "$real" && "$real" == "$tmp_root"/* ]] || die 3 "$file is not a regular file under $tmp_root"
 stamp_re='<!-- rv-gen:[A-Za-z0-9._-]+ sha256:[0-9a-f]{64} -->'
 grep -aqE -- "$stamp_re" "$real" || die 3 "$file carries no builder stamp <!-- rv-gen:<name> sha256:<64 hex> -->"
-
-# ---------------------------------------------------------------- scan
 
 # A copy of the shapes in claude-code-plugins lib/publish-gate.mjs and the
 # upload Worker's scan.js; change all three together. Only these shapes are
@@ -396,8 +388,6 @@ if [[ -n "$reason" ]]; then
   sent=private
 fi
 [[ "$sent" == "$visibility" ]] || page_id=''
-
-# ---------------------------------------------------------------- publish
 
 send "$sent" PUT "/_upload${page_id:+/$page_id}" "$real"
 if [[ "$status" == 409 && "$sent" == public && "$body" == private-required ]]; then

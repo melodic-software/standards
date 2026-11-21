@@ -5603,12 +5603,10 @@ test("anchored uses scalars retain provenance enforcement", async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // The `managed-literal` routing target: the governed fleet label written
 // directly, which is the only way a job reaches the managed fleet. Admitted
 // only on a private repository enrolled for local routing; everywhere else the
 // existing routing gate refuses it under its existing rule id.
-// ---------------------------------------------------------------------------
 
 const FLEET_LANE_CONTRACT = {
   routing: "runner-input",
@@ -6020,13 +6018,11 @@ test("a runner-input contract's fixedRunsOn must name known GitHub-hosted labels
   );
 });
 
-// ---------------------------------------------------------------------------
 // The ci-workflows `checks` consolidation reusable. One job, one runner, every
 // content-agnostic hygiene composite as a step: the lane the CI performance
 // program moves five repositories onto. Its contract is drawn at the
 // reusable's whole declared input surface rather than at any one caller's
 // subset, so a later caller needs no second standards round trip.
-// ---------------------------------------------------------------------------
 
 const CHECKS_REFERENCE =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1";
