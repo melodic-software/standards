@@ -234,9 +234,15 @@ integration PR. The sandbox takes the runtime only as the npm manifest its
 PR-pipeline lanes install, and runs no runner-policy gate, so its adoption is
 deferred until it gains one:
 
-1. A locally owned `.github/runner-policy.json` with correct visibility,
-   enrollment, and exact job exception and local-routing-grant inventory. A
-   hosted-only consumer uses `selfHostedCi: false` and `exceptions: {}`;
+1. For private consumers (or a public consumer that wants an explicit
+   `repositoryOwner` tripwire), a locally owned `.github/runner-policy.json`
+   with correct visibility, enrollment, and exact job exception and
+   local-routing-grant inventory. A public hosted-only consumer may omit
+   `.github/runner-policy.json` when CI passes
+   `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`, which
+   applies the built-in `{ visibility: "public", selfHostedCi: false, exceptions: {} }`
+   default; a private consumer without the file fails closed. A hosted-only
+   consumer with the file uses `selfHostedCi: false` and `exceptions: {}`;
    fixed approved hosted targets need no exception and the analyzer rejects
    every unconsumed entry as
    `exception-inventory-drift` (grants likewise fail as

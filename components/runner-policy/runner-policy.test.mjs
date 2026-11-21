@@ -6948,3 +6948,101 @@ test("the fleet-routed dependabot-automerge caller audits clean on every private
   );
   assert.ok(rules.has("public-self-hosted-routing"), `${source} is expected to be private-only`);
 });
+
+test("missing .github/runner-policy.json defaults to public hosted-only when visibility evidence is public", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "runner-policy-public-default-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github", "workflows", "ci.yml"), HOSTED_WORKFLOW);
+
+  assert.deepEqual(
+    await auditRepository({
+      root,
+      repositoryVisibility: "public",
+      githubRepository: "melodic-software/standards",
+    }),
+    [],
+  );
+
+  await writeFile(
+    path.join(root, ".github", "workflows", "fleet.yml"),
+    `name: Fleet\non: [pull_request]\npermissions: {}\njobs:\n  build:\n    runs-on: melodic-ubuntu-24.04-x64\n    permissions:\n      contents: read\n    steps:\n      - run: echo hi\n`,
+  );
+  const rules = new Set(
+    (
+      await auditRepository({
+        root,
+        repositoryVisibility: "public",
+        githubRepository: "melodic-software/standards",
+      })
+    ).map(({ rule }) => rule),
+  );
+  assert.ok(rules.has("public-self-hosted-routing"));
+  assert.ok(rules.has("raw-self-hosted-label"));
+});
+
+test("missing .github/runner-policy.json fails closed without public visibility evidence, on private repos, or on explicit --config", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "runner-policy-missing-fail-closed-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github", "workflows", "ci.yml"), HOSTED_WORKFLOW);
+
+  await assert.rejects(
+    () => auditRepository({ root }),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /may be omitted only when CI_REPOSITORY_VISIBILITY or --repository-visibility is "public"/u.test(
+        error.message,
+      ),
+  );
+  await assert.rejects(
+    () => auditRepository({ root, repositoryVisibility: "private" }),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /private repositories must declare \.github\/runner-policy\.json/u.test(error.message),
+  );
+  await assert.rejects(
+    () => auditRepository({ root, repositoryVisibility: "internal" }),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /repository visibility evidence must be "public" or "private"/u.test(error.message),
+  );
+  await assert.rejects(
+    () =>
+      auditRepository({
+        root,
+        configPath: ".github/custom-runner-policy.json",
+        repositoryVisibility: "public",
+      }),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /repository runner config could not be read/u.test(error.message),
+  );
+});
+
+test("dangling .github/runner-policy.json symlink fails closed even with public visibility evidence", async (context) => {
+  const root = await mkdtemp(path.join(tmpdir(), "runner-policy-dangling-symlink-"));
+  temporaryRoots.push(root);
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github", "workflows", "ci.yml"), HOSTED_WORKFLOW);
+
+  try {
+    await symlink(
+      path.join(root, ".github", "does-not-exist.json"),
+      path.join(root, ".github", "runner-policy.json"),
+      "file",
+    );
+  } catch (error) {
+    if (new Set(["EPERM", "EACCES", "ENOTSUP"]).has(error.code)) {
+      context.skip(`symlink creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  await assert.rejects(
+    () => auditRepository({ root, repositoryVisibility: "public" }),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /repository runner config could not be read/u.test(error.message),
+  );
+});
