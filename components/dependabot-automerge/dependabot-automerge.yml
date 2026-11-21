@@ -1,0 +1,41 @@
+name: PR Automerge Dependabot Hosted
+
+# SYNC-MANAGED FILE: DO NOT EDIT IN THE CONSUMING REPOSITORY.
+# Source of truth: melodic-software/standards,
+# components/dependabot-automerge/dependabot-automerge.yml (the
+# `dependabot-automerge-caller` component in distribution/sync-manifest.yml).
+# Downstream edits are overwritten by the next sync PR; change the component
+# upstream, or move the component to `locally-owned` in the manifest to
+# customize.
+#
+# Thin caller of the org's pr-automerge-dependabot reusable workflow
+# (melodic-software/ci-workflows). Arms GitHub auto-merge (squash) on a
+# Dependabot minor or patch pull request under the merge tiers in the synced
+# standards dependabot-policy (`.github/standards/dependabot-policy/policy.json`):
+# allowlisted GitHub Actions publishers (including `melodic-software/*`) and
+# npm, pip, uv and NuGet updates outside `autoMerge.reviewOnly`. Arming never
+# merges: GitHub merges once every required check, `CI Status` included, passes.
+#
+# Hosted-only shape: `with.runner` names the approved hosted label directly, so
+# runner-policy admits it on public repositories. A private target enrolled for
+# local CI routing takes the fleet-routed sibling,
+# components/dependabot-automerge/dependabot-automerge-fleet.yml, instead.
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-automerge-dependabot:
+    name: PR Automerge Dependabot
+    permissions:
+      contents: write # enablePullRequestAutoMerge requires it.
+      pull-requests: write # Arm or disarm auto-merge on the PR.
+    uses: melodic-software/ci-workflows/.github/workflows/pr-automerge-dependabot.yml@main
+    with:
+      runner: ubuntu-24.04

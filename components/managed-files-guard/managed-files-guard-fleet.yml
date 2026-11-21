@@ -61,6 +61,7 @@ on:
       - .github/standards/runner-policy/repository-policy.schema.json
       - .github/standards/runner-policy/runner-policy.mjs
       - .github/standards/tsconfig/tsconfig.json
+      - .github/workflows/pr-automerge-dependabot.yml
       - .github/workflows/pr-check-managed-files.yml
       - .github/workflows/pr-review-security.yml
       - .github/workflows/pr-review.yml

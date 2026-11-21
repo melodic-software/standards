@@ -179,6 +179,32 @@ components:
   commit-convention:
     files:
       components/commit-convention/commit-convention.yml: docs/conventions/source-control/commit-convention.yml
+  # Thin callers for ci-workflows' pr-automerge-dependabot.yml reusable
+  # (components/dependabot-automerge/README.md), the fourth recorded exception
+  # to the consumer-owned workflow-caller rule: 14 hand-maintained callers
+  # drifted across repositories. One component per runner-policy inventory:
+  # - dependabot-automerge-caller: hosted (`ubuntu-24.04`), for public targets.
+  # - dependabot-automerge-fleet-caller: managed fleet
+  #   (`melodic-ubuntu-24.04-x64`), for fleet-enrolled private targets.
+  # Both require `dependabot-policy` so the reusable reads the synced policy
+  # copy at the base commit. Deliberate exclusions:
+  # - ci-workflows: `locally-owned` — hosts the reusable itself at
+  #   .github/workflows/pr-automerge-dependabot.yml and uses a queue workflow.
+  # - medley: `locally-owned` — carries a repo-local second `automerge` job.
+  # - standards: manifest source, not a target — keeps its repo-local caller
+  #   with explicit `review-only-dependencies: '["yaml"]'`.
+  # - claude-code-plugins: merge queue (GITHUB_TOKEN cannot add PRs to a queue).
+  # - azure-iac, pr-pipeline-sandbox: no Dependabot automerge workflow.
+  dependabot-automerge-caller:
+    requires:
+      - dependabot-policy
+    files:
+      components/dependabot-automerge/dependabot-automerge.yml: .github/workflows/pr-automerge-dependabot-hosted.yml
+  dependabot-automerge-fleet-caller:
+    requires:
+      - dependabot-policy
+    files:
+      components/dependabot-automerge/dependabot-automerge-fleet.yml: .github/workflows/pr-automerge-dependabot.yml
   # The central Dependabot policy, read at the base by a target's Dependabot
   # merge classifiers (claude-code-plugins sends every update to a dependency
   # its `autoMerge.reviewOnly` lists to the review tier) and by ci-workflows'
@@ -472,6 +498,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -493,6 +520,7 @@ targets:
       - claude-review-caller
       - claude-security-review-caller
       - commit-convention
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - lychee
       - managed-files-guard-fleet-caller
@@ -508,6 +536,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - editorconfig-checker
       - gitleaks
@@ -526,6 +555,7 @@ targets:
   # and the typos config its spelling hook reads (its CI typos lane stays off).
   melodic-software/architecture:
     managed:
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - managed-files-guard-fleet-caller
       - typos
@@ -547,6 +577,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -592,6 +623,9 @@ targets:
     # run the guard twice per PR, once at each revision. Removal trigger:
     # ci-workflows retiring its in-repo job in favor of the synced caller.
     locally-owned:
+      # ci-workflows hosts the pr-automerge-dependabot.yml reusable itself and
+      # uses pr-automerge-dependabot-queue.yml for its merge queue.
+      - dependabot-automerge-caller
       - managed-files-guard-caller
       # Its .github/zizmor.yml carries the component's two rules plus a
       # repo-specific `self-repository` ignore. Removal trigger: that ignore
@@ -618,6 +652,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - dotnet-analysis
       - editorconfig-checker
@@ -731,6 +766,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - editorconfig-checker
       - gitleaks
@@ -765,6 +801,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -782,6 +819,7 @@ targets:
       - claude-security-review-hosted-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-caller
       - dependabot-policy
       - editorconfig-checker
       - gitleaks
@@ -803,6 +841,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -835,6 +874,7 @@ targets:
       - claude-settings-github-iac
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - dotnet-analysis
       - editorconfig-checker
@@ -858,6 +898,7 @@ targets:
   # The Dependabot policy copy and the fleet-routed guard, as for architecture.
   melodic-software/knowledge-corpus:
     managed:
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - managed-files-guard-fleet-caller
   melodic-software/medley:
@@ -900,6 +941,9 @@ targets:
       # committed cloud-bootstrap.test.sh over it); converge by moving them
       # into a cloud-bootstrap.local.sh, then flip to managed.
       - cloud-bootstrap
+      # Medley's pr-automerge-dependabot.yml carries an extra repo-local
+      # `automerge` job beside the reusable call.
+      - dependabot-automerge-fleet-caller
       # The canonical payload lands under eng/dotnet-analysis/ — no collision
       # with medley's monorepo-tuned root .NET analyzer config is possible.
       # Locally owned because medley does not consume that destination:
@@ -972,6 +1016,7 @@ targets:
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - editorconfig-checker
       - engineering-standards
@@ -994,5 +1039,6 @@ targets:
   # The Dependabot policy copy and the fleet-routed guard, as for architecture.
   melodic-software/songwriting:
     managed:
+      - dependabot-automerge-fleet-caller
       - dependabot-policy
       - managed-files-guard-fleet-caller

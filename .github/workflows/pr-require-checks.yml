@@ -912,6 +912,9 @@ jobs:
       - name: Test the managed-files-guard caller component
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/managed-files-guard/managed-files-guard.test.sh
+      - name: Test the dependabot-automerge caller components
+        if: ${{ !cancelled() }}
+        run: bash harness/shell/run-tests.sh components/dependabot-automerge/dependabot-automerge.test.sh
       - name: Test the ci-workflows action re-pin script
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/claude-lanes/repin-callers.test.sh
@@ -955,14 +958,15 @@ jobs:
     #
     # `.` audits this repo's own workflows only: zizmor discovers workflow
     # definitions by their `.github/workflows` location, so the workflow BYTES
-    # under components/claude-lanes/, components/claude-lanes-hosted/ and
-    # components/managed-files-guard/, which become consumers'
-    # .github/workflows/ files, are invisible to a repo-root scan. They are named explicitly so the lane audits what it
+    # under components/claude-lanes/, components/claude-lanes-hosted/,
+    # components/dependabot-automerge/ and components/managed-files-guard/,
+    # which become consumers' .github/workflows/ files, are invisible to a
+    # repo-root scan. They are named explicitly so the lane audits what it
     # ships.
     uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@main
     with:
       runner: ubuntu-24.04
-      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/claude-lanes-hosted/claude-review.yml components/claude-lanes-hosted/claude-security-review.yml components/managed-files-guard/managed-files-guard.yml components/managed-files-guard/managed-files-guard-fleet.yml
+      paths: . components/claude-lanes/claude-review.yml components/claude-lanes/claude-security-review.yml components/claude-lanes-hosted/claude-review.yml components/claude-lanes-hosted/claude-security-review.yml components/dependabot-automerge/dependabot-automerge.yml components/dependabot-automerge/dependabot-automerge-fleet.yml components/managed-files-guard/managed-files-guard.yml components/managed-files-guard/managed-files-guard-fleet.yml
       fail-on-severity: low
 
   pr-scan-dependencies:

@@ -86,11 +86,13 @@ Native adoption remains authoritative where it naturally lives:
 
 - package and `extends` references in consumer manifests;
 - actions and reusable workflows in consumer workflow files, with the
-  Claude review-lane callers, the managed-files-guard caller and the online
-  link-check callers as the recorded exceptions (see
+  Claude review-lane callers, the managed-files-guard caller, the online
+  link-check callers and the dependabot-automerge callers as the recorded
+  exceptions (see
   [Claude review-lane caller components](#claude-review-lane-caller-components),
-  [managed-files-guard caller component](#managed-files-guard-caller-component)
-  and [online link-check caller components](#online-link-check-caller-components));
+  [managed-files-guard caller component](#managed-files-guard-caller-component),
+  [online link-check caller components](#online-link-check-caller-components)
+  and [dependabot-automerge caller components](#dependabot-automerge-caller-components));
 - repository governance in the relevant `github-iac` repository;
 - repository reachability and App access in live GitHub state.
 
@@ -291,9 +293,10 @@ The synchronizer deliberately does not invent those files: workflow shape,
 exceptions, and dependency-update configuration are executable facts owned by
 each consumer. The
 [Claude review-lane callers](#claude-review-lane-caller-components), the
-[managed-files-guard caller](#managed-files-guard-caller-component) and the
-[online link-check callers](#online-link-check-caller-components) are the
-three recorded exceptions to that workflow-shape rule. A materialization PR is
+[managed-files-guard caller](#managed-files-guard-caller-component), the
+[online link-check callers](#online-link-check-caller-components) and the
+[dependabot-automerge callers](#dependabot-automerge-caller-components) are the
+four recorded exceptions to that workflow-shape rule. A materialization PR is
 not an adoption completion signal until its corresponding integration PR
 supplies this wiring and CI passes.
 
@@ -471,6 +474,21 @@ A scheduled run also needs the target's `link-check-online` org property set
 to `true`, which the reusable reads at run time; a dispatched run always
 checks. The opt-in steps and the cron slots in use live in
 [`components/lychee-online/README.md`](../components/lychee-online/README.md).
+
+## dependabot-automerge caller components
+
+Two components materialize the thin caller for `ci-workflows`'
+`pr-automerge-dependabot.yml@main` reusable: `dependabot-automerge-caller` at
+`.github/workflows/pr-automerge-dependabot-hosted.yml` (`ubuntu-24.04`, for
+public targets) and `dependabot-automerge-fleet-caller` at
+`.github/workflows/pr-automerge-dependabot.yml` (`melodic-ubuntu-24.04-x64`,
+for fleet-enrolled private targets). Both require `dependabot-policy` so the
+reusable reads `.github/standards/dependabot-policy/policy.json` at the base
+commit. It is the fourth recorded exception to the consumer-owned-caller rule:
+14 hand-maintained callers drifted across repositories. `ci-workflows` (which
+hosts the reusable itself) and `medley` (which carries an extra repo-local
+`automerge` job) stay `locally-owned`. Rationale and admission evidence live in
+[`components/dependabot-automerge/README.md`](../components/dependabot-automerge/README.md).
 
 ## Review-instructions reconciliation (medley)
 

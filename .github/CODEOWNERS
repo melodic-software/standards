@@ -24,6 +24,7 @@
 /components/cloud-environment/ @kyle-sexton
 /components/code-review-rules/ @kyle-sexton
 /components/comment-hygiene/ @kyle-sexton
+/components/dependabot-automerge/ @kyle-sexton
 /components/dependabot-policy/ @kyle-sexton
 /components/dotnet-analysis/ @kyle-sexton
 /components/lefthook-*/ @kyle-sexton
