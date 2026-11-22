@@ -173,8 +173,12 @@ workshop 04 alignment pass):
 - **Owner and outcome**: the `standards` maintainers own it. Acceptance: each
   target's sync pull request carries the guide at
   `docs/standards/filing-prs-and-issues.md`, and the targets that already have
-  it see no byte change. Rollback: move the guide back under
-  `engineering-standards`, which restores that component's earlier roster.
+  it see no byte change. Rollback: revert the admitting pull request, which
+  removes the component, the `requires` entry on `engineering-standards` and
+  the 19 target entries, and moves the guide back under
+  `engineering-standards`. The nine guide-only targets keep the delivered file
+  as an ordinary doc until each deletes it, because deselection never deletes,
+  and both guard callers keep listing its path.
 - **Delivery boundary**: exact materialization, the channel that already
   delivers it to the `engineering-standards` targets.
 - **Alternatives and overlap**: adding `engineering-standards` to every target
