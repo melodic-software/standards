@@ -110,7 +110,7 @@ Three prose copies are generated, not hand-written:
 `.claude/rules/pr-body-contract.md` rule (`pr-body-contract-rule`), and the
 harness-neutral filing guide
 [`standards/process/filing-prs-and-issues.md`](../../standards/process/filing-prs-and-issues.md)
-(`engineering-standards`, at `docs/standards/` in each target), the last also
+(`filing-guide`, at `docs/standards/` in every sync target), the last also
 from the [issue-body contract](../issue-body-contract/contract.json). The
 template's per-section guidance is `body.sectionGuidance`, whose keys must equal
 `requiredSections`. policy.json itself stays undistributed: the copies carry
@@ -160,6 +160,35 @@ Enforcement rollout
 `lint:contract-docs` and the byte-exact template check block from admission.
 Both are deterministic, and the admitting run observed the live consumer
 already matching byte for byte, so there is no baseline to learn.
+
+Admission evidence for the `filing-guide` component, which carries the filing
+guide alone so it reaches every sync target (owner-confirmed decision Q1628,
+workshop 04 alignment pass):
+
+- **Live consumer**: every agent that opens a pull request or files an issue
+  in a target, whatever harness it runs in. Each of the nine targets that lack
+  `engineering-standards` had agent-authored pull requests in the week before
+  admission. `engineering-standards` requires the component, since its index
+  lists the guide.
+- **Owner and outcome**: the `standards` maintainers own it. Acceptance: each
+  target's sync pull request carries the guide at
+  `docs/standards/filing-prs-and-issues.md`, and the targets that already have
+  it see no byte change. Rollback: move the guide back under
+  `engineering-standards`, which restores that component's earlier roster.
+- **Delivery boundary**: exact materialization, the channel that already
+  delivers it to the `engineering-standards` targets.
+- **Alternatives and overlap**: adding `engineering-standards` to every target
+  would ship its code-design files and index to content-only repositories
+  whose rosters are recorded as limited (knowledge-corpus, songwriting,
+  architecture, pr-pipeline-sandbox). A destination has one owning component,
+  so the guide moved here rather than being copied.
+- **Operational fit**: one markdown file with absolute links; none of the nine
+  new targets has `docs/standards/`, so nothing is overwritten. Nothing executes in the target.
+- **Upstream health, legal and security fit, update path**: as for
+  `pr-template`.
+- **Verification**: `sync-manifest.sh validate`, `sync-manifest.test.sh` and
+  `managed-files-guard.test.sh`; both guard callers already list the
+  destination.
 
 ### Behavioral lockstep
 
