@@ -786,6 +786,12 @@ jobs:
       - name: Enforce generated issue forms match the contract
         if: ${{ !cancelled() }}
         run: npm run lint:issue-forms
+      - name: Test PR and issue contract docs generator
+        if: ${{ !cancelled() }}
+        run: npm run test:contract-docs
+      - name: Enforce generated PR template, rule and filing guide match their records
+        if: ${{ !cancelled() }}
+        run: npm run lint:contract-docs
 
   # Lockstep drift check (ADR-0008), copy half. Separate job, not a step in
   # check-policies: the live run fetches the gate composite, the plugin hook

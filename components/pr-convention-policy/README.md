@@ -101,6 +101,66 @@ that transition-only artifact gained the two rules late (ci-workflows#544);
 ADR-0008's [2026-10-06 (#647) amendment](../../docs/adr/0008-distribute-pr-body-contract-rule.md#revisited-2026-10-06-647-rules-the-reusable-pins-predate)
 records that exception to its every-pin consequence.
 
+### Generated copies
+
+Three prose copies are generated, not hand-written:
+[`contract-docs.mjs`](contract-docs.mjs) renders the org PR template
+([`PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md), synced by the
+`pr-template` component to `melodic-software/.github`), the
+`.claude/rules/pr-body-contract.md` rule (`pr-body-contract-rule`), and the
+harness-neutral filing guide
+[`standards/process/filing-prs-and-issues.md`](../../standards/process/filing-prs-and-issues.md)
+(`engineering-standards`, at `docs/standards/` in each target), the last also
+from the [issue-body contract](../issue-body-contract/contract.json). The
+template's per-section guidance is `body.sectionGuidance`, whose keys must equal
+`requiredSections`. policy.json itself stays undistributed: the copies carry
+text, not the record.
+
+To change a section, a keyword or a marker, edit `policy.json`, run
+`node components/pr-convention-policy/contract-docs.mjs write`, and commit both.
+`npm run lint:contract-docs` fails CI when a committed copy differs from what
+the records generate, and the copy check above fails when the template live in
+`melodic-software/.github` matches neither this branch's render nor any of the
+last ten versions of the generated template committed on standards `main`. The
+live copy lags while a template change waits for its merge and then for the
+reviewed sync pull request, so a committed version passes; a hand edit matches
+none. A hand edit
+downstream is also caught by that repository's managed-files guard.
+
+Admission evidence for the `pr-template` component
+([component lifecycle](../../docs/component-lifecycle.md#admission-evidence)):
+
+- **Live consumer**: GitHub's organization default template, which every
+  repository without its own PR template uses, and `melodic-software/.github`'s
+  own `pr-section-drift.mjs`, which reads its headings.
+- **Owner and outcome**: the `standards` maintainers own it. It solves the
+  template drifting from `policy.json` by hand. Acceptance: the first sync pull
+  request in `melodic-software/.github` changes no template byte, and a later
+  `policy.json` change reaches the template through `contract-docs.mjs write`
+  and the sync alone. Rollback: revert the admitting pull request and move
+  `pr-template` out of `melodic-software/.github`'s `managed` list. The
+  delivered file stays in place, hand-owned again, because deselection never
+  deletes.
+- **Delivery boundary**: exact materialization through the sync, the channel
+  that already delivers the issue forms to the same repository. GitHub reads the
+  template from that repository, so no package or reusable can serve it.
+- **Alternatives and overlap**: the platform facility is the one used. The
+  component replaces the hand-kept copy rather than adding a second.
+- **Operational fit**: the first generated template is byte-identical to the
+  live copy, so the first sync pull request is empty; the live copy check
+  passed against it. Nothing executes in the target.
+- **Upstream health, legal and security fit, update path**: first-party text,
+  no dependency, no credential beyond the existing standards-sync App.
+- **Verification**: `contract-docs.test.mjs`, the template case in
+  `lockstep-drift.test.mjs`, `sync-manifest.test.sh` and
+  `managed-files-guard.test.sh`.
+
+Enforcement rollout
+([component lifecycle](../../docs/component-lifecycle.md#enforcement-rollout)):
+`lint:contract-docs` and the byte-exact template check block from admission.
+Both are deterministic, and the admitting run observed the live consumer
+already matching byte for byte, so there is no baseline to learn.
+
 ### Behavioral lockstep
 
 Static parsing proves a copy declares the policy's data; it cannot prove the

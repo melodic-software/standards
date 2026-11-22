@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
+import { renderTemplate } from "./contract-docs.mjs";
 import {
   CONSUMER_REPOSITORIES,
   checkCopies,
   checkFleet,
+  checkGeneratedTemplate,
   checkPinnedReusable,
   DriftError,
   detectArtifactPin,
@@ -644,4 +647,31 @@ test("the CLI fails a missing mode and a tokenless pin scan", () => {
   const pins = run(["pins"]);
   assert.equal(pins.status, 1);
   assert.match(pins.stderr, /needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN/);
+});
+
+test("the org template must equal the branch render or a committed generated template", async () => {
+  const committed = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
+  const policy = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
+  assert.deepEqual(checkGeneratedTemplate(policy, committed, []), []);
+  const edited = committed.replace("## Fix", "## Fix\n\nHand-added line.");
+  assert.equal(checkGeneratedTemplate(policy, edited, []).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, edited, [committed]).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`, [committed]).length, 1);
+});
+
+test("a template change passes before its merge and while its sync is pending", async () => {
+  const previous = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
+  const base = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
+  const changed = {
+    ...base,
+    body: { ...base.body, sectionGuidance: { ...base.body.sectionGuidance, Fix: "Reworded." } },
+  };
+  // Before the merge: the branch renders the change; main and the org still hold the old bytes.
+  assert.deepEqual(checkGeneratedTemplate(changed, previous, [previous]), []);
+  // After the merge, before the .github sync lands: main holds both versions, the org the old one.
+  assert.deepEqual(
+    checkGeneratedTemplate(changed, previous, [renderTemplate(changed), previous]),
+    [],
+  );
+  assert.equal(checkGeneratedTemplate(changed, previous, []).length, 1);
 });
