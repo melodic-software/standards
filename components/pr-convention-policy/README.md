@@ -120,9 +120,11 @@ To change a section, a keyword or a marker, edit `policy.json`, run
 `node components/pr-convention-policy/contract-docs.mjs write`, and commit both.
 `npm run lint:contract-docs` fails CI when a committed copy differs from what
 the records generate, and the copy check above fails when the template live in
-`melodic-software/.github` matches neither this branch's render nor the
-generated template on standards `main`. Accepting the `main` copy keeps a pull
-request that changes the template green before its merge is synced. A hand edit
+`melodic-software/.github` matches neither this branch's render nor any of the
+last ten versions of the generated template committed on standards `main`. The
+live copy lags while a template change waits for its merge and then for the
+reviewed sync pull request, so a committed version passes; a hand edit matches
+none. A hand edit
 downstream is also caught by that repository's managed-files guard.
 
 Admission evidence for the `pr-template` component
@@ -131,6 +133,14 @@ Admission evidence for the `pr-template` component
 - **Live consumer**: GitHub's organization default template, which every
   repository without its own PR template uses, and `melodic-software/.github`'s
   own `pr-section-drift.mjs`, which reads its headings.
+- **Owner and outcome**: the `standards` maintainers own it. It solves the
+  template drifting from `policy.json` by hand. Acceptance: the first sync pull
+  request in `melodic-software/.github` changes no template byte, and a later
+  `policy.json` change reaches the template through `contract-docs.mjs write`
+  and the sync alone. Rollback: revert the admitting pull request and move
+  `pr-template` out of `melodic-software/.github`'s `managed` list. The
+  delivered file stays in place, hand-owned again, because deselection never
+  deletes.
 - **Delivery boundary**: exact materialization through the sync, the channel
   that already delivers the issue forms to the same repository. GitHub reads the
   template from that repository, so no package or reusable can serve it.

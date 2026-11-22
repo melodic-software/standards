@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
+import { renderTemplate } from "./contract-docs.mjs";
 import {
   CONSUMER_REPOSITORIES,
   checkCopies,
@@ -648,26 +649,29 @@ test("the CLI fails a missing mode and a tokenless pin scan", () => {
   assert.match(pins.stderr, /needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN/);
 });
 
-test("the org template must equal the branch render or main's generated template", async () => {
+test("the org template must equal the branch render or a committed generated template", async () => {
   const committed = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
   const policy = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
-  assert.deepEqual(checkGeneratedTemplate(policy, committed, null), []);
+  assert.deepEqual(checkGeneratedTemplate(policy, committed, []), []);
   const edited = committed.replace("## Fix", "## Fix\n\nHand-added line.");
-  assert.equal(checkGeneratedTemplate(policy, edited, null).length, 1);
-  assert.equal(checkGeneratedTemplate(policy, edited, committed).length, 1);
-  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`, committed).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, edited, []).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, edited, [committed]).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`, [committed]).length, 1);
 });
 
-test("a branch that changes the template passes while the org copy still matches main", async () => {
-  const mainTemplate = await readFile(
-    path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"),
-    "utf8",
-  );
+test("a template change passes before its merge and while its sync is pending", async () => {
+  const previous = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
   const base = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
-  const branch = {
+  const changed = {
     ...base,
     body: { ...base.body, sectionGuidance: { ...base.body.sectionGuidance, Fix: "Reworded." } },
   };
-  assert.deepEqual(checkGeneratedTemplate(branch, mainTemplate, mainTemplate), []);
-  assert.equal(checkGeneratedTemplate(branch, mainTemplate, null).length, 1);
+  // Before the merge: the branch renders the change; main and the org still hold the old bytes.
+  assert.deepEqual(checkGeneratedTemplate(changed, previous, [previous]), []);
+  // After the merge, before the .github sync lands: main holds both versions, the org the old one.
+  assert.deepEqual(
+    checkGeneratedTemplate(changed, previous, [renderTemplate(changed), previous]),
+    [],
+  );
+  assert.equal(checkGeneratedTemplate(changed, previous, []).length, 1);
 });

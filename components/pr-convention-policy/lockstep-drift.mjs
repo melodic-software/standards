@@ -70,11 +70,6 @@ export const COPY_SOURCES = {
     "plugins/source-control/hooks/pr-linkage-validator.sh",
   ),
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
-  generatedTemplate: contentsUrl(
-    "standards",
-    "main",
-    "components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md",
-  ),
 };
 
 // Every repository whose gate caller the scan checks. A repository listed here
@@ -1252,24 +1247,42 @@ function cachedFetcher(fetcher) {
 }
 
 // The org template is a sync-managed copy of the file contract-docs.mjs generates. It must equal
-// either this branch's render or the generated template committed on standards `main`: a pull
-// request that changes the template cannot match the live copy until its merge is synced, so
-// the `main` copy keeps that pull request green, and a byte matching neither is a hand edit in
-// `melodic-software/.github`. `mainTemplate` is null while `main` has no generated template. The
-// rules file needs no such check: it is this repository's own file, and `contract-docs.mjs
-// check` holds it.
-export function checkGeneratedTemplate(policy, orgTemplate, mainTemplate) {
-  return orgTemplate === renderTemplate(policy) || orgTemplate === mainTemplate
+// this branch's render or a version of the generated template committed on standards `main`
+// (`committedTemplates`, newest first). The live copy lags both while a template change waits
+// for its merge, and then for the reviewed sync pull request in `melodic-software/.github`, so
+// any committed version passes; a byte matching none of them is a hand edit there. The rules
+// file needs no such check: it is this repository's own file, and `contract-docs.mjs check`
+// holds it.
+export function checkGeneratedTemplate(policy, orgTemplate, committedTemplates) {
+  return orgTemplate === renderTemplate(policy) || committedTemplates.includes(orgTemplate)
     ? []
     : [
-        "org PR template: differs from the template contract-docs.mjs generates, on this branch and on standards main; change policy.json here and let the sync deliver it",
+        "org PR template: matches neither this branch's generated template nor any version committed on standards main; change policy.json here and let the sync deliver it",
       ];
+}
+
+const GENERATED_TEMPLATE_PATH = "components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md";
+const TEMPLATE_HISTORY_DEPTH = 10;
+
+// The last TEMPLATE_HISTORY_DEPTH versions of the generated template on standards `main`; none
+// before the template is first merged.
+async function readCommittedTemplates() {
+  const response = await fetchWithRetry(
+    `${API_BASE}/standards/commits?sha=main&path=${GENERATED_TEMPLATE_PATH}&per_page=${TEMPLATE_HISTORY_DEPTH}`,
+    "application/vnd.github+json",
+  );
+  const commits = await response.json();
+  return Promise.all(
+    commits.map((commit) =>
+      fetchText(contentsUrl("standards", commit.sha, GENERATED_TEMPLATE_PATH)),
+    ),
+  );
 }
 
 export async function runCopyCheck() {
   const policy = await readPolicy();
   const orgTemplate = await fetchText(COPY_SOURCES.orgTemplate);
-  const mainTemplate = await fetchTextOrNull(COPY_SOURCES.generatedTemplate);
+  const committedTemplates = await readCommittedTemplates();
   return [
     ...checkCopies(policy, {
       ...(await readGateComposite(fetchTextOrNull)),
@@ -1277,7 +1290,7 @@ export async function runCopyCheck() {
       orgTemplate,
       rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
     }),
-    ...checkGeneratedTemplate(policy, orgTemplate, mainTemplate),
+    ...checkGeneratedTemplate(policy, orgTemplate, committedTemplates),
   ];
 }
 
