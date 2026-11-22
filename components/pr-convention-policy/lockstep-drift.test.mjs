@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -7,6 +8,7 @@ import {
   CONSUMER_REPOSITORIES,
   checkCopies,
   checkFleet,
+  checkGeneratedTemplate,
   checkPinnedReusable,
   DriftError,
   detectArtifactPin,
@@ -644,4 +646,13 @@ test("the CLI fails a missing mode and a tokenless pin scan", () => {
   const pins = run(["pins"]);
   assert.equal(pins.status, 1);
   assert.match(pins.stderr, /needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN/);
+});
+
+test("the org template must equal the generated template byte for byte", async () => {
+  const committed = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
+  const policy = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
+  assert.deepEqual(checkGeneratedTemplate(policy, committed), []);
+  const edited = committed.replace("## Fix", "## Fix\n\nHand-added line.");
+  assert.equal(checkGeneratedTemplate(policy, edited).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`).length, 1);
 });

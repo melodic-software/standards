@@ -44,6 +44,11 @@
             "minLength": 1
           }
         },
+        "sectionGuidance": {
+          "description": "Author guidance per required section, keyed by section name. contract-docs.mjs renders it into the org PR template and the filing guide, and fails unless its keys equal requiredSections. A newline starts a new template line.",
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
         "closingKeywords": {
           "type": "array",
           "minItems": 1,

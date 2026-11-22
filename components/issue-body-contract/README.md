@@ -9,6 +9,7 @@ slice `/work-items:decompose` publishes. Everything that writes or checks an iss
 | Consumer | How it gets the contract |
 | --- | --- |
 | Org issue forms in `melodic-software/.github` `.github/ISSUE_TEMPLATE/` | [`issue-forms.mjs`](issue-forms.mjs) generates [`forms/`](forms/) from the contract; the sync (`issue-forms` component) materializes them byte-exact, with the contract beside them at `.github/standards/issue-body-contract/contract.json` for that repository's own drift check |
+| The filing guide `docs/standards/filing-prs-and-issues.md` in each `engineering-standards` target | [`contract-docs.mjs`](../pr-convention-policy/contract-docs.mjs) generates the fields per type and the floor label into [`filing-prs-and-issues.md`](../../standards/process/filing-prs-and-issues.md); `npm run lint:contract-docs` fails CI when it lags the contract, so a contract change commits the regenerated guide too |
 | `/bugs:write`; `/work-items:track add`, `decompose`, `triage` | sync copy at `docs/contracts/issue-body/contract.json` in `claude-code-plugins`, which that repository's `scripts/sync-shared-copies.sh` copies into each plugin's `reference/issue-body-contract.json` |
 
 `config.yml` (blank issues off, the `SUPPORT.md` contact link) stays owned by
@@ -16,8 +17,8 @@ slice `/work-items:decompose` publishes. Everything that writes or checks an iss
 
 ## Changing a form
 
-Edit `contract.json`, run `node components/issue-body-contract/issue-forms.mjs write`, and commit
-both. `npm run lint:issue-forms` fails CI when the committed forms differ from what the contract
+Edit `contract.json`, run `node components/issue-body-contract/issue-forms.mjs write` and
+`node components/pr-convention-policy/contract-docs.mjs write`, and commit the results. `npm run lint:issue-forms` fails CI when the committed forms differ from what the contract
 generates; `npm run test:issue-forms` holds the generator and the contract rules. When a form's
 file name changes, list the old destination under the component's `previous-destinations` in
 `distribution/sync-manifest.yml`, or the old form stays in each target's template chooser.

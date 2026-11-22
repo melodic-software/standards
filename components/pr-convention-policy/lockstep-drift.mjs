@@ -33,6 +33,7 @@ import { pathToFileURL } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
+import { renderTemplate } from "./contract-docs.mjs";
 import {
   checkCompositeBehavior,
   checkHookBehavior,
@@ -1245,14 +1246,30 @@ function cachedFetcher(fetcher) {
   };
 }
 
+// The org template is a sync-managed copy of the file contract-docs.mjs generates, so any byte
+// that differs is a hand edit in `melodic-software/.github` or a sync that has not landed. The
+// rules file needs no such check here: it is this repository's own file, and
+// `contract-docs.mjs check` holds it.
+export function checkGeneratedTemplate(policy, orgTemplate) {
+  return orgTemplate === renderTemplate(policy)
+    ? []
+    : [
+        "org PR template: differs from what contract-docs.mjs generates from policy.json; change policy.json here and let the sync deliver it",
+      ];
+}
+
 export async function runCopyCheck() {
   const policy = await readPolicy();
-  return checkCopies(policy, {
-    ...(await readGateComposite(fetchTextOrNull)),
-    hookValidator: await fetchText(COPY_SOURCES.hookValidator),
-    orgTemplate: await fetchText(COPY_SOURCES.orgTemplate),
-    rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
-  });
+  const orgTemplate = await fetchText(COPY_SOURCES.orgTemplate);
+  return [
+    ...checkCopies(policy, {
+      ...(await readGateComposite(fetchTextOrNull)),
+      hookValidator: await fetchText(COPY_SOURCES.hookValidator),
+      orgTemplate,
+      rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
+    }),
+    ...checkGeneratedTemplate(policy, orgTemplate),
+  ];
 }
 
 export async function runPinScan(env = process.env) {

@@ -19,6 +19,12 @@
   },
   "body": {
     "requiredSections": ["Summary", "Fix", "Verification", "Related"],
+    "sectionGuidance": {
+      "Summary": "What changes and why, in a sentence or two of problem context.",
+      "Fix": "The concrete change and how it addresses the problem.",
+      "Verification": "How this was proven: the commands run and what they showed, or the manual check performed.",
+      "Related": "Issues, PRs, or decision records this change touches without closing\n(one per line, e.g. `Refs: #<issue-number>`). This section must not be empty:\nif nothing applies, say so in a sentence. The no-issue escape goes on the top\nline of this template, not here."
+    },
     "closingKeywords": ["Closes", "Fixes", "Resolves"],
     "noIssueMarkers": ["No linked issue", "No related issue"],
     "nonClosingMarkers": ["Refs", "Relates to"],
