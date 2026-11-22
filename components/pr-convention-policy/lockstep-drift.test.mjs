@@ -648,11 +648,26 @@ test("the CLI fails a missing mode and a tokenless pin scan", () => {
   assert.match(pins.stderr, /needs LOCKSTEP_GITHUB_TOKEN or GITHUB_TOKEN/);
 });
 
-test("the org template must equal the generated template byte for byte", async () => {
+test("the org template must equal the branch render or main's generated template", async () => {
   const committed = await readFile(path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"), "utf8");
   const policy = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
-  assert.deepEqual(checkGeneratedTemplate(policy, committed), []);
+  assert.deepEqual(checkGeneratedTemplate(policy, committed, null), []);
   const edited = committed.replace("## Fix", "## Fix\n\nHand-added line.");
-  assert.equal(checkGeneratedTemplate(policy, edited).length, 1);
-  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, edited, null).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, edited, committed).length, 1);
+  assert.equal(checkGeneratedTemplate(policy, `${committed}\n`, committed).length, 1);
+});
+
+test("a branch that changes the template passes while the org copy still matches main", async () => {
+  const mainTemplate = await readFile(
+    path.join(MODULE_DIRECTORY, "PULL_REQUEST_TEMPLATE.md"),
+    "utf8",
+  );
+  const base = JSON.parse(await readFile(path.join(MODULE_DIRECTORY, "policy.json"), "utf8"));
+  const branch = {
+    ...base,
+    body: { ...base.body, sectionGuidance: { ...base.body.sectionGuidance, Fix: "Reworded." } },
+  };
+  assert.deepEqual(checkGeneratedTemplate(branch, mainTemplate, mainTemplate), []);
+  assert.equal(checkGeneratedTemplate(branch, mainTemplate, null).length, 1);
 });

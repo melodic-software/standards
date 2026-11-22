@@ -70,6 +70,11 @@ export const COPY_SOURCES = {
     "plugins/source-control/hooks/pr-linkage-validator.sh",
   ),
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
+  generatedTemplate: contentsUrl(
+    "standards",
+    "main",
+    "components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md",
+  ),
 };
 
 // Every repository whose gate caller the scan checks. A repository listed here
@@ -1246,21 +1251,25 @@ function cachedFetcher(fetcher) {
   };
 }
 
-// The org template is a sync-managed copy of the file contract-docs.mjs generates, so any byte
-// that differs is a hand edit in `melodic-software/.github` or a sync that has not landed. The
-// rules file needs no such check here: it is this repository's own file, and
-// `contract-docs.mjs check` holds it.
-export function checkGeneratedTemplate(policy, orgTemplate) {
-  return orgTemplate === renderTemplate(policy)
+// The org template is a sync-managed copy of the file contract-docs.mjs generates. It must equal
+// either this branch's render or the generated template committed on standards `main`: a pull
+// request that changes the template cannot match the live copy until its merge is synced, so
+// the `main` copy keeps that pull request green, and a byte matching neither is a hand edit in
+// `melodic-software/.github`. `mainTemplate` is null while `main` has no generated template. The
+// rules file needs no such check: it is this repository's own file, and `contract-docs.mjs
+// check` holds it.
+export function checkGeneratedTemplate(policy, orgTemplate, mainTemplate) {
+  return orgTemplate === renderTemplate(policy) || orgTemplate === mainTemplate
     ? []
     : [
-        "org PR template: differs from what contract-docs.mjs generates from policy.json; change policy.json here and let the sync deliver it",
+        "org PR template: differs from the template contract-docs.mjs generates, on this branch and on standards main; change policy.json here and let the sync deliver it",
       ];
 }
 
 export async function runCopyCheck() {
   const policy = await readPolicy();
   const orgTemplate = await fetchText(COPY_SOURCES.orgTemplate);
+  const mainTemplate = await fetchTextOrNull(COPY_SOURCES.generatedTemplate);
   return [
     ...checkCopies(policy, {
       ...(await readGateComposite(fetchTextOrNull)),
@@ -1268,7 +1277,7 @@ export async function runCopyCheck() {
       orgTemplate,
       rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
     }),
-    ...checkGeneratedTemplate(policy, orgTemplate),
+    ...checkGeneratedTemplate(policy, orgTemplate, mainTemplate),
   ];
 }
 
