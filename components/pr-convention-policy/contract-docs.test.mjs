@@ -90,6 +90,17 @@ test("the guide marks required and optional issue fields", () => {
   assert.match(text, /- `Environment` \(optional\): /);
 });
 
+test("the guide states that a repository's own template, forms and AGENTS.md win, before its first section", () => {
+  const text = renderGuide(policy, contract);
+  const precedence = text.indexOf("This guide is the organization default.");
+  assert.ok(precedence > 0);
+  assert.ok(precedence < text.indexOf("\n## "));
+  assert.match(
+    text,
+    /PR template, issue forms or\n`AGENTS\.md` differ from it, the repository's own wins/,
+  );
+});
+
 test("the guide names the floor label and the three routing labels", () => {
   const text = renderGuide(policy, contract);
   assert.match(text, /floor label `needs-triage`/);

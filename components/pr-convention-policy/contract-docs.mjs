@@ -2,7 +2,7 @@
 
 // Generates the three prose copies of the PR and issue contracts from their records: the org PR
 // template, the always-loaded `.claude/rules/pr-body-contract.md` rule, and the harness-neutral
-// filing guide the engineering-standards component syncs to `docs/standards/`. `check` (the
+// filing guide the filing-guide component syncs to every target's `docs/standards/`. `check` (the
 // default) fails when a committed copy differs from what the records generate; `write`
 // regenerates them. The sync materializes the committed copies byte-exact, so each is changed in
 // policy.json or contract.json, or in this generator's wording, and nowhere else.
@@ -157,6 +157,10 @@ records that the gates and forms read:
 and [\`contract.json\`](${STANDARDS_BLOB}/components/issue-body-contract/contract.json) for issues.
 How labels, fields and triage work is the
 [issue-tracker playbook](${STANDARDS_BLOB}/standards/process/issue-tracker.md)'s.
+
+This guide is the organization default. Where a repository's own PR template, issue forms or
+\`AGENTS.md\` differ from it, the repository's own wins, as GitHub already prefers a repository's
+own template and forms over the organization's.
 
 ## Pull request title
 
