@@ -80,8 +80,9 @@ Always check:
   decisions was made is flagged when that reason is in no ADR, commit
   message, linked source, or test that pins the behavior: ask for the
   reason in an ADR, the commit message, or such a test. Never ask to restore
-  or reword the comment, which the code-tidying comment lint refuses. A
-  comment that only restates code or notes history is not such a record
+  or reword the comment: that puts the reason back where the cleanup
+  removed it from, instead of in a record that lasts. A comment that only
+  restates code or notes history is not such a record
   (`standards/review/code-quality.md#authoring-hygiene`).
 - No Dependabot pull request waits on a human. One whose updates are all
   non-major, with GitHub Actions only from `actions/*`, `github/*`,
