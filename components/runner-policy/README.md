@@ -482,12 +482,15 @@ require hosted execution. A grant is keyed by
   job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
   here; transformed expressions, workflow-level env values, `run:`
   interpolation, and conditions stay privileged-hosted.
-- `credentialActions` (optional): full `owner/action@<40-hex-SHA>`
-  references the job's steps may invoke, whose action name must be a central
+- `credentialActions` (optional): exact `owner/action@ref` references the
+  job's steps may invoke, whose action name must be a central
   `localCredentialActions` entry (for example
-  `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
-  ref because a different ref of the same action is different
-  credential-minting code; a tag, branch, or other SHA stays
+  `actions/create-github-app-token@v3`). The ref is a full 40-hex SHA, `@main`
+  for a `melodic-software` action, or a `vN`, `vN.N` or `vN.N.N` tag for an
+  official-vendor owner (`actions`, `github`, `dependabot`, `microsoft`,
+  `azure`, `anthropics`, `openai`), per the owner decision that first-party and
+  vendor refs run unpinned (architecture owner-decisions L351). The step must
+  name the granted ref exactly; any other ref of the same action stays
   privileged-hosted, and actions outside the central list cannot be granted.
 
 A grant applies only while the job genuinely routes to the managed fleet, that

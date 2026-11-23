@@ -1586,18 +1586,19 @@ jobs:
 });
 
 test("a local-routing grant admits exact named secrets and credential-minting actions", async () => {
-  const root = await repository({
-    localRoutingGrants: {
-      ".github/workflows/deploy.yml#apply": {
-        permissions: { contents: "read", "id-token": "write" },
-        environment: "github-iac-production",
-        secrets: ["APP_PRIVATE_KEY"],
-        credentialActions: [`actions/create-github-app-token@${SHA}`],
-        justification: "The protected governance apply mints its App token on the managed fleet.",
+  for (const ref of [SHA, "v3"]) {
+    const root = await repository({
+      localRoutingGrants: {
+        ".github/workflows/deploy.yml#apply": {
+          permissions: { contents: "read", "id-token": "write" },
+          environment: "github-iac-production",
+          secrets: ["APP_PRIVATE_KEY"],
+          credentialActions: [`actions/create-github-app-token@${ref}`],
+          justification: "The protected governance apply mints its App token on the managed fleet.",
+        },
       },
-    },
-    workflows: {
-      "deploy.yml": `permissions: read-all
+      workflows: {
+        "deploy.yml": `permissions: read-all
 jobs:
   apply:
     permissions:
@@ -1607,7 +1608,7 @@ jobs:
     environment: github-iac-production
     steps:
       - id: app-token
-        uses: actions/create-github-app-token@${SHA}
+        uses: actions/create-github-app-token@${ref}
         with:
           client-id: \${{ vars.APP_CLIENT_ID }}
           private-key: \${{ secrets.APP_PRIVATE_KEY }}
@@ -1615,9 +1616,10 @@ jobs:
         env:
           GH_TOKEN: \${{ steps.app-token.outputs.token }}
 `,
-    },
-  });
-  assert.deepEqual(await audit(root), []);
+      },
+    });
+    assert.deepEqual(await audit(root), [], ref);
+  }
 });
 
 test("a local-routing grant naming unexercised allowances is inventory drift", async () => {
@@ -2078,6 +2080,16 @@ test("local-routing grant structure rejects malformed permission maps and fields
     {
       permissions: { issues: "write" },
       credentialActions: ["actions/create-github-app-token@main"],
+      justification: "x",
+    },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["actions/create-github-app-token@latest"],
+      justification: "x",
+    },
+    {
+      permissions: { issues: "write" },
+      credentialActions: ["attacker/create-github-app-token@v3"],
       justification: "x",
     },
   ]) {
