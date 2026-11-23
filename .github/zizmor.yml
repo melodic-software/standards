@@ -3,8 +3,6 @@ rules:
   dependabot-cooldown:
     config:
       days: 3
-  # First-party and official-vendor refs float on a branch or tag; every other
-  # ref stays SHA-pinned and moves through Dependabot.
   unpinned-uses:
     config:
       policies:
