@@ -122,11 +122,13 @@ outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 `scheduleInterval` is the standard interval; `scheduleIntervalByEcosystem`
 lists the `accepted` intervals for an ecosystem that differs, with the date
 it was `reviewed` and its `basis`. The `github-actions` entry checks daily
-(owner decision, 2026-11-16) because this organization's own releases reach
-each repository as pin bumps in that entry, and a weekly check leaves
-repositories on different releases for days. Vendor actions keep their
-cooldown and grouping, and `open-pull-requests-limit` still caps the entry,
-so a daily check adds the organization's own bumps, not a burst.
+(owner decision, 2026-11-16). First-party actions float on `main` and
+official-vendor actions on their major tag (owner decision, architecture
+owner-decisions L351), so Dependabot moves no first-party ref; the entry
+carries vendor major-tag bumps and the full-commit-SHA pins of third-party
+actions. Those keep their cooldown and grouping, and
+`open-pull-requests-limit` still caps the entry, so a daily check does not
+burst.
 
 ### Cooldown by change class
 
@@ -276,9 +278,9 @@ The ci-workflows `pr-automerge-dependabot.yml` reusable arms GitHub
 auto-merge with `GITHUB_TOKEN` on auto-tier bumps: GitHub Actions from
 `tier: auto` publishers and, unless the caller passes
 `package-auto-merge: false`, npm, pip and NuGet packages not in its
-`review-only-dependencies`; uv packages too from
+`review-only-dependencies`; uv packages too since
 [ci-workflows#1025](https://github.com/melodic-software/ci-workflows/pull/1025),
-once a caller repins to a release that contains it. It is valid
+which callers run at `@main`. It is valid
 only in a repository without a merge queue. Until such a repository runs a
 review lane, its review-tier pull requests stay open.
 

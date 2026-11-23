@@ -91,8 +91,9 @@ source-control plugin's hook validator, the org PR template and the distributed
 `.claude/rules/pr-body-contract.md` rule. On `main`,
 `maintenance-audit-pr-convention-pins.yml` runs
 `npm run audit:pr-convention-pins` with the standards-sync App token against
-the contract of the artifact each consumer pins (the composite, or the reusable
-until that repository takes its Phase 3 pull request) at that pinned SHA; a
+the contract of the artifact each consumer calls (the composite, or the reusable
+until that repository takes its Phase 3 pull request) at the ref it calls: `main`
+or a full commit SHA for the composite, a full commit SHA for the reusable; a
 tokenless pin scan fails rather than checking only the public callers. The
 non-closing and negated-closer
 rules are checked in the live composite, at every composite pin, and in the
