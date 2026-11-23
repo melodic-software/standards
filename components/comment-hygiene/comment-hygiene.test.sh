@@ -90,7 +90,7 @@ emu_ref="$(printf '%s\n' '// see mona-cat_octo/scratch#12')"
 chp::scan_text "$emu_ref" >/dev/null
 assert_exit 'EMU owner with underscore in owner/repo#N is still flagged' 1 "$?"
 
-# Spawn census: the local-lane driver feeds one git-grep hit line per call.
+# Spawn census: a tree-scan driver feeds one git-grep hit line per call.
 # N single-line scans must not spawn N awk; multi-line content still uses one.
 awk_dir="$(mktemp -d "$TEST_TMPDIR/awk_dir.XXXXXX")"
 mkdir -p "$awk_dir/bin"

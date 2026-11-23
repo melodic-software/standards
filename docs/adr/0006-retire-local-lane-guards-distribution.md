@@ -1,6 +1,6 @@
 # Retire local-lane-guards driver distribution
 
-- Status: accepted
+- Status: superseded (partially) by [ADR-0009](0009-delete-local-lane-guards-drivers.md): the component directory is deleted; the drivers stay undistributed
 - Date: 2026-08-19
 - Supersedes (partially): [ADR-0004](0004-local-lane-guards-via-standards-component.md)
 

@@ -132,9 +132,6 @@ jobs:
       - name: Harness self-test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh harness/shell/lib.test.sh
-      - name: Local-lane-guards contract test
-        if: ${{ !cancelled() }}
-        run: bash harness/shell/run-tests.sh components/local-lane-guards/local-lane-guards.test.sh
 
   check-markdown-and-links:
     name: Check Markdown And Links
