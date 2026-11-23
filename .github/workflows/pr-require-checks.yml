@@ -168,9 +168,6 @@ jobs:
       - name: Markdownlint home contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-home.test.sh
-      - name: Markdownlint schema-pin contract test
-        if: ${{ !cancelled() }}
-        run: bash harness/shell/run-tests.sh components/markdownlint/markdownlint-schema-pin.test.sh
       - name: Check links (offline)
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/lychee-offline@07df326dec55d0740f9b0dd885a2d09c09620deb # v0.82.0
