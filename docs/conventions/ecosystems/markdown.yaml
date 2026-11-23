@@ -11,6 +11,6 @@ test-cmd: null
 check-cmd: 'markdownlint-cli2 --config "$REPO_ROOT/.markdownlint-cli2.jsonc" <files> "!components/**/fixtures/bad/**"'
 fix-cmd: 'markdownlint-cli2 --config "$REPO_ROOT/.markdownlint-cli2.jsonc" --fix <files> "!components/**/fixtures/bad/**"'
 opt-in: ".markdownlint-cli2.jsonc at the repository root"
-install-hint: "npm i -g markdownlint-cli2@0.24.1 (the version package.json pins) puts it on PATH; npm ci installs it only under node_modules/.bin, which the commands do not use"
+install-hint: "npm i -g markdownlint-cli2@0.24.2 (the version package.json pins) puts it on PATH; npm ci installs it only under node_modules/.bin, which the commands do not use"
 tool-pin:
-  markdownlint-cli2: "0.24.1"
+  markdownlint-cli2: "0.24.2"
