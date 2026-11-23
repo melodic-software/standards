@@ -1031,9 +1031,11 @@ targets:
   # github-actions-conventions, runner-policy with node-runtime, and
   # trusted-actors), so the copies stop drifting from claude-code-plugins',
   # plus the hosted-only `managed-files-guard-caller` every public target
-  # carries and the filing guide every target carries. It reads runner-policy as the npm manifest its lanes install,
-  # with no repo-local `.github/runner-policy.json` or gate job yet, so the
-  # handoff in distribution/README.md is not done there. Its other configs
+  # carries, the filing guide every target carries, and the zizmor policy its
+  # blocking pr-audit-workflows job reads. It reads runner-policy as the npm
+  # manifest its lanes install, with no repo-local
+  # `.github/runner-policy.json` or gate job yet, so the handoff in
+  # distribution/README.md is not done there. Its other configs
   # stay repo-owned: it has no product code or authored docs to lint.
   melodic-software/pr-pipeline-sandbox:
     managed:
@@ -1044,6 +1046,7 @@ targets:
       - node-runtime
       - runner-policy
       - trusted-actors
+      - zizmor
     # Its review callers are pr-review-cli variants pinned to the release
     # claude-code-plugins tests, with a kill-switch job and hold inputs, so
     # the sandbox can probe the lanes before claude-code-plugins adopts them.
