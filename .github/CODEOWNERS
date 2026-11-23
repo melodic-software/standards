@@ -12,6 +12,7 @@
 /.github/ @kyle-sexton
 /.claude/ @kyle-sexton
 /docs/conventions/source-control.yaml @kyle-sexton
+/docs/conventions/ecosystems/ @kyle-sexton
 /CLAUDE.md @kyle-sexton
 /.mcp.json @kyle-sexton
 /package.json @kyle-sexton
