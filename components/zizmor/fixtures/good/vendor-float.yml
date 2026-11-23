@@ -1,0 +1,14 @@
+name: vendor-float
+on: push
+permissions: {}
+jobs:
+  vendor:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: github/codeql-action/init@v4
+      - uses: dependabot/fetch-metadata@v2
+      - uses: microsoft/setup-msbuild@v2
+      - uses: azure/login@v2
+      - uses: Azure/setup-helm@v4
+      - uses: anthropics/claude-code-action@v1
+      - uses: openai/codex-action@v1

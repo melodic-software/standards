@@ -7,7 +7,8 @@ jobs:
   composite:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: melodic-software/ci-workflows/.github/actions/gitleaks@2476d5dde8979eab34374150b7e4b0a2b99f4e88 # 2476d5d 2026-10-29
+      - uses: melodic-software/ci-workflows/.github/actions/gitleaks@main
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
