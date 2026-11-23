@@ -41,14 +41,14 @@ jobs:
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
     steps:
       - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Mint a read-only App token over the installation
         id: app-token
         if: env.HAS_APP_CREDENTIAL == 'true'
-        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}

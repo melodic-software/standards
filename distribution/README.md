@@ -191,8 +191,7 @@ paginated snapshots of its repository access with that set. Malformed or changin
 access, or a selected trust root, fails the whole run; a missing target fails
 only its own sync job; any other excess repository is reported as an over-grant
 warning. `standards` itself, the sync source, is expected access and is not
-reported: its re-pin job (`.github/workflows/maintenance-repin-ci-workflows.yml`)
-opens pull requests as this App. The optional `targets` input limits
+reported: its maintenance audits mint tokens as this App. The optional `targets` input limits
 reconciliation only; it never narrows access attestation.
 
 Adding, removing, transferring, or renaming a manifest target therefore
@@ -313,7 +312,7 @@ The `go-analysis` component materializes the root `.golangci.yml` in
 change the enabled set, suppression rules, or config version downstream.
 
 Analyzer execution remains a separate native workflow adoption. The consumer
-calls the merged `ci-workflows` Go quality workflow by a full commit SHA, passes
+calls the merged `ci-workflows` Go quality workflow at `@main`, passes
 the exact `.golangci.yml` path, runs native Linux and Windows analysis, and
 includes its stable local gateway job in required `CI Status`. The workflow
 owns golangci-lint v2.12.2 and govulncheck v1.6.0 installation and integrity
@@ -455,7 +454,7 @@ github-iac and its `ci.yml` runs on the fleet label, though it has no
 `ci-workflows` is `locally-owned`: it hosts the action and
 already runs the guard from its own tree. The check is advisory (not in any
 `ci-status`) during its soak, and the caller passes `standards-ref: main`
-until the soak completes. Rationale, the action pin and how it advances, and
+until the soak completes. Rationale, the action ref, and
 the promotion record live in
 [`components/managed-files-guard/README.md`](../components/managed-files-guard/README.md).
 

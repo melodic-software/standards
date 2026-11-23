@@ -15,10 +15,8 @@ repository's own live config. It sets two rules:
   Microsoft's `microsoft`, `azure` and `Azure`; Anthropic's `anthropics`; and
   OpenAI's `openai`. zizmor matches owners case-sensitively, so each spelling
   in use has its own entry and any other spelling falls to `hash-pin`. A SHA
-  pin also satisfies `ref-pin`. While the org Actions setting requires every
-  action pinned to a full commit SHA, GitHub still refuses a floating action
-  ref at run time, so first-party and vendor actions keep their SHA pins until
-  that setting is off.
+  pin also satisfies `ref-pin`. First-party refs use `@main` and vendor refs
+  the vendor's major tag (owner decision, architecture owner-decisions L351).
 
 Both rules only relax zizmor's defaults, so adopting the file cannot add a
 finding to a target.

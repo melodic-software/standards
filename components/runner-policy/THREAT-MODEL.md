@@ -111,13 +111,10 @@ not duplicate those changing inventories.
   contract already admits. ci-workflows review and branch protection are the
   control for that content, accepted by the owner's decision to float
   first-party reusable workflows.
-- First-party composite actions a caller names directly stay pinned to a full
-  SHA (org policy). `maintenance-repin-ci-workflows` moves those pins to each
-  new ci-workflows release that changes the action, through a pull request
-  the review lanes read and that merges once `CI Status` passes (owner
-  decision, 2026-11-15: a hold on the organization's own pin moves is a
-  workflow gate, not a security control); it never moves a reusable-workflow
-  ref.
+- First-party composite actions a caller names directly float on `@main` too
+  (owner decision, architecture owner-decisions L351), with the same residual
+  risk: a ci-workflows action change reaches every caller with no standards
+  review.
 - `approvedShas` is migration-only: it keeps callers pinned to a previously
   approved SHA passing while they move to `@main`, and each path's list is
   deleted once no consumer pins that path to a SHA. An approved SHA is judged

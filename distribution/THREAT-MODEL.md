@@ -42,7 +42,7 @@ target Git history, and the reviewed pull-request boundary that follows apply.
   authentication boundary after this engine returns.
 - Git and core file utilities are trusted production tooling at their
   installed revisions. The Node runtime (pinned by the repository's
-  `.node-version`, installed by SHA-pinned setup-node) and the exact-locked
+  `.node-version`, installed by setup-node) and the exact-locked
   `yaml` parser are production tooling for the Node engine. Mike Farah `yq` v4
   left the production trust set at the Bash engine's retirement and is
   authoring-CI tooling only (suite fixture conversion, sibling lint jobs). The
@@ -92,7 +92,7 @@ it does not authorize publication.
 | A valid target is applied to the wrong checkout, or unavailable index evidence is treated as absence. | Apply requires exactly one strictly parsed normal GitHub `origin` whose normalized owner/repository matches the manifest target. Every `git ls-files` status is propagated before evidence is consumed. Origin identity detects accidental checkout mismatch; it does not authenticate the remote. | Missing/mismatched-origin and injected index-inspection-failure cases prove nonzero exit before any write. |
 | A later invalid destination leaves an apparently complete partial update. | Apply gathers and preflights every destination before the first mutation. Any later copy failure stops the caller before pull-request creation. | The preflight-collision fixture asserts that none of the earlier destinations are created. |
 | A filter broadens reconciliation to an unintended target. | Filters accept only exact known owner/repository names, reject empty and duplicate entries, and retain manifest order. Apply accepts exactly one known target. | Exact-filter, unknown, duplicate, empty-token, and earlier-target regression cases in [`sync-manifest.test.sh`](sync-manifest.test.sh). |
-| Tool substitution changes parsing or validation. | The Node engine requires Git and the Node runtime pinned by `.node-version` and installed by SHA-pinned setup-node, with its single exact-locked production dependency (`yaml`) installed by `npm ci` under `--omit=dev --ignore-scripts`. Explicit-tag classification, merge-key rejection, and duplicate-key rejection are pinned parser configuration, not defaults. Separate authoring CI uses exact locked Ajv for an independent parse of the same manifest (yq/Go converts the schema-path input; the `yaml` parser reads the engine-path input: two parser families). | The contract suite and the automerge literal-spelling fixture in the `test-distribution` CI job; [`package-lock.json`](package-lock.json) SRI; the engine's command checks. The node-only runtime control relocates the production trio (wrapper, engine, locked deps) and proves the path never invokes a planted `yq` shim, the inversion of the retired Bash-era no-Node control. |
+| Tool substitution changes parsing or validation. | The Node engine requires Git and the Node runtime pinned by `.node-version` and installed by setup-node, with its single exact-locked production dependency (`yaml`) installed by `npm ci` under `--omit=dev --ignore-scripts`. Explicit-tag classification, merge-key rejection, and duplicate-key rejection are pinned parser configuration, not defaults. Separate authoring CI uses exact locked Ajv for an independent parse of the same manifest (yq/Go converts the schema-path input; the `yaml` parser reads the engine-path input: two parser families). | The contract suite and the automerge literal-spelling fixture in the `test-distribution` CI job; [`package-lock.json`](package-lock.json) SRI; the engine's command checks. The node-only runtime control relocates the production trio (wrapper, engine, locked deps) and proves the path never invokes a planted `yq` shim, the inversion of the retired Bash-era no-Node control. |
 
 The current ownership and operating commands live in the
 [distribution README](README.md) and [`sync-manifest.yml`](sync-manifest.yml).
@@ -159,7 +159,7 @@ controls, never derived from the current dependency tree's shape:
   hashes) ships in the reviewed standards checkout the reusable clones;
   `npm ci` refuses drift from it, bounding registry-substitution risk.
 - **Runtime pin:** `engines` requires Node 24+; workflows install via
-  SHA-pinned setup-node reading the repository's `.node-version`.
+  setup-node reading the repository's `.node-version`.
 - **Update policy:** the nested Dependabot root covers `distribution/`, and a
   `yaml` bump is a production-parser change that never takes the auto tier.
   The dependabot-policy `autoMerge.reviewOnly` list names it, so every bump
