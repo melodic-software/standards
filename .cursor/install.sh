@@ -183,9 +183,9 @@ install_engine shellcheck 0.11.0 \
   b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6 \
   shellcheck-v0.11.0/shellcheck
 
-install_engine typos 1.50.3 \
-  "https://github.com/crate-ci/typos/releases/download/v1.50.3/typos-v1.50.3-x86_64-unknown-linux-musl.tar.gz" \
-  aca6b5d546307092b8d0a8e0a89dd80f9da51f2f7617c5e45c5607c1684ffbf2 \
+install_engine typos 1.52.2 \
+  "https://github.com/crate-ci/typos/releases/download/v1.52.2/typos-v1.52.2-x86_64-unknown-linux-musl.tar.gz" \
+  3b13d1291281d39d01822e54035636487a7a0f228e70097899b1e33aeb0e7e93 \
   ./typos
 
 install_engine gitleaks 8.30.1 \

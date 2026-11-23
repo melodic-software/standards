@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Contract tests for .cursor/install.sh: the PATH-link helpers must not abort
 # when nvm already owns the first writable directory, and the four Lefthook
-# hygiene-engine pins must match the ci-workflows action defaults at the SHA
-# this repository already pins in pr-require-checks.yml.
+# hygiene-engine pins must match the ci-workflows action defaults at the ref
+# (main, or a full SHA) pr-require-checks.yml uses.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -62,7 +62,7 @@ parse_install_pin() {
   ' "$root/.cursor/install.sh"
 }
 
-parse_ci_action_sha() {
+parse_ci_action_ref() {
   local action="$1"
   awk -v action="$action" '
     $1 == "uses:" && $2 ~ "ci-workflows/.github/actions/" action "@" {
@@ -106,16 +106,16 @@ tmp_actions="$scratch/actions"
 mkdir -p "$tmp_actions"
 for engine in shellcheck typos gitleaks editorconfig-checker; do
   action="$engine"
-  sha="$(parse_ci_action_sha "$action")"
-  if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-    fail "pr-require-checks.yml pins ci-workflows $action at a full SHA" "got ${sha:-empty}"
+  ref="$(parse_ci_action_ref "$action")"
+  if [[ ! "$ref" =~ ^([0-9a-f]{40}|main)$ ]]; then
+    fail "pr-require-checks.yml uses ci-workflows $action at main or a full SHA" "got ${ref:-empty}"
     continue
   fi
-  url="https://raw.githubusercontent.com/melodic-software/ci-workflows/${sha}/.github/actions/${action}/action.yml"
+  url="https://raw.githubusercontent.com/melodic-software/ci-workflows/${ref}/.github/actions/${action}/action.yml"
   dest="$tmp_actions/${action}.yml"
   if ! curl -fsSL "$url" -o "$dest"; then
     if [[ "${CI:-}" == true ]]; then
-      fail "fetch $action action.yml at ${sha:0:7}" "curl failed"
+      fail "fetch $action action.yml at ${ref:0:7}" "curl failed"
       continue
     fi
     skip_case "cannot fetch $action action.yml (need network); remaining lockstep skipped"
@@ -127,8 +127,8 @@ for engine in shellcheck typos gitleaks editorconfig-checker; do
   install_pin="$(parse_install_pin "$engine")"
   install_ver="${install_pin%% *}"
   install_sha="${install_pin#* }"
-  assert_eq "$engine version matches ci-workflows $action@${sha:0:7}" "$action_ver" "$install_ver"
-  assert_eq "$engine sha256 matches ci-workflows $action@${sha:0:7}" "$action_sha" "$install_sha"
+  assert_eq "$engine version matches ci-workflows $action@${ref:0:7}" "$action_ver" "$install_ver"
+  assert_eq "$engine sha256 matches ci-workflows $action@${ref:0:7}" "$action_sha" "$install_sha"
 done
 
 inline="$(parse_ci_shellcheck_inline)"

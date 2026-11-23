@@ -19,7 +19,7 @@ the workflow `name:` (each is its destination stem in Title Case) and their head
 | `managed-files-guard-caller` | `managed-files-guard.yml` | `.github/workflows/pr-check-managed-files-hosted.yml` | `ubuntu-24.04` |
 | `managed-files-guard-fleet-caller` | `managed-files-guard-fleet.yml` | `.github/workflows/pr-check-managed-files.yml` | `melodic-ubuntu-24.04-x64` |
 
-Both carry the same action pin and the same job name, so the check context is
+Both carry the same action ref and the same job name, so the check context is
 `PR Check Managed Files` on every target. The destinations differ because the
 manifest requires each destination to have one owning component.
 The guard caller is the second recorded exception to the rule that workflow callers stay
@@ -120,46 +120,11 @@ workflow when the diff exceeds 3,000 files and no match is among the first
 and between a standards merge that adds a destination and that target's sync,
 the consumer's caller still carries the old list.
 
-## The two pins
+## The two refs
 
-**The action pin** is a full 40-character commit SHA of ci-workflows `main`,
-because the org requires every action, first-party included, to be pinned to
-a full SHA; only reusable workflows may float on `main`. The pin advances
-through `.github/workflows/maintenance-repin-ci-workflows.yml` (daily), which
-resolves the newest full-SemVer ci-workflows release and, when that release
-changed the action, rewrites the pin in both files to its SHA with a
-`# vX.Y.Z` comment in one pull request that merges once `CI Status` passes; the sync
-then fans it out. A pin to a commit the release does not contain (the
-`# <short-sha> <date>` form) is left alone until a release contains it, so the
-job never moves a pin backwards. It moves action pins only, never a
-reusable-workflow ref (`components/claude-lanes/repin-callers.sh`, covered by
-`repin-callers.test.sh`).
-The earlier pins are recorded because of what they fixed:
-`2c1de45aa0e1b1489afb8edfebc12cb3a4fa6ac3` (v0.24.0) superseded
-`5776760254f8b63cba44e896f51604cb755350d9` (v0.22.2), which in turn
-superseded `3b2f4eab5b4bb58a150e400613350ede37742ee8` (2026-08-30,
-ci-workflows#530), the commit that closed the guard's fail-open on an
-unreadable diff: before it, an unfetched or bogus ref produced an empty change
-list and the guard passed precisely when it could not see the diff. No release
-carried that commit when this component was admitted (the newest, v0.17.2, is
-2026-08-21), so the comment took the convention's short-SHA fallback form until
-a release contained it; v0.22.2 was the first release that did, and the pin has
-carried the release-tag comment form since. Between v0.22.2 and v0.24.0
-`.github/actions/managed-files-guard/action.yml` changed once (verified through
-the compare API), in ci-workflows `3c23f69e4248700c3636cabd49f1d5c888284444`
-(ci-workflows#568). It adds a `'dependabot[bot]'|dependabot` arm to the actor
-`case`, so both the bracketed login and the bare name now skip the hand-edit
-check; a Dependabot bump that edits a pinned action inside a standards-managed
-file reds the guard without it. It also **quotes** the existing
-`melodic-standards-sync[bot]` pattern, which is a behavior change, not
-cosmetics: unquoted, bash parsed `[bot]` as a glob character class matching a
-single `b`, `o` or `t`, so that arm never matched the bot login at all. It was
-masked by the sibling `standards-sync` label check, which skipped sync-bot PRs
-through the label path; quoting turns a dead arm live. Nothing else the guard
-executes moved. v0.30.1 (ci-workflows#634) installs the standards tree's
-`.node-version` with SHA-pinned `actions/setup-node` before `npm ci`: the fleet
-caller's self-hosted runners ship no Node, so the guard failed there with
-`npm: command not found`.
+**The action ref** is `@main` of ci-workflows: first-party actions float on
+`main` (owner decision, architecture owner-decisions L351), so a ci-workflows
+change reaches every caller without a pin move or a sync.
 
 **`standards-ref: main`** for the soak, per the action's input contract
 ("Pin to a full SHA in callers once soak completes"). The guard must read the
@@ -198,7 +163,7 @@ the guard executes); do not pin it in this hop.
 - **No caller checkout.** The action checks out the consumer repository
   itself (ci-workflows#881), so each file is one step and carries no
   third-party action pin for a consumer's Dependabot to bump. The
-  `actions/checkout` pin lives in the action and moves with the action pin.
+  `actions/checkout` ref lives in the action.
 
 ## Verification
 
@@ -209,8 +174,8 @@ metacharacters; `contents: read` and `pull-requests: read` as the whole
 grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; one
-step, the action pinned to a full 40-character SHA; and `standards-ref: main`. It asserts the two files carry the same
-action pin and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
+step, the action at `@main`; and `standards-ref: main`. It asserts the two files carry the same
+action ref and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
 manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
 accounted for) and materializes each managing target through the real engine, asserting byte-identity at the

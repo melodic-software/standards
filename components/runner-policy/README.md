@@ -390,9 +390,7 @@ a 40-character `uses:` pin contains a token that reads as a short commit SHA
 (mixed hex digits and letters, or a full 40-character SHA), it must be a
 prefix of the pinned commit. Version tags, prose, dates, and hex-only English
 words are not treated as SHA claims. Update the comment in the same change as
-the pin. A `@main` reference carries no pin and no such comment. The
-`maintenance-repin-ci-workflows` job writes the `# vX.Y.Z` form when it moves
-a first-party action pin, which this check accepts.
+the pin. A `@main` or tag reference carries no pin and no such comment.
 
 For a reusable workflow call, name the target through its canonical `runner`
 input:
@@ -484,12 +482,15 @@ require hosted execution. A grant is keyed by
   job-level `env` or step `env`/`with` entry. `GITHUB_TOKEN` cannot be named
   here; transformed expressions, workflow-level env values, `run:`
   interpolation, and conditions stay privileged-hosted.
-- `credentialActions` (optional): full `owner/action@<40-hex-SHA>`
-  references the job's steps may invoke, whose action name must be a central
+- `credentialActions` (optional): exact `owner/action@ref` references the
+  job's steps may invoke, whose action name must be a central
   `localCredentialActions` entry (for example
-  `actions/create-github-app-token@<reviewed SHA>`). The grant pins the exact
-  ref because a different ref of the same action is different
-  credential-minting code; a tag, branch, or other SHA stays
+  `actions/create-github-app-token@v3`). The ref is a full 40-hex SHA, `@main`
+  for a `melodic-software` action, or a `vN`, `vN.N` or `vN.N.N` tag for an
+  official-vendor owner (`actions`, `github`, `dependabot`, `microsoft`,
+  `azure`, `anthropics`, `openai`), per the owner decision that first-party and
+  vendor refs run unpinned (architecture owner-decisions L351). The step must
+  name the granted ref exactly; any other ref of the same action stays
   privileged-hosted, and actions outside the central list cannot be granted.
 
 A grant applies only while the job genuinely routes to the managed fleet, that

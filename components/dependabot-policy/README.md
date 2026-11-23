@@ -179,8 +179,10 @@ see the [auto tier](#merge-tiers-for-dependabot-pull-requests).
 
 These safeguards remain on a fast-tracked update:
 
-- every action stays pinned to a full commit SHA, so the update is one
-  reviewable diff that moves a pin, never a tag that changes underneath;
+- every third-party action stays pinned to a full commit SHA, so its update
+  is one reviewable diff that moves a pin; first-party and official-vendor
+  actions (`anthropics/*` included) float on `main` or the vendor's major tag
+  (owner decision, architecture owner-decisions L351);
 - `CI Status` must pass before any merge, and the merge lanes' gates
   (non-major rule, `reviewOnly`, readable `updated-dependencies` metadata)
   apply unchanged;

@@ -143,7 +143,7 @@ renaming, find each of these and change it in the same rollout:
    The old id stays reachable through the API as `deleted` while it has runs;
    delete those runs once no branch or open pull request still carries the old
    file.
-6. **Action pins.** repin-callers moves a pin's SHA, never its path: when a
+6. **Action paths.** Callers name ci-workflows actions at `@main`: when a
    ci-workflows composite action moves, update every caller's `uses:` path in
    the same rollout.
 
