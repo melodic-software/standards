@@ -1,0 +1,145 @@
+name: Maintenance Audit Action Pins
+
+# Detective half of the action-pinning policy: each repository's CI Status
+# runs zizmor's unpinned-uses rule on its pull requests, and this sweep checks
+# every default branch with the standards config (.github/zizmor.yml), so a
+# ref that landed without that check (a break-glass merge, a repository whose
+# workflows skip it) is still caught. components/zizmor/sweep.sh runs the
+# audit; its README section "Fleet sweep" states the scope.
+#
+# Repository listing follows maintenance-audit-org-architecture-pointer: the
+# workflow token reads the org's public repositories, and a read-only
+# standards-sync App token reads the private repositories in that App's
+# installation. The sweep covers every non-archived repository, sandbox ones
+# included. A finding fails the run; it opens no issue.
+on:
+  workflow_dispatch:
+  schedule:
+    # Off-minute daily poll, clear of the other maintenance schedules here.
+    - cron: "53 8 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit
+    permissions:
+      contents: read
+    # The App key lives only in the standards-sync environment, whose branch
+    # policy admits main; schedule and dispatch run there. No deployment record.
+    environment:
+      name: standards-sync
+      deployment: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # A boolean, never the credential.
+      HAS_APP_CREDENTIAL: >-
+        ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
+            && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The version and checksum follow ci-workflows' pr-audit-workflows.yml
+      # defaults, so the sweep and each repository's CI read refs alike.
+      - name: Install zizmor
+        env:
+          ZIZMOR_VERSION: 1.30.0
+          ZIZMOR_SHA256: ec8c95cd800845abb9bbc5f377ec7c57d2eb8e2386a00a201d3a74ee4092e5ed
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/zizmor"
+          mkdir -p -- "$dir"
+          archive="$dir/zizmor.tar.gz"
+          curl --fail --show-error --location --proto '=https' --proto-redir '=https' \
+            --tlsv1.2 --connect-timeout 10 --max-time 120 --retry 5 --retry-all-errors \
+            --output "$archive" \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          printf '%s  %s\n' "$ZIZMOR_SHA256" "$archive" | sha256sum --check --strict -
+          tar --extract --gzip --file="$archive" --directory="$dir" --no-same-owner zizmor
+          test "$("$dir/zizmor" --version)" = "zizmor $ZIZMOR_VERSION"
+          echo "$dir" >>"$GITHUB_PATH"
+
+      - name: Mint a read-only App token over the installation
+        id: app-token
+        if: env.HAS_APP_CREDENTIAL == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
+          # `owner` without `repositories` scopes the token to every repository
+          # in the installation, which is the set being checked. It can read
+          # names and file contents, and write nothing.
+          owner: melodic-software # zizmor: ignore[github-app] whole-installation scope is the set being checked; the token is read-only
+          permission-metadata: read
+          permission-contents: read
+
+      # A missing credential leaves private repositories unchecked, which is
+      # a failed sweep, not a partial pass.
+      - name: Report the missing App credential
+        if: env.HAS_APP_CREDENTIAL != 'true'
+        run: |
+          echo "::error::STANDARDS_SYNC_APP_* is not configured in the standards-sync environment, so private repositories cannot be checked."
+          exit 1
+
+      # Depth 1 and a sparse checkout of the root files and .github: the
+      # workflows and the actions zizmor collects there.
+      - name: Check out public repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p -- "$RUNNER_TEMP/repos"
+          gh api --paginate 'orgs/melodic-software/repos?type=public&per_page=100' \
+            --jq '.[] | select(.archived | not) | .name' >"$RUNNER_TEMP/public.txt"
+          printf 'Public repositories: %s\n' "$(wc -l <"$RUNNER_TEMP/public.txt")"
+          while IFS= read -r repo; do
+            dest="$RUNNER_TEMP/repos/$repo"
+            gh repo clone "melodic-software/$repo" "$dest" -- --depth 1 --sparse --quiet
+            if git -C "$dest" rev-parse -q --verify HEAD >/dev/null; then
+              git -C "$dest" sparse-checkout add .github
+            fi
+          done <"$RUNNER_TEMP/public.txt"
+
+      - name: Check out private installation repositories
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate 'installation/repositories?per_page=100' \
+            --jq '.repositories[] | select(.private and (.archived | not)) | .name' >"$RUNNER_TEMP/private.txt"
+          printf 'Private installation repositories: %s\n' "$(wc -l <"$RUNNER_TEMP/private.txt")"
+          while IFS= read -r repo; do
+            dest="$RUNNER_TEMP/repos/$repo"
+            gh repo clone "melodic-software/$repo" "$dest" -- --depth 1 --sparse --quiet
+            if git -C "$dest" rev-parse -q --verify HEAD >/dev/null; then
+              git -C "$dest" sparse-checkout add .github
+            fi
+          done <"$RUNNER_TEMP/private.txt"
+
+      - name: Audit every default branch
+        run: |
+          # The default shell carries -e; the sweep's exit code is the result.
+          set +e -uo pipefail
+          rc=0
+          bash components/zizmor/sweep.sh --config .github/zizmor.yml "$RUNNER_TEMP"/repos/* >"$RUNNER_TEMP/sweep.out" || rc=$?
+          cat "$RUNNER_TEMP/sweep.out"
+          {
+            echo '## Action pin sweep'
+            echo
+            echo '```text'
+            grep -E '^(UNPINNED|NO-INPUTS): ' "$RUNNER_TEMP/sweep.out" || echo 'No unpinned refs.'
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+          grep '^UNPINNED: ' "$RUNNER_TEMP/sweep.out" | while IFS= read -r line; do
+            echo "::error::${line} (see components/zizmor/README.md)"
+          done
+          exit "$rc"
