@@ -1,0 +1,8 @@
+name: ignored-tag
+on: push
+permissions: {}
+jobs:
+  tagged:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
