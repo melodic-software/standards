@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests the commit-convention component: the convention file's types equal the
 # pr-convention-policy `title.allowedTypes` and the `types` default of the
-# ci-workflows check-contract action at the ref this repository pins; the
+# ci-workflows check-contract action at the ref this repository uses; the
 # guardrails resolver reads the file at its well-known path when it is tracked;
 # the guardrails commit-msg hook accepts and rejects the expected subjects; and
 # this repository's own copy at that path is byte-identical to the component.
@@ -10,7 +10,7 @@
 #
 # Needs the pr-convention-policy dependencies (`npm ci --prefix
 # components/pr-convention-policy`) for the YAML parser, and network access to
-# read the pinned check-contract action and the guardrails plugin. A failed
+# read the check-contract action and the guardrails plugin. A failed
 # fetch fails the suite.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
@@ -84,14 +84,14 @@ assert_eq 'types equal pr-convention-policy title.allowedTypes' "$policy_types" 
 require_scope="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).title.requireScope))' "$policy")"
 assert_eq 'pr-convention-policy keeps the scope optional, as the pattern does' 'false' "$require_scope"
 
-# report-ci-status runs check-contract through `$/` at the commit it is pinned
-# to, so either pin names the check-contract that gates.
-contract_pin="$(sed -E -n 's#^ *uses: melodic-software/ci-workflows/\.github/actions/pr-require-checks/(check-contract|report-ci-status)@([0-9a-f]{40}).*#\2#p' \
+# report-ci-status runs check-contract through `$/` at the ref it is called
+# at, so either ref names the check-contract that gates.
+contract_pin="$(sed -E -n 's#^ *uses: melodic-software/ci-workflows/\.github/actions/pr-require-checks/(check-contract|report-ci-status)@([0-9a-f]{40}|main)([[:space:]].*)?$#\2#p' \
   "$root/.github/workflows/pr-require-checks.yml" | sort -u)"
-if [[ "$contract_pin" =~ ^[0-9a-f]{40}$ ]]; then
-  pass 'pr-require-checks.yml pins one check-contract or report-ci-status SHA'
+if [[ "$contract_pin" =~ ^([0-9a-f]{40}|main)$ ]]; then
+  pass 'pr-require-checks.yml uses one check-contract or report-ci-status ref (main or a full SHA)'
 else
-  fail 'pr-require-checks.yml pins one check-contract or report-ci-status SHA' "got: $contract_pin"
+  fail 'pr-require-checks.yml uses one check-contract or report-ci-status ref (main or a full SHA)' "got: $contract_pin"
 fi
 action_yml="$TEST_TMPDIR/check-contract-action.yml"
 auth=()
