@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Tests the zizmor component: with the root-canonical config, a first-party
-# reusable on `@main`, a SHA-pinned first-party action and a 3-day Dependabot
-# cooldown audit clean, a third-party tag still fails unpinned-uses, and a
-# configless control run flags the first-party reusable and the cooldown.
+# Tests the zizmor component: with the root-canonical config, first-party and
+# official-vendor refs on a branch or tag, a SHA-pinned third-party action and a
+# 3-day Dependabot cooldown audit clean, a third-party tag still fails
+# unpinned-uses, and a configless control run flags the first-party reusable,
+# the vendor tags and the cooldown.
 # Skips when zizmor is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
@@ -27,7 +28,7 @@ trap 'rm -rf -- "$project"' EXIT
 make_repo "$project"
 mkdir -p "$project/.github/workflows"
 cp "$config" "$project/.github/"
-cp "$fixtures/good/first-party-float.yml" "$project/.github/workflows/"
+cp "$fixtures/good/first-party-float.yml" "$fixtures/good/vendor-float.yml" "$project/.github/workflows/"
 cp "$fixtures/good/dependabot.yml" "$project/.github/"
 
 audit() { (cd "$project" && zizmor --offline --no-progress --color=never -- "$@" 2>&1); }
@@ -35,7 +36,7 @@ audit() { (cd "$project" && zizmor --offline --no-progress --color=never -- "$@"
 for input in . .github .github/workflows; do
   out="$(audit "$input")"
   rc=$?
-  assert_exit "first-party @main refs and a 3-day cooldown audit clean (input $input)" 0 "$rc"
+  assert_exit "first-party and vendor refs and a 3-day cooldown audit clean (input $input)" 0 "$rc"
   assert_not_contains "no unpinned-uses finding (input $input)" "$out" 'unpinned-uses'
 done
 
@@ -45,6 +46,7 @@ rc=$?
 assert_nonzero 'a third-party tag still fails with the config' "$rc"
 assert_contains 'the third-party tag is rejected' "$out" 'third-party-tag.yml:'
 assert_not_contains 'first-party refs stay admitted' "$out" 'first-party-float.yml:'
+assert_not_contains 'vendor refs stay admitted' "$out" 'vendor-float.yml:'
 
 # Control: without the config zizmor's default hash-pins every ref and wants a
 # 7-day cooldown. When this fails, the default changed; recheck the policy.
@@ -53,6 +55,7 @@ out="$(audit .)"
 rc=$?
 assert_nonzero 'first-party @main refs fail without the config (removal tripwire)' "$rc"
 assert_contains 'control run flags first-party refs' "$out" 'first-party-float.yml:'
+assert_contains 'control run flags vendor tags' "$out" 'vendor-float.yml:'
 assert_contains 'control run flags the 3-day cooldown' "$out" 'dependabot-cooldown'
 
 [[ $FAILED -eq 0 ]] || exit 1

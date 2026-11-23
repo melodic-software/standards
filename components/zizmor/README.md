@@ -8,13 +8,17 @@ repository's own live config. It sets two rules:
 - `dependabot-cooldown` accepts a 3-day `cooldown.default-days`, the org floor
   in [dependabot-policy](../dependabot-policy/README.md) (`cooldownMinimumDays`),
   below zizmor's default of 7.
-- `unpinned-uses` lets `melodic-software/*` refs float on a branch or tag
-  (`ref-pin`), so the synced ci-workflows reusable-workflow callers can use
-  `@main`, and keeps every other ref SHA-pinned (`hash-pin`, zizmor's
-  default). First-party actions stay SHA-pinned anyway, because the org
-  requires actions pinned to a full commit SHA; a SHA pin also satisfies
-  `ref-pin`. `maintenance-repin-ci-workflows` moves those pins on each
-  ci-workflows release.
+- `unpinned-uses` lets first-party and official-vendor refs float on a branch
+  or tag (`ref-pin`) and keeps every other ref SHA-pinned (`hash-pin`, zizmor's
+  default), moved by Dependabot under the cooldown above. The `ref-pin` owners
+  are `melodic-software`; GitHub's `actions`, `github` and `dependabot`;
+  Microsoft's `microsoft`, `azure` and `Azure`; Anthropic's `anthropics`; and
+  OpenAI's `openai`. zizmor matches owners case-sensitively, so each spelling
+  in use has its own entry and any other spelling falls to `hash-pin`. A SHA
+  pin also satisfies `ref-pin`. While the org Actions setting requires every
+  action pinned to a full commit SHA, GitHub still refuses a floating action
+  ref at run time, so first-party and vendor actions keep their SHA pins until
+  that setting is off.
 
 Both rules only relax zizmor's defaults, so adopting the file cannot add a
 finding to a target.
@@ -56,9 +60,10 @@ visible to neither token, as in `maintenance-audit-org-architecture-pointer`.
 ## Verification
 
 `zizmor.test.sh` runs zizmor against a scratch repository holding the config
-and `fixtures/`. A workflow with a first-party reusable on `@main`, a SHA-pinned
-first-party composite action and a SHA-pinned third-party action, and a Dependabot file with a
-3-day cooldown, audit clean whether the input is `.`, `.github` or
-`.github/workflows`. A third-party tag (`fixtures/bad/`) still fails. A
-configless control run flags the first-party reusable and the cooldown; it fails
-once zizmor's defaults change, which is the trigger to recheck this policy.
+and `fixtures/`. A first-party reusable and composite action on `@main`, a
+GitHub action on a tag, a SHA-pinned third-party action, a tagged action from
+each other vendor owner, and a Dependabot file with a 3-day cooldown audit
+clean whether the input is `.`, `.github` or `.github/workflows`. A third-party
+tag (`fixtures/bad/`) still fails. A configless control run flags the
+first-party refs, the vendor tags and the cooldown; it fails once zizmor's
+defaults change, which is the trigger to recheck this policy.

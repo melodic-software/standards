@@ -487,11 +487,12 @@ components:
     files:
       _typos.toml: _typos.toml
   # zizmor audit policy (components/zizmor/README.md): the org 3-day
-  # Dependabot cooldown floor, and `melodic-software/*` refs `ref-pin` with
-  # every other ref `hash-pin`, so the `@main` ci-workflows callers audit
-  # clean. Both rules only relax zizmor's defaults. Targets: every repository
-  # that runs zizmor. The source doubles as this repository's own live config
-  # (standards is manifest source, not a target). Deliberate exclusion:
+  # Dependabot cooldown floor, and first-party and official-vendor refs
+  # `ref-pin` with every other ref `hash-pin`, so the `@main` ci-workflows
+  # callers audit clean. Both rules only relax zizmor's defaults. Targets:
+  # every repository that runs zizmor. The source doubles as this repository's
+  # own live config (standards is manifest source, not a target). Deliberate
+  # exclusion:
   # - ci-workflows: `locally-owned` — its copy adds a repo-specific
   #   `self-repository` ignore a whole-file sync would clobber.
   zizmor:
