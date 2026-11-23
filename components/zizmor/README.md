@@ -42,6 +42,21 @@ ci-workflows' `self-repository` ignore) owns its copy as `locally-owned`, per
 [Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component),
 and keeps both blocks above.
 
+## Fleet sweep
+
+Each repository's `CI Status` audits its own pull requests. The scheduled
+[`maintenance-audit-action-pins`](../../.github/workflows/maintenance-audit-action-pins.yml)
+workflow also audits every non-archived `melodic-software` repository's default
+branch against this file, which catches a ref that merged without that check.
+It clones each repository at depth 1 with only the root files and `.github`,
+and [`sweep.sh`](sweep.sh) runs zizmor offline over the workflows and actions
+there with ignore comments disabled, keeping only `unpinned-uses` findings. A
+finding fails the run with one `UNPINNED:` line per ref. The run opens no
+issue. Composite actions outside `.github` and the repository root are not
+read. Private repositories outside the standards-sync App installation are
+visible to neither token, as in `maintenance-audit-org-architecture-pointer`.
+`sweep.test.sh` covers the script.
+
 ## Verification
 
 `zizmor.test.sh` runs zizmor against a scratch repository holding the config
