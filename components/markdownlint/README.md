@@ -10,10 +10,10 @@ editor integrations at the location they deploy to:
 | `markdownlint` | root-canonical [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | a repository's own `.markdownlint-cli2.jsonc` |
 | `markdownlint-home` | [`home/.markdownlint-cli2.jsonc`](home/.markdownlint-cli2.jsonc) | `~/.markdownlint-cli2.jsonc`, via the dotfiles `dot_` source name |
 
-Both configs own their rule choices, and both pin their `$schema` URL to this
-repository's own `markdownlint-cli2` `package.json` version: authoring-time
-validation here, not a statement about which CLI version a consumer runs. The
-root config additionally declares a repository traversal scope; the home config
+Both configs own their rule choices, and both point their `$schema` URL at
+markdownlint-cli2's `main` branch schema. The CLI never reads `$schema`; only
+editors use it, so the URL names no version and a dependency bump leaves it
+alone. The root config additionally declares a repository traversal scope; the home config
 declares its own, deliberately different one.
 
 ## Why the home payload is a sibling, not the same file
@@ -46,8 +46,3 @@ only the exclusions that hold anywhere: vendored `node_modules` and `.venv`.
   no flag, that the discovered ruleset is this one rather than stock defaults,
   ruleset parity with the root config, and that authored Markdown under `bin/`
   is linted rather than silently excluded.
-- `markdownlint-schema-pin.test.sh` proves both configs' `$schema` URL still
-  names this repository's own pinned `markdownlint-cli2` `package.json`
-  version. That pin authors authoring-time validation here and makes no claim
-  about a consumer's tool version, so nothing else keeps it from drifting
-  silently when one is bumped without the other.
