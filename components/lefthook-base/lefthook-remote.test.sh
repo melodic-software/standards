@@ -158,9 +158,11 @@ assert_exit 'a missing markdownlint-cli2 does not fail the commit' 0 "$?"
 assert_contains 'the skip names the missing binary' "$out" 'skipped, node_modules/.bin/markdownlint-cli2 not found'
 
 # Case 5: a missing tool fails its job with an install pointer.
+# node stays reachable: an npm-installed lefthook is a node script.
 mkdir -p "$work/bare-bin"
-ln -s "$(command -v git)" "$work/bare-bin/git"
-ln -s "$(command -v lefthook)" "$work/bare-bin/lefthook"
+for bin in git lefthook node; do
+  if command -v "$bin" >/dev/null 2>&1; then ln -s "$(command -v "$bin")" "$work/bare-bin/$bin"; fi
+done
 bare_path="$work/bare-bin:/usr/bin:/bin"
 if PATH="$bare_path" command -v typos >/dev/null 2>&1; then
   skip_case 'typos is installed system-wide, so no PATH hides it'
