@@ -109,8 +109,9 @@ was retired with no targets in #430 and is not reintroduced.
 and tool updates: Dependabot, and the version-bump tooling that pins tools
 outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
-- schedule on the interval its ecosystem accepts: `daily` for
-  `github-actions`, `weekly` for every other ecosystem;
+- schedule on the interval its ecosystem accepts: `weekly` for every
+  ecosystem, and `daily` as well for `github-actions` while the fleet
+  switches to weekly;
 - set `cooldown.default-days` to at least the minimum (`3`), so a compromised or
   yanked release is caught before adoption while security updates still bypass
   the soak;
@@ -121,14 +122,14 @@ outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 
 `scheduleInterval` is the standard interval; `scheduleIntervalByEcosystem`
 lists the `accepted` intervals for an ecosystem that differs, with the date
-it was `reviewed` and its `basis`. The `github-actions` entry checks daily
-(owner decision, 2026-11-16). First-party actions float on `main` and
+it was `reviewed` and its `basis`. The `github-actions` entry returns to
+weekly (owner decision, 2026-11-23); `daily` and `weekly` are both accepted
+while the fleet switches. First-party actions float on `main` and
 official-vendor actions on their major tag (owner decision, architecture
 owner-decisions L351), so Dependabot moves no first-party ref; the entry
 carries vendor major-tag bumps and the full-commit-SHA pins of third-party
 actions. Those keep their cooldown and grouping, and
-`open-pull-requests-limit` still caps the entry, so a daily check does not
-burst.
+`open-pull-requests-limit` still caps the entry.
 
 ### Cooldown by change class
 
