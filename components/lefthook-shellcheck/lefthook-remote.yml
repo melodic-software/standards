@@ -1,0 +1,12 @@
+# Remote form of lefthook.yml, listed beside lefthook-base's lefthook-remote.yml
+# under a consumer's `remotes:` entry for melodic-software/standards. The script
+# passes ShellCheck the standards .shellcheckrc fetched beside it.
+
+pre-commit:
+  jobs:
+    - name: standards-shellcheck
+      script: standards-shellcheck.sh
+      runner: sh
+      glob: "{*,**/*}.{sh,bash}"
+      args: "{staged_files}"
+      fail_text: "ShellCheck findings. Fix them, or annotate a justified exception with a shellcheck directive."

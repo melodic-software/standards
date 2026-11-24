@@ -384,6 +384,9 @@ jobs:
       - name: Lefthook base contract test
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh
+      - name: Lefthook remote contract test
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
+        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-remote.test.sh
       - name: Lefthook merge/rebase skip placement test
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-merge-skip.test.sh

@@ -1,0 +1,30 @@
+# Remote form of lefthook.yml: list this file under a consumer's `remotes:`
+# entry for melodic-software/standards. Each job runs a script under the
+# repository root's .lefthook/pre-commit/, which passes the tool the standards
+# config fetched beside it, so the consumer needs no synced copy.
+#
+# No top-level settings and no `skip`: remote configs merge after the
+# consumer's lefthook.yml, so either would override the consumer's own call.
+
+pre-commit:
+  jobs:
+    - name: standards-typos
+      script: standards-typos.sh
+      runner: sh
+      args: "{staged_files}"
+      fail_text: "Spelling issues. Fix them, or record a false positive per the Typos component's escape hatches."
+    - name: standards-gitleaks
+      script: standards-gitleaks.sh
+      runner: sh
+      fail_text: "Potential secret in staged changes. Remove it, or allowlist a verified false positive in .gitleaks.toml."
+    - name: standards-editorconfig
+      script: standards-editorconfig.sh
+      runner: sh
+      args: "{staged_files}"
+      fail_text: "EditorConfig violation. Align with .editorconfig (most editors auto-fix on save)."
+    - name: standards-markdownlint
+      script: standards-markdownlint.sh
+      runner: sh
+      glob: "{*,**/*}.{md,markdown}"
+      args: "{staged_files}"
+      fail_text: "Markdown lint failures, or markdownlint-cli2 missing (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"

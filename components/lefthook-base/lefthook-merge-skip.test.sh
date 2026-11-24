@@ -108,8 +108,8 @@ rm -f "$work/.git/MERGE_HEAD"
 # touches, because the first cut of this fix updated two adapters and missed
 # three. Comment text mentioning `skip:` does not match -- the pattern is
 # anchored to the key.
-for fragment in "$root"/components/lefthook-*/lefthook.yml; do
-  assert_eq "$(basename "$(dirname "$fragment")") declares no skip; the consumer owns that call" \
+for fragment in "$root"/components/lefthook-*/lefthook.yml "$root"/components/lefthook-*/lefthook-remote.yml; do
+  assert_eq "${fragment#"$root"/} declares no skip; the consumer owns that call" \
     '0' "$(grep -c '^ *skip:' "$fragment" || true)"
 done
 

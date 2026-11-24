@@ -1,0 +1,13 @@
+#!/bin/sh
+# shellcheck shell=sh
+# Lefthook runs a script from every source dir that holds it, so only the fetched remote copy acts.
+src=$(printf '%s\n' "$0" | tr '\134' '/')
+case "$src" in
+  */info/lefthook-remotes/*) ;;
+  *) exit 0 ;;
+esac
+command -v editorconfig-checker >/dev/null 2>&1 || {
+  echo 'standards-editorconfig: editorconfig-checker is not on PATH (alias ec to it). Install it: https://github.com/editorconfig-checker/editorconfig-checker#installation' >&2
+  exit 1
+}
+exec editorconfig-checker -config "${src%/*}/../../.editorconfig-checker.json" "$@"
