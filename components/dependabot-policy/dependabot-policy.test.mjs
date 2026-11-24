@@ -114,7 +114,7 @@ test("multiple conformant entries including the directories plural form pass", a
       - /.github/actions/*
     open-pull-requests-limit: 5
     schedule:
-      interval: daily
+      interval: weekly
     cooldown:
       default-days: 3
     groups:
@@ -143,6 +143,25 @@ test("a non-weekly schedule is flagged", async () => {
   const entry = CONFORMANT.replace("interval: weekly", "interval: daily");
   const root = await repository({ dependabotYaml: dependabot(entry) });
   assert.deepEqual(rules(await auditRepository({ root })), ["npm:/:schedule-not-standard"]);
+});
+
+test("the shipped policy rejects a daily github-actions schedule", async () => {
+  const entry = `  - package-ecosystem: github-actions
+    directory: /
+    open-pull-requests-limit: 5
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 3
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+`;
+  const root = await repository({ dependabotYaml: dependabot(entry) });
+  assert.deepEqual(rules(await auditRepository({ root })), [
+    "github-actions:/:schedule-not-standard",
+  ]);
 });
 
 test("a missing cooldown is flagged", async () => {
