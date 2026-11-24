@@ -326,21 +326,6 @@ components:
       - shellcheck
     files:
       components/lefthook-shellcheck/lefthook.yml: .lefthook/shellcheck.yml
-  # Link-check config for every target's offline lychee lane. Deliberate
-  # non-targets:
-  # - pr-pipeline-sandbox: a test bed for PR-pipeline CI lanes with no product
-  #   code or authored docs, and no lychee lane.
-  # - songwriting, architecture and knowledge-corpus (targets for `dependabot-policy` and the guard only)
-  #   run the offline lane with no copy of this file: the ci-workflows
-  #   lychee-offline composite falls back to the canonical copy ci-workflows
-  #   carries as a target here when the caller has none. knowledge-corpus
-  #   excludes its captured docs text through pr-run-checks'
-  #   lychee-offline-exclude; the lane is deterministic and feeds no agent,
-  #   so its review-lane deferral does not apply.
-  # - standards: manifest source, not a target.
-  lychee:
-    files:
-      lychee.toml: lychee.toml
   # Weekly online link-check callers (ci-workflows#739), the third recorded
   # exception to the workflow-caller exclusion in README.md: one source file
   # per opted-in target, because the cron minute and day differ per target
@@ -479,18 +464,6 @@ components:
   typos:
     files:
       _typos.toml: _typos.toml
-  # zizmor audit policy (components/zizmor/README.md): the org 3-day
-  # Dependabot cooldown floor, and first-party and official-vendor refs
-  # `ref-pin` with every other ref `hash-pin`, so the `@main` ci-workflows
-  # callers audit clean. Both rules only relax zizmor's defaults. Targets:
-  # every repository that runs zizmor. The source doubles as this repository's
-  # own live config (standards is manifest source, not a target). Deliberate
-  # exclusion:
-  # - ci-workflows: `locally-owned` — its copy adds a repo-specific
-  #   `self-repository` ignore a whole-file sync would clobber.
-  zizmor:
-    files:
-      .github/zizmor.yml: .github/zizmor.yml
 
 # Automerge is restored: the watchdog's tracking-issue
 # create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
@@ -522,7 +495,6 @@ targets:
       - filing-guide
       - gitleaks
       - issue-forms
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
@@ -530,10 +502,8 @@ targets:
       - repository-text
       - review-instructions
       - typos
-  # Link-check config plus the managed-files guard every target carries: its
-  # pr-require-checks lane turns lychee-offline on once this delivers
-  # lychee.toml. Private and fleet-enrolled in github-iac, so it takes the
-  # fleet-routed guard and lane callers. Its other configs stay repo-owned.
+  # The managed-files guard every target carries. Private and fleet-enrolled
+  # in github-iac, so it takes the fleet-routed guard and lane callers. Its other configs stay repo-owned.
   melodic-software/agent-automations:
     managed:
       - claude-review-caller
@@ -542,7 +512,6 @@ targets:
       - dependabot-automerge-fleet-caller
       - dependabot-policy
       - filing-guide
-      - lychee
       - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
@@ -561,7 +530,6 @@ targets:
       - editorconfig-checker
       - filing-guide
       - gitleaks
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - repository-text
@@ -587,7 +555,6 @@ targets:
       - editorconfig-checker
       - filing-guide
       - gitleaks
-      - lychee
       - managed-files-guard-fleet-caller
       - markdownlint
       - repository-text
@@ -607,7 +574,6 @@ targets:
       - filing-guide
       - gitleaks
       - go-analysis
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
@@ -615,7 +581,6 @@ targets:
       - review-instructions
       - shellcheck
       - typos
-      - zizmor
     locally-owned:
       - actionlint
   melodic-software/ci-workflows:
@@ -631,7 +596,6 @@ targets:
       - engineering-standards
       - filing-guide
       - gitleaks
-      - lychee
       - markdownlint
       - node-runtime
       - path-detection-action
@@ -651,10 +615,6 @@ targets:
       # uses pr-automerge-dependabot-queue.yml for its merge queue.
       - dependabot-automerge-caller
       - managed-files-guard-caller
-      # Its .github/zizmor.yml carries the component's two rules plus a
-      # repo-specific `self-repository` ignore. Removal trigger: that ignore
-      # retiring (rhysd/actionlint#732).
-      - zizmor
   # Renamed from account-rotation on 2026-09-07 (github-iac aliases the old name).
   # Adopted 2026-09-05 at repository creation (github-iac governs it; the
   # Pulumi entry and this target land in the same window). A public .NET tool
@@ -685,7 +645,6 @@ targets:
       - gitleaks
       - lefthook-base
       - lefthook-dotnet
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - node-runtime
@@ -709,7 +668,6 @@ targets:
       - github-actions-conventions
       - gitleaks
       - issue-body-contract-plugins
-      - lychee
       - lychee-online-claude-code-plugins
       - managed-files-guard-caller
       - markdownlint
@@ -723,7 +681,6 @@ targets:
       - shellcheck
       - trusted-actors
       - typos
-      - zizmor
     # The hosted lane pair is locally owned here, so this repository's copies
     # can resolve their models through its own resolve-config action and pass
     # them as `model-args` (ci-workflows v0.45.0). No other target has that
@@ -800,7 +757,6 @@ targets:
       - lefthook-base
       - lefthook-powershell
       - lefthook-python
-      - lychee
       - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
@@ -809,7 +765,6 @@ targets:
       - repository-text
       - review-instructions
       - typos
-      - zizmor
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
@@ -834,7 +789,6 @@ targets:
       - engineering-standards
       - filing-guide
       - gitleaks
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - pr-body-contract-rule
@@ -852,7 +806,6 @@ targets:
       - editorconfig-checker
       - filing-guide
       - gitleaks
-      - lychee
       - managed-files-guard-caller
       - markdownlint
       - repository-text
@@ -880,7 +833,6 @@ targets:
       - lefthook-powershell
       - lefthook-python
       - lefthook-shellcheck
-      - lychee
       - managed-files-guard-fleet-caller
       - markdownlint
       - markdownlint-home
@@ -894,7 +846,6 @@ targets:
       - ruff
       - runner-policy
       - typos
-      - zizmor
     locally-owned:
       - shellcheck
   melodic-software/github-iac:
@@ -913,7 +864,6 @@ targets:
       - gitleaks
       - lefthook-base
       - lefthook-dotnet
-      - lychee
       - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
@@ -923,7 +873,6 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-      - zizmor
     locally-owned:
       - actionlint
   # The Dependabot policy copy, the fleet-routed guard and the filing guide, as for architecture.
@@ -956,7 +905,6 @@ targets:
       - dependabot-policy
       - engineering-standards
       - filing-guide
-      - lychee
       - managed-files-guard-fleet-caller
       # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
       # --vault the behavior is unchanged, and medley's *-dispatch.test.sh
@@ -967,7 +915,6 @@ targets:
       - pr-body-contract-rule
       - runner-policy
       - tsconfig
-      - zizmor
     locally-owned:
       - actionlint
       # Repo-specific toolchain steps live inside the bootstrap itself (plus a
@@ -1024,8 +971,7 @@ targets:
   # github-actions-conventions, runner-policy with node-runtime, and
   # trusted-actors), so the copies stop drifting from claude-code-plugins',
   # plus the hosted-only `managed-files-guard-caller` every public target
-  # carries, the filing guide every target carries, and the zizmor policy its
-  # blocking pr-audit-workflows job reads. It reads runner-policy as the npm
+  # carries and the filing guide every target carries. It reads runner-policy as the npm
   # manifest its lanes install, with no repo-local
   # `.github/runner-policy.json` or gate job yet, so the handoff in
   # distribution/README.md is not done there. Its other configs
@@ -1039,7 +985,6 @@ targets:
       - node-runtime
       - runner-policy
       - trusted-actors
-      - zizmor
     # Its review callers are pr-review-cli variants pinned to the release
     # claude-code-plugins tests, with a kill-switch job and hold inputs, so
     # the sandbox can probe the lanes before claude-code-plugins adopts them.
@@ -1062,7 +1007,6 @@ targets:
       - lefthook-base
       - lefthook-powershell
       - lefthook-shellcheck
-      - lychee
       - managed-files-guard-fleet-caller
       - markdownlint
       - node-runtime
@@ -1073,7 +1017,6 @@ targets:
       - runner-policy
       - shellcheck
       - typos
-      - zizmor
   # The Dependabot policy copy, the fleet-routed guard and the filing guide, as for architecture.
   melodic-software/songwriting:
     managed:
