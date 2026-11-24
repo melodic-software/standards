@@ -15,6 +15,45 @@ The fragment is check-only: hooks do not rewrite and restage work. The
 repository pins Lefthook in `package.json` and validates the composed local
 adapter in CI.
 
+## Remote form
+
+`lefthook-remote.yml` runs the same four checks from a Lefthook
+[remote](https://lefthook.dev/configuration/remotes/) instead of a synced
+copy. A consumer lists it under a `remotes:` entry for this repository:
+
+```yaml
+remotes:
+  - git_url: https://github.com/melodic-software/standards
+    ref: main
+    refetch_frequency: 24h
+    configs:
+      - components/lefthook-base/lefthook-remote.yml
+      - components/lefthook-shellcheck/lefthook-remote.yml
+```
+
+Each job runs a script under the repository root's `.lefthook/pre-commit/`,
+where Lefthook requires a remote's scripts to live. The script finds the
+standards config two directories above itself in the fetched copy and passes it
+to its tool: Typos `-c _typos.toml`, Gitleaks `--config .gitleaks.toml`,
+EditorConfig-checker `-config .editorconfig-checker.json`, and
+markdownlint-cli2 `--config .markdownlint-cli2.jsonc`. Files are selected as in
+`lefthook.yml`: every staged file for Typos and EditorConfig-checker, staged
+Markdown for markdownlint-cli2, and the staged diff for Gitleaks. The remote
+form declares no top-level settings, because remote configs merge after the
+consumer's `lefthook.yml` and would override it.
+
+Two differences from `lefthook.yml`: when the consumer has no
+`node_modules/.bin/markdownlint-cli2`, the Markdown job warns and skips rather
+than running `npm ci`; and a script outside a fetched remote, such as this
+repository's own work tree, exits without running its tool, because Lefthook
+runs a script from every source directory that holds it. A failed refetch
+leaves the last fetched copy in force, with a warning.
+
+`lefthook-remote.test.sh` runs each script from two fetched locations and
+checks the config path it passes, then has a consumer fetch a stand-in remote
+and checks the files and configs each job receives. Where Typos or ShellCheck
+is installed, it commits a fixture only the standards config rejects.
+
 ## Merge and rebase commits
 
 No fragment in this component set declares a `skip`, at the hook level or the
