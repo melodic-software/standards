@@ -1,5 +1,4 @@
 rules:
-  # The org Dependabot cooldown floor is 3 days (standards dependabot-policy).
   dependabot-cooldown:
     config:
       days: 3
