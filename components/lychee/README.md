@@ -1,23 +1,20 @@
 # Lychee
 
 Local link and Markdown-anchor validation with
-[Lychee](https://github.com/lycheeverse/lychee). The exported payload is the
-root-canonical [`lychee.toml`](../../lychee.toml).
+[Lychee](https://github.com/lycheeverse/lychee). The config is the
+root-canonical [`lychee.toml`](../../lychee.toml), which the sync does not
+copy into other repositories.
 
 The blocking `ci-workflows` action runs offline for deterministic local-file and
 fragment checks. External URLs are checked only by a manual online run, because
 network health is inherently transient.
 
-Managed consumers do not edit the config; a repository that needs a different
-one [opts out](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
-`fixtures/` and `lychee.test.sh`
-prove valid links and missing file/fragment failures with Lychee 0.24.2+.
-
-A repository outside the sync keeps no copy: when the caller has no root
-`lychee.toml`, the `lychee-offline` composite uses the canonical copy that
-ci-workflows, a sync target, carries. The non-targets that rely on this are
-listed with their reasons beside the `lychee` component in
-[`sync-manifest.yml`](../../distribution/sync-manifest.yml).
+A repository keeps no copy: when the caller has no root `lychee.toml`, the
+`lychee-offline` composite and the online `maintenance-check-links-online`
+reusable read this repository's. A repository that needs a different config
+commits its own root `lychee.toml`, which wins. `fixtures/` and
+`lychee.test.sh` prove valid links and missing file/fragment failures with
+Lychee 0.24.2+.
 
 Manual online runs exclude explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes an unauthenticated request receive
@@ -31,8 +28,7 @@ when an excluded repository went public and holds the two alternations sorted
 and identical. A private repository missing from the list has no check: it
 shows up as a 404 in the next online run, which names the repository. Run
 `generate --write` when the org gains a private repository, or when an online
-run reports one. Fix it at this source, never in a consumer's synced copy,
-which the next sync overwrites. Public siblings and stale pre-transfer owner
+run reports one. Fix it at this source. Public siblings and stale pre-transfer owner
 URLs remain checked. Public bot-blocking
 exceptions are scoped to the exact URL, not the host: every other URL on
 those hosts remains checked. The specific exceptions are inventoried alongside

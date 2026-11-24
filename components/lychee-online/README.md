@@ -3,8 +3,9 @@
 Sync-managed callers for the weekly online link check, the `ci-workflows`
 reusable `.github/workflows/maintenance-check-links-online.yml`
 (ci-workflows#739). The reusable runs lychee with the network on over the
-target's Markdown with its managed [`lychee.toml`](../lychee/README.md) and
-its own `.lycheeignore`, writes the report to the job summary, fails red on a
+target's Markdown with the target's own `lychee.toml`, or this repository's
+root [`lychee.toml`](../lychee/README.md) when the target has none, plus the
+target's own `.lycheeignore`, writes the report to the job summary, fails red on a
 broken link, and holds only the `GITHUB_TOKEN`. A 429, a 5xx or a timeout does
 not fail the run ([status handling](../lychee/README.md#status-handling-and-fragment-remaps)
 says why).
@@ -56,6 +57,6 @@ permissions change on ci-workflows `main`, update that contract's
 ## Exceptions
 
 Exact-URL `.lycheeignore` entries in the target, each with a dated reason,
-only for pages proven alive that block the checker; shared ones go in the
-managed `lychee.toml`. Per-host pacing (standards#775, removed in #776) did not
+only for pages proven alive that block the checker; shared ones go in this
+repository's root `lychee.toml`. Per-host pacing (standards#775, removed in #776) did not
 stop runner 429s, so the managed config accepts 429 and 5xx instead.

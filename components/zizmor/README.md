@@ -1,9 +1,10 @@
 # zizmor
 
 Audit policy for [zizmor](https://docs.zizmor.sh/), the GitHub Actions
-security linter. The exported payload is the root-canonical
+security linter. The policy is the root-canonical
 [`.github/zizmor.yml`](../../.github/zizmor.yml), which is also this
-repository's own live config. It sets two rules:
+repository's own live config; the sync does not copy it into other
+repositories. It sets two rules:
 
 - `dependabot-cooldown` accepts a 3-day `cooldown.default-days`, the org floor
   in [dependabot-policy](../dependabot-policy/README.md) (`cooldownMinimumDays`),
@@ -18,8 +19,8 @@ repository's own live config. It sets two rules:
   pin also satisfies `ref-pin`. First-party refs use `@main` and vendor refs
   the vendor's major tag (owner decision, architecture owner-decisions L351).
 
-Both rules only relax zizmor's defaults, so adopting the file cannot add a
-finding to a target.
+Both rules only relax zizmor's defaults, so reading this file cannot add a
+finding to a repository.
 
 ## Discovery
 
@@ -34,11 +35,10 @@ discovery, so a consumer that sets either does not read this file.
 
 ## Ownership
 
-Managed consumers do not edit the file; the managed-files guard flags a
-downstream edit. A repository that needs an extra rule owns its copy as
-`locally-owned`, per
-[Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component),
-and keeps both blocks above.
+A repository keeps no copy. The `ci-workflows` `pr-audit-workflows` reusable
+audits with the caller's own config when it has one and with this file
+otherwise. A repository that needs an extra rule commits its own
+`.github/zizmor.yml`, which wins, and keeps both blocks above.
 
 ## Fleet sweep
 

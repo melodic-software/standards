@@ -65,7 +65,6 @@ on:
       - .github/workflows/pr-check-managed-files.yml
       - .github/workflows/pr-review-security.yml
       - .github/workflows/pr-review.yml
-      - .github/zizmor.yml
       - .gitleaks.toml
       - .lefthook/base.yml
       - .lefthook/dotnet-format-staged.mjs
@@ -100,7 +99,6 @@ on:
       - dot_markdownlint-cli2.jsonc
       - eng/dotnet-analysis/Directory.Build.props
       - eng/dotnet-analysis/dotnet.globalconfig
-      - lychee.toml
       - ruff.toml
       - tools/mcp-launcher/dispatch.js
       - tools/mcp-launcher/launcher.js
