@@ -261,10 +261,6 @@ components:
   filing-guide:
     files:
       standards/process/filing-prs-and-issues.md: docs/standards/filing-prs-and-issues.md
-  github-actions-conventions:
-    files:
-      components/github-actions-conventions/vocabulary.json: .github/standards/github-actions-conventions/vocabulary.json
-      components/github-actions-conventions/vocabulary.schema.json: .github/standards/github-actions-conventions/vocabulary.schema.json
   gitleaks:
     files:
       .gitleaks.toml: .gitleaks.toml
@@ -441,10 +437,6 @@ components:
   shellcheck:
     files:
       .shellcheckrc: .shellcheckrc
-  trusted-actors:
-    files:
-      components/trusted-actors/trusted-actors.json: .github/standards/trusted-actors/trusted-actors.json
-      components/trusted-actors/trusted-actors.schema.json: .github/standards/trusted-actors/trusted-actors.schema.json
   # Shared strict TypeScript base; a target's tsconfig extends it by relative
   # path and sets its own runtime, module and scope options.
   tsconfig:
@@ -653,7 +645,6 @@ targets:
       - editorconfig-checker
       - engineering-standards
       - filing-guide
-      - github-actions-conventions
       - gitleaks
       - issue-body-contract-plugins
       - lychee-online-claude-code-plugins
@@ -666,7 +657,6 @@ targets:
       - repository-text
       - review-instructions
       - shellcheck
-      - trusted-actors
       - typos
     # The hosted lane pair is locally owned here, so this repository's copies
     # can resolve their models through its own resolve-config action and pass
@@ -951,9 +941,9 @@ targets:
       # 174 lines vs 58). Recorded 2026-08-16 (audit).
       - typos
   # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
-  # payloads those lanes read from `.github/standards/` (dependabot-policy,
-  # github-actions-conventions and trusted-actors) and the `.node-version`
-  # node-runtime writes, so the copies stop drifting from claude-code-plugins',
+  # payload those lanes read from `.github/standards/` (dependabot-policy) and
+  # the `.node-version` node-runtime writes, so the copies stop drifting from
+  # claude-code-plugins',
   # plus the hosted-only `managed-files-guard-caller` every public target
   # carries and the filing guide every target carries. Its other configs
   # stay repo-owned: it has no product code or authored docs to lint.
@@ -961,10 +951,8 @@ targets:
     managed:
       - dependabot-policy
       - filing-guide
-      - github-actions-conventions
       - managed-files-guard-caller
       - node-runtime
-      - trusted-actors
     # Its review callers are pr-review-cli variants pinned to the release
     # claude-code-plugins tests, with a kill-switch job and hold inputs, so
     # the sandbox can probe the lanes before claude-code-plugins adopts them.

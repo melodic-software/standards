@@ -2,13 +2,15 @@
 
 `trusted-actors.json` is the one list of GitHub accounts whose text may reach
 the prompt of a CI lane, a GitHub Actions job that runs Claude Code with a write
-token. Each lane reads the list from the pull request's base commit and drops
-every comment, review, and body written by an account not on it. Lanes match on
+token. Each lane reads the list and drops every comment, review, and body
+written by an account not on it. Lanes match on
 `id`, never on `login`: a login can be renamed or re-registered, a user id
 cannot. `trusted-actors.schema.json` is the structural contract.
 
-The sync materializes both files at `.github/standards/trusted-actors/` in each
-consuming repository. How the lanes use the list is in the
+Lanes read the list from this repository's `main` (a standards checkout, or the
+token broker); it is not synced. A copy under `.github/standards/trusted-actors/`
+that an earlier sync left in a repository is no longer updated. How the lanes use
+the list is in the
 [pr-pipeline convention](https://github.com/melodic-software/claude-code-plugins/blob/main/docs/conventions/pr-pipeline/README.md).
 
 ## Changing the list
