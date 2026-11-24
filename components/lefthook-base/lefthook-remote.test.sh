@@ -89,8 +89,8 @@ for script in "${scripts[@]}"; do
   clear_logs
   (cd "$work/cwd" && PATH="$shims:$real_path" sh "$root/.lefthook/pre-commit/$script.sh" doc.md)
   assert_exit "$script in a work tree exits 0" 0 "$?"
+  assert_eq "$script in a work tree runs no tool" '' "$(ls "$work"/*.log 2>/dev/null)"
 done
-assert_eq 'no work-tree copy ran its tool' '' "$(ls "$work"/*.log 2>/dev/null)"
 
 # Case 3: a real consumer. lefthook install fetches the stand-in remote at main
 # and a commit's staged files reach each job the way lefthook-base selects them.
@@ -150,12 +150,12 @@ for matcher in default doublestar; do
 done
 cp "$work/lefthook.yml" "$consumer/lefthook.yml"
 
-# Case 4: with no local markdownlint-cli2, the job warns and skips.
+# Case 4: with no local markdownlint-cli2, the job fails like the other tools.
 rm -rf "$consumer/node_modules"
 clear_logs
 out="$(cd "$consumer" && PATH="$shims:$real_path" lefthook run pre-commit --job standards-markdownlint 2>&1)"
-assert_exit 'a missing markdownlint-cli2 does not fail the commit' 0 "$?"
-assert_contains 'the skip names the missing binary' "$out" 'skipped, node_modules/.bin/markdownlint-cli2 not found'
+assert_nonzero 'a missing markdownlint-cli2 fails its job' "$?"
+assert_contains 'the failure names the missing binary' "$out" 'node_modules/.bin/markdownlint-cli2 not found. Run: npm ci'
 
 # Case 5: a missing tool fails its job with an install pointer.
 # node stays reachable: an npm-installed lefthook is a node script.

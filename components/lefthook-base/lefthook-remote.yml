@@ -27,4 +27,4 @@ pre-commit:
       runner: sh
       glob: "{*,**/*}.{md,markdown}"
       args: "{staged_files}"
-      fail_text: "Markdown lint failures. Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
+      fail_text: "Markdown lint failures, or markdownlint-cli2 missing (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"

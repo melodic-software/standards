@@ -8,7 +8,7 @@ case "$src" in
 esac
 bin=node_modules/.bin/markdownlint-cli2
 [ -x "$bin" ] || {
-  echo "standards-markdownlint: skipped, $bin not found. Run: npm ci" >&2
-  exit 0
+  echo "standards-markdownlint: $bin not found. Run: npm ci" >&2
+  exit 1
 }
 exec "$bin" --config "${src%/*}/../../.markdownlint-cli2.jsonc" "$@"
