@@ -438,17 +438,6 @@ components:
   ruff:
     files:
       ruff.toml: ruff.toml
-  runner-policy:
-    requires:
-      - node-runtime
-    files:
-      components/runner-policy/package-lock.json: .github/standards/runner-policy/package-lock.json
-      components/runner-policy/package.json: .github/standards/runner-policy/package.json
-      components/runner-policy/policy-input.mjs: .github/standards/runner-policy/policy-input.mjs
-      components/runner-policy/policy.json: .github/standards/runner-policy/policy.json
-      components/runner-policy/policy.schema.json: .github/standards/runner-policy/policy.schema.json
-      components/runner-policy/repository-policy.schema.json: .github/standards/runner-policy/repository-policy.schema.json
-      components/runner-policy/runner-policy.mjs: .github/standards/runner-policy/runner-policy.mjs
   shellcheck:
     files:
       .shellcheckrc: .shellcheckrc
@@ -620,8 +609,8 @@ targets:
   # Pulumi entry and this target land in the same window). A public .NET tool
   # repo, so the set is github-iac's minus two things.
   # `claude-settings-github-iac` is that target's own settings file.
-  # `runner-policy` is an adoption list, not a visibility class (README
-  # "Runner-policy consumer handoff"; claude-code-plugins is public and
+  # The runner-policy gate is an adoption, not a visibility class (README
+  # "Runner-policy consumers"; claude-code-plugins is public and
   # enrolled). claude-code-account-rotation enrolled with
   # claude-code-account-rotation#98: a repo-local `.github/runner-policy.json`
   # with `selfHostedCi: false` and the gate steps in its CI. Both
@@ -651,7 +640,6 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - review-instructions
-      - runner-policy
       - shellcheck
       - typos
     # Armed as of 2026-09-22: claude-code-account-rotation#95 landed the ci.yml
@@ -677,7 +665,6 @@ targets:
       - pyright
       - repository-text
       - review-instructions
-      - runner-policy
       - shellcheck
       - trusted-actors
       - typos
@@ -844,7 +831,6 @@ targets:
       - repository-text
       - review-instructions
       - ruff
-      - runner-policy
       - typos
     locally-owned:
       - shellcheck
@@ -870,7 +856,6 @@ targets:
       - pr-body-contract-rule
       - repository-text
       - review-instructions
-      - runner-policy
       - shellcheck
       - typos
     locally-owned:
@@ -913,7 +898,6 @@ targets:
       - node-runtime
       - path-detection-tools
       - pr-body-contract-rule
-      - runner-policy
       - tsconfig
     locally-owned:
       - actionlint
@@ -968,13 +952,10 @@ targets:
       - typos
   # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
   # payloads those lanes read from `.github/standards/` (dependabot-policy,
-  # github-actions-conventions, runner-policy with node-runtime, and
-  # trusted-actors), so the copies stop drifting from claude-code-plugins',
+  # github-actions-conventions and trusted-actors) and the `.node-version`
+  # node-runtime writes, so the copies stop drifting from claude-code-plugins',
   # plus the hosted-only `managed-files-guard-caller` every public target
-  # carries and the filing guide every target carries. It reads runner-policy as the npm
-  # manifest its lanes install, with no repo-local
-  # `.github/runner-policy.json` or gate job yet, so the handoff in
-  # distribution/README.md is not done there. Its other configs
+  # carries and the filing guide every target carries. Its other configs
   # stay repo-owned: it has no product code or authored docs to lint.
   melodic-software/pr-pipeline-sandbox:
     managed:
@@ -983,7 +964,6 @@ targets:
       - github-actions-conventions
       - managed-files-guard-caller
       - node-runtime
-      - runner-policy
       - trusted-actors
     # Its review callers are pr-review-cli variants pinned to the release
     # claude-code-plugins tests, with a kill-switch job and hold inputs, so
@@ -1014,7 +994,6 @@ targets:
       - psscriptanalyzer
       - repository-text
       - review-instructions
-      - runner-policy
       - shellcheck
       - typos
   # The Dependabot policy copy, the fleet-routed guard and the filing guide, as for architecture.

@@ -19,9 +19,9 @@ $env:GITHUB_REPOSITORY = "melodic-software/standards"
 node components/runner-policy/runner-policy.mjs --root .
 ```
 
-The distributed component lives at `.github/standards/runner-policy/` and owns
-its own `package.json` and lockfile with exact `ajv@8.20.0` and `yaml@2.9.0`
-runtime pins. `policy.schema.json` (central policy, `schemaVersion` 4) and
+The component is not synced: consumers run it from a checkout of this
+repository. It owns its own `package.json` and lockfile with exact
+`ajv@8.20.0` and `yaml@2.9.0` runtime pins. `policy.schema.json` (central policy, `schemaVersion` 4) and
 `repository-policy.schema.json` are the
 Draft 2020-12 structural authorities. Ajv compiles them in strict mode; the
 runtime retains only cross-record semantics and workflow/path checks that JSON
@@ -29,19 +29,20 @@ Schema cannot express.
 
 [`policy-input.mjs`](policy-input.mjs) holds the strict JSON parsing and
 schema-error helpers. It ships in the same directory so the distributed
-runtime stays self-contained; the concurrency, dependabot and pr-convention
+runtime stays self-contained in a consumer's checkout; the concurrency, dependabot and pr-convention
 policy analyzers import it from here.
 
 The security boundaries, fail-closed behavior, and required review triggers are
 documented in the component [threat model](THREAT-MODEL.md).
 
-Consumers install and invoke that dependency root directly, supplying their own
-`owner/repository` identity for local analysis:
+Consumers install and invoke that dependency root from their checkout of this
+repository (`STANDARDS_PATH`), supplying their own `owner/repository` identity
+for local analysis:
 
 ```sh
-npm ci --prefix .github/standards/runner-policy
+npm ci --prefix "$STANDARDS_PATH/components/runner-policy"
 GITHUB_REPOSITORY=owner/repository \
-  node .github/standards/runner-policy/runner-policy.mjs --root .
+  node "$STANDARDS_PATH/components/runner-policy/runner-policy.mjs" --root .
 ```
 
 In a hosted-only repository the policy gate stays on an explicit
@@ -60,11 +61,14 @@ runner-policy:
     - uses: actions/setup-node@<REVIEWED_40_CHARACTER_SHA>
       with:
         node-version-file: .node-version
-        cache: npm
-        cache-dependency-path: .github/standards/runner-policy/package-lock.json
-    - run: npm ci --prefix .github/standards/runner-policy
-    - run: node .github/standards/runner-policy/runner-policy.mjs --root .
+    - id: standards
+      uses: melodic-software/ci-workflows/.github/actions/download-standards@main
+    - run: npm ci --prefix "$STANDARDS_PATH/components/runner-policy"
       env:
+        STANDARDS_PATH: ${{ steps.standards.outputs.path }}
+    - run: node "$STANDARDS_PATH/components/runner-policy/runner-policy.mjs" --root .
+      env:
+        STANDARDS_PATH: ${{ steps.standards.outputs.path }}
         CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
 ```
 
@@ -87,13 +91,8 @@ private. GitHub Actions supplies the default `GITHUB_REPOSITORY` environment
 variable independently of the checked-out repository, so the owner-mismatch
 tripwire reads identity that no workflow-controlled input can forge.
 
-Consumers must not add an npm Dependabot entry for
-`/.github/standards/runner-policy`. That lockfile is byte-exact sync-managed
-from `/components/runner-policy`; a downstream version bump is drift the next
-sync reverts (and can silently downgrade). Coverage rides the source
-repository's `/components/runner-policy` Dependabot entry plus standards-sync.
-Dependabot directory entries drive version updates only; security alerts still
-report the nested lockfile without a consumer entry.
+Dependency updates ride this repository's `/components/runner-policy`
+Dependabot entry; consumers need none.
 
 Each adopting private repository carries `.github/runner-policy.json`:
 

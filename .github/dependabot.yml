@@ -45,11 +45,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # The runner policy is distributed with its own runtime lockfile, so it is a
-  # separate npm dependency root. This source entry is the only version-update
-  # coverage; consumers must not add a nested
-  # `/.github/standards/runner-policy` Dependabot directory (byte-exact sync
-  # would revert a downstream bump). Alerts still report that nested lockfile.
+  # The runner policy has its own runtime lockfile, so it is a separate npm
+  # dependency root. Consumers run it from a checkout of this repository, so
+  # this entry is its only version-update coverage.
   - package-ecosystem: npm
     directory: /components/runner-policy
     labels: ["dependencies"]

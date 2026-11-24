@@ -599,82 +599,19 @@ else
   skip_case 'symlink destination case unavailable on this platform'
 fi
 
-# Production coverage contract: the runner policy is one atomic runtime
-# component in each enrolled consumer. Its dependency lockfile travels
-# with the executable, and node-runtime makes the engine pin explicit.
 actual_manifest="$root/distribution/sync-manifest.yml"
-assert_eq 'runner-policy requires the shared Node runtime pin' 'node-runtime' \
-  "$(yq -r '.components.runner-policy.requires | join(",")' "$actual_manifest")"
-assert_eq 'runner-policy materializes exactly seven runtime files' '7' \
-  "$(yq -r '.components.runner-policy.files | length' "$actual_manifest")"
-
-# assert_component_mappings <component> <source=destination>...
-assert_component_mappings() {
-  local component="$1" mapping source_path destination_path
-  shift
-  for mapping in "$@"; do
-    source_path="${mapping%%=*}"
-    destination_path="${mapping#*=}"
-    assert_eq "$component mapping is exact: $source_path" "$destination_path" \
-      "$(SOURCE_PATH="$source_path" yq -r ".components.$component.files[strenv(SOURCE_PATH)]" "$actual_manifest")"
-  done
-}
-
-assert_component_mappings runner-policy \
-  'components/runner-policy/runner-policy.mjs=.github/standards/runner-policy/runner-policy.mjs' \
-  'components/runner-policy/policy-input.mjs=.github/standards/runner-policy/policy-input.mjs' \
-  'components/runner-policy/policy.json=.github/standards/runner-policy/policy.json' \
-  'components/runner-policy/policy.schema.json=.github/standards/runner-policy/policy.schema.json' \
-  'components/runner-policy/repository-policy.schema.json=.github/standards/runner-policy/repository-policy.schema.json' \
-  'components/runner-policy/package.json=.github/standards/runner-policy/package.json' \
-  'components/runner-policy/package-lock.json=.github/standards/runner-policy/package-lock.json'
-
-runner_policy_source='components/runner-policy/runner-policy.mjs'
-runner_policy_destination='.github/standards/runner-policy/runner-policy.mjs'
-
-# The runtime runs on its own at the consumer, so every module it imports by
-# relative path must travel with it.
-while IFS= read -r sibling_module; do
-  assert_eq "runner-policy syncs its sibling import $sibling_module" \
-    ".github/standards/runner-policy/$sibling_module" \
-    "$(SOURCE_PATH="components/runner-policy/$sibling_module" yq -r '.components.runner-policy.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
-done < <(sed -nE 's/^.*from "\.\/([^"]+)";$/\1/p' "$root/$runner_policy_source")
 
 lefthook_dotnet_source='components/lefthook-dotnet/dotnet-format-staged.mjs'
 lefthook_dotnet_destination='.lefthook/dotnet-format-staged.mjs'
-assert_eq 'runner-policy production CLI source is executable in the Git index' '100755' \
-  "$(git -C "$root" ls-files --stage -- "$runner_policy_source" | awk '{print $1}')"
 assert_eq 'lefthook-dotnet production CLI source is executable in the Git index' '100755' \
   "$(git -C "$root" ls-files --stage -- "$lefthook_dotnet_source" | awk '{print $1}')"
 
-# assert_production_cli <component> <source> <destination>
-# Reads production_slug, production_target, and out from the loop below.
-assert_production_cli() {
-  local component="$1" cli_source="$2" cli_destination="$3"
-  assert_contains "$production_slug $component apply reports executable mode" "$out" \
-    "$cli_source -> $cli_destination (100755)"
-  assert_file_exists "$production_slug $component CLI reaches the target" \
-    "$production_target/$cli_destination"
-  if [[ "$(uname -s)" == Linux* ]]; then
-    assert_eq "$production_slug $component target worktree mode is executable" 755 \
-      "$(stat -c '%a' "$production_target/$cli_destination")"
-    git -C "$production_target" add -- "$cli_destination"
-    assert_eq "$production_slug $component target index mode is executable" 100755 \
-      "$(git -C "$production_target" ls-files --stage -- "$cli_destination" | awk '{print $1}')"
-  else
-    skip_case "$production_slug $component worktree mode requires a mode-preserving filesystem"
-    skip_case "$production_slug $component index mode requires a mode-preserving filesystem"
-  fi
-}
-
-# Exercise every production target that carries either CLI, not only the
-# generic executable fixture. Each CLI's assertions run only where the target
-# manages that component: a public .NET target carries lefthook-dotnet without
-# runner-policy (runner-policy is a private fleet-routed consumer's file).
-# Linux is the deployment environment that records worktree modes in
-# materialization PR indexes; source-index assertions remain
-# platform-independent and fail before apply if either production mode regresses.
-while IFS=$'\t' read -r production_slug includes_runner_policy includes_dotnet; do
+# Exercise every production target that carries the lefthook-dotnet CLI, not
+# only the generic executable fixture. Linux is the deployment environment that
+# records worktree modes in materialization PR indexes; the source-index
+# assertion remains platform-independent and fails before apply if the
+# production mode regresses.
+while IFS= read -r production_slug; do
   production_target="$tmp_root/production-${production_slug//\//-}"
   make_target "$production_target" "$production_slug"
   out="$(
@@ -686,17 +623,22 @@ while IFS=$'\t' read -r production_slug includes_runner_policy includes_dotnet; 
   )"
   rc=$?
   assert_exit "$production_slug production mapping applies" 0 "$rc"
-  if [[ "$includes_runner_policy" == true ]]; then
-    assert_production_cli runner-policy "$runner_policy_source" "$runner_policy_destination"
-  fi
-  if [[ "$includes_dotnet" == true ]]; then
-    assert_production_cli lefthook-dotnet "$lefthook_dotnet_source" "$lefthook_dotnet_destination"
+  assert_contains "$production_slug lefthook-dotnet apply reports executable mode" "$out" \
+    "$lefthook_dotnet_source -> $lefthook_dotnet_destination (100755)"
+  assert_file_exists "$production_slug lefthook-dotnet CLI reaches the target" \
+    "$production_target/$lefthook_dotnet_destination"
+  if [[ "$(uname -s)" == Linux* ]]; then
+    assert_eq "$production_slug lefthook-dotnet target worktree mode is executable" 755 \
+      "$(stat -c '%a' "$production_target/$lefthook_dotnet_destination")"
+    git -C "$production_target" add -- "$lefthook_dotnet_destination"
+    assert_eq "$production_slug lefthook-dotnet target index mode is executable" 100755 \
+      "$(git -C "$production_target" ls-files --stage -- "$lefthook_dotnet_destination" | awk '{print $1}')"
+  else
+    skip_case "$production_slug lefthook-dotnet worktree mode requires a mode-preserving filesystem"
+    skip_case "$production_slug lefthook-dotnet index mode requires a mode-preserving filesystem"
   fi
 done < <(
-  yq -r \
-    '.targets | to_entries[] |
-     select(.value.managed | any_c(. == "runner-policy" or . == "lefthook-dotnet")) |
-     [.key, (.value.managed | any_c(. == "runner-policy")), (.value.managed | any_c(. == "lefthook-dotnet"))] | @tsv' \
+  yq -r '.targets | to_entries[] | select(.value.managed | any_c(. == "lefthook-dotnet")) | .key' \
     "$actual_manifest"
 )
 
@@ -707,9 +649,9 @@ managing_targets() {
     "$actual_manifest"
 }
 
-expected_runner_policy_targets='["melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/medley","melodic-software/pr-pipeline-sandbox","melodic-software/provisioning"]'
-assert_eq 'runner-policy covers exactly the seven enrolled consumers' \
-  "$expected_runner_policy_targets" "$(managing_targets runner-policy)"
+# Consumers run the runner policy from a standards checkout; the sync carries no copy.
+assert_eq 'runner-policy is not a sync component' 'false' \
+  "$(yq -r '.components | has("runner-policy")' "$actual_manifest")"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
   "$(
     yq -r \
