@@ -1,15 +1,7 @@
-// SYNC-MANAGED FILE — DO NOT EDIT IN THE CONSUMING REPOSITORY.
-// Source of truth: melodic-software/standards,
-// components/runner-policy/policy-input.mjs (the `runner-policy`
-// component in distribution/sync-manifest.yml). Downstream edits are
-// overwritten by the next sync PR; change the component upstream, or move the
-// component to `locally-owned` in the manifest to customize.
-//
 // Strict JSON input and schema-error helpers shared by the runner, concurrency,
 // dependabot and pr-convention policy analyzers. It lives beside
-// runner-policy.mjs because that analyzer is synced and runs on its own at the
-// consumer: this file travels with it and resolves `yaml` from the same
-// component-local dependency root.
+// runner-policy.mjs because consumers run that analyzer from this directory:
+// this file resolves `yaml` from the same component-local dependency root.
 
 import { readFile } from "node:fs/promises";
 

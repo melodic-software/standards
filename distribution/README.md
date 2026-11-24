@@ -200,10 +200,11 @@ record the approval, actor and time, before/after repository sets, and the
 successful attested sync. Managed bytes must wait for that authoritative sync;
 they are never hand-copied around a failed access check.
 
-## Runner-policy consumer handoff
+## Runner-policy consumers
 
-The `runner-policy` component materializes one atomic runtime at
-`.github/standards/runner-policy/` in exactly these enrolled targets, an
+The runner policy is not synced. Its consumers run `components/runner-policy/`
+from a checkout of this repository (ci-workflows' `download-standards`
+action), so every gate reads this repository's `main`. Enrollment is an
 adoption list rather than a visibility class; note `claude-code-plugins` is
 public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 
@@ -212,26 +213,15 @@ public (see [`REVIEW-CREDENTIAL.md`](REVIEW-CREDENTIAL.md)):
 - `melodic-software/dotfiles`
 - `melodic-software/github-iac`
 - `melodic-software/medley`
-- `melodic-software/pr-pipeline-sandbox`
 - `melodic-software/provisioning`
 
-It includes `runner-policy.mjs`, the `policy-input.mjs` module it imports,
-`policy.json`, both Draft 2020-12 policy schema files, and the component-local
-npm manifest and lockfile. The component requires `node-runtime`, so
-`.node-version` is part of each target's managed materialization as well. The
-runtime loads both schemas and its imported module directly; omitting any of
-them would make the supposedly atomic payload fail on a clean consumer checkout.
+`melodic-software/ci-workflows` is not enrolled in the gate; its caller-surface
+check reads the approved contracts from `components/runner-policy/policy.json`
+the same way. A copy under `.github/standards/runner-policy/` that an earlier
+sync left in a repository is no longer updated; its repository deletes it.
 
-`melodic-software/ci-workflows` is not enrolled in the runner-policy gate and
-takes no copy: its caller-surface check reads the approved contracts from
-`components/runner-policy/policy.json` in a checkout of this repository
-(ci-workflows' `download-standards` action).
-
-Repository-specific adoption remains a separate consumer change. Each target
-except `pr-pipeline-sandbox` must add all of the following in the same
-integration PR. The sandbox takes the runtime only as the npm manifest its
-PR-pipeline lanes install, and runs no runner-policy gate, so its adoption is
-deferred until it gains one:
+Adoption is a consumer change. Each enrolled repository adds all of the
+following in the same integration PR:
 
 1. For private consumers (or a public consumer that wants an explicit
    `repositoryOwner` tripwire), a locally owned `.github/runner-policy.json`
@@ -246,9 +236,9 @@ deferred until it gains one:
    every unconsumed entry as
    `exception-inventory-drift` (grants likewise fail as
    `local-routing-grant-drift`).
-2. A CI job that runs
-   `npm ci --prefix .github/standards/runner-policy`, then invokes
-   `node .github/standards/runner-policy/runner-policy.mjs --root .` with
+2. A CI job that downloads this repository, runs
+   `npm ci --prefix "$STANDARDS_PATH/components/runner-policy"`, then invokes
+   `node "$STANDARDS_PATH/components/runner-policy/runner-policy.mjs" --root .` with
    `CI_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}`. A
    private consumer with `selfHostedCi: true` names the governed fleet label
    `melodic-ubuntu-24.04-x64` directly, which the analyzer admits under its
@@ -258,11 +248,7 @@ deferred until it gains one:
    as trusted owner evidence; `.github/runner-policy.json#repositoryOwner` is
    only inventory and a mismatch tripwire.
 3. Workflow routing, exception, and grant inventory that pass the gate at the
-   reviewed reusable-workflow SHA in the distributed `policy.json`.
-   Do not add a consumer npm Dependabot entry for
-   `/.github/standards/runner-policy`: that lockfile is byte-exact
-   sync-managed, so a downstream bump is drift the next sync reverts.
-   Alerts still report the nested lockfile without a consumer entry.
+   reviewed reusable-workflow SHA in this repository's `policy.json`.
 
 **The selector recovery contract is retired.** ci-perf Phase 7 deleted the
 `select-runner` reusable workflow (ci-workflows#569, merged as
