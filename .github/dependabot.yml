@@ -1,7 +1,8 @@
 version: 2
 updates:
-  # Keep SHA-pinned third-party actions and tagged vendor actions current;
-  # first-party refs float on `main`. Merge lanes per
+  # First-party `melodic-software/*` refs track `@main`, vendor actions
+  # (`actions/*`, `github/*`, `anthropics/*`) use major tags, and other
+  # third-party actions stay hash-pinned and move by Dependabot. Merge lanes per
   # components/dependabot-policy: the vendor-actions group (non-major only) may
   # auto-merge once CI Status passes; every other PR is reviewed by hand.
   # Delay version bumps so a compromised or yanked release is caught before we
@@ -11,7 +12,7 @@ updates:
     labels: ["dependencies"]
     open-pull-requests-limit: 5
     schedule:
-      interval: daily
+      interval: weekly
     cooldown:
       default-days: 3
     # Vendor bumps get their own PR so a community bump never blocks the
