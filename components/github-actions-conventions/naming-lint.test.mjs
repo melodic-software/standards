@@ -238,7 +238,7 @@ test("the recorded exception is exact: neither the stem nor a Title Case form pa
 test("a stem's Title Case form capitalizes each word and upper-cases the acronyms", () => {
   for (const [stem, expected] of [
     ["pr-run-checks-go", "PR Run Checks Go"],
-    ["maintenance-repin-ci-workflows", "Maintenance Repin CI Workflows"],
+    ["maintenance-check-ci-status", "Maintenance Check CI Status"],
     ["post-merge-detect-silent-revert", "Post Merge Detect Silent Revert"],
     ["work-check-api-wip", "Work Check API WIP"],
     ["release-deploy-oidc", "Release Deploy OIDC"],
