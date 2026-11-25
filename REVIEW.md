@@ -76,14 +76,6 @@ Always check:
   an atomic rename, a constraint, or a compensation step. An
   interruption between steps must not leave state no code path expects
   (`standards/review/error-handling.md#atomicity`).
-- A deleted comment that recorded why one of the repository's own
-  decisions was made is flagged when that reason is in no ADR, commit
-  message, linked source, or test that pins the behavior: ask for the
-  reason in an ADR, the commit message, or such a test. Never ask to restore
-  or reword the comment: that puts the reason back where the cleanup
-  removed it from, instead of in a record that lasts. A comment that only
-  restates code or notes history is not such a record
-  (`standards/review/code-quality.md#authoring-hygiene`).
 - No Dependabot pull request waits on a human. One whose updates are all
   non-major, with GitHub Actions only from `actions/*`, `github/*`,
   `anthropics/*` or the organization's own `melodic-software/*`, and none in
