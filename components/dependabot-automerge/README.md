@@ -4,9 +4,11 @@ Sync-managed thin callers for the `pr-automerge-dependabot.yml` reusable
 workflow in `melodic-software/ci-workflows`
 (`.github/workflows/pr-automerge-dependabot.yml@main`). The reusable arms
 GitHub squash auto-merge on Dependabot non-major pull requests that satisfy the
-merge tiers in the target's synced
-[dependabot-policy](../dependabot-policy/README.md) copy
-(`.github/standards/dependabot-policy/policy.json`).
+merge tiers in the [dependabot-policy](../dependabot-policy/README.md), which
+the reusable reads from this repository's `main`
+(`components/dependabot-policy/policy.json`) when the target's
+`docs/conventions/source-control.yaml` names `melodic-software/standards` as its
+`standards_repository`.
 
 Two files, one per `runner-policy` inventory, identical except for
 `with.runner`, the workflow `name:` (each is its destination stem in Title
@@ -17,11 +19,10 @@ Case) and their headers:
 | `dependabot-automerge-caller` | `dependabot-automerge.yml` | `.github/workflows/pr-automerge-dependabot-hosted.yml` | `ubuntu-24.04` |
 | `dependabot-automerge-fleet-caller` | `dependabot-automerge-fleet.yml` | `.github/workflows/pr-automerge-dependabot.yml` | `melodic-ubuntu-24.04-x64` |
 
-Both require `dependabot-policy` in `distribution/sync-manifest.yml` so the
-reusable always finds `.github/standards/dependabot-policy/policy.json` at the
-base commit (supplying `fastTrack.own`, `autoMerge.ecosystems`, and
-`autoMerge.reviewOnly`). The destinations differ because the manifest requires
-each destination to have one owning component.
+Neither requires another component: the policy (`fastTrack.own`,
+`autoMerge.ecosystems`, `autoMerge.reviewOnly`) comes from standards, never from
+a synced copy. The destinations differ because the manifest requires each
+destination to have one owning component.
 
 This pair is the fourth recorded exception to the rule that workflow callers
 stay consumer-owned (`distribution/README.md`): 14 repositories previously
@@ -41,8 +42,7 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence):
   `ci-workflows` (hosts the reusable itself) and `medley` (carries an extra
   repo-local `automerge` job) stay `locally-owned`. `standards` is the manifest
   source, not a target, and keeps its repo-local caller with explicit
-  `review-only-dependencies: '["yaml"]'` because it does not carry a synced
-  `.github/standards/dependabot-policy/policy.json` copy.
+  `review-only-dependencies: '["yaml"]'`.
 - **Owner and outcome**: owned by the `standards` maintainers; `ci-workflows`
   maintainers own the reusable workflow. Problem: 14 hand-maintained thin
   callers drifted across repositories (`melodic-software/control-hub#17`, Row
@@ -77,7 +77,7 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence):
 - **Update path**: the reusable floats on `@main` per org policy; caller-shape
   changes land in one PR here and fan out via `standards-sync`.
 - **Verification**: `dependabot-automerge.test.sh` checks parsed YAML shape,
-  sibling parity, manifest wiring, `dependabot-policy` dependency, and
+  sibling parity, manifest wiring, the absence of any `requires` edge, and
   materialization + `actionlint`; `runner-policy.test.mjs` proves hosted and
   fleet callers audit clean on every managing target and fail on the opposite
   visibility/enrollment.

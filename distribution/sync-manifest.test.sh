@@ -675,9 +675,12 @@ assert_eq 'lefthook-dotnet declares its direct Node runtime dependency' '1' \
 
 assert_eq 'lefthook-powershell materializes its complete isolated adapter' '3' \
   "$(yq -r '.components.lefthook-powershell.files | length' "$actual_manifest")"
-assert_component_mappings lefthook-powershell \
+for mapping in \
   'components/lefthook-powershell/psscriptanalyzer-staged.ps1=.lefthook/psscriptanalyzer-staged.ps1' \
-  'components/lefthook-powershell/psscriptanalyzer-target.ps1=.lefthook/psscriptanalyzer-target.ps1'
+  'components/lefthook-powershell/psscriptanalyzer-target.ps1=.lefthook/psscriptanalyzer-target.ps1'; do
+  assert_eq "lefthook-powershell mapping is exact: ${mapping%%=*}" "${mapping#*=}" \
+    "$(SOURCE_PATH="${mapping%%=*}" yq -r '.components.lefthook-powershell.files[strenv(SOURCE_PATH)]' "$actual_manifest")"
+done
 
 assert_eq 'Ruff materializes at its root-canonical discovery path' \
   'ruff.toml' \
@@ -714,7 +717,7 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
 # pyright, whose one reader (dotfiles) owns its whole config.
 for component in agent-orientation engineering-standards filing-guide review-instructions \
   actionlint editorconfig-checker gitleaks lefthook-base lefthook-shellcheck markdownlint \
-  shellcheck typos pyright; do
+  shellcheck typos pyright dependabot-policy; do
   assert_eq "no component named $component exists (retired)" '0' \
     "$(COMPONENT="$component" yq -r '[.components | keys[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"

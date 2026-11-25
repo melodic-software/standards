@@ -379,7 +379,7 @@ cursor-plugins.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
-knowledge-corpus and songwriting are sync targets for `dependabot-policy` and the fleet-routed guard only, so they take neither caller. songwriting carries
+knowledge-corpus and songwriting are sync targets for the fleet-routed Dependabot automerge caller and guard only, so they take neither review caller. songwriting carries
 repo-local copies of the fleet callers; knowledge-corpus's lane stays deferred
 over its prompt-injection surface (see the lane comment in
 `sync-manifest.yml`).
@@ -472,9 +472,9 @@ Two components materialize the thin caller for `ci-workflows`'
 `.github/workflows/pr-automerge-dependabot-hosted.yml` (`ubuntu-24.04`, for
 public targets) and `dependabot-automerge-fleet-caller` at
 `.github/workflows/pr-automerge-dependabot.yml` (`melodic-ubuntu-24.04-x64`,
-for fleet-enrolled private targets). Both require `dependabot-policy` so the
-reusable reads `.github/standards/dependabot-policy/policy.json` at the base
-commit. It is the fourth recorded exception to the consumer-owned-caller rule:
+for fleet-enrolled private targets). The reusable reads the Dependabot policy
+from this repository's `main` (`components/dependabot-policy/policy.json`),
+never a synced copy. It is the fourth recorded exception to the consumer-owned-caller rule:
 14 hand-maintained callers drifted across repositories. `ci-workflows` (which
 hosts the reusable itself) and `medley` (which carries an extra repo-local
 `automerge` job) stay `locally-owned`. Rationale and admission evidence live in

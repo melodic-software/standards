@@ -10,8 +10,10 @@ name: PR Automerge Dependabot Hosted
 #
 # Thin caller of the org's pr-automerge-dependabot reusable workflow
 # (melodic-software/ci-workflows). Arms GitHub auto-merge (squash) on a
-# Dependabot minor or patch pull request under the merge tiers in the synced
-# standards dependabot-policy (`.github/standards/dependabot-policy/policy.json`):
+# Dependabot minor or patch pull request under the merge tiers in the standards
+# dependabot-policy, which the reusable reads from melodic-software/standards
+# `main` (`components/dependabot-policy/policy.json`) when this repository's
+# `docs/conventions/source-control.yaml` names it as `standards_repository`:
 # allowlisted GitHub Actions publishers (including `melodic-software/*`) and
 # npm, pip, uv and NuGet updates outside `autoMerge.reviewOnly`. Arming never
 # merges: GitHub merges once every required check, `CI Status` included, passes.
