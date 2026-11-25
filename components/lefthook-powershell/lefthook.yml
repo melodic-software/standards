@@ -17,6 +17,10 @@
 # here would win over the consumer's and silently defeat the documented
 # `skip: true` opt-out. See lefthook-base's header for the full rule.
 
+# This fragment's `**/*.ext` glob must match files at the repo root too; the
+# default matcher requires `**` to consume at least one directory.
+glob_matcher: doublestar
+
 pre-commit:
   commands:
     psscriptanalyzer:

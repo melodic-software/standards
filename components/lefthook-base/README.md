@@ -59,8 +59,11 @@ remote configs merge after the consumer's `lefthook.yml` and would override it.
 So the consumer's own `lefthook.yml` carries the settings `lefthook.yml` would
 have supplied through `extends`: `min_version: "2.0.5"` and
 `assert_lefthook_installed: true`, as in the example, and `parallel: true`
-under `pre-commit` if it wants the jobs run in parallel. The globs match the
-same files with or without `glob_matcher: doublestar`.
+under `pre-commit` if it wants the jobs run in parallel. The remote's globs
+match the same files with or without `glob_matcher: doublestar`. The language
+adapter fragments (dotnet, powershell, python, typescript) need it for root
+files and set it themselves; `lefthook-adapter-globs.test.sh` proves a
+root-level file reaches each adapter's lane when the consumer sets no matcher.
 
 A missing tool fails its job with an install pointer, as in `lefthook.yml`.
 A script outside a fetched remote, such as this repository's own work
