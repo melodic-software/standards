@@ -1,7 +1,8 @@
 # Typos
 
 Source-aware spell checking with [Typos](https://github.com/crate-ci/typos).
-The exported payload is the root-canonical [`_typos.toml`](../../_typos.toml).
+The policy is the root-canonical [`_typos.toml`](../../_typos.toml), which
+its readers fetch from this repository at run time; it is not synced.
 
 The config carries the small organization-wide vocabulary union. One-off false
 positives use the documented inline ignore directives; a broadly valid word

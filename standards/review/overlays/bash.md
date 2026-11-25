@@ -1,8 +1,8 @@
 # Bash review overlay
 
 Stack-specific review bars for shell scripts. The mechanically enforced posture
-is owned by the [`shellcheck`][1] component (with staged-file feedback from
-[`lefthook-shellcheck`][2]), which ships the repo's `.shellcheckrc` and so
+is owned by the [`shellcheck`][1] component, whose `.shellcheckrc` CI and the
+claude-code-plugins lefthook remote run unless a repository has its own. It
 enforces more than stock ShellCheck: double-bracket tests, `command -v` over
 `which`, useless-`cat`, a default case, and errexit-suppression detection among
 them. This overlay covers only reasoning-tier judgments ShellCheck does not make.
@@ -118,7 +118,6 @@ contract. This overlay owns only what a shell script should do itself.
   effects. Important.
 
 [1]: ../../../components/shellcheck/
-[2]: ../../../components/lefthook-shellcheck/
 [3]: https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
 [4]: https://mywiki.wooledge.org/BashFAQ/105
 [5]: https://github.com/koalaman/shellcheck/wiki/SC2312

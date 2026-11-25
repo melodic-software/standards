@@ -1,4 +1,4 @@
-# PowerShell adapter — opt-in. Extend it alongside the base from a consumer root
+# PowerShell adapter — opt-in. Extend it from a consumer root
 # that has PowerShell sources and PSScriptAnalyzer installed.
 #
 # The lane calls a small component-owned runner via `pwsh -File` rather than an inline
@@ -16,6 +16,10 @@
 # commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
 # here would win over the consumer's and silently defeat the documented
 # `skip: true` opt-out. See lefthook-base's header for the full rule.
+
+# This fragment's `**/*.ext` glob must match files at the repo root too; the
+# default matcher requires `**` to consume at least one directory.
+glob_matcher: doublestar
 
 pre-commit:
   commands:

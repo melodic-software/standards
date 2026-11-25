@@ -1,16 +1,16 @@
 # Gitleaks
 
 Secret scanning with [Gitleaks](https://github.com/gitleaks/gitleaks). The
-exported payload is the root-canonical [`.gitleaks.toml`](../../.gitleaks.toml),
-which inherits Gitleaks' maintained default ruleset and adds one rule for
-GitHub App installation tokens in the classic and stateless formats, but no
-repo-specific allowlist.
+policy is the root-canonical [`.gitleaks.toml`](../../.gitleaks.toml), which
+its readers fetch from this repository at run time (it is not synced). It
+inherits Gitleaks' maintained default ruleset and adds one rule for GitHub App
+installation tokens in the classic and stateless formats, but no repo-specific
+allowlist.
 
-Managed consumers do not edit the config. Use an inline `gitleaks:allow` pragma
-for a reviewed one-line false positive or a repository-owned `.gitleaksignore`
-fingerprint for an intentional finding. A broadly valid policy change goes
-upstream; a genuinely different policy requires local component ownership, per
-[Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
+Use an inline `gitleaks:allow` pragma for a reviewed one-line false positive or
+a repository-owned `.gitleaksignore` fingerprint for an intentional finding. A
+broadly valid policy change goes upstream; a genuinely different policy is the
+complete override below.
 
 ## Defaults, extensions and overrides
 

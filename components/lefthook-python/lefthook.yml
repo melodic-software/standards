@@ -1,4 +1,4 @@
-# Python adapter — opt-in. Extend it alongside the base from a consumer root
+# Python adapter — opt-in. Extend it from a consumer root
 # that has Python sources and the ruff binary installed. Ruff auto-discovers
 # ruff.toml / pyproject.toml from the repo root.
 #
@@ -11,6 +11,10 @@
 # commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
 # here would win over the consumer's and silently defeat the documented
 # `skip: true` opt-out. See lefthook-base's header for the full rule.
+
+# This fragment's `**/*.ext` glob must match files at the repo root too; the
+# default matcher requires `**` to consume at least one directory.
+glob_matcher: doublestar
 
 pre-commit:
   commands:

@@ -1,13 +1,17 @@
 # Lefthook base
 
-Default staged-file feedback for cross-cutting repository hygiene. The exported
-`lefthook.yml` fragment supplies strict Lefthook settings plus Typos, Gitleaks,
-EditorConfig, and Markdownlint commands. It invokes each tool without policy
-flags so the matching root-canonical config remains the single rule owner.
+Staged-file feedback for cross-cutting repository hygiene. Other repositories
+take it from Lefthook remotes, not a synced copy: Gitleaks and
+EditorConfig-checker from this component's `lefthook-remote.yml` (below), and
+Typos, markdownlint-cli2, ShellCheck and actionlint from the
+melodic-software/claude-code-plugins aggregate remote. Each reads this
+repository's root configs unless the repository has its own.
 
-This component is independent from language adapters. A consumer composes only
-the fragments it needs from its root `lefthook.yml`; the sync manifest owns the
-stable downstream destinations. A repository can add local commands or
+The `lefthook.yml` fragment supplies strict Lefthook settings plus Typos,
+Gitleaks, EditorConfig, and Markdownlint commands for this repository's own
+root `lefthook.yml`, which extends it; the sync manifest no longer distributes
+it. It invokes each tool without policy flags so the matching root-canonical
+config remains the single rule owner. A repository can add local commands or
 explicitly opt out of an inherited lane with Lefthook's native `skip: true`
 override. CI remains the authoritative gate.
 
@@ -18,8 +22,7 @@ adapter in CI.
 ## Remote form
 
 `lefthook-remote.yml` runs Gitleaks and EditorConfig-checker from a Lefthook
-[remote](https://lefthook.dev/configuration/remotes/) instead of a synced
-copy. Typos, markdownlint-cli2, ShellCheck and actionlint run from the
+[remote](https://lefthook.dev/configuration/remotes/). Typos, markdownlint-cli2, ShellCheck and actionlint run from the
 melodic-software/claude-code-plugins aggregate remote every repository already
 lists, which reads this repository's configs once the repository's
 `docs/conventions/source-control.yaml` names
@@ -56,8 +59,11 @@ remote configs merge after the consumer's `lefthook.yml` and would override it.
 So the consumer's own `lefthook.yml` carries the settings `lefthook.yml` would
 have supplied through `extends`: `min_version: "2.0.5"` and
 `assert_lefthook_installed: true`, as in the example, and `parallel: true`
-under `pre-commit` if it wants the jobs run in parallel. The globs match the
-same files with or without `glob_matcher: doublestar`.
+under `pre-commit` if it wants the jobs run in parallel. The remote's globs
+match the same files with or without `glob_matcher: doublestar`. The language
+adapter fragments (dotnet, powershell, python, typescript) need it for root
+files and set it themselves; `lefthook-adapter-globs.test.sh` proves a
+root-level file reaches each adapter's lane when the consumer sets no matcher.
 
 A missing tool fails its job with an install pointer, as in `lefthook.yml`.
 A script outside a fetched remote, such as this repository's own work
@@ -105,7 +111,7 @@ own lane out, and every fragment in the component set is asserted to declare no
 `skip` at all -- an invariant over the whole set rather than the files a given
 change happens to touch.
 
-`lefthook-base.test.sh` builds a temporary consumer, composes the managed
+`lefthook-base.test.sh` builds a temporary consumer, composes the
 fragment, and proves the Markdownlint lane resolves the consumer's own
 `node_modules/.bin` binary rather than an arbitrary one on `PATH`. Because
 `node_modules` is per worktree, a missing local binary makes the lane run

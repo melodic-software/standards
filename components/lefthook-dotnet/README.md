@@ -1,8 +1,11 @@
 # Lefthook .NET
 
-Opt-in staged C# whitespace verification. Compose this fragment with
-`lefthook-base`, then add one consumer-owned data file at
-`.lefthook/dotnet-format.json`:
+Opt-in staged C# whitespace verification. The fragment sets
+`glob_matcher: doublestar` itself, so its `**/*.cs` glob also matches files at
+the repository root. The consumer's root `lefthook.yml` extends it and sets
+`min_version: "2.0.5"` and `assert_lefthook_installed: true` (see
+[lefthook-base](../lefthook-base/README.md#remote-form)), then adds one
+consumer-owned data file at `.lefthook/dotnet-format.json`:
 
 ```json
 {

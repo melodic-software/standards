@@ -2,13 +2,12 @@
 
 GitHub Flavored Markdown policy for
 [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2). This
-directory backs two manifest components, both auto-discovered by the CLI and
-editor integrations at the location they deploy to:
+directory documents two configs:
 
-| Component | Payload | Deploys as |
-| --- | --- | --- |
-| `markdownlint` | root-canonical [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | a repository's own `.markdownlint-cli2.jsonc` |
-| `markdownlint-home` | [`home/.markdownlint-cli2.jsonc`](home/.markdownlint-cli2.jsonc) | `~/.markdownlint-cli2.jsonc`, via the dotfiles `dot_` source name |
+| Config | Reaches its readers as |
+| --- | --- |
+| root-canonical [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | fetched from this repository at run time (not synced), as below |
+| [`home/.markdownlint-cli2.jsonc`](home/.markdownlint-cli2.jsonc) | the `markdownlint-home` manifest component: `~/.markdownlint-cli2.jsonc`, via the dotfiles `dot_` source name, auto-discovered by the CLI and editor integrations |
 
 Both configs own their rule choices, and both point their `$schema` URL at
 markdownlint-cli2's `main` branch schema. The CLI never reads `$schema`; only
@@ -32,7 +31,7 @@ The ci-workflows `markdownlint` composite and the melodic-software/claude-code-p
 markdownlint-cli2 does not read a config from an *ancestor* of the working
 directory, so a session rooted at the home directory resolves no config at all
 and falls back to stock defaults. The home payload closes that gap without
-touching repository-rooted runs, which keep using their own materialized copy.
+touching repository-rooted runs, which keep using the root config.
 
 The two `config` blocks are identical and must stay that way.
 `markdownlint-home.test.sh` asserts the equality and fails the build on drift.

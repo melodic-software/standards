@@ -6,8 +6,10 @@ payload: the fragment invokes the orchestrator at
 `.lefthook/psscriptanalyzer-staged.ps1`, and the orchestrator discovers the root
 `PSScriptAnalyzerSettings.psd1` policy.
 
-Compose the fragment with `lefthook-base` for shared strict settings and
-root-aware glob matching.
+The fragment sets `glob_matcher: doublestar` itself, so its `**/` glob also
+matches files at the repository root. The consumer's root `lefthook.yml` sets
+`min_version: "2.0.5"` and `assert_lefthook_installed: true` (see
+[lefthook-base](../lefthook-base/README.md#remote-form)).
 
 The runner exists because nested cross-shell quoting is unreliable on Windows.
 PSScriptAnalyzer policy remains owned by the `psscriptanalyzer` component; this
