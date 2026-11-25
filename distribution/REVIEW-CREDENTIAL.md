@@ -3,7 +3,7 @@
 Classification for the read-only credential a private calling repo's CI job
 uses to mount this repo's `standards/review` tree by native reference, the
 depth tier described in [`standards/README.md`](../standards/README.md)
-and cited from the synced `REVIEW.md`. Scope is exactly this credential's
+and cited from the root `REVIEW.md`. Scope is exactly this credential's
 authentication and republication boundary. It is adjacent to, but distinct
 from, the sync-manifest push credential covered by
 [`THREAT-MODEL.md`](THREAT-MODEL.md), and external to the reconciliation

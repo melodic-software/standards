@@ -8,7 +8,7 @@ Org architecture (cross-repo decisions, glossary, why each trust link exists): p
 
 Each line names a rule CI does not enforce; the linked file states it in full.
 
-- Org-wide criteria: [`REVIEW.md`](REVIEW.md), the canonical source the standards sync distributes.
+- Org-wide criteria: [`REVIEW.md`](REVIEW.md), the org base review lanes read from `main`.
 - Normative-doc changes reconcile every file that cites or assumes the rule before merge:
   [governance process](distribution/governance-process.md#cross-doc-reconciliation-before-a-normative-doc-change-merges).
 - A new component brings its admission evidence:

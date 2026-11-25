@@ -27,42 +27,36 @@ a probe on the pilot repository raised a finding citing the linked file
 
 ## The inherited block
 
-Copy this block, with the one pointer line that matches how the repository
-receives `REVIEW.md`: its `review-instructions` entry in
-[`sync-manifest.yml`](../../distribution/sync-manifest.yml).
+Review lanes read `melodic-software/standards`' `REVIEW.md` from `main` as the
+org base and a repository's own root `REVIEW.md`, when it has one, as its
+additions. Copy this block, with the one pointer line that matches whether the
+repository has a root `REVIEW.md`:
 
 ```markdown
 ## Code Review Rules
 
 Each line names a rule CI does not enforce; the linked file states it in full.
 
-- Org-wide criteria: [`REVIEW.md`](REVIEW.md), synced from `melodic-software/standards`.
+- Org-wide criteria: [`REVIEW.md`](https://github.com/melodic-software/standards/blob/main/REVIEW.md) in `melodic-software/standards`.
 ```
 
-That pointer line is the `managed` case. Any other case replaces it:
+That pointer line is the case with no root `REVIEW.md`. Any other case
+replaces it:
 
-- `locally-owned`:
-
-  ```markdown
-  - Org-wide criteria: [`REVIEW.md`](REVIEW.md), a locally-owned copy reconciled with `melodic-software/standards`.
-  ```
-
-- absent, so the repository has no root `REVIEW.md`:
+- the repository keeps its own root `REVIEW.md`:
 
   ```markdown
-  - Org-wide criteria: [`REVIEW.md`](https://github.com/melodic-software/standards/blob/main/REVIEW.md) in `melodic-software/standards`.
+  - Org-wide criteria: [`REVIEW.md`](REVIEW.md), this repository's additions to the `melodic-software/standards` base.
   ```
 
 - `standards` itself, the canonical source:
 
   ```markdown
-  - Org-wide criteria: [`REVIEW.md`](REVIEW.md), the canonical source the standards sync distributes.
+  - Org-wide criteria: [`REVIEW.md`](REVIEW.md), the org base review lanes read from `main`.
   ```
 
-The absent case links the canonical file by URL, for a repository outside the
-sync targets. No audited target uses it. The probe covered in-repository links
-only, so whether the Codex reviewer fetches that URL is unverified; adopting
-`review-instructions` gives a repository the in-repository form.
+The probe covered in-repository links only, so whether the Codex reviewer
+fetches the canonical URL is unverified.
 
 `standards` owns no other org-wide review rule that belongs in the block:
 `REVIEW.md` already points into [`standards/review/`](../../standards/review/README.md),
@@ -106,9 +100,8 @@ verbatim.
   sync target. A private repository outside the installation is not visible to
   either token.
 - Both listings skip a repository with the `sandbox` topic, such as
-  `pr-pipeline-sandbox`: a disposable test bed takes no `review-instructions`
-  and so carries no pointer to it, even where `distribution/sync-manifest.yml`
-  syncs it other payloads. `code-review-rules.sh names` holds that one filter;
+  `pr-pipeline-sandbox`: a disposable test bed carries no `REVIEW.md` pointer,
+  even where `distribution/sync-manifest.yml` syncs it other payloads. `code-review-rules.sh names` holds that one filter;
   the public listing applies it in the script and the workflow pipes the
   private listing through it.
 

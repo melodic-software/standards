@@ -57,15 +57,15 @@ This repository's own root files (`README.md`, `REVIEW.md`, `AGENTS.md`,
 `CLAUDE.md`) are neither `managed` nor `locally-owned` here: those labels
 describe a *downstream* copy's relationship to an upstream source. In
 `standards` itself a file is simply the canonical source: no ownership label,
-because there is no synchronization to record. Note the canonical source of a
-component is not always the same-named root file: `review-instructions`
-exports root `REVIEW.md`, while a component may equally export a file that
-lives only under `components/` (the root `AGENTS.md` and `CLAUDE.md` here back
-no component: `CLAUDE.md` is an empty placeholder, and `AGENTS.md` holds only
-this repository's own `## Code Review Rules` section, whose shape
+because there is no synchronization to record. None of these root files backs
+a component. Review lanes read the root `REVIEW.md` from `main` as the org
+base beneath a repository's own `REVIEW.md`, rather than through a synced
+copy; `CLAUDE.md` is an empty placeholder; and `AGENTS.md` holds only this
+repository's own `## Code Review Rules` section, whose shape
 [`components/code-review-rules/`](../components/code-review-rules/README.md)
-defines and checks rather than syncs). Wherever the source lives, the
-downstream copy is what carries the `managed` label; this repository's own
+defines and checks rather than syncs. A component's source may equally be a
+root file or a file that lives only under `components/`; wherever it lives, the
+downstream copy is what carries the `managed` label, and this repository's own
 originals never carry an ownership label themselves.
 
 There are no layouts, per-target paths, transforms, patches, profiles, receipts,
@@ -479,24 +479,3 @@ commit. It is the fourth recorded exception to the consumer-owned-caller rule:
 hosts the reusable itself) and `medley` (which carries an extra repo-local
 `automerge` job) stay `locally-owned`. Rationale and admission evidence live in
 [`components/dependabot-automerge/README.md`](../components/dependabot-automerge/README.md).
-
-## Review-instructions reconciliation (medley)
-
-`review-instructions` is `locally-owned` in `melodic-software/medley`, not
-`managed`: medley's own `REVIEW.md` predates this manifest, is load-bearing
-for medley's own `/quality-gate` automation (a severity vocabulary, a
-tracker-priority axis, and a confidence axis this manifest does not model),
-and is cited from dozens of files. A whole-file managed sync would clobber
-content the `managed`/`locally-owned` split exists to protect. (Medley's
-bespoke `AGENTS.md` enjoys the same protection simply by not being any
-component's destination: the former agent-orientation component was retired
-by the standards sync audit.)
-
-The `Reconcile` lifecycle row above is what keeps this from silently
-blinding medley to canonical drift: when the canonical `REVIEW.md` gains a
-criterion, medley's own copy is checked for the equivalent content (not a
-byte match) and updated by a repository-specific PR in medley, same as the
-initial reconciliation pattern (`melodic-software/medley#1541`). This is a
-periodic self-review obligation, not an automated reconciliation PR the
-synchronizer opens: `locally-owned` means exactly that the synchronizer
-never reads, changes, or deletes the file.

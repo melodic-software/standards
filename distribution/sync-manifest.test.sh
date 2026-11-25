@@ -709,24 +709,15 @@ assert_eq 'ci-runner enrolls the managed Go analyzer policy exactly once' '1' \
 assert_eq 'Go analysis covers exactly the ci-runner target' \
   '["melodic-software/ci-runner"]' "$(managing_targets go-analysis)"
 
-expected_review_instructions_targets='["melodic-software/.github","melodic-software/agent-plugins","melodic-software/azure-iac","melodic-software/ci-runner","melodic-software/ci-workflows","melodic-software/claude-code-account-rotation","melodic-software/claude-code-plugins","melodic-software/claude-code-proxy","melodic-software/codex-plugins","melodic-software/cursor-plugins","melodic-software/dotfiles","melodic-software/github-iac","melodic-software/provisioning"]'
-assert_eq 'REVIEW.md reaches every enrolled ci-workflows-reviewable target, public and private alike' \
-  "$expected_review_instructions_targets" "$(managing_targets review-instructions)"
-
-# agent-orientation was retired: no component ships AGENTS.md
-# anywhere anymore.
-assert_eq 'no component named agent-orientation exists (retired)' '0' \
-  "$(yq -r '[.components | keys[] | select(. == "agent-orientation")] | length' \
-    "$actual_manifest")"
-
-assert_eq 'medley locally-owns review-instructions rather than whole-file-managing it' '1' \
-  "$(yq -r \
-    '[.targets."melodic-software/medley".locally-owned[] | select(. == "review-instructions")] | length' \
-    "$actual_manifest")"
-assert_eq "medley's managed list does not also claim review-instructions" '0' \
-  "$(yq -r \
-    '[.targets."melodic-software/medley".managed[] | select(. == "review-instructions")] | length' \
-    "$actual_manifest")"
+# Retired components: agent-orientation (no component ships AGENTS.md), and
+# engineering-standards, filing-guide and review-instructions, whose readers
+# take standards/README.md and REVIEW.md from this repository's main as the
+# org layer instead of a synced copy.
+for component in agent-orientation engineering-standards filing-guide review-instructions; do
+  assert_eq "no component named $component exists (retired)" '0' \
+    "$(COMPONENT="$component" yq -r '[.components | keys[] | select(. == strenv(COMPONENT))] | length' \
+      "$actual_manifest")"
+done
 
 # automerge is optional policy-as-data: absent means true (exercised by every
 # prior matrix assertion above), an explicit value is emitted verbatim, and a
