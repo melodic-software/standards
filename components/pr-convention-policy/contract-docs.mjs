@@ -2,10 +2,10 @@
 
 // Generates the three prose copies of the PR and issue contracts from their records: the org PR
 // template, the always-loaded `.claude/rules/pr-body-contract.md` rule, and the harness-neutral
-// filing guide the filing-guide component syncs to every target's `docs/standards/`. `check` (the
-// default) fails when a committed copy differs from what the records generate; `write`
-// regenerates them. The sync materializes the committed copies byte-exact, so each is changed in
-// policy.json or contract.json, or in this generator's wording, and nowhere else.
+// filing guide the org standards index lists. `check` (the default) fails when a committed copy
+// differs from what the records generate; `write` regenerates them. Consumers read the committed
+// copies byte-exact, so each is changed in policy.json or contract.json, or in this generator's
+// wording, and nowhere else.
 
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
