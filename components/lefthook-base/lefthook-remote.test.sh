@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Tests the lefthook remote form of lefthook-base and lefthook-shellcheck: a
-# consumer lists the two lefthook-remote.yml configs under `remotes:`, lefthook
-# fetches this repository into .git/info/lefthook-remotes/, and each job's
-# script under .lefthook/pre-commit/ passes its tool the standards config that
-# sits two directories above the script itself.
+# Tests the lefthook remote form of lefthook-base: a consumer lists
+# lefthook-remote.yml under `remotes:`, lefthook fetches this repository into
+# .git/info/lefthook-remotes/, and each job's script under .lefthook/pre-commit/
+# passes its tool the consumer's own config when it has one, else the standards
+# config that sits two directories above the script itself.
 #
 # Recording shims stand in for the tools, so the argv each script builds is an
-# artifact on disk; only lefthook gates the suite. Where real typos and
-# ShellCheck binaries are on PATH, a fixture only the standards config rejects shows
-# the fetched config is the one in force.
+# artifact on disk; only lefthook gates the suite.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -20,19 +18,18 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 export GIT_CONFIG_GLOBAL="$work/gitconfig" GIT_CONFIG_NOSYSTEM=1
 real_path="$PATH"
-scripts=(standards-typos standards-gitleaks standards-editorconfig standards-markdownlint standards-shellcheck)
-configs=(_typos.toml .gitleaks.toml .editorconfig-checker.json .markdownlint-cli2.jsonc .shellcheckrc)
-tools=(typos gitleaks editorconfig-checker markdownlint-cli2 shellcheck)
-flags=(-c --config -config --config --rcfile)
+scripts=(standards-gitleaks standards-editorconfig)
+configs=(.gitleaks.toml .editorconfig-checker.json)
+tools=(gitleaks editorconfig-checker)
+flags=(--config -config)
 
 # The files a consumer fetches, committed on main in a stand-in remote.
 seed_remote() {
   local dest="$1" cfg
-  mkdir -p "$dest/components/lefthook-base" "$dest/components/lefthook-shellcheck"
+  mkdir -p "$dest/components/lefthook-base"
   cp -R "$root/.lefthook" "$dest/.lefthook"
   for cfg in "${configs[@]}"; do cp "$root/$cfg" "$dest/$cfg"; done
   cp "$root/components/lefthook-base/lefthook-remote.yml" "$dest/components/lefthook-base/"
-  cp "$root/components/lefthook-shellcheck/lefthook-remote.yml" "$dest/components/lefthook-shellcheck/"
 }
 
 shims="$work/shims"
@@ -67,8 +64,7 @@ clear_logs() {
 # whichever directory the remote was fetched into, and passes the files on.
 for at in "$work/a/.git/info/lefthook-remotes/standards-main" "$work/b/x/.git/info/lefthook-remotes/r"; do
   seed_remote "$at"
-  mkdir -p "$work/cwd/node_modules/.bin"
-  cp "$shims/markdownlint-cli2" "$work/cwd/node_modules/.bin/"
+  mkdir -p "$work/cwd"
   for i in "${!scripts[@]}"; do
     clear_logs
     (cd "$work/cwd" && PATH="$shims:$real_path" sh "$at/.lefthook/pre-commit/${scripts[$i]}.sh" doc.md)
@@ -81,6 +77,18 @@ for at in "$work/a/.git/info/lefthook-remotes/standards-main" "$work/b/x/.git/in
       assert_contains "${scripts[$i]} passes the hook's files to its tool" "$(tail -n 1 "$work/${tools[$i]}.log")" 'doc.md'
     fi
   done
+done
+
+# Case 1b: a repository with its own config replaces the standards one whole.
+at="$work/a/.git/info/lefthook-remotes/standards-main"
+mkdir -p "$work/own"
+for i in "${!scripts[@]}"; do
+  printf 'own\n' >"$work/own/${configs[$i]}"
+  clear_logs
+  (cd "$work/own" && PATH="$shims:$real_path" sh "$at/.lefthook/pre-commit/${scripts[$i]}.sh" doc.md)
+  assert_exit "${scripts[$i]} with the repository's own ${configs[$i]} exits 0" 0 "$?"
+  assert_eq "${scripts[$i]} passes the repository's own ${configs[$i]}, not the standards one" \
+    "$(resolved "$work/own/${configs[$i]}")" "$(config_of "$work/own" "$work/${tools[$i]}.log" "${flags[$i]}")"
 done
 
 # Case 2: a copy of a script outside a fetched remote (this repository's own
@@ -108,18 +116,16 @@ remotes:
     ref: main
     configs:
       - components/lefthook-base/lefthook-remote.yml
-      - components/lefthook-shellcheck/lefthook-remote.yml
 YAML
 (cd "$consumer" && lefthook install >/dev/null 2>&1)
 fetched="$(find "$consumer/.git/info/lefthook-remotes" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1)"
-assert_file_exists 'lefthook install fetched the remote' "$fetched/.lefthook/pre-commit/standards-typos.sh"
+assert_file_exists 'lefthook install fetched the remote' "$fetched/.lefthook/pre-commit/standards-gitleaks.sh"
 dump="$(cd "$consumer" && lefthook dump 2>/dev/null)"
 for script in "${scripts[@]}"; do
   assert_contains "the merged config holds $script" "$dump" "name: $script"
 done
 
-mkdir -p "$consumer/node_modules/.bin" "$consumer/docs" "$consumer/lib/deep"
-cp "$shims/markdownlint-cli2" "$consumer/node_modules/.bin/"
+mkdir -p "$consumer/docs" "$consumer/lib/deep"
 printf '# Title\n' >"$consumer/docs/doc.md"
 printf '# Notes\n' >"$consumer/NOTES.md"
 printf 'root\n' >"$consumer/README.txt"
@@ -139,23 +145,13 @@ for matcher in default doublestar; do
     assert_eq "$matcher matcher: ${scripts[$i]} passes ${flags[$i]} the fetched ${configs[$i]}" \
       "$(resolved "$fetched/${configs[$i]}")" "$(config_of "$consumer" "$work/${tools[$i]}.log" "${flags[$i]}")"
   done
-  for tool in typos editorconfig-checker; do
-    assert_eq "$matcher matcher: $tool gets every staged file" 'NOTES.md README.txt docs/doc.md lib/deep/x.bash run.sh' \
-      "$(sed '1,2d' "$work/$tool.log" 2>/dev/null | sort | xargs)"
-  done
-  assert_eq "$matcher matcher: markdownlint gets each staged markdown file once" 'NOTES.md docs/doc.md' \
-    "$(sed '1,2d' "$work/markdownlint-cli2.log" 2>/dev/null | sort | xargs)"
-  assert_eq "$matcher matcher: shellcheck gets each staged shell script once" 'lib/deep/x.bash run.sh' \
-    "$(sed '1,2d' "$work/shellcheck.log" 2>/dev/null | sort | xargs)"
+  assert_eq "$matcher matcher: editorconfig-checker gets every staged file" 'NOTES.md README.txt docs/doc.md lib/deep/x.bash run.sh' \
+    "$(sed '1,2d' "$work/editorconfig-checker.log" 2>/dev/null | sort | xargs)"
+done
+for gone in standards-typos standards-markdownlint standards-shellcheck; do
+  assert_not_contains "the merged config holds no $gone job: the claude-code-plugins remote runs that tool" "$dump" "name: $gone"
 done
 cp "$work/lefthook.yml" "$consumer/lefthook.yml"
-
-# Case 4: with no local markdownlint-cli2, the job fails like the other tools.
-rm -rf "$consumer/node_modules"
-clear_logs
-out="$(cd "$consumer" && PATH="$shims:$real_path" lefthook run pre-commit --job standards-markdownlint 2>&1)"
-assert_nonzero 'a missing markdownlint-cli2 fails its job' "$?"
-assert_contains 'the failure names the missing binary' "$out" 'node_modules/.bin/markdownlint-cli2 not found. Run: npm ci'
 
 # Case 5: a missing tool fails its job with an install pointer.
 # node stays reachable: an npm-installed lefthook is a node script.
@@ -164,42 +160,12 @@ for bin in git lefthook node; do
   if command -v "$bin" >/dev/null 2>&1; then ln -s "$(command -v "$bin")" "$work/bare-bin/$bin"; fi
 done
 bare_path="$work/bare-bin:/usr/bin:/bin"
-if PATH="$bare_path" command -v typos >/dev/null 2>&1; then
-  skip_case 'typos is installed system-wide, so no PATH hides it'
+if PATH="$bare_path" command -v gitleaks >/dev/null 2>&1; then
+  skip_case 'gitleaks is installed system-wide, so no PATH hides it'
 else
-  out="$(cd "$consumer" && PATH="$bare_path" lefthook run pre-commit --job standards-typos 2>&1)"
-  assert_nonzero 'a missing typos fails its job' "$?"
-  assert_contains 'the failure names the missing tool' "$out" 'typos is not on PATH'
-fi
-
-# Case 6: real tools against fixtures only the standards config rejects.
-git -C "$consumer" -c commit.gpgsign=false commit -q -m seed --no-verify
-if command -v typos >/dev/null 2>&1; then
-  printf 'The %s box.\n' "gr""ey" >"$consumer/box.txt"
-  assert_exit 'typos alone accepts the fixture' 0 "$(
-    cd "$consumer" && typos --isolated box.txt >/dev/null 2>&1
-    echo $?
-  )"
-  git -C "$consumer" add box.txt
-  (cd "$consumer" && lefthook run pre-commit --job standards-typos >/dev/null 2>&1)
-  assert_nonzero 'standards-typos rejects it with the fetched _typos.toml' "$?"
-  git -C "$consumer" rm -q --cached box.txt
-else
-  skip_case 'typos not on PATH'
-fi
-if command -v shellcheck >/dev/null 2>&1; then
-  # shellcheck disable=SC2016 # the fixture's own text
-  printf '#!/usr/bin/env bash\nx=1\nif [ -n "$x" ]; then echo "$x"; fi\n' >"$consumer/single.sh"
-  assert_exit 'shellcheck without an rcfile accepts the fixture' 0 "$(
-    cd "$consumer" && shellcheck --norc single.sh >/dev/null 2>&1
-    echo $?
-  )"
-  git -C "$consumer" add single.sh
-  out="$(cd "$consumer" && lefthook run pre-commit --job standards-shellcheck 2>&1)"
-  assert_nonzero 'standards-shellcheck rejects it with the fetched .shellcheckrc' "$?"
-  assert_contains 'the finding is the rcfile-enabled double-bracket check' "$out" 'SC2292'
-else
-  skip_case 'shellcheck not on PATH'
+  out="$(cd "$consumer" && PATH="$bare_path" lefthook run pre-commit --job standards-gitleaks 2>&1)"
+  assert_nonzero 'a missing gitleaks fails its job' "$?"
+  assert_contains 'the failure names the missing tool' "$out" 'gitleaks is not on PATH'
 fi
 
 [[ $FAILED -eq 0 ]] || exit 1

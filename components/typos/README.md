@@ -3,11 +3,21 @@
 Source-aware spell checking with [Typos](https://github.com/crate-ci/typos).
 The exported payload is the root-canonical [`_typos.toml`](../../_typos.toml).
 
-Because Typos has no native config layering, the managed config carries the
-small organization-wide vocabulary union. One-off false positives use the
-documented inline ignore directives. A broadly valid word goes upstream; a
-repository with incompatible vocabulary policy owns the complete component.
+The config carries the small organization-wide vocabulary union. One-off false
+positives use the documented inline ignore directives; a broadly valid word
+goes upstream.
 
 `fixtures/` and `typos.test.sh` prove clean and failing input plus every blessed
 inline directive. Typos exits `2` for spelling findings; the contract test
 distinguishes that from engine errors.
+
+## Defaults, extensions and overrides
+
+The ci-workflows `typos` composite and the melodic-software/claude-code-plugins lefthook remote (for a repository whose `docs/conventions/source-control.yaml` names `standards_repository`) read this file at run time. Typos merges a `--config`/`-c` file with the config it discovers from the checked path, and the `-c` file wins a key both set ([config sources](https://github.com/crate-ci/typos/blob/master/docs/reference.md#sources), checked with typos 1.52.2); the readers pass this file with `-c` and never `--isolated`.
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file alone |
+| Extension | root `_typos.toml` with only its added `extend-words`, `extend-identifiers`, `extend-ignore-re` or `extend-exclude` entries | both files' entries apply |
+| Partial override | root `_typos.toml` setting a key this file leaves unset | the repository's value applies; a key this file sets keeps this file's value |
+| Complete override | CI: a config at another path passed as the composite's `config` input; local: `skip: true` on the claude-code-plugins `spelling-remote-lint` job and the repository's own job | that file alone |
