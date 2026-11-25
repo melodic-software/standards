@@ -34,7 +34,7 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
 - **Alternatives and overlap**: a per-repository copy would drift with no
   owner. `code-review-rules` and `REVIEW.md` carry review criteria; this
   component carries working conventions and links into them rather than
-  restating them. `managed-files-guard` lists the eleven destinations, so a
+  restating them. `managed-files-guard` guards the eleven destinations, so a
   local edit to a synced file is caught as drift instead of competing with the
   source.
 - **Operational fit**: `sync-manifest.sh plan` for a target lists exactly the
@@ -52,8 +52,7 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
   targets on the next sync run; a change to the index's `standards-contract`
   version follows the contract's `CHANGELOG.md` in `claude-code-plugins`.
 - **Verification**: `distribution/sync-manifest.test.sh` and
-  `sync-manifest.sh validate` cover the manifest entry, and
-  `managed-files-guard.test.sh` covers the guarded destinations.
+  `sync-manifest.sh validate` cover the manifest entry.
 
 ## Ownership
 
@@ -68,5 +67,5 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
   The index is `managed` because the engine
   has no seed-once mode.
 - **Rollback**: remove the component from the targets' `managed` lists and
-  delete its manifest entry and `managed-files-guard` paths. The files already
+  delete its manifest entry. The files already
   synced stay as ordinary repository docs until each target deletes them.

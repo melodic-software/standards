@@ -423,9 +423,10 @@ the second recorded exception to the consumer-owned-caller rule, on the same
 grounds as the first: the guard is a fleet signal only if every target runs
 the same caller at the same pin.
 
-Both call `.github/actions/check-managed-files` at the same pin. The two files
-differ only in `runs-on`, comments, their `on.pull_request.paths` entries (each
-lists the managed destinations of the targets that receive it) and the workflow
+Both call `.github/actions/check-managed-files` at the same pin and trigger on
+every pull request with no `paths` filter: the action resolves the managed
+destinations at run time, so the callers' bytes change only when the caller
+does. The two files differ only in `runs-on`, comments and the workflow
 `name:`, which is each destination stem in Title Case (`PR Check Managed Files Hosted` and
 `PR Check Managed Files`). They share the job id
 `pr-check-managed-files` and job name `PR Check Managed Files`, which is the

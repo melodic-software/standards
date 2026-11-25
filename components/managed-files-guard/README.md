@@ -12,7 +12,9 @@ binary, the fix path is always a standards change, and the guard is what
 makes a hand-edit visible before the next sync silently reverts it.
 
 Two files, one per `runner-policy` inventory, identical except for `runs-on`,
-the workflow `name:` (each is its destination stem in Title Case) and their headers:
+the workflow `name:` (each is its destination stem in Title Case) and their
+headers. Neither carries a `paths` filter, so the bytes change only when the
+caller itself does:
 
 | Manifest component | Source | Destination | `runs-on` |
 | --- | --- | --- | --- |
@@ -31,8 +33,8 @@ that.
 ## Rollout: advisory first, one caller per runner inventory
 
 **Advisory soak.** The check is not aggregated into any target's `ci-status`
-and is not a required context anywhere. It runs on every pull request that
-touches a managed path (see "Path filter" below), reports, and blocks nothing. This follows the action's own contract
+and is not a required context anywhere. It runs on every pull request (see
+"No path filter" below), reports, and blocks nothing. This follows the action's own contract
 ("advisory-first: wire into ci-status only after a clean soak") and the
 enforcement-rollout steps in `docs/component-lifecycle.md`: observe against
 the live consumers, classify every finding, then promote per target once the
@@ -90,35 +92,26 @@ trigger: ci-workflows retiring its in-repo job in favor of the synced caller.
 
 `standards` is the manifest source, not a target, and carries no caller.
 
-## Path filter
+## No path filter
 
-The action fails only when the diff touches an exact managed destination
-path (`run.sh` in the action: `git diff --name-only` checked against the
-engine's `dest-paths` set). Each caller therefore carries
-`on.pull_request.paths` set to the sorted union of the `dest-paths` of every
-target that receives that caller, its own destination included, so a pull
-request that touches no managed path starts no job. The hosted caller lists
-only hosted targets' destinations and the fleet-routed caller only
-fleet-routed targets', so neither names the other's workflow files
-(standards#698). The list is a union, not a per-target set, because one file
-ships byte-identical to every target that receives it; on a target that does
-not manage a listed path, a match runs the guard and it passes. `types` restates GitHub's documented default (`opened`,
-`synchronize`, `reopened`).
+Each caller triggers on every `pull_request` (`types` restates GitHub's
+documented default: `opened`, `synchronize`, `reopened`) and lets the action
+decide. The action resolves this repository's managed destinations from the
+manifest at `standards-ref` (`sync-manifest.sh dest-paths`) and checks the
+pull request's changed files against them; on a `pull_request` run it reads
+those files from the pulls API and clones nothing, so a pull request that
+touches no managed file passes after a standards checkout and the manifest
+lookup. A repository that is not a manifest target passes as a no-op.
 
-The contract test computes the union through the engine and requires the
-list to equal it, so a manifest change that adds, moves or drops a
-destination fails CI here until both callers follow in the same pull
-request; the next sync then delivers the new list together with the new
-file. A required check could not take this filter (a workflow skipped by
-`paths` leaves its check pending), which is one more thing promotion has to
-decide; today only `CI Status` is required on any target.
+Do not add one. One file ships byte-identical to every target, so a filter
+would have to list the union of every receiving target's destinations, and
+any manifest change that adds, moves or drops a destination for any target
+would change the caller and re-sync it into every target. The action already
+holds the per-target list.
 
-Known gaps, both fail-open on an advisory check: GitHub skips a filtered
-workflow when the diff exceeds 3,000 files and no match is among the first
-3,000
-([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#git-diff-comparisons));
-and between a standards merge that adds a destination and that target's sync,
-the consumer's caller still carries the old list.
+A required check could not take a `paths` filter (a skipped workflow leaves
+its check pending); without one, promotion to a required context needs no
+trigger change.
 
 ## The two refs
 
@@ -168,15 +161,14 @@ the guard executes); do not pin it in this hop.
 ## Verification
 
 `managed-files-guard.test.sh` asserts, against the parsed YAML of each file:
-the `pull_request` trigger with the default `types` and a `paths` list equal
-to the managed union of the targets that receive that file, free of glob
-metacharacters; `contents: read` and `pull-requests: read` as the whole
-grant; the
+the `pull_request` trigger with the default `types` and no `paths` filter;
+`contents: read` and `pull-requests: read` as the whole grant; the
 canonical `concurrency-policy` block and nothing else in it; one job on its
 literal label with a 10-minute timeout, calling no reusable workflow; one
 step, the action at `@main`; and `standards-ref: main`. It asserts the two files carry the same
-action ref and differ only in comments, the workflow name, `paths` and `runs-on`. It then checks the
-manifest wiring (destination paths, fleet-routed targets on the fleet-routed
+action ref and differ only in comments, the workflow name and `runs-on`. It
+checks that the engine lists `dest-paths` for every target, as the action
+runs it, then the manifest wiring (destination paths, fleet-routed targets on the fleet-routed
 caller only, no target on both, ci-workflows `locally-owned`, every target
 accounted for) and materializes each managing target through the real engine, asserting byte-identity at the
 destination and, when `actionlint` is on PATH, a clean lint there.

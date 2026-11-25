@@ -100,8 +100,7 @@ was retired with no targets in #430 and is not reintroduced.
 - **Verification**: `npm run test:dependabot-policy` and
   `npm run lint:dependabot-policy` validate the file against
   [`policy.schema.json`](policy.schema.json). `distribution/sync-manifest.test.sh`
-  and `components/managed-files-guard/managed-files-guard.test.sh` cover the
-  mapping and the guard's path union.
+  covers the mapping.
 
 ## The standard
 

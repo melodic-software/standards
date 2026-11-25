@@ -27,76 +27,19 @@ name: PR Check Managed Files
 # for local CI routing. Public and un-enrolled private targets take the
 # hosted sibling, components/managed-files-guard/managed-files-guard.yml.
 # The two files differ only in this paragraph, the source lines above, the
-# workflow `name:` (each is its destination stem in Title Case), the `paths` entries
-# (each lists its own targets' destinations) and `runs-on`; the job
-# name is the same, so the check context is `PR Check Managed Files` on every
-# target.
+# workflow `name:` (each is its destination stem in Title Case) and
+# `runs-on`; the job name is the same, so the check context is
+# `PR Check Managed Files` on every target.
 
-# The guard fails only on an exact managed destination path, so the workflow
-# runs only when the pull request touches one. `paths` is the sorted union of
-# the managed destinations (`sync-manifest.sh dest-paths`) of every sync target
-# that receives this file, this workflow included; the contract test fails
-# when the manifest moves that union and this list does not follow. `types`
+# No `paths` filter: the action resolves this repository's managed
+# destinations from the manifest at run time and passes in seconds when the
+# pull request's file list (read from the API, no clone) touches none. A
+# filter here would have to list every target's destinations, so any
+# manifest change anywhere would re-sync this file to every target. `types`
 # restates the documented pull_request default.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - .chezmoidata/claude-permissions.json
-      - .claude/cloud-bootstrap.sh
-      - .claude/rules/pr-body-contract.md
-      - .claude/settings.json
-      - .editorconfig
-      - .editorconfig-checker.json
-      - .gitattributes
-      - .github/actionlint.yaml
-      - .github/standards/biome/biome.json
-      - .github/standards/dependabot-policy/policy.json
-      - .github/standards/pyright/pyrightconfig.json
-      - .github/standards/tsconfig/tsconfig.json
-      - .github/workflows/pr-automerge-dependabot.yml
-      - .github/workflows/pr-check-managed-files.yml
-      - .github/workflows/pr-review-security.yml
-      - .github/workflows/pr-review.yml
-      - .gitleaks.toml
-      - .lefthook/base.yml
-      - .lefthook/dotnet-format-staged.mjs
-      - .lefthook/dotnet.yml
-      - .lefthook/powershell.yml
-      - .lefthook/psscriptanalyzer-staged.ps1
-      - .lefthook/psscriptanalyzer-target.ps1
-      - .lefthook/python.yml
-      - .lefthook/shellcheck.yml
-      - .markdownlint-cli2.jsonc
-      - .node-version
-      - .shellcheckrc
-      - PSScriptAnalyzerSettings.psd1
-      - REVIEW.md
-      - _typos.toml
-      - docs/adr/README.md
-      - docs/adr/adr-template.md
-      - docs/conventions/source-control/commit-convention.yml
-      - docs/standards/README.md
-      - docs/standards/bulk-mutation.md
-      - docs/standards/concise-prose.md
-      - docs/standards/configuration-switch-naming.md
-      - docs/standards/design-for-change.md
-      - docs/standards/deterministic-work-execution.md
-      - docs/standards/documentation-and-citations.md
-      - docs/standards/filing-prs-and-issues.md
-      - docs/standards/issue-tracker.md
-      - docs/standards/reference-dont-duplicate.md
-      - docs/standards/simpler-code.md
-      - docs/standards/source-authority-tiers.md
-      - dot_local/bin/executable_pages-publish
-      - dot_markdownlint-cli2.jsonc
-      - eng/dotnet-analysis/Directory.Build.props
-      - eng/dotnet-analysis/dotnet.globalconfig
-      - ruff.toml
-      - tools/mcp-launcher/dispatch.js
-      - tools/mcp-launcher/launcher.js
-      - tools/shared/comment-hygiene/comment-hygiene-patterns.sh
-      - tools/shared/path-detection/machine-path-patterns.sh
 
 permissions:
   contents: read

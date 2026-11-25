@@ -153,8 +153,7 @@ Admission evidence for the `pr-template` component
 - **Upstream health, legal and security fit, update path**: first-party text,
   no dependency, no credential beyond the existing standards-sync App.
 - **Verification**: `contract-docs.test.mjs`, the template case in
-  `lockstep-drift.test.mjs`, `sync-manifest.test.sh` and
-  `managed-files-guard.test.sh`.
+  `lockstep-drift.test.mjs` and `sync-manifest.test.sh`.
 
 Enforcement rollout
 ([component lifecycle](../../docs/component-lifecycle.md#enforcement-rollout)):
@@ -178,8 +177,7 @@ workshop 04 alignment pass):
   removes the component, the `requires` entry on `engineering-standards` and
   the 19 target entries, and moves the guide back under
   `engineering-standards`. The nine guide-only targets keep the delivered file
-  as an ordinary doc until each deletes it, because deselection never deletes,
-  and both guard callers keep listing its path.
+  as an ordinary doc until each deletes it, because deselection never deletes.
 - **Delivery boundary**: exact materialization, the channel that already
   delivers it to the `engineering-standards` targets.
 - **Alternatives and overlap**: adding `engineering-standards` to every target
@@ -191,9 +189,7 @@ workshop 04 alignment pass):
   new targets has `docs/standards/`, so nothing is overwritten. Nothing executes in the target.
 - **Upstream health, legal and security fit, update path**: as for
   `pr-template`.
-- **Verification**: `sync-manifest.sh validate`, `sync-manifest.test.sh` and
-  `managed-files-guard.test.sh`; both guard callers already list the
-  destination.
+- **Verification**: `sync-manifest.sh validate` and `sync-manifest.test.sh`.
 
 ### Behavioral lockstep
 
