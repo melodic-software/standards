@@ -102,6 +102,37 @@ unhidden_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" --hidd
   './**/*.md' 2>&1)"
 assert_not_contains 'without hidden the glob skips .github/' "$unhidden_dump" 'dot=.github'
 
+# Layering, the contract in components/lychee/README.md: a repository's own
+# lychee.toml is a second --config after this one. Its arrays add to these
+# (extension), its scalars replace these (partial override), and a file read
+# alone drops these entirely (complete override). .lycheeignore adds in every
+# mode.
+layer_root="$path_fixture_root/layers"
+mkdir -p "$layer_root"
+printf "exclude = ['dot=\\\\.workshop']\n" >"$layer_root/extend.toml"
+printf 'hidden = false\n' >"$layer_root/partial.toml"
+printf 'hidden = true\n' >"$layer_root/complete.toml"
+extend_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
+  --config "$layer_root/extend.toml" './**/*.md' 2>&1)"
+assert_not_contains 'extension: the layered exclude applies' "$extend_dump" 'dot=.workshop'
+assert_row_count 'extension: the standards exclude_path still applies' "$extend_dump" 0 'dot=\.work$'
+assert_contains 'extension: the standards hidden still applies' "$extend_dump" 'dot=.github'
+partial_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
+  --config "$layer_root/partial.toml" --hidden=true './**/*.md' 2>&1)"
+assert_contains 'control: a flag after both configs wins over them' "$partial_dump" 'dot=.github'
+partial_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
+  --config "$layer_root/partial.toml" './**/*.md' 2>&1)"
+assert_not_contains 'partial override: the layered scalar wins' "$partial_dump" 'dot=.github'
+complete_dump="$(cd "$dot_root" && lychee --dump --config "$layer_root/complete.toml" \
+  './**/*.md' 2>&1)"
+assert_row_count 'complete override: the standards exclude_path is gone' "$complete_dump" 1 'dot=\.work$'
+printf 'dot=\\.claude/rules\n' >"$dot_root/.lycheeignore"
+ignore_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
+  --config "$layer_root/extend.toml" './**/*.md' 2>&1)"
+rm -f -- "$dot_root/.lycheeignore"
+assert_not_contains '.lycheeignore adds to layered configs' "$ignore_dump" 'dot=.claude/rules'
+assert_contains '.lycheeignore leaves other links checked' "$ignore_dump" 'dot=.github'
+
 # The private-repo inventory is derived, not copied: the two entries must be
 # byte-identical to what private-repo-inventory.sh renders for the set it reads
 # back from the file (sorted, unique, both hosts carrying the same set). Whether

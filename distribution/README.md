@@ -449,9 +449,9 @@ the promotion record live in
 One component per opted-in target, `lychee-online-<repo>`, materializes
 `.github/workflows/maintenance-check-links-online.yml`: a thin caller
 for the `ci-workflows` reusable `maintenance-check-links-online.yml`
-(ci-workflows#739), which runs lychee online with the target's own
-`lychee.toml`, or this repository's root `lychee.toml` when the target has
-none. It is the third recorded exception to the consumer-owned-caller
+(ci-workflows#739), which runs lychee online with this repository's root
+`lychee.toml` and the target's own merged over it
+([layering](../components/lychee/README.md#defaults-extensions-and-overrides)). It is the third recorded exception to the consumer-owned-caller
 rule, for the same reason as the first two: one definition at one pin across
 every target that runs it. Each target has its own source file under
 `components/lychee-online/targets/` because the cron minute and day differ

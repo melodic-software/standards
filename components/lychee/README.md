@@ -9,12 +9,36 @@ The blocking `ci-workflows` action runs offline for deterministic local-file and
 fragment checks. External URLs are checked only by a manual online run, because
 network health is inherently transient.
 
-A repository keeps no copy: when the caller has no root `lychee.toml`, the
-`lychee-offline` composite and the online `maintenance-check-links-online`
-reusable read this repository's. A repository that needs a different config
-commits its own root `lychee.toml`, which wins. `fixtures/` and
-`lychee.test.sh` prove valid links and missing file/fragment failures with
-Lychee 0.24.2+.
+`fixtures/` and `lychee.test.sh` prove valid links and missing file/fragment
+failures with Lychee 0.24.2+.
+
+## Defaults, extensions and overrides
+
+A repository keeps no copy. The `lychee-offline` composite and the online
+`maintenance-check-links-online` reusable read this repository's `lychee.toml`
+at run time, and a repository changes it only by stating its difference.
+Lychee 0.24.0 and later read `--config` repeatedly and merge the files, later
+ones winning ([CLI docs][2], read 2026-11-24); the readers pass this file
+first and the repository's own second.
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file alone |
+| Extension | root `lychee.toml` with only the added `exclude`, `exclude_path` or `remap` entries | both files' entries apply; an array in the repository's file adds to this one's and cannot remove an entry from it |
+| Partial override | root `lychee.toml` with only the changed scalar keys (`hidden`, `include_fragments`, `max_retries`, ...) | the repository's value wins; every other key stays this file's |
+| Complete override | a ruleset at another path, passed as the reader's `config` input (`lychee-offline` `config:`, the reusable's `config:`) | that file alone; nothing here applies |
+
+Precedence, lowest to highest: this file, the repository's root
+`lychee.toml`, then command-line flags (a reader's `exclude` input becomes
+`--exclude-path` and adds to both files' lists). A `.lycheeignore` in the
+working directory adds URL excludes in every mode; it is the place for an
+exact-URL exception one repository alone cites. `lychee.test.sh` proves the
+extension, partial-override, complete-override and `.lycheeignore` cases
+against this file.
+
+A local check-cmd matches CI by passing the same files in the same order:
+`--config "<standards checkout>/lychee.toml"`, then `--config lychee.toml` when
+the repository has one.
 
 Manual online runs exclude explicitly inventoried private GitHub repository and
 raw-content URLs whose auth boundary makes an unauthenticated request receive
@@ -59,11 +83,13 @@ still checked, and the first matching rule wins.
 
 ## Run the online check
 
-From a consumer's root, with the pinned Lychee version:
+From a consumer's root, with the pinned Lychee version and `STANDARDS_DIR` a
+standards checkout (add `--config lychee.toml` after it when the consumer has
+one):
 
 ```bash
-GITHUB_TOKEN="$(gh auth token)" lychee --config lychee.toml --no-progress \
-  --max-retries 2 './**/*.md'
+GITHUB_TOKEN="$(gh auth token)" lychee --config "$STANDARDS_DIR/lychee.toml" \
+  --no-progress --max-retries 2 './**/*.md'
 ```
 
 In `standards` itself, add `--exclude-path '(^|/)components/lychee/fixtures/'`:
@@ -77,3 +103,4 @@ an exclude list. Lychee also reads a `.lycheeignore` in the working directory
 on top of `--config`, so a consumer's local file widens these excludes.
 
 [1]: https://lychee.cli.rs/recipes/excluding-links/
+[2]: https://lychee.cli.rs/guides/cli/#-c---config
