@@ -6,13 +6,12 @@
 #
 # Three layers, in order:
 #   1. Shape: each parsed YAML carries exactly the locked design: pull_request
-#      trigger filtered to the union of the managed destinations of every
-#      target that receives that file,
-#      read-only token, the canonical concurrency block, one job on
+#      trigger with no paths filter (the action resolves the managed
+#      destinations at run time), read-only token, the canonical concurrency block, one job on
 #      its approved label, one step (no caller checkout), and the composite action
 #      at `@main` with `standards-ref: main` for the soak, and a workflow name equal to the
 #      destination stem in Title Case. The two files differ only in `runs-on`,
-#      the workflow name, the `paths` entries and comments.
+#      the workflow name and comments.
 #   2. Manifest wiring: each component maps to its locked destination; a
 #      target that manages a `components/claude-lanes/`-sourced caller takes
 #      the fleet sibling, never the hosted caller; no target manages both;
@@ -50,25 +49,14 @@ trap 'rm -rf -- "$scratch"' EXIT
 
 mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
 
-# Each target's managed destinations, through the engine the guard runs.
-declare -A target_dest_paths=()
+# The action resolves each target's managed destinations through this engine
+# command at run time.
 dest_paths_failures=''
 for t in "${all_targets[@]}"; do
-  target_dest_paths["$t"]="$(bash distribution/sync-manifest.sh dest-paths --source-root "$root" --target "$t")" ||
+  bash distribution/sync-manifest.sh dest-paths --source-root "$root" --target "$t" >/dev/null ||
     dest_paths_failures+="$t "
 done
 assert_eq 'the engine lists dest-paths for every target' '' "$dest_paths_failures"
-
-# managed_union <caller destination>: every destination managed by a target
-# that receives this caller. Scoping the union to those targets keeps one
-# caller from naming the other caller's workflow files, which none of its
-# targets has.
-managed_union() {
-  local t
-  for t in "${!target_dest_paths[@]}"; do
-    grep -qxF "$1" <<<"${target_dest_paths[$t]}" && printf '%s\n' "${target_dest_paths[$t]}"
-  done | LC_ALL=C sort -u
-}
 
 title_case() {
   local words word title=''
@@ -97,18 +85,13 @@ check_shape() {
   stem="${destination##*/}"
   assert_eq "$p workflow name is the destination stem in Title Case" "$(title_case "${stem%.yml}")" "$(q '.name')"
   assert_eq "$p triggers on pull_request only" 'pull_request' "$(q '.on | keys | join(",")')"
-  assert_eq "$p pull_request carries types and paths only" 'paths,types' \
-    "$(q '.on.pull_request | keys | sort | join(",")')"
+  # No paths filter: the action decides from the manifest at run time, and a
+  # list here would have to name every target's destinations, so any manifest
+  # change would re-sync this file to every target.
+  assert_eq "$p pull_request carries types only (no paths filter)" 'types' \
+    "$(q '.on.pull_request | keys | join(",")')"
   assert_eq "$p pull_request types are the diff-changing default" 'opened,synchronize,reopened' \
     "$(q '.on.pull_request.types | join(",")')"
-  # The guard flags only exact destination paths, so the filter must be the
-  # whole managed union: a missing entry would skip a pull request the guard
-  # would fail. `paths` entries are globs, so a metacharacter in a
-  # destination would widen or break the match.
-  assert_eq "$p paths is the sorted union of the managed destinations of every target it ships to" \
-    "$(managed_union "$destination")" "$(q '.on.pull_request.paths[]')"
-  assert_silent "$p no paths entry carries a glob metacharacter" \
-    "$(q '.on.pull_request.paths[]' | grep -E '[][*?+!]' || true)"
   assert_eq "$p workflow token is contents: read and pull-requests: read and nothing else" 'contents=read,pull-requests=read' \
     "$(q '.permissions | to_entries | map(.key + "=" + .value) | join(",")')"
 
@@ -150,14 +133,13 @@ check_shape() {
 check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"
 check_shape "$fleet_source" "$fleet_component" 'melodic-ubuntu-24.04-x64' "$fleet_destination"
 
-# Beyond comments, the workflow name, the `paths` entries (checked per file
-# above) and `runs-on`, the siblings are the same bytes, so one review covers
-# both.
-strip() { grep -vE '^([[:space:]]*(#|runs-on:)|name:|      - [^[:space:]]+$)' "$1"; }
+# Beyond comments, the workflow name and `runs-on`, the siblings are the same
+# bytes, so one review covers both.
+strip() { grep -vE '^([[:space:]]*(#|runs-on:)|name:)' "$1"; }
 if diff <(strip "$hosted_source") <(strip "$fleet_source") >/dev/null; then
-  pass 'the fleet sibling equals the hosted caller apart from comments, the workflow name, paths and runs-on'
+  pass 'the fleet sibling equals the hosted caller apart from comments, the workflow name and runs-on'
 else
-  fail 'the fleet sibling equals the hosted caller apart from comments, the workflow name, paths and runs-on' \
+  fail 'the fleet sibling equals the hosted caller apart from comments, the workflow name and runs-on' \
     "$(diff <(strip "$hosted_source") <(strip "$fleet_source"))"
 fi
 
