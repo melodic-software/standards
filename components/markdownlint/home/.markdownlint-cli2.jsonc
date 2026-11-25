@@ -3,9 +3,10 @@
   // so a session whose working directory IS the home directory lints under the org's
   // rules instead of markdownlint's stock defaults. markdownlint-cli2 does not read a
   // config from an ancestor of the working directory, so this only governs $HOME-rooted
-  // runs; a repository linted from its own root keeps its own materialized config.
+  // runs. A repository reads standards' root .markdownlint-cli2.jsonc at run time and
+  // keeps a root file of its own only for its additions or a complete override.
   //
-  // The `config` block below is byte-identical to the root .markdownlint-cli2.jsonc and
+  // The `config` block below is the same ruleset as the root .markdownlint-cli2.jsonc and
   // MUST stay that way — markdownlint-home.test.sh asserts the equality and fails the
   // build on drift. `config.extends` would express the sharing directly, but the target
   // it names has to exist beside the deployed file, and only this one file deploys.
