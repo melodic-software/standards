@@ -14,93 +14,37 @@ In this source repository, run it from the repository root:
 node components/dependabot-policy/dependabot-policy.mjs --root .
 ```
 
-The distributed component lives at `.github/standards/dependabot-policy/` and
-owns its own `package.json` and lockfile with exact `ajv` and `yaml` runtime
-pins. `policy.json` carries the canonical values each repository converges to;
+`policy.json` carries the canonical values each repository converges to;
 `policy.schema.json` and `dependabot-policy.schema.json` are the Draft 2020-12
 structural authorities for that policy and for the repository exception file.
-Consumers install and invoke that dependency root directly:
 
-```sh
-npm ci --prefix .github/standards/dependabot-policy
-node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
-```
+## Readers
 
-The `dependabot-policy` sync component ships `policy.json` alone to that
-path, for a target whose Dependabot merge classifiers read it at the base
-(claude-code-plugins reads `autoMerge.reviewOnly`), whose
-ci-workflows `bump-versions` run takes its `cooldownDays` (dotfiles,
-provisioning), or whose `pr-automerge-dependabot.yml` caller takes its
-allowlist and `fastTrack` globs from it. Its admission evidence is
-[below](#sync-component-admission-evidence).
+Nothing syncs this policy into another repository. Every reader reads
+`components/dependabot-policy/policy.json` from this repository's `main`, and
+only for a repository whose `docs/conventions/source-control.yaml` names
+`melodic-software/standards` as its `standards_repository`. A reader that cannot
+read it fails closed:
 
-## Sync component admission evidence
+- ci-workflows' `pr-automerge-dependabot.yml` reusable takes its allowlist,
+  `fastTrack` globs, `autoMerge.ecosystems` and `autoMerge.reviewOnly` from it,
+  and arms nothing without it.
+- ci-workflows' `bump-versions` action takes its `cooldownDays` when the
+  repository's `.github/version-bump/policy.yaml` sets none.
+- ci-workflows' `check-dependabot-policy` action runs this analyzer's checks
+  against a repository's `.github/dependabot.yml`.
+- claude-code-plugins' pr-merge and pr-unblock lanes route an update to a
+  dependency `autoMerge.reviewOnly` lists to the AI review tier; without the
+  policy every Dependabot pull request is tier `review` with
+  `dependabot-policy-unreadable`.
 
-Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
-This covers the policy-only payload. The earlier analyzer-and-runtime payload
-was retired with no targets in #430 and is not reintroduced.
+A `.github/standards/dependabot-policy/policy.json` left in a repository by the
+retired sync is no longer updated or read; each repository deletes its copy in
+its own pull request.
 
-- **Live consumer**: melodic-software/claude-code-plugins (melodic-software/claude-code-plugins#7717).
-  Its pr-merge lane (`babysit_merge_policy.dependabot_eligibility`) and
-  pr-unblock lane (`.github/scripts/pr-unblock/dispatch.mjs` and the
-  `dependency-select` step of `pr-run-activity-write.yml`) read
-  `.github/standards/dependabot-policy/policy.json` at the base. An update
-  to a dependency `autoMerge.reviewOnly` lists for that repository goes to the
-  AI review tier (`review-only:<dependency>`).
-- **Live consumer**: melodic-software/dotfiles and melodic-software/provisioning.
-  Their `maintenance-bump-pinned-versions.yml` runs ci-workflows'
-  `.github/actions/bump-versions`, whose `bump.py` (`load_policy`,
-  `synced_cooldown_days`) reads `cooldownDays` from this copy when the repo's
-  `.github/version-bump/policy.yaml` sets none, and stops when both are absent.
-- **Live consumer**: every target that calls ci-workflows'
-  `pr-automerge-dependabot.yml` at its default `publisher-allowlist`. With the
-  copy at the base, the reusable's allowlist is the copy's `tier: auto`
-  publishers plus its `fastTrack` `github-actions` and `own` globs, and a
-  below-1.0 minor bump of an `own` dependency arms auto-merge; with no copy the
-  input is the allowlist and no own release is armed (the reusable's header
-  comment). provisioning's first own bump merged this way
-  (melodic-software/provisioning#1031).
-- **Owner and outcome**: owned by the `standards` maintainers. Problem: a
-  hijacked non-major release of a dependency that runs in a job holding a
-  secret merges at tier `auto` with no review. Acceptance: once the sync PR
-  lands the file, no claude-code-plugins Dependabot pull request carries
-  `dependabot-policy-unreadable`, and the next `@playwright/cli` update
-  carries `review-only:@playwright/cli`. Rollback: move the
-  component to claude-code-plugins' `locally-owned` list, which keeps the
-  last synced file in place. Removing the file without reverting the
-  consumer's classifiers sends every Dependabot pull request to review,
-  because they fail closed.
-- **Delivery boundary**: exact materialization. `policy.json` stays the only
-  authority for the tiers. The consumer reads its synced copy at the base,
-  which the pull request under review cannot change. Schema version 2 only
-  adds `cooldownDays` and `fastTrack`; neither consumer's classifier
-  (`dependency-classify.mjs`, `babysit_dependabot.py`) reads `schemaVersion`,
-  so the bump does not change their tiers.
-- **Alternatives and overlap**: a copy in the consumer would be a second
-  authority that drifts. Reading this repository at run time would put a
-  cross-repository token into the lanes. Syncing the full analyzer payload
-  ships a runtime the consumer never runs. The destination path is not
-  shared with `runner-policy` or `trusted-actors`, and no other component
-  routes Dependabot tiers.
-- **Operational fit**: the consumer's classifier tests cover a match
-  (review, then merge on a verdict), a non-match (auto) and an unreadable
-  policy (review): 1642 engine tests and 219 pr-unblock tests pass on
-  claude-code-plugins#7717. Live-run evidence follows the first sync, since
-  the file does not reach the consumer before this change merges. Runtime:
-  one contents-API read or one local file read per run. Privileges: the
-  lanes' existing read tokens, no new credential. Failure behavior: a
-  missing, non-JSON or malformed file makes every Dependabot pull request
-  tier `review`.
-- **Upstream health**: no third-party dependency.
-- **Legal and security fit**: first-party JSON under the repository's
-  license. No dependency, no network boundary, no executable content. The
-  file is trusted only from the consumer's base branch.
-- **Update path**: no dependency root. Entries change by a reviewed pull
-  request here and reach the consumer through `standards-sync`.
-- **Verification**: `npm run test:dependabot-policy` and
-  `npm run lint:dependabot-policy` validate the file against
-  [`policy.schema.json`](policy.schema.json). `distribution/sync-manifest.test.sh`
-  covers the mapping.
+Edit `policy.json` only by a reviewed pull request here. `npm run
+test:dependabot-policy` and `npm run lint:dependabot-policy` validate it against
+[`policy.schema.json`](policy.schema.json).
 
 ## The standard
 
@@ -382,25 +326,9 @@ the underlying alert visible is an open decision, tracked on
 
 The gate installs the component's locked runtime and runs the analyzer against
 the repository. In this repository the `check-policies` CI job does exactly
-that; a consumer adds the equivalent job in its own integration change:
-
-```yaml
-dependabot-policy:
-  runs-on: ubuntu-24.04
-  permissions:
-    contents: read
-  steps:
-    - uses: actions/checkout@<REVIEWED_40_CHARACTER_SHA>
-      with:
-        persist-credentials: false
-    - uses: actions/setup-node@<REVIEWED_40_CHARACTER_SHA>
-      with:
-        node-version-file: .node-version
-        cache: npm
-        cache-dependency-path: .github/standards/dependabot-policy/package-lock.json
-    - run: npm ci --prefix .github/standards/dependabot-policy
-    - run: node .github/standards/dependabot-policy/dependabot-policy.mjs --root .
-```
+that. Another repository runs ci-workflows' `check-dependabot-policy` action as
+a step of its CI, which reads `policy.json` from this repository (see
+[Readers](#readers)).
 
 The security boundaries, fail-closed behavior, and review triggers are in the
 [threat model](THREAT-MODEL.md).

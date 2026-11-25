@@ -51,8 +51,8 @@ components:
   #   ci-runner's earlier runner-infra exemption (a stuck lane job could
   #   block its own runners) does not apply to the hosted shape: those jobs
   #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
-  # - knowledge-corpus, songwriting: sync targets for `dependabot-policy` and
-  #   the fleet-routed guard only (the Phase 4 note near `targets:`), so neither takes these components.
+  # - knowledge-corpus, songwriting: sync targets for the Dependabot automerge
+  #   caller and the fleet-routed guard only (the Phase 4 note near `targets:`), so neither takes these components.
   #   songwriting carries repo-local copies of the fleet callers by owner
   #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
   #   longer holds. knowledge-corpus stays DEFERRED by owner decision
@@ -174,8 +174,9 @@ components:
   # - dependabot-automerge-caller: hosted (`ubuntu-24.04`), for public targets.
   # - dependabot-automerge-fleet-caller: managed fleet
   #   (`melodic-ubuntu-24.04-x64`), for fleet-enrolled private targets.
-  # Both require `dependabot-policy` so the reusable reads the synced policy
-  # copy at the base commit. Deliberate exclusions:
+  # The reusable reads the Dependabot policy from this repository's `main`
+  # (components/dependabot-policy/policy.json), never a synced copy, so neither
+  # requires another component. Deliberate exclusions:
   # - ci-workflows: `locally-owned` — hosts the reusable itself at
   #   .github/workflows/pr-automerge-dependabot.yml and uses a queue workflow.
   # - medley: `locally-owned` — carries a repo-local second `automerge` job.
@@ -184,25 +185,11 @@ components:
   # - claude-code-plugins: merge queue (GITHUB_TOKEN cannot add PRs to a queue).
   # - azure-iac, pr-pipeline-sandbox: no Dependabot automerge workflow.
   dependabot-automerge-caller:
-    requires:
-      - dependabot-policy
     files:
       components/dependabot-automerge/dependabot-automerge.yml: .github/workflows/pr-automerge-dependabot-hosted.yml
   dependabot-automerge-fleet-caller:
-    requires:
-      - dependabot-policy
     files:
       components/dependabot-automerge/dependabot-automerge-fleet.yml: .github/workflows/pr-automerge-dependabot.yml
-  # The central Dependabot policy, read at the base by a target's Dependabot
-  # merge classifiers (claude-code-plugins sends every update to a dependency
-  # its `autoMerge.reviewOnly` lists to the review tier) and by ci-workflows'
-  # bump-versions action, which takes its cooldownDays when the target's
-  # version-bump policy sets none (dotfiles, provisioning), and by ci-workflows'
-  # pr-automerge-dependabot.yml reusable, which arms the organization's own
-  # releases only when the base holds this copy.
-  dependabot-policy:
-    files:
-      components/dependabot-policy/policy.json: .github/standards/dependabot-policy/policy.json
   dotnet-analysis:
     files:
       components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
@@ -379,7 +366,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - issue-forms
       - managed-files-guard-caller
       - pr-body-contract-rule
@@ -393,7 +379,6 @@ targets:
       - claude-security-review-caller
       - commit-convention
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - managed-files-guard-fleet-caller
   # Adopted 2026-08-19 by operator decision, POSTDATING the standards-sync-audit
   # plan's Phase 4 roster (repo created 2026-08-17, after that plan locked —
@@ -408,23 +393,19 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - managed-files-guard-caller
       - repository-text
     # Armed as of 2026-09-04: agent-plugins#11 landed ci.yml plus the three
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
-  # Takes the Dependabot policy copy, which the auto-merge lane reads to arm
-  # the organization's own releases, and the fleet-routed guard.
+  # Takes the fleet-routed Dependabot automerge caller and guard only.
   melodic-software/architecture:
     managed:
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - managed-files-guard-fleet-caller
   melodic-software/azure-iac:
     managed:
-      - dependabot-policy
       - managed-files-guard-fleet-caller
       - repository-text
   melodic-software/ci-runner:
@@ -434,7 +415,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - go-analysis
       - managed-files-guard-caller
       - pr-body-contract-rule
@@ -481,7 +461,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - dotnet-analysis
       - lefthook-dotnet
       - managed-files-guard-caller
@@ -494,7 +473,6 @@ targets:
     # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
     managed:
-      - dependabot-policy
       - issue-body-contract-plugins
       - lychee-online-claude-code-plugins
       - managed-files-guard-caller
@@ -542,10 +520,10 @@ targets:
   # selected-repo grant covers them as of 2026-08-19 (grant-first per the
   # plan's exact-set attestation constraint). Deliberate NON-adoptions, per
   # the same locked plan:
-  # - knowledge-corpus: takes `dependabot-policy` and the fleet-routed guard only (owner decision 2026-11-15); the hygiene set stays deferred: structural LFS
+  # - knowledge-corpus: takes the fleet-routed Dependabot automerge caller and guard only (owner decision 2026-11-15); the hygiene set stays deferred: structural LFS
   #   blocker recorded; no extend mechanism exists. The separate review-LANE
   #   question is answered at the claude-review caller comment above.
-  # - songwriting: takes `dependabot-policy` and the fleet-routed guard only (owner decision 2026-11-15); the hygiene set stays out (github-iac ADR-0006); its two drifted
+  # - songwriting: takes the fleet-routed Dependabot automerge caller and guard only (owner decision 2026-11-15); the hygiene set stays out (github-iac ADR-0006); its two drifted
   #   files were hand-fixed once (plan Phase 0.6), not adopted.
   # - claude-lane-sandbox: a disposable lane-testing sandbox, not a
   #   convergence target — sync PRs there are churn against throwaway state.
@@ -571,7 +549,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - lefthook-powershell
       - lefthook-python
       - managed-files-guard-fleet-caller
@@ -597,7 +574,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - managed-files-guard-caller
       - pr-body-contract-rule
       - repository-text
@@ -608,7 +584,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-caller
-      - dependabot-policy
       - managed-files-guard-caller
       - repository-text
     # Armed as of 2026-09-04: cursor-plugins#24 landed a ci-status aggregate
@@ -623,7 +598,6 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - lefthook-powershell
       - lefthook-python
       - managed-files-guard-fleet-caller
@@ -642,18 +616,16 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - dotnet-analysis
       - lefthook-dotnet
       - managed-files-guard-fleet-caller
       - node-runtime
       - pr-body-contract-rule
       - repository-text
-  # The Dependabot policy copy and the fleet-routed guard, as for architecture.
+  # The same two components as architecture.
   melodic-software/knowledge-corpus:
     managed:
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - managed-files-guard-fleet-caller
   melodic-software/medley:
     managed:
@@ -675,7 +647,6 @@ targets:
       # wrapper.
       - comment-hygiene-tools
       - commit-convention
-      - dependabot-policy
       - managed-files-guard-fleet-caller
       # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
       # --vault the behavior is unchanged, and medley's *-dispatch.test.sh
@@ -715,15 +686,12 @@ targets:
       # adopts the dotfiles extend pattern.
       - ruff
   # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
-  # payload those lanes read from `.github/standards/` (dependabot-policy) and
-  # the `.node-version` node-runtime writes, so the copies stop drifting from
-  # claude-code-plugins',
-  # plus the hosted-only `managed-files-guard-caller` every public target
-  # carries. Its other configs
-  # stay repo-owned: it has no product code or authored docs to lint.
+  # `.node-version` node-runtime writes, so the copy stops drifting from
+  # claude-code-plugins', plus the hosted-only `managed-files-guard-caller`
+  # every public target carries. Its other configs stay repo-owned: it has no
+  # product code or authored docs to lint.
   melodic-software/pr-pipeline-sandbox:
     managed:
-      - dependabot-policy
       - managed-files-guard-caller
       - node-runtime
     # Its review callers are pr-review-cli variants pinned to the release
@@ -739,16 +707,14 @@ targets:
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - lefthook-powershell
       - managed-files-guard-fleet-caller
       - node-runtime
       - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
-  # The Dependabot policy copy and the fleet-routed guard, as for architecture.
+  # The same two components as architecture.
   melodic-software/songwriting:
     managed:
       - dependabot-automerge-fleet-caller
-      - dependabot-policy
       - managed-files-guard-fleet-caller

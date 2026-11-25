@@ -98,8 +98,8 @@ for pair in "$hosted_component:$hosted_source:$hosted_destination" \
   assert_eq "manifest maps $c to its locked destination" "$d" \
     "$(yq -r ".components.\"$c\".files.\"$s\"" "$manifest")"
   assert_eq "$c ships exactly one file" '1' "$(yq -r ".components.\"$c\".files | length" "$manifest")"
-  assert_eq "$c requires dependabot-policy" 'dependabot-policy' \
-    "$(yq -r ".components.\"$c\".requires | join(\",\")" "$manifest")"
+  assert_eq "$c requires no component (the reusable reads standards main)" '0' \
+    "$(yq -r ".components.\"$c\".requires // [] | length" "$manifest")"
 done
 
 mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
