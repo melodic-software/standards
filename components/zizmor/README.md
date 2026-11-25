@@ -33,12 +33,29 @@ root", and that search tries `.github/zizmor.yml` first. Discovery behavior
 zizmor 1.29.0 or newer. A `--config` flag or `ZIZMOR_CONFIG` replaces local
 discovery, so a consumer that sets either does not read this file.
 
-## Ownership
+## Defaults, extensions and overrides
 
 A repository keeps no copy. The `ci-workflows` `pr-audit-workflows` reusable
-audits with the caller's own config when it has one and with this file
-otherwise. A repository that needs an extra rule commits its own
-`.github/zizmor.yml`, which wins, and keeps both blocks above.
+and a local check-cmd pass this file with `--config` when the repository has
+none of its own. zizmor reads exactly one config: "when a global
+configuration file is used no other configuration files are discovered or
+loaded" ([configuration docs](https://docs.zizmor.sh/configuration/#discovery),
+read 2026-11-24), and it has no include or merge.
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file |
+| Extension | `# zizmor: ignore[<audit>]` comments on the flagged lines ([ignoring results](https://docs.zizmor.sh/usage/#ignoring-results)) | this file, minus those findings; the only way to ignore a composite-action finding |
+| Complete override | its own `.github/zizmor.yml` (or `.yaml`, or root `zizmor.yml`/`.yaml`) | that file alone, so it restates both blocks above; on a pull request the reusable reads it from the base commit |
+
+A partial override (changing one rule while inheriting the rest) has no
+native mechanism; today it is a complete override.
+
+A local check-cmd matches CI by passing `--config` with this file from the
+standards checkout (`STANDARDS_DIR`, else
+`<ghq root>/github.com/melodic-software/standards`). Without `--config`, zizmor
+finds no config in a repository that keeps no copy and audits under its own
+defaults, which flag every first-party `@main` ref.
 
 ## Fleet sweep
 

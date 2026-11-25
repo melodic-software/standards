@@ -3,8 +3,9 @@
 Sync-managed callers for the weekly online link check, the `ci-workflows`
 reusable `.github/workflows/maintenance-check-links-online.yml`
 (ci-workflows#739). The reusable runs lychee with the network on over the
-target's Markdown with the target's own `lychee.toml`, or this repository's
-root [`lychee.toml`](../lychee/README.md) when the target has none, plus the
+target's Markdown with this repository's root
+[`lychee.toml`](../lychee/README.md#defaults-extensions-and-overrides), the
+target's own `lychee.toml` merged over it when it has one, plus the
 target's own `.lycheeignore`, writes the report to the job summary, fails red on a
 broken link, and holds only the `GITHUB_TOKEN`. A 429, a 5xx or a timeout does
 not fail the run ([status handling](../lychee/README.md#status-handling-and-fragment-remaps)
