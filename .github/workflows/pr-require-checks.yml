@@ -378,7 +378,7 @@ jobs:
           sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
           rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
           shellcheck --version
-      - name: Validate the merged hook config (root + all fragments)
+      - name: Validate the root hook config
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: lefthook validate
       - name: Lefthook base contract test
