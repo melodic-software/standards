@@ -30,7 +30,9 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence).
   contract requires the files to sit in the consuming repository, and the
   sync is the one channel that writes text files there from a single source.
   A link to this repository instead would leave the contract's team layer
-  empty, and skills do not fetch remote standards.
+  empty. Standards contract 1.2.0 adds an org layer that reads this
+  repository's own index, [`standards/README.md`](../../standards/README.md),
+  from `main`; this component retires once consumers read that instead.
 - **Alternatives and overlap**: a per-repository copy would drift with no
   owner. `code-review-rules` and `REVIEW.md` carry review criteria; this
   component carries working conventions and links into them rather than
