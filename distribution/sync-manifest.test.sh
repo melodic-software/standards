@@ -688,11 +688,7 @@ assert_eq 'Lefthook Python materializes as a composable fragment' \
 assert_eq 'Lefthook Python carries its complete direct dependencies' \
   'ruff' \
   "$(yq -r '.components.lefthook-python.requires | join(",")' "$actual_manifest")"
-assert_eq 'Pyright materializes as an inheritable base below the consumer root' \
-  '.github/standards/pyright/pyrightconfig.json' \
-  "$(yq -r '.components.pyright.files."components/pyright/pyrightconfig.json"' "$actual_manifest")"
-
-for component in ruff lefthook-python pyright; do
+for component in ruff lefthook-python; do
   assert_eq "dotfiles enrolls the managed Python component exactly once: $component" '1' \
     "$(COMPONENT="$component" yq -r \
       '[.targets."melodic-software/dotfiles".managed[] | select(. == strenv(COMPONENT))] | length' \
@@ -714,10 +710,11 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
 # take standards/README.md and REVIEW.md from this repository's main as the
 # org layer instead of a synced copy; and the lint configs and lefthook
 # fragments, whose readers (ci-workflows composites, the claude-code-plugins
-# and standards lefthook remotes) read this repository's root configs.
+# and standards lefthook remotes) read this repository's root configs; and
+# pyright, whose one reader (dotfiles) owns its whole config.
 for component in agent-orientation engineering-standards filing-guide review-instructions \
   actionlint editorconfig-checker gitleaks lefthook-base lefthook-shellcheck markdownlint \
-  shellcheck typos; do
+  shellcheck typos pyright; do
   assert_eq "no component named $component exists (retired)" '0' \
     "$(COMPONENT="$component" yq -r '[.components | keys[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"

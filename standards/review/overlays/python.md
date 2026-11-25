@@ -1,6 +1,6 @@
 # Python review overlay
 
-Stack-specific review bars for Python. The mechanically enforced posture is owned independently by the [`ruff`](../../../components/ruff/) and [`pyright`](../../../components/pyright/) components; this overlay covers only reasoning-tier judgments those tools do not make. Severity labels are defined in [../README.md](../README.md).
+Stack-specific review bars for Python. The mechanically enforced posture is owned by the [`ruff`](../../../components/ruff/) component and by each repository's own type-checker config; this overlay covers only reasoning-tier judgments those tools do not make. Severity labels are defined in [../README.md](../README.md).
 
 ## Correctness traps
 

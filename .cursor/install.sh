@@ -15,7 +15,7 @@
 #     editorconfig-checker. Versions and checksums match the ci-workflows
 #     actions this repository pins, so a local commit and CI agree.
 #
-# Language-specific engines (.NET, Python/ruff/pyright, PowerShell, Go, lychee,
+# Language-specific engines (.NET, Python/ruff, PowerShell, Go, lychee,
 # yq) are provisioned by CI; the component contract tests skip cleanly when
 # their engine is absent locally, matching this repository's own design.
 #
