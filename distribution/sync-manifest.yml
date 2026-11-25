@@ -342,9 +342,6 @@ components:
   psscriptanalyzer:
     files:
       PSScriptAnalyzerSettings.psd1: PSScriptAnalyzerSettings.psd1
-  pyright:
-    files:
-      components/pyright/pyrightconfig.json: .github/standards/pyright/pyrightconfig.json
   repository-text:
     files:
       .editorconfig: .editorconfig
@@ -504,7 +501,6 @@ targets:
       - node-runtime
       - path-detection-guardrails
       - pr-body-contract-rule
-      - pyright
       - repository-text
     # The hosted lane pair is locally owned here, so this repository's copies
     # can resolve their models through its own resolve-config action and pass
@@ -556,7 +552,7 @@ targets:
   #   Rationale mirrored here per the plan so the manifest, not only the
   #   plan file, records why it is absent.
   # Beyond the Phase 4 hygiene set, claude-code-proxy manages the lefthook
-  # lanes, psscriptanalyzer, and pyright per its own Phase 1 adoption:
+  # lanes and psscriptanalyzer per its own Phase 1 adoption:
   # lefthook-powershell + lefthook-python with their closure
   # (psscriptanalyzer). ruff stays locally-owned (below) and
   # satisfies lefthook-python's requirement as a repo-owned implementation.
@@ -581,7 +577,6 @@ targets:
       - managed-files-guard-fleet-caller
       - node-runtime
       - psscriptanalyzer
-      - pyright
       - repository-text
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
@@ -637,7 +632,6 @@ targets:
       - pages-publish
       - pr-body-contract-rule
       - psscriptanalyzer
-      - pyright
       - repository-text
       - ruff
   melodic-software/github-iac:
@@ -710,12 +704,6 @@ targets:
       # SMALLER than canonical). Recorded 2026-08-16 (audit); nearest-parity
       # adoption candidate among them.
       - psscriptanalyzer
-      # The canonical payload lands under .github/standards/pyright/ — no
-      # overwrite of medley's root Python config is possible. Locally owned
-      # because medley does not consume that destination. (The earlier
-      # rationale here misattributed `target-version` — a ruff key — to
-      # pyright.) Revisit if medley moves to the canonical destination layout.
-      - pyright
       # Substantially diverged local copies of both payload files at the
       # canonical destinations (.editorconfig 204 lines vs 67, .gitattributes
       # 290 vs 61 — monorepo expansion). Recorded 2026-08-16 (audit); the

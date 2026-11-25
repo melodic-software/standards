@@ -435,12 +435,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      # Inline install — component contract tests assert specific rule codes on
-      # bad fixtures, which needs the tools on PATH (the Ruff/Pyright actions
-      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
+      # Inline install — the component contract test asserts specific rule codes
+      # on bad fixtures, which needs the tool on PATH (the Ruff action only
+      # passes/fails). Keep in lockstep with the action default in ci-workflows
       # and with medley.
       RUFF_VERSION: 0.15.14
-      PYRIGHT_VERSION: 1.1.409
     steps:
       - name: Detect relevant changes
         id: changes
@@ -454,57 +453,39 @@ jobs:
               .gitignore
               .gitattributes
               components/ruff/**
-              components/pyright/**
               **/*.py
               **/*.pyi
               **/*.ipynb
               **/pyproject.toml
-              **/pyrightconfig.json
       - name: Check out
         if: ${{ fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # The two actions run before the inline install so the contract tests
-      # find the inline-installed tools first on PATH.
+      # The action runs before the inline install so the contract test finds
+      # the inline-installed tool first on PATH.
       - name: Lint and format-check Python
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/ruff@main
         with:
           config: ruff.toml
           exclude: components/ruff/fixtures/bad
-      - name: Type-check Python
-        # The shipped ruleset carries no project-scope `include`, so scope Pyright
-        # at the conforming fixture explicitly (the bad fixture is non-conforming
-        # by design).
-        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
-        uses: melodic-software/ci-workflows/.github/actions/pyright@main
-        with:
-          config: components/pyright/pyrightconfig.json
-          paths: components/pyright/fixtures/good
       - name: Set up uv
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           python-version: "3.14"
-      - name: Install ruff and pyright
+      - name: Install ruff
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: |
           uv tool install --force "ruff==${RUFF_VERSION}"
-          uv tool install --force "pyright==${PYRIGHT_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify toolchain
-        # Also warms pyright's first-run Node download so the test step is fast.
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
-        run: |
-          ruff --version
-          pyright --version
+        run: ruff --version
       - name: Ruff contract test
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/ruff/ruff.test.sh
-      - name: Pyright contract test
-        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
-        run: bash harness/shell/run-tests.sh components/pyright/pyright.test.sh
 
   check-typescript:
     name: Check TypeScript
