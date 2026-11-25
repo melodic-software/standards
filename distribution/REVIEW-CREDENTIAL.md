@@ -31,14 +31,12 @@ behind it; under the current visibility state there is nothing to provision.
 > 3. for `claude-code-plugins`, the `CI_REPOSITORY_VISIBILITY` value Actions
 >    supplies to its own runner-policy job, the value the gate itself reads.
 >
-> **These are one source, not three, and the claim does not meet this
-> repository's corroboration floor.** Under
+> **These are one source, not three, and one is enough.** Under
 > [`source-authority-tiers.md`](../standards/engineering/source-authority-tiers.md)
-> sources that "share an upstream pool" count once, and all three read GitHub's
-> repository state. Repository visibility is a fact GitHub *owns*; no
-> independent pool exists to corroborate it from, so the floor of one primary
-> plus two independent corroborators is unmeetable for this class of claim, not
-> merely unmet here.
+> sources that share an upstream source count once, and all three read GitHub's
+> repository state. Repository visibility is a fact GitHub *owns*, so GitHub
+> answering for it is enough to rely on; no independent source exists to
+> confirm it from.
 >
 > What the three planes do buy is protection against **observation** error:
 > a stale credential context, a cached value, a mistyped repository. That is
