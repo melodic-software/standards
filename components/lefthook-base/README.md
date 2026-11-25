@@ -17,9 +17,15 @@ adapter in CI.
 
 ## Remote form
 
-`lefthook-remote.yml` runs the same four checks from a Lefthook
+`lefthook-remote.yml` runs Gitleaks and EditorConfig-checker from a Lefthook
 [remote](https://lefthook.dev/configuration/remotes/) instead of a synced
-copy. A consumer lists it under a `remotes:` entry for this repository:
+copy. Typos, markdownlint-cli2, ShellCheck and actionlint run from the
+melodic-software/claude-code-plugins aggregate remote every repository already
+lists, which reads this repository's configs once the repository's
+`docs/conventions/source-control.yaml` names
+`standards_repository: melodic-software/standards`; listing both remotes runs
+each tool once per commit. A consumer lists it under a `remotes:` entry for
+this repository:
 
 ```yaml
 min_version: "2.0.5"
@@ -30,17 +36,16 @@ remotes:
     refetch_frequency: 24h
     configs:
       - components/lefthook-base/lefthook-remote.yml
-      - components/lefthook-shellcheck/lefthook-remote.yml
 ```
 
 Each job runs a script under the repository root's `.lefthook/pre-commit/`,
-where Lefthook requires a remote's scripts to live. The script finds the
-standards config two directories above itself in the fetched copy and passes it
-to its tool: Typos `-c _typos.toml`, Gitleaks `--config .gitleaks.toml`,
-EditorConfig-checker `-config .editorconfig-checker.json`, and
-markdownlint-cli2 `--config .markdownlint-cli2.jsonc`. Files are selected as in
-`lefthook.yml`: every staged file for Typos and EditorConfig-checker, staged
-Markdown for markdownlint-cli2, and the staged diff for Gitleaks.
+where Lefthook requires a remote's scripts to live. Both tools read one config
+file, so the consumer's own root `.gitleaks.toml` or
+`.editorconfig-checker.json`, when present, replaces the standards one whole;
+otherwise the script passes the standards config two directories above itself
+in the fetched copy (Gitleaks `--config`, EditorConfig-checker `-config`), as
+the ci-workflows composites do. Files are selected as in `lefthook.yml`: every
+staged file for EditorConfig-checker and the staged diff for Gitleaks.
 
 The remote form needs Lefthook 2.0.5 or later, the first release that passes
 `args` such as `{staged_files}` to a script
@@ -54,17 +59,16 @@ have supplied through `extends`: `min_version: "2.0.5"` and
 under `pre-commit` if it wants the jobs run in parallel. The globs match the
 same files with or without `glob_matcher: doublestar`.
 
-A missing tool fails its job with an install pointer, as in `lefthook.yml`;
-for markdownlint-cli2 the pointer is `npm ci`, which the job does not run
-itself. A script outside a fetched remote, such as this repository's own work
+A missing tool fails its job with an install pointer, as in `lefthook.yml`.
+A script outside a fetched remote, such as this repository's own work
 tree, exits without running its tool, because Lefthook runs a script from every
 source directory that holds it. A failed refetch leaves the last fetched copy
 in force, with a warning.
 
 `lefthook-remote.test.sh` runs each script from two fetched locations and
-checks the config path it passes, then has a consumer fetch a stand-in remote
-and checks the files and configs each job receives. Where Typos or ShellCheck
-is installed, it commits a fixture only the standards config rejects.
+checks the config path it passes, with and without the consumer's own config,
+then has a consumer fetch a stand-in remote and checks the files and configs
+each job receives.
 
 ## Merge and rebase commits
 

@@ -21,3 +21,15 @@ that entrypoint: a two-job fleet-label workflow lints clean with the config, an
 undeclared fleet-shaped label still fails alongside it, and a configless control
 run reproduces both label errors. The control case is the removal tripwire: it
 fails once a fleet label becomes built-in, so the stale entry gets dropped.
+
+## Defaults, extensions and overrides
+
+The ci-workflows `actionlint` composite and the melodic-software/claude-code-plugins lefthook remote (for a repository whose `docs/conventions/source-control.yaml` names `standards_repository`) read this file at run time. actionlint reads one config and has no include or extends, so a repository's own file replaces this one whole; with none, the readers pass this file (`-config-file`).
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file alone |
+| Extension | per-finding suppressions: none beyond the composite's inputs; fix the workflow | this file plus the suppressions |
+| Complete override | its own `.github/actionlint.yaml` | that file alone; nothing here applies |
+
+A partial override has no native mechanism; a repository that needs one copies this file and edits it.

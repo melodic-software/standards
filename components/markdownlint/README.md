@@ -16,6 +16,17 @@ editors use it, so the URL names no version and a dependency bump leaves it
 alone. The root config additionally declares a repository traversal scope; the home config
 declares its own, deliberately different one.
 
+## Defaults, extensions and overrides
+
+The ci-workflows `markdownlint` composite and the melodic-software/claude-code-plugins lefthook remote (for a repository whose `docs/conventions/source-control.yaml` names `standards_repository`) read this file at run time. markdownlint-cli2 applies a `--config` file as the base and merges the repository's own `.markdownlint-cli2.jsonc` (and nested configs) over it rule by rule ([README](https://github.com/DavidAnson/markdownlint-cli2/blob/main/README.md), checked with markdownlint-cli2 0.24.1).
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file alone |
+| Extension | root `.markdownlint-cli2.jsonc` with only the rules it adds | both apply |
+| Partial override | root `.markdownlint-cli2.jsonc` with only the rules it changes | the repository's value wins per rule; a top-level option such as `ignores` it sets replaces this file's whole |
+| Complete override | a config that sets every rule this file sets, or (CI) a config at another path passed as the composite's `config` input | that file's rules |
+
 ## Why the home payload is a sibling, not the same file
 
 markdownlint-cli2 does not read a config from an *ancestor* of the working

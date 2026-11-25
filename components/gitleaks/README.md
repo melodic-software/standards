@@ -12,6 +12,18 @@ fingerprint for an intentional finding. A broadly valid policy change goes
 upstream; a genuinely different policy requires local component ownership, per
 [Escape hatches](../../distribution/ESCAPE-HATCHES.md#opting-a-repository-out-of-a-managed-component).
 
+## Defaults, extensions and overrides
+
+The ci-workflows `gitleaks` composite and this repository's lefthook remote (`components/lefthook-base/lefthook-remote.yml`) read this file at run time. Gitleaks reads one config, so a repository's own file replaces this one whole; with none, the readers pass this file (`--config`).
+
+| Mode | What the repository commits | Result |
+| --- | --- | --- |
+| Default | nothing | this file alone |
+| Extension | per-finding suppressions: `gitleaks:allow` and `.gitleaksignore` | this file plus the suppressions |
+| Complete override | its own root `.gitleaks.toml` (it may `[extend] useDefault = true` to keep Gitleaks' default rules) | that file alone; nothing here applies |
+
+Gitleaks' `[extend] path` resolves relative to the directory Gitleaks runs in, not to the config file ([README](https://github.com/gitleaks/gitleaks/blob/master/README.md)), and this file sits at a different path under each reader, so a repository file cannot extend this one portably; a repository that needs this file's rules plus its own copies this file's one rule into its own config.
+
 ## Execution contract
 
 `ci-workflows` owns reusable Gitleaks installation and execution. Its scans

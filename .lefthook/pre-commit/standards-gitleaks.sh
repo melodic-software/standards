@@ -10,4 +10,8 @@ command -v gitleaks >/dev/null 2>&1 || {
   echo 'standards-gitleaks: gitleaks is not on PATH. Install it: https://github.com/gitleaks/gitleaks#installing' >&2
   exit 1
 }
+# gitleaks reads one config: the repository's own .gitleaks.toml replaces this one whole.
+if [ -f .gitleaks.toml ]; then
+  exec gitleaks git --pre-commit --staged --no-banner --config .gitleaks.toml
+fi
 exec gitleaks git --pre-commit --staged --no-banner --config "${src%/*}/../../.gitleaks.toml"
