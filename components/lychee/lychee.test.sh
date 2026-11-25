@@ -112,9 +112,14 @@ mkdir -p "$layer_root"
 printf "exclude = ['dot=\\\\.workshop']\n" >"$layer_root/extend.toml"
 printf 'hidden = false\n' >"$layer_root/partial.toml"
 printf 'hidden = true\n' >"$layer_root/complete.toml"
+# A link only a standards `exclude` entry matches, so a layered `exclude` that
+# replaced the standards list instead of adding to it would let it through.
+printf '<https://bsky.app/profile/layer-probe>\n' >"$dot_root/Bsky.md"
 extend_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
-  --config "$layer_root/extend.toml" './**/*.md' 2>&1)"
+  --config "$layer_root/extend.toml" --exclude 'dot=\.claude/rules' './**/*.md' 2>&1)"
 assert_not_contains 'extension: the layered exclude applies' "$extend_dump" 'dot=.workshop'
+assert_not_contains 'extension: the standards exclude list still applies' "$extend_dump" 'layer-probe'
+assert_not_contains 'extension: a command-line --exclude adds to both lists' "$extend_dump" 'dot=.claude/rules'
 assert_row_count 'extension: the standards exclude_path still applies' "$extend_dump" 0 'dot=\.work$'
 assert_contains 'extension: the standards hidden still applies' "$extend_dump" 'dot=.github'
 partial_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
@@ -126,6 +131,8 @@ assert_not_contains 'partial override: the layered scalar wins' "$partial_dump" 
 complete_dump="$(cd "$dot_root" && lychee --dump --config "$layer_root/complete.toml" \
   './**/*.md' 2>&1)"
 assert_row_count 'complete override: the standards exclude_path is gone' "$complete_dump" 1 'dot=\.work$'
+assert_contains 'complete override: the standards exclude list is gone' "$complete_dump" 'layer-probe'
+rm -f -- "$dot_root/Bsky.md"
 printf 'dot=\\.claude/rules\n' >"$dot_root/.lycheeignore"
 ignore_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
   --config "$layer_root/extend.toml" './**/*.md' 2>&1)"
