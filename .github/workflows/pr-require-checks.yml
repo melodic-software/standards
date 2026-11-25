@@ -378,9 +378,12 @@ jobs:
           sudo install "shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
           rm -rf shellcheck.tar.gz "shellcheck-v${ver}"
           shellcheck --version
-      - name: Validate the merged hook config (root + all fragments)
+      - name: Validate the root hook config
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: lefthook validate
+      - name: Validate each lefthook component fragment
+        if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
+        run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-fragments-validate.test.sh
       - name: Lefthook base contract test
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: bash harness/shell/run-tests.sh components/lefthook-base/lefthook-base.test.sh

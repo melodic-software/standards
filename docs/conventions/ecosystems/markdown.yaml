@@ -2,9 +2,9 @@
 # https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
 # markdownlint-cli2 from PATH, pinned to the version package.json pins, with the
 # root config and the intentionally bad fixtures left out, as package.json's
-# lint:md script and CI's check-markdown-and-links job run it. The lefthook
-# lane runs the node_modules/.bin copy instead. Commands run from the
-# repository root.
+# lint:md script and CI's check-markdown-and-links job run it. The
+# claude-code-plugins markdown-format hook resolves the binary itself.
+# Commands run from the repository root.
 globs: ["*.md"]
 build-cmd: null
 test-cmd: null
