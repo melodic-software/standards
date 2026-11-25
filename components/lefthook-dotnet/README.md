@@ -1,7 +1,9 @@
 # Lefthook .NET
 
-Opt-in staged C# whitespace verification. Compose this fragment with
-`lefthook-base`, then add one consumer-owned data file at
+Opt-in staged C# whitespace verification. Extend this fragment from a root
+`lefthook.yml` that sets the strict settings itself (see
+[lefthook-base](../lefthook-base/README.md#remote-form)), then add one
+consumer-owned data file at
 `.lefthook/dotnet-format.json`:
 
 ```json

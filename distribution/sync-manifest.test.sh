@@ -686,7 +686,7 @@ assert_eq 'Lefthook Python materializes as a composable fragment' \
   '.lefthook/python.yml' \
   "$(yq -r '.components.lefthook-python.files."components/lefthook-python/lefthook.yml"' "$actual_manifest")"
 assert_eq 'Lefthook Python carries its complete direct dependencies' \
-  'lefthook-base,ruff' \
+  'ruff' \
   "$(yq -r '.components.lefthook-python.requires | join(",")' "$actual_manifest")"
 assert_eq 'Pyright materializes as an inheritable base below the consumer root' \
   '.github/standards/pyright/pyrightconfig.json' \
@@ -709,11 +709,15 @@ assert_eq 'ci-runner enrolls the managed Go analyzer policy exactly once' '1' \
 assert_eq 'Go analysis covers exactly the ci-runner target' \
   '["melodic-software/ci-runner"]' "$(managing_targets go-analysis)"
 
-# Retired components: agent-orientation (no component ships AGENTS.md), and
+# Retired components: agent-orientation (no component ships AGENTS.md);
 # engineering-standards, filing-guide and review-instructions, whose readers
 # take standards/README.md and REVIEW.md from this repository's main as the
-# org layer instead of a synced copy.
-for component in agent-orientation engineering-standards filing-guide review-instructions; do
+# org layer instead of a synced copy; and the lint configs and lefthook
+# fragments, whose readers (ci-workflows composites, the claude-code-plugins
+# and standards lefthook remotes) read this repository's root configs.
+for component in agent-orientation engineering-standards filing-guide review-instructions \
+  actionlint editorconfig-checker gitleaks lefthook-base lefthook-shellcheck markdownlint \
+  shellcheck typos; do
   assert_eq "no component named $component exists (retired)" '0' \
     "$(COMPONENT="$component" yq -r '[.components | keys[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"

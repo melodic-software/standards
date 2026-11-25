@@ -1,4 +1,4 @@
-# TypeScript adapter — opt-in. Extend it alongside the base from a consumer root
+# TypeScript adapter — opt-in. Extend it from a consumer root
 # that has JS/TS sources. Biome auto-discovers biome.json from the repo root (the
 # shipped ruleset is `root: false`, so a consumer's root biome.json `extends` it).
 #

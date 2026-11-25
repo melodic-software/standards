@@ -1,4 +1,4 @@
-# Python adapter — opt-in. Extend it alongside the base from a consumer root
+# Python adapter — opt-in. Extend it from a consumer root
 # that has Python sources and the ruff binary installed. Ruff auto-discovers
 # ruff.toml / pyproject.toml from the repo root.
 #

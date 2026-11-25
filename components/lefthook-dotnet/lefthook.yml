@@ -1,4 +1,4 @@
-# .NET adapter — opt-in. Extend it alongside the base from a consumer root that
+# .NET adapter — opt-in. Extend it from a consumer root that
 # has C# sources, Node, and the .NET SDK installed. The consumer owns one strict
 # data-only file; it never repeats this managed job or its command behavior:
 #

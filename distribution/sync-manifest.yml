@@ -4,25 +4,13 @@
 version: 2
 
 components:
-  # actionlint config: the self-hosted fleet runner-label allowlist. Targets
-  # repos where the canonical file can own the config
-  # outright — either no pre-existing actionlint config, or (ci-workflows) a
-  # pre-existing copy whose only divergence from canonical was comment prose.
-  # The source doubles as this repository's own live config. Deliberate
-  # exclusions:
-  # - medley: keeps its locally-owned config — repo-specific `self-hosted-runner`
-  #   labels, including the deliberate `ci-runner-selection-failed` sentinel
-  #   load-bearing in 12 workflows; a whole-file sync would overwrite them
-  #   (12 label errors observed in the fleet probe).
-  # - ci-runner: keeps its locally-owned config with repo-specific waivers a
-  #   whole-file sync would clobber.
-  # - github-iac: extends its own enumerated config in-repo; its
-  #   GovernanceTopologyTests pin the config content.
-  # - standards: manifest source, not a target — carries the canonical file.
-  # - .github: no workflows needing it.
-  actionlint:
-    files:
-      .github/actionlint.yaml: .github/actionlint.yaml
+  # Not synced: the lint configs (typos, markdownlint, gitleaks,
+  # editorconfig-checker, actionlint, shellcheck) and the lefthook-base and
+  # lefthook-shellcheck fragments. Their readers (the ci-workflows composites,
+  # the claude-code-plugins aggregate lefthook remote and this repository's
+  # lefthook remote) read this repository's root configs at run time, and a
+  # repository's own file layers over or replaces them per each component's
+  # README.
   architecture-decisions:
     files:
       docs/adr/README.md: docs/adr/README.md
@@ -219,14 +207,6 @@ components:
     files:
       components/dotnet-analysis/Directory.Build.props: eng/dotnet-analysis/Directory.Build.props
       components/dotnet-analysis/dotnet.globalconfig: eng/dotnet-analysis/dotnet.globalconfig
-  editorconfig-checker:
-    requires:
-      - repository-text
-    files:
-      .editorconfig-checker.json: .editorconfig-checker.json
-  gitleaks:
-    files:
-      .gitleaks.toml: .gitleaks.toml
   go-analysis:
     files:
       .golangci.yml: .golangci.yml
@@ -247,27 +227,15 @@ components:
       components/issue-body-contract/forms/bug-report.yml: .github/ISSUE_TEMPLATE/bug-report.yml
       components/issue-body-contract/forms/feature-request.yml: .github/ISSUE_TEMPLATE/feature-request.yml
       components/issue-body-contract/forms/task.yml: .github/ISSUE_TEMPLATE/task.yml
-  lefthook-base:
-    requires:
-      - editorconfig-checker
-      - gitleaks
-      - markdownlint
-      - node-runtime
-      - repository-text
-      - typos
-    files:
-      components/lefthook-base/lefthook.yml: .lefthook/base.yml
   lefthook-dotnet:
     requires:
       - dotnet-analysis
-      - lefthook-base
       - node-runtime
     files:
       components/lefthook-dotnet/dotnet-format-staged.mjs: .lefthook/dotnet-format-staged.mjs
       components/lefthook-dotnet/lefthook.yml: .lefthook/dotnet.yml
   lefthook-powershell:
     requires:
-      - lefthook-base
       - psscriptanalyzer
     files:
       components/lefthook-powershell/lefthook.yml: .lefthook/powershell.yml
@@ -275,16 +243,9 @@ components:
       components/lefthook-powershell/psscriptanalyzer-target.ps1: .lefthook/psscriptanalyzer-target.ps1
   lefthook-python:
     requires:
-      - lefthook-base
       - ruff
     files:
       components/lefthook-python/lefthook.yml: .lefthook/python.yml
-  lefthook-shellcheck:
-    requires:
-      - lefthook-base
-      - shellcheck
-    files:
-      components/lefthook-shellcheck/lefthook.yml: .lefthook/shellcheck.yml
   # Weekly online link-check callers (ci-workflows#739), the third recorded
   # exception to the workflow-caller exclusion in README.md: one source file
   # per opted-in target, because the cron minute and day differ per target
@@ -332,9 +293,6 @@ components:
   managed-files-guard-fleet-caller:
     files:
       components/managed-files-guard/managed-files-guard-fleet.yml: .github/workflows/pr-check-managed-files.yml
-  markdownlint:
-    files:
-      .markdownlint-cli2.jsonc: .markdownlint-cli2.jsonc
   markdownlint-home:
     files:
       components/markdownlint/home/.markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
@@ -394,17 +352,11 @@ components:
   ruff:
     files:
       ruff.toml: ruff.toml
-  shellcheck:
-    files:
-      .shellcheckrc: .shellcheckrc
   # Shared strict TypeScript base; a target's tsconfig extends it by relative
   # path and sets its own runtime, module and scope options.
   tsconfig:
     files:
       components/tsconfig/tsconfig.json: .github/standards/tsconfig/tsconfig.json
-  typos:
-    files:
-      _typos.toml: _typos.toml
 
 # Automerge is restored: the watchdog's tracking-issue
 # create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
@@ -431,15 +383,11 @@ targets:
       - commit-convention
       - dependabot-automerge-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - issue-forms
       - managed-files-guard-caller
-      - markdownlint
       - pr-body-contract-rule
       - pr-template
       - repository-text
-      - typos
   # The managed-files guard every target carries. Private and fleet-enrolled
   # in github-iac, so it takes the fleet-routed guard and lane callers. Its other configs stay repo-owned.
   melodic-software/agent-automations:
@@ -464,35 +412,24 @@ targets:
       - commit-convention
       - dependabot-automerge-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - managed-files-guard-caller
-      - markdownlint
       - repository-text
-      - typos
     # Armed as of 2026-09-04: agent-plugins#11 landed ci.yml plus the three
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
   # Takes the Dependabot policy copy, which the auto-merge lane reads to arm
-  # the organization's own releases, the fleet-routed guard, and the typos
-  # config its spelling hook reads (its CI typos lane stays off).
+  # the organization's own releases, and the fleet-routed guard.
   melodic-software/architecture:
     managed:
       - dependabot-automerge-fleet-caller
       - dependabot-policy
       - managed-files-guard-fleet-caller
-      - typos
   melodic-software/azure-iac:
     managed:
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - managed-files-guard-fleet-caller
-      - markdownlint
       - repository-text
-      - shellcheck
-      - typos
   melodic-software/ci-runner:
     managed:
       - claude-review-hosted-caller
@@ -501,36 +438,20 @@ targets:
       - commit-convention
       - dependabot-automerge-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - go-analysis
       - managed-files-guard-caller
-      - markdownlint
       - pr-body-contract-rule
       - repository-text
-      - shellcheck
-      - typos
-    locally-owned:
-      - actionlint
   melodic-software/ci-workflows:
     managed:
-      # Flipped to managed after byte-parity held: the pre-existing local copy
-      # (the file this component's content was derived from) differed from
-      # canonical only in comment prose.
-      - actionlint
       - cloud-bootstrap
       - comment-hygiene-action
       - commit-convention
-      - editorconfig-checker
-      - gitleaks
-      - markdownlint
       - node-runtime
       - path-detection-action
       - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
-      - shellcheck
-      - typos
     # ci-workflows hosts the managed-files-guard action and already runs it
     # as a job of its own ci.yml, through a `./` action ref that resolves to
     # the commit under test. A synced caller pinned to an older commit would
@@ -565,38 +486,26 @@ targets:
       - dependabot-automerge-caller
       - dependabot-policy
       - dotnet-analysis
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
       - lefthook-dotnet
       - managed-files-guard-caller
-      - markdownlint
       - node-runtime
       - pr-body-contract-rule
       - repository-text
-      - shellcheck
-      - typos
     # Armed as of 2026-09-22: claude-code-account-rotation#95 landed the ci.yml
     # whose ci-status job aggregates every lane and carries the pull-request
     # contract as steps of that one check, and github-iac#528 extends the org
     # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
     managed:
-      - actionlint
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - issue-body-contract-plugins
       - lychee-online-claude-code-plugins
       - managed-files-guard-caller
-      - markdownlint
       - node-runtime
       - path-detection-guardrails
       - pr-body-contract-rule
       - pyright
       - repository-text
-      - shellcheck
-      - typos
     # The hosted lane pair is locally owned here, so this repository's copies
     # can resolve their models through its own resolve-config action and pass
     # them as `model-args` (ci-workflows v0.45.0). No other target has that
@@ -648,8 +557,8 @@ targets:
   #   plan file, records why it is absent.
   # Beyond the Phase 4 hygiene set, claude-code-proxy manages the lefthook
   # lanes, psscriptanalyzer, and pyright per its own Phase 1 adoption:
-  # lefthook-base + lefthook-powershell + lefthook-python with their closure
-  # (node-runtime, psscriptanalyzer). ruff stays locally-owned (below) and
+  # lefthook-powershell + lefthook-python with their closure
+  # (psscriptanalyzer). ruff stays locally-owned (below) and
   # satisfies lefthook-python's requirement as a repo-owned implementation.
   # claude-code-proxy is private and fleet-enrolled in github-iac (its ci.yml
   # runs on the fleet label), so it takes the fleet-routed guard and both
@@ -667,18 +576,13 @@ targets:
       - commit-convention
       - dependabot-automerge-fleet-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
       - lefthook-powershell
       - lefthook-python
       - managed-files-guard-fleet-caller
-      - markdownlint
       - node-runtime
       - psscriptanalyzer
       - pyright
       - repository-text
-      - typos
     # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
     # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
@@ -699,13 +603,9 @@ targets:
       - commit-convention
       - dependabot-automerge-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - managed-files-guard-caller
-      - markdownlint
       - pr-body-contract-rule
       - repository-text
-      - typos
   melodic-software/cursor-plugins:
     managed:
       - claude-review-hosted-caller
@@ -714,19 +614,14 @@ targets:
       - commit-convention
       - dependabot-automerge-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
       - managed-files-guard-caller
-      - markdownlint
       - repository-text
-      - typos
     # Armed as of 2026-09-04: cursor-plugins#24 landed a ci-status aggregate
     # plus the three metadata callers, probe PR cursor-plugins#25 showed all
     # four contexts SUCCESS, and github-iac#367 extended the org ci-gate
     # ruleset to this repository.
   melodic-software/dotfiles:
     managed:
-      - actionlint
       - claude-permissions
       - claude-review-caller
       - claude-security-review-caller
@@ -734,14 +629,9 @@ targets:
       - commit-convention
       - dependabot-automerge-fleet-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
       - lefthook-powershell
       - lefthook-python
-      - lefthook-shellcheck
       - managed-files-guard-fleet-caller
-      - markdownlint
       - markdownlint-home
       - node-runtime
       - pages-publish
@@ -750,9 +640,6 @@ targets:
       - pyright
       - repository-text
       - ruff
-      - typos
-    locally-owned:
-      - shellcheck
   melodic-software/github-iac:
     managed:
       - claude-review-caller
@@ -763,19 +650,11 @@ targets:
       - dependabot-automerge-fleet-caller
       - dependabot-policy
       - dotnet-analysis
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
       - lefthook-dotnet
       - managed-files-guard-fleet-caller
-      - markdownlint
       - node-runtime
       - pr-body-contract-rule
       - repository-text
-      - shellcheck
-      - typos
-    locally-owned:
-      - actionlint
   # The Dependabot policy copy and the fleet-routed guard, as for architecture.
   melodic-software/knowledge-corpus:
     managed:
@@ -813,7 +692,6 @@ targets:
       - pr-body-contract-rule
       - tsconfig
     locally-owned:
-      - actionlint
       # Repo-specific toolchain steps live inside the bootstrap itself (plus a
       # committed cloud-bootstrap.test.sh over it); converge by moving them
       # into a cloud-bootstrap.local.sh, then flip to managed.
@@ -827,18 +705,10 @@ targets:
       # adopting would land unused payloads beside its own tuned config.
       # Revisit if medley moves to the canonical destination layout.
       - dotnet-analysis
-      # Diverged local copies of both payload files at the canonical
-      # destinations (.editorconfig-checker.json 40 lines vs 33). Recorded
-      # 2026-08-16 (audit). Depends on repository-text staying locally owned.
-      - editorconfig-checker
-      - gitleaks
-      # Diverged local copy at the canonical destination
-      # (.markdownlint-cli2.jsonc, 74 lines vs 41). Recorded 2026-08-16 (audit).
-      - markdownlint
       # Slightly stale local copy at the canonical destination
       # (PSScriptAnalyzerSettings.psd1, 138 lines vs 141 — the one counterpart
       # SMALLER than canonical). Recorded 2026-08-16 (audit); nearest-parity
-      # adoption candidate of the seven.
+      # adoption candidate among them.
       - psscriptanalyzer
       # The canonical payload lands under .github/standards/pyright/ — no
       # overwrite of medley's root Python config is possible. Locally owned
@@ -849,19 +719,13 @@ targets:
       # Substantially diverged local copies of both payload files at the
       # canonical destinations (.editorconfig 204 lines vs 67, .gitattributes
       # 290 vs 61 — monorepo expansion). Recorded 2026-08-16 (audit); the
-      # heaviest divergence of the seven counterpart files.
+      # heaviest divergence of medley's counterpart files.
       - repository-text
       # The ONLY true root-file overwrite among medley's analyzer exclusions:
       # canonical ruff.toml at the repo root would clobber medley's tuned
       # `target-version`, `include`, and per-tree scope. Revisit when medley
       # adopts the dotfiles extend pattern.
       - ruff
-      # Diverged local copy at the canonical destination (.shellcheckrc,
-      # 65 lines vs 63). Recorded 2026-08-16 (audit).
-      - shellcheck
-      # Diverged local copy at the canonical destination (_typos.toml,
-      # 174 lines vs 58). Recorded 2026-08-16 (audit).
-      - typos
   # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
   # payload those lanes read from `.github/standards/` (dependabot-policy) and
   # the `.node-version` node-runtime writes, so the copies stop drifting from
@@ -882,26 +746,18 @@ targets:
       - claude-security-review-hosted-caller
   melodic-software/provisioning:
     managed:
-      - actionlint
       - claude-review-caller
       - claude-security-review-caller
       - cloud-bootstrap
       - commit-convention
       - dependabot-automerge-fleet-caller
       - dependabot-policy
-      - editorconfig-checker
-      - gitleaks
-      - lefthook-base
       - lefthook-powershell
-      - lefthook-shellcheck
       - managed-files-guard-fleet-caller
-      - markdownlint
       - node-runtime
       - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
-      - shellcheck
-      - typos
   # The Dependabot policy copy and the fleet-routed guard, as for architecture.
   melodic-software/songwriting:
     managed:

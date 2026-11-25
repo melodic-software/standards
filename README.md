@@ -2,8 +2,8 @@
 
 The normative source of shared repository-quality policy and engineering
 conventions. Change shared standards here; consuming repositories receive the
-result through native references/packages or reviewed synchronization pull
-requests. A downstream repository owns only its product behavior, project
+result through native references/packages, run-time reads of this repository,
+or reviewed synchronization pull requests. A downstream repository owns only its product behavior, project
 scope, and explicit local exceptions.
 
 ## Ownership boundaries
@@ -37,7 +37,9 @@ which names the agnostic-audit-tooling owner.
   package metadata live with the policy they prove.
 - root tool configs: canonical files for tools that require or naturally
   discover a repository-root path. They exist exactly once; the corresponding
-  component slice documents and tests them.
+  component slice documents and tests them. CI and the lefthook remotes read
+  the lint configs from this repository at run time instead of a synced copy;
+  each component README names its readers.
 - `standards/`: reasoning-only engineering, review, and process standards
   that cannot be reduced honestly to deterministic tooling.
 - `distribution/`: explicit mappings for exact-file synchronization when no

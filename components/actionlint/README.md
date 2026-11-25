@@ -1,7 +1,8 @@
 # actionlint
 
-Lint policy for actionlint workflow linting. The exported payload is the
-root-canonical [`.github/actionlint.yaml`](../../.github/actionlint.yaml): a
+Lint policy for actionlint workflow linting. The policy is the root-canonical
+[`.github/actionlint.yaml`](../../.github/actionlint.yaml), which its readers
+fetch from this repository at run time (it is not synced): a
 `self-hosted-runner.labels` allowlist naming the fleet runner labels Phase 4 of
 the ci-perf program
 ([melodic-software/github-iac#378](https://github.com/melodic-software/github-iac/issues/378))

@@ -1,4 +1,4 @@
-# PowerShell adapter — opt-in. Extend it alongside the base from a consumer root
+# PowerShell adapter — opt-in. Extend it from a consumer root
 # that has PowerShell sources and PSScriptAnalyzer installed.
 #
 # The lane calls a small component-owned runner via `pwsh -File` rather than an inline
