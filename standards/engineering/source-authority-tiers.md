@@ -73,7 +73,8 @@ require more in its own settings.
   More accounts guard against one source being unrepresentative, not against
   every source being wrong.
 - When sources disagree, the claim is not settled by any count. Settle it
-  against the official source, or record the claim as open.
+  against a first-hand source (the thing itself, for a runtime fact), or record
+  the claim as open.
 
 ## A source must be re-read in the session that relies on it
 
