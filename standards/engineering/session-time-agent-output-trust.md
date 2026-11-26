@@ -61,13 +61,13 @@ carries no information about whether a check was available.
   information the reader needed most.
 - **A conclusion whose provenance is gone**: a summary of a summary, a
   subagent's return, or a recollection of earlier session work, presented as
-  findings. The conclusion survived; the evidence did not. The rung it now holds
+  findings. The conclusion survived; the evidence did not. What it is now worth
   is set by
-  [`source-authority-tiers.md#the-four-rungs`](source-authority-tiers.md#the-four-rungs).
+  [`source-authority-tiers.md#four-kinds-of-source`](source-authority-tiers.md#four-kinds-of-source).
 - **Agreement mistaken for corroboration**: several agents, or several passes
   of one agent, converging on an answer. The tell is a count of agreeing reports
   offered where independent sources were needed;
-  [`source-authority-tiers.md#independence-is-what-corroboration-counts`](source-authority-tiers.md#independence-is-what-corroboration-counts)
+  [`source-authority-tiers.md#how-many-sources-a-claim-needs`](source-authority-tiers.md#how-many-sources-a-claim-needs)
   decides what such a count is worth.
 - **A constraint that quietly stopped being mentioned**: a late claim that
   contravenes a limit set early: a directory that was out of bounds, a step that
@@ -76,7 +76,7 @@ carries no information about whether a check was available.
   constraint set once is not.
 - **An answer more confident than its retrieval**: an authority-shaped
   assertion about an external fact with no source named. Route it through
-  [`source-authority-tiers.md#the-four-rungs`](source-authority-tiers.md#the-four-rungs)
+  [`source-authority-tiers.md#four-kinds-of-source`](source-authority-tiers.md#four-kinds-of-source)
   rather than judging it on how well it reads.
 
 ## What a usable report carries
@@ -88,7 +88,7 @@ instead of re-verifiable:
   was deliberately left out and why.
 - For anything executed, the record required by
   [`deterministic-work-execution.md#make-the-execution-honest`](deterministic-work-execution.md#make-the-execution-honest).
-- For any external fact, the source and its rung.
+- For any external fact, the source and what kind of source it is.
 - For a claim relayed from a subagent or peer, the cited line, read by the
   relayer. Without that, the claim is labeled `UNVERIFIED` or left out, and
   says no more than its source shows.
@@ -114,7 +114,7 @@ a reader discovering the downgrade later has already acted on it.
   across it.
 - **vs [`source-authority-tiers.md`](source-authority-tiers.md)**: that file
   ranks an external source. This file governs an agent's assertion about its own
-  work, which carries no rung until a source is named.
+  work, which is worth nothing as evidence until a source is named.
 - **vs [`../review/testing.md#verification-honesty`](../review/testing.md#verification-honesty)**:
   that file owns which kind of proof a change's verification claim rests on,
   reviewed against the change. This file owns whether a session-time claim
