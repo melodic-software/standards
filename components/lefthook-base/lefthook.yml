@@ -76,8 +76,11 @@ pre-commit:
       # version when the local package is missing. node_modules is per worktree,
       # so when the binary is missing the lane runs `npm ci` once and lints; if
       # that install fails or still leaves no binary, it hard-fails with the
-      # "run npm ci" remediation rather than a wrong-version lint. The binary
-      # still auto-discovers its own config.
+      # "run npm ci" remediation rather than a wrong-version lint. When npm is
+      # missing or resolves under /mnt/* (unpruned Windows interop PATH in a
+      # non-interactive WSL shell), source ~/.config/shell/env.sh first and
+      # refuse /mnt/* npm so hooks never hang on Windows node.exe; Linux runs
+      # get a 120s timeout. The binary still auto-discovers its own config.
       glob: "**/*.{md,markdown}"
-      run: "test -x node_modules/.bin/markdownlint-cli2 || { npm ci --no-audit --no-fund >&2 && test -x node_modules/.bin/markdownlint-cli2; } || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
+      run: "test -x node_modules/.bin/markdownlint-cli2 || { case $(command -v npm 2>/dev/null || true) in ''|/mnt/*) if test -f ~/.config/shell/env.sh; then . ~/.config/shell/env.sh; fi ;; esac; case $(command -v npm 2>/dev/null || true) in /mnt/*) echo 'Refusing npm ci via Windows interop path in WSL.' >&2; false ;; *) case $(uname -s) in Linux) timeout 120 npm ci --no-audit --no-fund >&2 ;; *) npm ci --no-audit --no-fund >&2 ;; esac ;; esac && test -x node_modules/.bin/markdownlint-cli2; } || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
       fail_text: "Markdown lint failures, or markdownlint-cli2 missing and npm ci failed (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"
