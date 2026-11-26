@@ -110,15 +110,23 @@ assert_file_absent 'the PATH binary is not a fallback after an empty install' "$
 assert_contains 'the empty-install failure names the local path' "$out" 'not found at node_modules/.bin/markdownlint-cli2'
 
 # Case 5: npm missing from PATH in a non-interactive shell recovers via ~/.config/shell/env.sh.
+# Build an isolated bin dir with required system utilities and no npm, so hosts with /usr/bin/npm
+# still exercise the missing-npm recovery path deterministically.
 rm -rf "$work/node_modules" "$local_log" "$npm_log"
 printf 'install\n' >"$work/npm.mode"
 fake_home="$work/fake-home"
-mkdir -p "$fake_home/.config/shell"
+no_npm_bin="$work/no-npm-bin"
+mkdir -p "$fake_home/.config/shell" "$no_npm_bin"
+for cmd in sh bash env git uname timeout mkdir cp cat printf; do
+  if cmd_path="$(command -v "$cmd" 2>/dev/null)"; then
+    ln -s "$cmd_path" "$no_npm_bin/$cmd"
+  fi
+done
 cat >"$fake_home/.config/shell/env.sh" <<SH
 export PATH="$global_bin:\$PATH"
 SH
 lefthook_bin="$(mise which lefthook 2>/dev/null || command -v lefthook)"
-HOME="$fake_home" PATH="/usr/bin:/bin" "$lefthook_bin" run pre-commit --command markdownlint >/dev/null 2>&1
+HOME="$fake_home" PATH="$no_npm_bin" "$lefthook_bin" run pre-commit --command markdownlint >/dev/null 2>&1
 assert_exit 'missing npm on PATH recovers via env.sh' 0 "$?"
 assert_contains 'env.sh recovery ran quiet npm ci' "$(cat "$npm_log" 2>/dev/null)" 'ci --no-audit --no-fund'
 assert_contains 'env.sh recovery ran installed local binary' "$(cat "$local_log" 2>/dev/null)" 'doc.md'
