@@ -117,8 +117,8 @@ printf 'install\n' >"$work/npm.mode"
 fake_home="$work/fake-home"
 no_npm_bin="$work/no-npm-bin"
 mkdir -p "$fake_home/.config/shell" "$no_npm_bin"
-for cmd in sh bash env git uname timeout mkdir cp cat printf; do
-  if cmd_path="$(command -v "$cmd" 2>/dev/null)"; then
+for cmd in sh bash env git uname timeout mkdir cp cat printf node; do
+  if cmd_path="$(mise which "$cmd" 2>/dev/null || command -v "$cmd" 2>/dev/null)"; then
     ln -s "$cmd_path" "$no_npm_bin/$cmd"
   fi
 done
