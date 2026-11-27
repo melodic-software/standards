@@ -356,8 +356,8 @@ fail its own `runner-policy` lane (and with it `ci-status`) the moment the
 caller synced in. These components are therefore private-only, which resolves
 differently for each lane:
 
-- Both components are `managed` for the private targets agent-automations,
-  claude-code-proxy, dotfiles, github-iac, medley and provisioning, so every
+- Both components are `managed` for the private targets claude-code-proxy,
+  dotfiles, github-iac, medley and provisioning, so every
   PR there gets both
   advisory lanes. Public repos, `claude-code-plugins` and `ci-workflows`
   among them, remain ineligible for the fleet-routed shape.
@@ -374,8 +374,7 @@ routing via `REVIEWS_CLAUDE_API_KEY`, `REVIEWS_CLAUDE_CODE_OAUTH_TOKEN`, and
 destination file's stem in Title Case and the same job ids (`pr-review` /
 `pr-review-security`). The destinations differ because
 a destination has one owning component. They are `managed` for .github,
-agent-plugins, ci-runner, claude-code-account-rotation, codex-plugins and
-cursor-plugins.
+ci-runner, and claude-code-account-rotation.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the
 review model from its own `models:` config, which no other target has (see the
 comment on its `locally-owned:` entry in `sync-manifest.yml`).
@@ -433,8 +432,8 @@ does. The two files differ only in `runs-on`, comments and the workflow
 check context on every target, hosted or fleet-routed. The hosted caller
 runs on `ubuntu-24.04` and is `managed` for the public targets. The
 fleet-routed caller runs on `melodic-ubuntu-24.04-x64` and is `managed` for
-the fleet-enrolled private targets (`agent-automations`,
-`claude-code-proxy`, `dotfiles`, `github-iac`, `medley`, `provisioning`), where runner-policy requires the
+the fleet-enrolled private targets (`claude-code-proxy`,
+`dotfiles`, `github-iac`, `medley`, `provisioning`), where runner-policy requires the
 fleet literal for every read-only job. claude-code-proxy is fleet-enrolled in
 github-iac and its `ci.yml` runs on the fleet label, though it has no
 `.github/runner-policy.json`. No target manages both.

@@ -77,16 +77,12 @@ export const COPY_SOURCES = {
 // gate and the standards-sync App installation can read it.
 export const CONSUMER_REPOSITORIES = [
   ".github",
-  "agent-automations",
-  "agent-plugins",
   "azure-iac",
   "ci-runner",
   "ci-workflows",
   "claude-code-account-rotation",
   "claude-code-plugins",
   "claude-code-proxy",
-  "codex-plugins",
-  "cursor-plugins",
   "dotfiles",
   "github-iac",
   "knowledge-corpus",
@@ -97,12 +93,7 @@ export const CONSUMER_REPOSITORIES = [
 ];
 
 // There is no exemption: every repository above must run one of the two
-// contract artifacts, and running neither is drift. agent-plugins,
-// claude-code-proxy and cursor-plugins were carried as a non-failing report
-// while they sat outside the org `ci-gate` ruleset; `sync-manifest.yml` records
-// that github-iac#367 extended the ruleset to all three and that each carries
-// the required contexts, so a lost caller there is as much a gate removal as
-// anywhere else. Fail closed.
+// contract artifacts, and running neither is drift. Fail closed.
 
 // The composite is called from the `ci-status` job, which lives in
 // `pr-require-checks.yml` after the rename, `ci.yml` before it, and

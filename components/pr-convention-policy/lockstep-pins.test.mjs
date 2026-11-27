@@ -15,19 +15,19 @@ import {
   SINGLE_LOOP_COMPOSITE_RUN,
 } from "./lockstep-fixtures.mjs";
 
-const checkCodexPin = (runSh) =>
-  checkPinnedComposite(POLICY, "codex-plugins", "d".repeat(40), runSh, GOOD_COMPOSITE_ACTION);
+const checkConsumerPin = (runSh) =>
+  checkPinnedComposite(POLICY, "ci-runner", "d".repeat(40), runSh, GOOD_COMPOSITE_ACTION);
 
 test("a composite at a consumer pin passes when it matches policy", () => {
-  assert.deepEqual(checkCodexPin(GOOD_COMPOSITE_RUN), []);
+  assert.deepEqual(checkConsumerPin(GOOD_COMPOSITE_RUN), []);
 });
 
 test("a composite pin that still inlines the #N reference passes", () => {
-  assert.deepEqual(checkCodexPin(LITERAL_REF_COMPOSITE_RUN), []);
+  assert.deepEqual(checkConsumerPin(LITERAL_REF_COMPOSITE_RUN), []);
 });
 
 test("a composite pin with the bounded negation scan passes", () => {
-  assert.deepEqual(checkCodexPin(BOUNDED_SCAN_COMPOSITE_RUN), []);
+  assert.deepEqual(checkConsumerPin(BOUNDED_SCAN_COMPOSITE_RUN), []);
   assert.deepEqual(
     checkCopies(POLICY, { ...goodTexts(), gateRun: BOUNDED_SCAN_COMPOSITE_RUN }),
     [],
@@ -124,9 +124,9 @@ test("an issue-ref-pattern composite that loses its default is drift", () => {
       "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
     ]);
     // Three checks read the default; a consumer pin reports the finding once.
-    const pinned = checkCodexPin(GOOD_COMPOSITE_RUN.replace(from, to));
+    const pinned = checkConsumerPin(GOOD_COMPOSITE_RUN.replace(from, to));
     assert.equal(pinned.length, 1, pinned.join("; "));
-    assert.match(pinned[0], /^caller codex-plugins pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
+    assert.match(pinned[0], /^caller ci-runner pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);
   }
 });
 
@@ -165,12 +165,12 @@ test("an action.yml issue-ref-pattern default that differs from run.sh is drift"
 test("a composite pin predating the security type is drift at that pin", () => {
   const errors = checkPinnedComposite(
     POLICY,
-    "codex-plugins",
+    "ci-runner",
     "e".repeat(40),
     GOOD_COMPOSITE_RUN,
     GOOD_COMPOSITE_ACTION.replace(",security", ""),
   );
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /caller codex-plugins pin eeeeeee/);
+  assert.match(errors[0], /caller ci-runner pin eeeeeee/);
   assert.match(errors[0], /missing security/);
 });
