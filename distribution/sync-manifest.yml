@@ -183,7 +183,7 @@ components:
   # - standards: manifest source, not a target — keeps its repo-local caller
   #   with explicit `review-only-dependencies: '["yaml"]'`.
   # - claude-code-plugins: merge queue (GITHUB_TOKEN cannot add PRs to a queue).
-  # - azure-iac, pr-pipeline-sandbox: no Dependabot automerge workflow.
+  # - azure-iac: no Dependabot automerge workflow.
   dependabot-automerge-caller:
     files:
       components/dependabot-automerge/dependabot-automerge.yml: .github/workflows/pr-automerge-dependabot-hosted.yml
@@ -625,21 +625,6 @@ targets:
       # `target-version`, `include`, and per-tree scope. Revisit when medley
       # adopts the dotfiles extend pattern.
       - ruff
-  # A public test bed for claude-code-plugins' PR-pipeline lanes. It takes the
-  # `.node-version` node-runtime writes, so the copy stops drifting from
-  # claude-code-plugins', plus the hosted-only `managed-files-guard-caller`
-  # every public target carries. Its other configs stay repo-owned: it has no
-  # product code or authored docs to lint.
-  melodic-software/pr-pipeline-sandbox:
-    managed:
-      - managed-files-guard-caller
-      - node-runtime
-    # Its review callers are pr-review-cli variants pinned to the release
-    # claude-code-plugins tests, with a kill-switch job and hold inputs, so
-    # the sandbox can probe the lanes before claude-code-plugins adopts them.
-    locally-owned:
-      - claude-review-hosted-caller
-      - claude-security-review-hosted-caller
   melodic-software/provisioning:
     managed:
       - claude-review-caller
