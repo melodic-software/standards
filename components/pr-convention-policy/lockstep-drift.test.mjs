@@ -551,10 +551,9 @@ test("a repository whose fetch already failed is not double-reported", () => {
   assert.deepEqual(errors, []);
 });
 
-test("consumer roster covers all fifteen gated repositories", () => {
-  assert.equal(CONSUMER_REPOSITORIES.length, 15);
+test("consumer roster covers all fourteen gated repositories", () => {
+  assert.equal(CONSUMER_REPOSITORIES.length, 14);
   for (const repo of [
-    "architecture",
     "azure-iac",
     "claude-code-account-rotation",
     "claude-code-proxy",

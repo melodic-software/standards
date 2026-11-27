@@ -77,7 +77,6 @@ export const COPY_SOURCES = {
 // gate and the standards-sync App installation can read it.
 export const CONSUMER_REPOSITORIES = [
   ".github",
-  "architecture",
   "azure-iac",
   "ci-runner",
   "ci-workflows",
