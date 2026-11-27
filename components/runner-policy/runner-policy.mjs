@@ -200,6 +200,11 @@ export function validatePolicy(value) {
           `reusable workflow contract ${reference}.allowedInputs must include role when role is declared`,
         );
       }
+      if (contract.roleDefault && !contract.role) {
+        throw new ConfigurationError(
+          `reusable workflow contract ${reference}.roleDefault requires role to be declared`,
+        );
+      }
       if (Object.hasOwn(contract, "allowedCallerPermissions")) {
         const prefix = contract.role ? `${contract.role.toUpperCase().replaceAll("-", "_")}_` : "";
         for (const { map: secrets, location } of secretMaps) {

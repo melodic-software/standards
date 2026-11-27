@@ -12,6 +12,7 @@ import {
   ConfigurationError,
   parseArguments,
   parseUniqueJson,
+  validatePolicy,
 } from "./runner-policy.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
@@ -6704,6 +6705,7 @@ test("each hosted claude lane caller calls pr-review-cli with the expected lane,
         actions: "read",
         checks: "read",
         contents: "read",
+        issues: "read",
         "pull-requests": "write",
       },
       `${source} caller permissions`,
@@ -7121,6 +7123,19 @@ jobs:
     wrongRoleFindings.some(({ message }) => message.includes("must receive role: reviews")),
     `expected non-matching literal role to fail closed, got ${JSON.stringify(wrongRoleFindings)}`,
   );
+
+  const policyWithoutRole = JSON.parse(
+    await readFile(new URL("./policy.json", import.meta.url), "utf8"),
+  );
+  delete policyWithoutRole.approvedReusableWorkflowContracts[
+    "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml"
+  ].role;
+  assert.throws(
+    () => validatePolicy(policyWithoutRole),
+    (error) =>
+      error instanceof ConfigurationError &&
+      /roleDefault requires role to be declared/u.test(error.message),
+  );
 });
 
 test("each fleet claude lane caller calls pr-review-cli with melodic-review-ubuntu-24.04-x64 and reviews secrets", async () => {
@@ -7149,6 +7164,7 @@ test("each fleet claude lane caller calls pr-review-cli with melodic-review-ubun
         actions: "read",
         checks: "read",
         contents: "read",
+        issues: "read",
         "pull-requests": "write",
       },
       `${source} caller permissions`,
