@@ -399,11 +399,6 @@ targets:
     # metadata callers, probe PR agent-plugins#12 showed pr-title,
     # do-not-merge, pr-issue-linkage and ci-status all SUCCESS, and
     # github-iac#367 extended the org ci-gate ruleset to this repository.
-  # Takes the fleet-routed Dependabot automerge caller and guard only.
-  melodic-software/architecture:
-    managed:
-      - dependabot-automerge-fleet-caller
-      - managed-files-guard-fleet-caller
   melodic-software/azure-iac:
     managed:
       - managed-files-guard-fleet-caller

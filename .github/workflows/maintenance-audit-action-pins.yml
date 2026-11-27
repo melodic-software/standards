@@ -7,7 +7,7 @@ name: Maintenance Audit Action Pins
 # workflows skip it) is still caught. components/zizmor/sweep.sh runs the
 # audit; its README section "Fleet sweep" states the scope.
 #
-# Repository listing follows maintenance-audit-org-architecture-pointer: the
+# Repository listing follows maintenance-audit-code-review-rules: the
 # workflow token reads the org's public repositories, and a read-only
 # standards-sync App token reads the private repositories in that App's
 # installation. The sweep covers every non-archived repository, sandbox ones

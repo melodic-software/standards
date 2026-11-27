@@ -69,7 +69,7 @@ there with ignore comments disabled, keeping only `unpinned-uses` findings. A
 finding fails the run with one `UNPINNED:` line per ref. The run opens no
 issue. Composite actions outside `.github` and the repository root are not
 read. Private repositories outside the standards-sync App installation are
-visible to neither token, as in `maintenance-audit-org-architecture-pointer`.
+visible to neither token, as in `maintenance-audit-code-review-rules`.
 `sweep.test.sh` covers the script.
 
 ## Verification
