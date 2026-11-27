@@ -121,28 +121,49 @@ ADR-0005's retirement of its distribution stands.
 
 ## Revisited 2026-11-27 (#1128): retire the distributed PR-body contract rule
 
-Decision 1 is retired. The owner's standards-by-pointer direction
+Decision 1 is retired. This revisit overrides the
+[2026-10-06 (#641) rejection](#revisited-2026-10-06-641) of retirement and
+supersedes the [Consequences](#consequences) line stating that plugin-less
+sessions see the contract before creating a pull request.
+
+The owner's standards-by-pointer direction
 ([melodic-software/architecture#241](https://github.com/melodic-software/architecture/pull/241),
 2026-11-24) moved org prose to pointers with organization standards as fallback,
 and #1135 retired the synced `filing-guide` component so consumers read
 `standards/process/filing-prs-and-issues.md` from this repository's `main`
 through `standards/README.md`.
 
-Empirical review across recent `needs-issue-linkage` pull requests showed misses
-still occurring in repositories that already carried
-`.claude/rules/pr-body-contract.md`, while an unscoped `.claude/rules/` file
-loads into every Claude Code session regardless of whether it opens a pull
-request and reaches no other harness (Cursor and other tools read `AGENTS.md`).
-The `check-contract` gate (hard failure on title and `do-not-merge`, advisory
-comment and `needs-issue-linkage` label on body misses), the org default
-`PULL_REQUEST_TEMPLATE.md`, and the harness-neutral filing guide at
-`standards/process/filing-prs-and-issues.md` cover every harness without syncing
-a Claude-only copy.
+The residual gap for a plugin-less session drafting with a bare
+`gh pr create --body` is explicitly accepted on empirical grounds:
+
+- Across recent `needs-issue-linkage` pull requests, body-contract misses still
+  occurred repeatedly in repositories that already carried
+  `.claude/rules/pr-body-contract.md` (`dotfiles`, `provisioning`,
+  `ci-workflows`, `claude-code-account-rotation`, `ci-runner`, `.github`),
+  showing that the always-loaded rule did not prevent misses across harnesses.
+- An unscoped `.claude/rules/` file consumes up-front context on every Claude
+  Code session regardless of whether it opens a pull request, and reaches no
+  other harness (Cursor and other tools read `AGENTS.md`).
+- Hard merge gates (Conventional Commits title and `do-not-merge`) remain
+  enforced by `check-contract`; body-contract misses remain advisory and are
+  surfaced immediately after PR open by `check-contract`'s comment and
+  `needs-issue-linkage` label; default drafts still load the org
+  `PULL_REQUEST_TEMPLATE.md`; and org-layer readers resolve
+  `standards/process/filing-prs-and-issues.md` through `standards/README.md`.
+
+Changes and consumer impact:
 
 - `pr-body-contract-rule` is removed from `distribution/sync-manifest.yml` and
   `.claude/rules/pr-body-contract.md` is deleted here; consumers delete their
   copies in repo-local follow-up pull requests because deselection never
   deletes.
+- Verified consumer references cited in #1128 on `melodic-software/claude-code-plugins`
+  `main`: `.github/scripts/work-resolve-issue/report-outcome.mjs` no longer
+  mentions `pr-body-contract`, and `.github/workflows/pr-check-managed-files-hosted.yml`
+  delegates to `melodic-software/ci-workflows/.github/actions/check-managed-files@main`
+  with `standards-ref: main` (no static path list), so once this change merges
+  the managed-files guard stops treating `.claude/rules/pr-body-contract.md` as
+  managed and will not block consumer deletion PRs.
 - `components/pr-convention-policy/contract-docs.mjs` now generates two files
   (`PULL_REQUEST_TEMPLATE.md` and `standards/process/filing-prs-and-issues.md`),
   and `lockstep-drift.mjs` checks the gate composite, the hook validator, and
