@@ -108,19 +108,12 @@ export const BACKTICKED_TEMPLATE = GOOD_TEMPLATE.replace(
   "No related issue: <reason>",
   "Use `No related issue: <reason>` or `No linked issue`.",
 );
-const GOOD_RULES = [
-  "# PR body contract",
-  "`Closes #<issue>` (`Fixes`/`Resolves`), a `Refs: #<issue>` line, or `No related issue: <reason>`.",
-  "Sections: `## Summary`, `## Fix`, `## Verification`, `## Related`.",
-].join("\n\n");
-
 export function goodTexts() {
   return {
     gateRun: GOOD_COMPOSITE_RUN,
     gateAction: GOOD_COMPOSITE_ACTION,
     hookValidator: GOOD_VALIDATOR,
     orgTemplate: GOOD_TEMPLATE,
-    rulesFile: GOOD_RULES,
   };
 }
 

@@ -10,7 +10,6 @@ import {
   OUTPUTS,
   renderAll,
   renderGuide,
-  renderRule,
   renderTemplate,
   validateInputs,
 } from "./contract-docs.mjs";
@@ -66,14 +65,6 @@ test("a section added to policy appears in the template with its guidance", () =
   );
 });
 
-test("the rule names every section and every closing keyword", () => {
-  const text = renderRule(
-    withBody({ requiredSections: ["A", "B"], closingKeywords: ["Closes", "Fixes"] }),
-  );
-  assert.match(text, /fill `## A` and `## B`\. Draft from/);
-  assert.match(text, /`Closes #<issue>` \(or\n`Fixes`\)/);
-});
-
 test("the guide gives each typed form its gh --type flag and each untyped one none", () => {
   const text = renderGuide(policy, contract);
   assert.match(text, /\| Bug Report \| `--type Bug` \| `bug-report.yml` \|/);
@@ -122,7 +113,6 @@ test("check reports a hand-edited and a missing copy", async () => {
     const drift = await diffOutputs(outputs, root);
     assert.deepEqual(drift, [
       `${OUTPUTS.template}: differs from what the records generate`,
-      `${OUTPUTS.rule}: missing`,
       `${OUTPUTS.guide}: missing`,
     ]);
   } finally {

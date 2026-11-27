@@ -87,8 +87,7 @@ exactly the failure #393 recorded. That lockstep is enforced by
 [`lockstep-drift.mjs`](lockstep-drift.mjs) (ADR-0008) in two modes. On every
 pull request, the `check-pr-convention-copies` job runs
 `npm run lint:pr-convention-copies` against the live gate source, the
-source-control plugin's hook validator, the org PR template and the distributed
-`.claude/rules/pr-body-contract.md` rule. On `main`,
+source-control plugin's hook validator, and the org PR template. On `main`,
 `maintenance-audit-pr-convention-pins.yml` runs
 `npm run audit:pr-convention-pins` with the standards-sync App token against
 the contract of the artifact each consumer calls (the composite, or the reusable
@@ -104,11 +103,10 @@ records that exception to its every-pin consequence.
 
 ### Generated copies
 
-Three prose copies are generated, not hand-written:
+Two prose copies are generated, not hand-written:
 [`contract-docs.mjs`](contract-docs.mjs) renders the org PR template
 ([`PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md), synced by the
-`pr-template` component to `melodic-software/.github`), the
-`.claude/rules/pr-body-contract.md` rule (`pr-body-contract-rule`), and the
+`pr-template` component to `melodic-software/.github`) and the
 harness-neutral filing guide
 [`standards/process/filing-prs-and-issues.md`](../../standards/process/filing-prs-and-issues.md)
 (read from `main` through the org [standards index](../../standards/README.md#standards-index)), the last also

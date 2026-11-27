@@ -239,28 +239,6 @@ test("the masker follows the composite's code-span rules", () => {
   );
 });
 
-test("rules file missing a section or keyword is reported", () => {
-  const texts = goodTexts();
-  texts.rulesFile = texts.rulesFile.replace("## Related", "## See also").replace("Resolves", "");
-  const errors = checkCopies(POLICY, texts);
-  assert.equal(errors.filter((e) => e.startsWith("rules file")).length, 2, errors.join("; "));
-});
-
-test("a rules file that names no non-closing marker is reported", () => {
-  const texts = goodTexts();
-  texts.rulesFile = texts.rulesFile.replace("a `Refs: #<issue>` line, ", "");
-  const errors = checkCopies(POLICY, texts);
-  assert.equal(errors.length, 1, errors.join("; "));
-  assert.match(
-    errors[0],
-    /^rules file \(non-closing markers\): mentions none of: Refs:, Relates to:/,
-  );
-  // The marker without the colon is not the form the gate reads.
-  const colonless = goodTexts();
-  colonless.rulesFile = colonless.rulesFile.replace("`Refs: #<issue>`", "`Refs #<issue>`");
-  assert.equal(checkCopies(POLICY, colonless).length, 1);
-});
-
 test("composite keyword/marker regressions are caught functionally, not by mention", () => {
   // Keyword stem removed from the DECLARED pattern while the word survives in
   // prose: a mention check would pass; the functional probe must not.

@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-// Generates the three prose copies of the PR and issue contracts from their records: the org PR
-// template, the always-loaded `.claude/rules/pr-body-contract.md` rule, and the harness-neutral
-// filing guide the org standards index lists. `check` (the default) fails when a committed copy
-// differs from what the records generate; `write` regenerates them. Consumers read the committed
-// copies byte-exact, so each is changed in policy.json or contract.json, or in this generator's
-// wording, and nowhere else.
+// Generates the two prose copies of the PR and issue contracts from their records: the org PR
+// template and the harness-neutral filing guide the org standards index lists. `check` (the
+// default) fails when a committed copy differs from what the records generate; `write`
+// regenerates them. Consumers read the committed copies byte-exact, so each is changed in
+// policy.json or contract.json, or in this generator's wording, and nowhere else.
 
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -17,13 +16,12 @@ export const POLICY_PATH = path.join(HERE, "policy.json");
 export const CONTRACT_PATH = path.join(ROOT, "components", "issue-body-contract", "contract.json");
 export const OUTPUTS = {
   template: "components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md",
-  rule: ".claude/rules/pr-body-contract.md",
   guide: "standards/process/filing-prs-and-issues.md",
 };
 
 // The one marker of each kind the prose steers an author to. policy.json keeps the full accepted
 // set for the copies that enforce it; naming one gives the author no choice the gate never asked
-// for (lockstep-drift.mjs holds the rule file and template to "at least one").
+// for (lockstep-drift.mjs holds the template to "at least one").
 export const NO_ISSUE_MARKER = "No related issue";
 export const NON_CLOSING_MARKER = "Refs";
 
@@ -50,11 +48,6 @@ export function validateInputs(policy, contract) {
     errors.push("contract.json floorLabels must be a non-empty array");
   }
   return errors;
-}
-
-function oxfordList(items) {
-  if (items.length < 3) return items.join(" and ");
-  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
 function htmlComment(text) {
@@ -91,28 +84,6 @@ as missing every section rather than passing vacuously.
 -->
 
 ${sections}`;
-}
-
-export function renderRule(policy) {
-  const [first, ...others] = policy.body.closingKeywords;
-  const sections = oxfordList(policy.body.requiredSections.map((name) => `\`## ${name}\``));
-  return `# PR body contract
-
-The \`check-contract\` step inside \`CI Status\` fails a pull request on a
-non-Conventional-Commits title or a \`do-not-merge\` label. In repositories that
-enable it, a separate \`CI Status\` check fails a body line that would start with
-the word \`committer\` after the 72-column squash wrap, which breaks the squash
-commit's signature: reword that line. The body contract is advisory, reported
-by comment and the \`needs-issue-linkage\` label, but expected: open with
-\`${first} #<issue>\` (or
-${others.map((keyword) => `\`${keyword}\``).join("/")}), a \`${NON_CLOSING_MARKER}: #<issue>\` line to link without closing (never
-"does not close", which still closes), or \`${NO_ISSUE_MARKER}: <reason>\`, then
-fill ${sections}. Draft from
-the repo's PR template (else the \`melodic-software/.github\` default);
-canonical record of the title and body contract:
-\`components/pr-convention-policy/policy.json\` in
-\`melodic-software/standards\`.
-`;
 }
 
 function codeList(items, separator = ", ") {
@@ -226,7 +197,6 @@ label, and intake triage takes it from there.
 export function renderAll(policy, contract) {
   return {
     [OUTPUTS.template]: renderTemplate(policy),
-    [OUTPUTS.rule]: renderRule(policy),
     [OUTPUTS.guide]: renderGuide(policy, contract),
   };
 }
