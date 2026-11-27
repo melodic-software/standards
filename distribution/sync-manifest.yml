@@ -617,7 +617,7 @@ targets:
       - node-runtime
       - pr-body-contract-rule
       - repository-text
-  # The same two components as architecture.
+  # Takes the fleet-routed Dependabot automerge caller and guard only.
   melodic-software/knowledge-corpus:
     managed:
       - dependabot-automerge-fleet-caller
@@ -708,7 +708,7 @@ targets:
       - pr-body-contract-rule
       - psscriptanalyzer
       - repository-text
-  # The same two components as architecture.
+  # Takes the fleet-routed Dependabot automerge caller and guard only.
   melodic-software/songwriting:
     managed:
       - dependabot-automerge-fleet-caller
