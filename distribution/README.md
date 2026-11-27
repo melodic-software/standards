@@ -330,9 +330,11 @@ in `ci-workflows`; only the caller files are managed bytes.
 
 What stays consumer-owned:
 
-- The `CLAUDE_CODE_OAUTH_TOKEN` secret. The `CI_RUNNER_*` selector variables and
-  the `melodic-ci-runner-observer` App's `CI_RUNNER_OBSERVER_*` credentials are
-  retired.
+- The review credential secrets (`REVIEWS_CLAUDE_API_KEY`,
+  `REVIEWS_CLAUDE_CODE_OAUTH_TOKEN`, and the optional
+  `FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`, provisioned at the org level). The
+  `CI_RUNNER_*` selector variables and the `melodic-ci-runner-observer` App's
+  `CI_RUNNER_OBSERVER_*` credentials are retired.
 
 The security lane has no path gating: it reviews every non-draft
 same-repository PR whose actor is not a bot (or is a bot whose sender id the
