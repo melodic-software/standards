@@ -17,10 +17,10 @@ test("stale reusable pin enforcing an older contract is reported", () => {
 `;
   // Two findings: the stale section list AND the missing enforcement-pattern
   // declarations (pre-pattern-era reusables lack the const declarations).
-  const errors = checkPinnedReusable(POLICY, "codex-plugins", "c".repeat(40), oldReusable);
+  const errors = checkPinnedReusable(POLICY, "ci-runner", "c".repeat(40), oldReusable);
   assert.equal(errors.length, 2);
-  assert.match(errors[0], /caller codex-plugins/);
-  assert.match(errors[1], /caller codex-plugins/);
+  assert.match(errors[0], /caller ci-runner/);
+  assert.match(errors[1], /caller ci-runner/);
 });
 
 test("current pinned reusable contract passes", () => {

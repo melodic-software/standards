@@ -6269,16 +6269,12 @@ ${jobBody}    runs-on: ${FLEET_LABEL}
 // failing test naming the gap.
 const TARGET_VISIBILITY = new Map([
   ["melodic-software/.github", "public"],
-  ["melodic-software/agent-plugins", "public"],
   ["melodic-software/ci-runner", "public"],
   ["melodic-software/ci-workflows", "public"],
   ["melodic-software/claude-code-account-rotation", "public"],
   ["melodic-software/claude-code-plugins", "public"],
-  ["melodic-software/codex-plugins", "public"],
-  ["melodic-software/cursor-plugins", "public"],
   ["melodic-software/pr-pipeline-sandbox", "public"],
   ["melodic-software/standards", "public"],
-  ["melodic-software/agent-automations", "private"],
   ["melodic-software/architecture", "private"],
   ["melodic-software/azure-iac", "private"],
   ["melodic-software/knowledge-corpus", "private"],

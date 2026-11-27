@@ -38,6 +38,6 @@ exclude = [
   '^https://api\.github\.com/',
   '^https?://localhost',
   '^https?://127\.0\.0\.1',
-  '^https?://github\.com/melodic-software/(agent-automations|architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)(\.git)?([/#?]|$)',
-  '^https?://raw\.githubusercontent\.com/melodic-software/(agent-automations|architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)/',
+  '^https?://github\.com/melodic-software/(architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)(\.git)?([/#?]|$)',
+  '^https?://raw\.githubusercontent\.com/melodic-software/(architecture|azure-iac|claude-code-proxy|dotfiles|github-iac|itinerary-planner|knowledge-corpus|medley|medley-archive|melodic-main-archive|provisioning|songwriting)/',
 ]
