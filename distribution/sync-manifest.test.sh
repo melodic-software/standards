@@ -711,13 +711,16 @@ assert_eq 'Go analysis covers exactly the ci-runner target' \
 # Retired components: agent-orientation (no component ships AGENTS.md);
 # engineering-standards, filing-guide and review-instructions, whose readers
 # take standards/README.md and REVIEW.md from this repository's main as the
-# org layer instead of a synced copy; and the lint configs and lefthook
+# org layer instead of a synced copy; the lint configs and lefthook
 # fragments, whose readers (ci-workflows composites, the claude-code-plugins
-# and standards lefthook remotes) read this repository's root configs; and
-# pyright, whose one reader (dotfiles) owns its whole config.
+# and standards lefthook remotes) read this repository's root configs;
+# pyright, whose one reader (dotfiles) owns its whole config; and
+# pr-body-contract-rule, retired by ADR-0008's 2026-11-27 amendment in favor of
+# standards/process/filing-prs-and-issues.md, the org PR template, and the
+# check-contract gate.
 for component in agent-orientation engineering-standards filing-guide review-instructions \
   actionlint editorconfig-checker gitleaks lefthook-base lefthook-shellcheck markdownlint \
-  shellcheck typos pyright dependabot-policy; do
+  shellcheck typos pyright dependabot-policy pr-body-contract-rule; do
   assert_eq "no component named $component exists (retired)" '0' \
     "$(COMPONENT="$component" yq -r '[.components | keys[] | select(. == strenv(COMPONENT))] | length' \
       "$actual_manifest")"

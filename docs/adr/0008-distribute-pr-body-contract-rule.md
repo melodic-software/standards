@@ -118,3 +118,37 @@ on the pull request's branch or in a recent version on `main`, so neither a
 template change nor a pull request opened before its sync lands goes red.
 Decision 3 is unchanged: nothing reads `policy.json` at run time, and
 ADR-0005's retirement of its distribution stands.
+
+## Revisited 2026-11-27 (#1128): retire the distributed PR-body contract rule
+
+Decision 1 is retired. The owner's standards-by-pointer direction
+([melodic-software/architecture#241](https://github.com/melodic-software/architecture/pull/241),
+2026-11-24) moved org prose to pointers with organization standards as fallback,
+and #1135 retired the synced `filing-guide` component so consumers read
+`standards/process/filing-prs-and-issues.md` from this repository's `main`
+through `standards/README.md`.
+
+Empirical review across recent `needs-issue-linkage` pull requests showed misses
+still occurring in repositories that already carried
+`.claude/rules/pr-body-contract.md`, while an unscoped `.claude/rules/` file
+loads into every Claude Code session regardless of whether it opens a pull
+request and reaches no other harness (Cursor and other tools read `AGENTS.md`).
+The `check-contract` gate (hard failure on title and `do-not-merge`, advisory
+comment and `needs-issue-linkage` label on body misses), the org default
+`PULL_REQUEST_TEMPLATE.md`, and the harness-neutral filing guide at
+`standards/process/filing-prs-and-issues.md` cover every harness without syncing
+a Claude-only copy.
+
+- `pr-body-contract-rule` is removed from `distribution/sync-manifest.yml` and
+  `.claude/rules/pr-body-contract.md` is deleted here; consumers delete their
+  copies in repo-local follow-up pull requests because deselection never
+  deletes.
+- `components/pr-convention-policy/contract-docs.mjs` now generates two files
+  (`PULL_REQUEST_TEMPLATE.md` and `standards/process/filing-prs-and-issues.md`),
+  and `lockstep-drift.mjs` checks the gate composite, the hook validator, and
+  the org PR template.
+
+Rejected: keeping `.claude/rules/pr-body-contract.md` synced as a short URL
+pointer (retains Claude-only sync coupling across nine targets and always-loaded
+context overhead on every session without closing the cross-harness gap).
+Decisions 2 and 3 stand unchanged.

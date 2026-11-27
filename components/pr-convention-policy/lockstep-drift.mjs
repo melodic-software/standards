@@ -4,9 +4,8 @@
 // the fleet PR convention, but other copies of the contract exist and must
 // change in lockstep with it — the ci-workflows `check-contract` composite
 // (the live gate every consumer runs inside its `ci-status` job), the
-// source-control plugin's PreToolUse validator, the org `.github` PR
-// template, and this repository's distributed
-// `.claude/rules/pr-body-contract.md`. Letting any copy drift is exactly the
+// source-control plugin's PreToolUse validator, and the org `.github` PR
+// template. Letting any copy drift is exactly the
 // failure #393 recorded (and claude-code-plugins#3205 repeated). This check
 // also dereferences every consumer's pinned artifact and validates the
 // contract AT THAT PIN, because a stale pin enforcing an older contract (the
@@ -44,14 +43,6 @@ import { parseUniqueJson } from "./pr-convention-policy.mjs";
 
 const MODULE_DIRECTORY = import.meta.dirname;
 const POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
-const RULES_FILE_PATH = path.join(
-  MODULE_DIRECTORY,
-  "..",
-  "..",
-  ".claude",
-  "rules",
-  "pr-body-contract.md",
-);
 
 // Contents-API URLs, not raw.githubusercontent: several consumers are private
 // repositories, and the API honors the token `LOCKSTEP_GITHUB_TOKEN` (or
@@ -728,12 +719,6 @@ function assertMentions(text, terms, location) {
   }
 }
 
-function assertMentionsAny(text, terms, location) {
-  if (!terms.some((term) => text.includes(term))) {
-    throw new DriftError(`${location}: mentions none of: ${terms.join(", ")}`);
-  }
-}
-
 // The `check-contract` composite masks fenced and indented code blocks and inline
 // code spans before matching a PR body, so an escape an author copies verbatim
 // from a backticked template is invisible to the gate and the PR draws the
@@ -938,42 +923,12 @@ export function checkCopies(policy, texts) {
   run(() =>
     assertContainsSections(parseMarkdownHeadings(texts.orgTemplate), sections, "org PR template"),
   );
-  // The rules file names the section headings in prose (backticked, inside
-  // bullets), not as its own document headings — a mention check, not a
-  // heading parse.
-  run(() =>
-    assertMentions(
-      texts.rulesFile,
-      sections.map((name) => `## ${name}`),
-      "rules file (sections)",
-    ),
-  );
-  run(() =>
-    assertMentions(texts.rulesFile, policy.body.closingKeywords, "rules file (closing keywords)"),
-  );
-  // The rules file and the org PR template are guidance, not enforcement: each
-  // must steer an author to at least one accepted opt-out marker, not
-  // enumerate every accepted phrasing. Naming more than one gives the author a
-  // choice the gate never asked for, and `policy.json` keeps the full accepted
-  // set for the artifacts that do enforce it. The rules file names its marker
-  // as prose markup and is never copied into a PR body, so it is matched as
-  // written; the template is copied verbatim, so its marker is matched after
-  // masking.
-  run(() =>
-    assertMentionsAny(texts.rulesFile, policy.body.noIssueMarkers, "rules file (no-issue markers)"),
-  );
-  // The same holds for linking without closing: the rules file must steer an
-  // author to one non-closing marker, in the `<marker>:` form the gate reads,
-  // so a session that must not close an issue is not pushed toward a false
-  // no-issue marker or a negated closer. The org template is not held to this
-  // yet: it lives in another repository and names no marker in that form.
-  run(() =>
-    assertMentionsAny(
-      texts.rulesFile,
-      policy.body.nonClosingMarkers.map((marker) => `${marker}:`),
-      "rules file (non-closing markers)",
-    ),
-  );
+  // The org PR template is guidance, not enforcement: it must steer an author
+  // to at least one accepted opt-out marker, not enumerate every accepted
+  // phrasing. Naming more than one gives the author a choice the gate never
+  // asked for, and `policy.json` keeps the full accepted set for the artifacts
+  // that do enforce it. The template is copied verbatim, so its marker is
+  // matched after masking.
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
     assertMentionsAnyRendered(
@@ -1240,9 +1195,7 @@ function cachedFetcher(fetcher) {
 // this branch's render or a version of the generated template committed on standards `main`
 // (`committedTemplates`, newest first). The live copy lags both while a template change waits
 // for its merge, and then for the reviewed sync pull request in `melodic-software/.github`, so
-// any committed version passes; a byte matching none of them is a hand edit there. The rules
-// file needs no such check: it is this repository's own file, and `contract-docs.mjs check`
-// holds it.
+// any committed version passes; a byte matching none of them is a hand edit there.
 export function checkGeneratedTemplate(policy, orgTemplate, committedTemplates) {
   return orgTemplate === renderTemplate(policy) || committedTemplates.includes(orgTemplate)
     ? []
@@ -1278,7 +1231,6 @@ export async function runCopyCheck() {
       ...(await readGateComposite(fetchTextOrNull)),
       hookValidator: await fetchText(COPY_SOURCES.hookValidator),
       orgTemplate,
-      rulesFile: await readFile(RULES_FILE_PATH, "utf8"),
     }),
     ...checkGeneratedTemplate(policy, orgTemplate, committedTemplates),
   ];
