@@ -367,12 +367,13 @@ Public targets take the hosted pair:
 sourced from `components/claude-lanes-hosted/` and materialized at
 `.github/workflows/pr-review-hosted.yml` and
 `.github/workflows/pr-review-security-hosted.yml`. Both call
-`ci-workflows`' hosted-only `pr-review-cli.yml@main` (`lane: code` /
-`lane: security`, running on GitHub-hosted `ubuntu-24.04` with API-key-first
+`ci-workflows`' `pr-review-cli.yml@main` (`lane: code` /
+`lane: security`, defaulting to GitHub-hosted `ubuntu-24.04` with API-key-first
 routing via `REVIEWS_CLAUDE_API_KEY`, `REVIEWS_CLAUDE_CODE_OAUTH_TOKEN`, and
-`FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`), with the workflow `name:` set to each
-destination file's stem in Title Case and the same job ids (`pr-review` /
-`pr-review-security`). The destinations differ because
+`FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`), matching the fleet pair's reusable and
+secrets while omitting the fleet `runner` literal. The workflow `name:` is set
+to each destination file's stem in Title Case and the same job ids
+(`pr-review` / `pr-review-security`). The destinations differ because
 a destination has one owning component. They are `managed` for .github,
 ci-runner, and claude-code-account-rotation.
 claude-code-plugins holds both as `locally-owned`: its callers resolve the

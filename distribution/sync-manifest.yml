@@ -66,8 +66,8 @@ components:
   # PUBLIC SHAPE (`claude-review-hosted-caller` and
   # `claude-security-review-hosted-caller`), sourced from
   # `components/claude-lanes-hosted/`: both call `pr-review-cli.yml@main`
-  # (`lane: code` / `lane: security`), which is hosted-only (`ubuntu-24.04`
-  # inside the reusable, no `runner` input) and runs the reviews role's API key
+  # (`lane: code` / `lane: security`), omitting `runner` so the reusable
+  # defaults to GitHub-hosted `ubuntu-24.04`, and run the reviews role's API key
   # first, then its subscription token, then `FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`
   # (melodic-software/control-hub#13). runner-policy admits `pr-review-cli.yml`
   # on public repositories, matching GitHub's recommendation against self-hosted

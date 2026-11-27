@@ -265,9 +265,17 @@ unknown secret names, and alternate expressions:
   `role` (lower kebab, and `role` must be in `allowedInputs`) may instead map
   it to that role's prefixed name, `NAME: ${{ secrets.<ROLE>_NAME }}`, with
   `<ROLE>` upper-snake (`issue-lane` is `ISSUE_LANE`), and its caller must pass
-  `role:` as that exact literal. Role-named secrets let several funding roles
+  `role:` as that exact literal unless the contract also declares
+  `roleDefault: true` (matching a reusable whose `role` input already defaults
+  to that value, in which case an omitted `role` is accepted and any non-matching
+  literal is still refused). Role-named secrets let several funding roles
   share one repository; the role stays a reviewed literal, never an
   expression, and every other rename is still refused.
+  A runner-input contract may also declare `runnerInputDefault` (an approved
+  hosted runner label matching the reusable's own `runner` default): callers
+  that omit the runner input are audited against that default label, so public
+  callers stay clean without repeating the default while enrolled private
+  consumers still fail closed unless they pass a governed managed fleet label.
   A runner-input reusable whose jobs do not all run on its runner input
   records the GitHub-hosted labels those jobs use in `fixedRunsOn`. On an
   enrolled private repository a call that passes the fleet label then still

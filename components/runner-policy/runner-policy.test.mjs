@@ -7053,3 +7053,114 @@ test("dangling .github/runner-policy.json symlink fails closed even with public 
       /repository runner config could not be read/u.test(error.message),
   );
 });
+
+test("pr-review-cli runnerInputDefault admits omitted runner on public repos and fails closed on private fleet repos", async () => {
+  const workflowBody = `name: PR Review Hosted
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  pr-review:
+    name: PR Review
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+    uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
+    with:
+      lane: code
+      publish: comments
+    secrets:
+      CLAUDE_API_KEY: \${{ secrets.REVIEWS_CLAUDE_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}
+      FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}
+`;
+  const publicRoot = await consumerCarrying({
+    body: workflowBody,
+    visibility: "public",
+    selfHostedCi: false,
+  });
+  assert.deepEqual(
+    await auditRepository({
+      root: publicRoot,
+      githubRepository: "melodic-software/claude-code-plugins",
+      repositoryVisibility: "public",
+    }),
+    [],
+  );
+
+  const privateRoot = await consumerCarrying({
+    body: workflowBody,
+    visibility: "private",
+    selfHostedCi: true,
+  });
+  const privateFindings = await auditRepository({
+    root: privateRoot,
+    githubRepository: "melodic-software/medley",
+    repositoryVisibility: "private",
+  });
+  assert.ok(
+    privateFindings.some(({ rule }) => rule === "hosted-exception-required"),
+    `expected private fleet caller omitting runner to fail closed, got ${JSON.stringify(privateFindings)}`,
+  );
+
+  const wrongRoleRoot = await consumerCarrying({
+    body: workflowBody.replace("publish: comments\n", "publish: comments\n      role: intake\n"),
+    visibility: "public",
+    selfHostedCi: false,
+  });
+  const wrongRoleFindings = await auditRepository({
+    root: wrongRoleRoot,
+    githubRepository: "melodic-software/claude-code-plugins",
+    repositoryVisibility: "public",
+  });
+  assert.ok(
+    wrongRoleFindings.some(({ message }) => message.includes("must receive role: reviews")),
+    `expected non-matching literal role to fail closed, got ${JSON.stringify(wrongRoleFindings)}`,
+  );
+});
+
+test("each fleet claude lane caller calls pr-review-cli with melodic-review-ubuntu-24.04-x64 and reviews secrets", async () => {
+  const fleet = await claudeLaneCallerComponents("components/claude-lanes/");
+  assert.equal(fleet.length, 2, "expected a fleet code-review and security-review caller");
+  for (const { source, body } of fleet) {
+    const parsed = parse(body);
+    const [jobId] = Object.keys(parsed.jobs);
+    const job = parsed.jobs[jobId];
+    const expectedLane = source.endsWith("claude-security-review.yml") ? "security" : "code";
+    assert.equal(
+      job.uses,
+      "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main",
+      `${source} must call pr-review-cli.yml@main`,
+    );
+    assert.equal(job.with?.lane, expectedLane, `${source} lane input`);
+    assert.equal(job.with?.publish, "comments", `${source} publish input`);
+    assert.equal(
+      job.with?.runner,
+      "melodic-review-ubuntu-24.04-x64",
+      `${source} must pass melodic-review-ubuntu-24.04-x64`,
+    );
+    assert.deepEqual(
+      job.permissions,
+      {
+        actions: "read",
+        checks: "read",
+        contents: "read",
+        "pull-requests": "write",
+      },
+      `${source} caller permissions`,
+    );
+    assert.deepEqual(
+      job.secrets,
+      {
+        CLAUDE_API_KEY: `\${{ secrets.REVIEWS_CLAUDE_API_KEY }}`,
+        CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}`,
+        FALLBACK_CLAUDE_CODE_OAUTH_TOKEN: `\${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}`,
+      },
+      `${source} review secrets`,
+    );
+  }
+});
