@@ -34,10 +34,11 @@ name: PR Review Security Hosted
 # reviews only pull requests from branches of this repository: fork and
 # Dependabot pull requests get no secrets.
 #
-# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml runs on
-# GitHub-hosted `ubuntu-24.04` (it takes no `runner` input), which the
-# standards `runner-policy` component admits on a public repository. It is the
-# hosted sibling of components/claude-lanes/claude-security-review.yml.
+# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml defaults to
+# GitHub-hosted `ubuntu-24.04` when `runner` is omitted, which the standards
+# `runner-policy` component admits on a public repository. It is the hosted
+# sibling of components/claude-lanes/claude-security-review.yml (which passes
+# `runner: melodic-review-ubuntu-24.04-x64` on private fleet-enrolled repos).
 
 on:
   pull_request:
@@ -76,6 +77,7 @@ jobs:
       actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
       checks: read           # Publish Review reads its earlier runs' cost notices
       contents: read         # checkout + read the diff
+      issues: read           # read closing issues on private repositories
       pull-requests: write   # post the security review, comments, and the lane's reviewed-head marker comment
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:

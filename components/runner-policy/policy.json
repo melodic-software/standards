@@ -152,9 +152,13 @@
       ]
     },
     "melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml": {
-      "routing": "hosted-only",
-      "fixedRunsOn": ["ubuntu-24.04"],
+      "routing": "runner-input",
+      "runnerInput": "runner",
+      "runnerInputDefault": "ubuntu-24.04",
+      "role": "reviews",
+      "roleDefault": true,
       "allowedInputs": [
+        "runner",
         "lane",
         "publish",
         "role",
@@ -187,6 +191,22 @@
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}",
         "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
       },
+      "allowedCallerPermissions": [
+        {
+          "actions": "read",
+          "checks": "read",
+          "contents": "read",
+          "pull-requests": "write"
+        },
+        {
+          "actions": "read",
+          "checks": "read",
+          "contents": "read",
+          "issues": "read",
+          "pull-requests": "write"
+        }
+      ],
+      "allowedCallerPermissionsUntil": "2027-01-27",
       "approvedShas": [
         "20a822d73b6e2d7e21d48e609a01b427e0e161e7",
         "3180217076b19bbdfccc43026c7f91c604da673d",

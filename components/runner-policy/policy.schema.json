@@ -144,7 +144,9 @@
       "properties": {
         "routing": { "const": "runner-input" },
         "runnerInput": { "$ref": "#/$defs/inputName" },
+        "runnerInputDefault": { "$ref": "#/$defs/nonWhitespaceString" },
         "role": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+        "roleDefault": { "type": "boolean" },
         "allowedInputs": { "$ref": "#/$defs/uniqueStringArray" },
         "allowedSecrets": { "$ref": "#/$defs/secretMaps" },
         "allowedSecretsUntil": { "$ref": "#/$defs/switchoverDate" },

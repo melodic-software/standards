@@ -42,6 +42,7 @@ jobs:
       actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
       checks: read           # Publish Review reads its earlier runs' cost notices
       contents: read         # checkout + read the diff
+      issues: read           # read closing issues on private repositories
       pull-requests: write   # post the security review, comments, and the lane's reviewed-head marker comment
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:

@@ -21,15 +21,14 @@ name: PR Review Hosted
 # repository that means the lane reviews only pull requests from branches of
 # this repository: fork and Dependabot pull requests get no secrets.
 #
-# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml runs on
-# GitHub-hosted `ubuntu-24.04` (it takes no `runner` input), which the
-# standards `runner-policy` component admits on a public repository. It is the
-# hosted sibling of components/claude-lanes/claude-review.yml. The workflow
-# `name:` is the destination file's stem in Title Case and the job id stays
-# `pr-review`; this hosted caller reports `PR Review / Publish Review` (the
-# fleet sibling still reports `PR Review / Claude` until private callers
-# migrate, and the org's review-lane check lists accept both). A target manages
-# one of the two, never both.
+# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml defaults to
+# GitHub-hosted `ubuntu-24.04` when `runner` is omitted, which the standards
+# `runner-policy` component admits on a public repository. It is the hosted
+# sibling of components/claude-lanes/claude-review.yml (which passes
+# `runner: melodic-review-ubuntu-24.04-x64` on private fleet-enrolled repos).
+# The workflow `name:` is the destination file's stem in Title Case and the job
+# id stays `pr-review`; both hosted and fleet callers report
+# `PR Review / Publish Review`. A target manages one of the two, never both.
 #
 # This lane is advisory (github-iac ADR 0011: no organization ruleset may make
 # an agentic review a merge prerequisite).
@@ -77,6 +76,7 @@ jobs:
       actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
       checks: read           # Publish Review reads its earlier runs' cost notices
       contents: read         # checkout + read the diff
+      issues: read           # read closing issues on private repositories
       pull-requests: write   # post review, comments, and the lane's reviewed-head marker comment
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:

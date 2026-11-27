@@ -148,6 +148,14 @@ export function validatePolicy(value) {
           `reusable workflow contract ${reference}.allowedInputs must include ${contract.runnerInput}`,
         );
       }
+      if (
+        Object.hasOwn(contract, "runnerInputDefault") &&
+        !approvedHostedRunnerLabels.has(contract.runnerInputDefault)
+      ) {
+        throw new ConfigurationError(
+          `reusable workflow contract ${reference}.runnerInputDefault must be an approved hosted runner label`,
+        );
+      }
       for (const { map: permissions, location } of callerPermissionMaps) {
         if (!Object.values(permissions).includes("write")) {
           throw new ConfigurationError(`${location} must include at least one write permission`);
@@ -192,6 +200,11 @@ export function validatePolicy(value) {
           `reusable workflow contract ${reference}.allowedInputs must include role when role is declared`,
         );
       }
+      if (contract.roleDefault && !contract.role) {
+        throw new ConfigurationError(
+          `reusable workflow contract ${reference}.roleDefault requires role to be declared`,
+        );
+      }
       if (Object.hasOwn(contract, "allowedCallerPermissions")) {
         const prefix = contract.role ? `${contract.role.toUpperCase().replaceAll("-", "_")}_` : "";
         for (const { map: secrets, location } of secretMaps) {
@@ -230,7 +243,9 @@ export function validatePolicy(value) {
     approvedReusableWorkflowContracts.set(reference, {
       routing: contract.routing,
       ...(contract.runnerInput ? { runnerInput: contract.runnerInput } : {}),
+      ...(contract.runnerInputDefault ? { runnerInputDefault: contract.runnerInputDefault } : {}),
       ...(contract.role ? { role: contract.role } : {}),
+      ...(contract.roleDefault ? { roleDefault: true } : {}),
       allowedInputs: new Set(contract.allowedInputs),
       allowedSecrets: Object.freeze(secretMaps.map(({ map }) => Object.freeze({ ...map }))),
       ...(contract.allowedCallerPermissions
@@ -1014,14 +1029,18 @@ function reusableWorkflowStatus(job, policy, workflow) {
   if (contract.routing === "hosted-only") {
     return { isReusable: true, approved: true, contract };
   }
-  if (!Object.hasOwn(inputs, contract.runnerInput)) {
+  if (!Object.hasOwn(inputs, contract.runnerInput) && !contract.runnerInputDefault) {
     return {
       isReusable: true,
       approved: false,
       reason: `the reviewed reusable workflow must receive its ${contract.runnerInput} input explicitly`,
     };
   }
-  if (contract.role && inputs.role !== contract.role) {
+  if (
+    contract.role &&
+    (Object.hasOwn(inputs, "role") || !contract.roleDefault) &&
+    inputs.role !== contract.role
+  ) {
     return {
       isReusable: true,
       approved: false,
@@ -1147,7 +1166,9 @@ function runnerTargetStatus(job, workflow, policy, file, workflowIndex) {
   const target = local.approved
     ? job.with[policy.governedReusableRunnerInput.name]
     : reusable.approved
-      ? job.with[reusable.contract.runnerInput]
+      ? Object.hasOwn(job.with ?? {}, reusable.contract.runnerInput)
+        ? job.with[reusable.contract.runnerInput]
+        : reusable.contract.runnerInputDefault
       : job?.["runs-on"];
   if (typeof target !== "string") {
     return {
