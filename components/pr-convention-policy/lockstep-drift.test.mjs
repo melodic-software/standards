@@ -296,7 +296,7 @@ test("a composite that stops lowercasing the line is drift, not a pass", () => {
   assert.match(errors[1], /^gate composite \(behavior\): .*"Closes #12" should be closing/);
 });
 
-// The composite's findings at one codex-plugins pin, with the good action.yml.
+// The composite's findings at one consumer pin, with the good action.yml.
 
 const COMPOSITE_DIRECTORY = ".github/actions/pr-require-checks/check-contract";
 const COMPOSITE_STEP = `      - uses: melodic-software/ci-workflows/${COMPOSITE_DIRECTORY}@1234567890abcdef1234567890abcdef12345678 # v0.34.0`;
@@ -485,18 +485,18 @@ test("a mixed fleet of composite and reusable consumers passes", () => {
   const errors = checkFleet(
     POLICY,
     fleetResolutions({
-      "codex-plugins": compositeAt("4".repeat(40)),
+      "ci-runner": compositeAt("4".repeat(40)),
       "github-iac": compositeAt("5".repeat(40)),
     }),
   );
   assert.deepEqual(errors, []);
 });
 
-// Fail-closed, with no per-repository exemption: github-iac#367 put every
-// repository in the roster under the org `ci-gate` ruleset, so a repository
-// running neither artifact is a gate removal wherever it happens.
+// Fail-closed, with no per-repository exemption: every repository in the roster
+// sits under the org `ci-gate` ruleset, so a repository running neither artifact
+// is a gate removal wherever it happens.
 test("a repository running neither artifact fails the fleet, whichever repository it is", () => {
-  for (const repo of ["dotfiles", "agent-plugins", "claude-code-proxy", "cursor-plugins"]) {
+  for (const repo of ["dotfiles", "ci-runner", "claude-code-proxy", "songwriting"]) {
     const errors = checkFleet(POLICY, fleetResolutions({ [repo]: { kind: "none" } }));
     assert.equal(errors.length, 1, `${repo} produces exactly one finding`);
     assert.match(errors[0], new RegExp(`caller ${repo}: no check-contract composite step`));
@@ -551,16 +551,13 @@ test("a repository whose fetch already failed is not double-reported", () => {
   assert.deepEqual(errors, []);
 });
 
-test("consumer roster covers all nineteen gated repositories", () => {
-  assert.equal(CONSUMER_REPOSITORIES.length, 19);
+test("consumer roster covers all fifteen gated repositories", () => {
+  assert.equal(CONSUMER_REPOSITORIES.length, 15);
   for (const repo of [
-    "agent-automations",
-    "agent-plugins",
     "architecture",
     "azure-iac",
     "claude-code-account-rotation",
     "claude-code-proxy",
-    "cursor-plugins",
     "knowledge-corpus",
     "songwriting",
   ]) {

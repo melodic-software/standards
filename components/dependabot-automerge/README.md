@@ -33,10 +33,9 @@ permission wording while invoking the identical reusable workflow.
 
 Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence):
 
-- **Live consumers**: 6 public targets (`melodic-software/.github`,
-  `agent-plugins`, `ci-runner`, `claude-code-account-rotation`,
-  `codex-plugins`, `cursor-plugins`) for `dependabot-automerge-caller`, and 8
-  private fleet-enrolled targets (`agent-automations`, `architecture`,
+- **Live consumers**: 3 public targets (`melodic-software/.github`,
+  `ci-runner`, `claude-code-account-rotation`) for `dependabot-automerge-caller`,
+  and 7 private fleet-enrolled targets (`architecture`,
   `claude-code-proxy`, `dotfiles`, `github-iac`, `knowledge-corpus`,
   `provisioning`, `songwriting`) for `dependabot-automerge-fleet-caller`.
   `ci-workflows` (hosts the reusable itself) and `medley` (carries an extra

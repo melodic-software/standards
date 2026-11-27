@@ -52,9 +52,8 @@ for such a pull request to bump: the action checks out the consumer itself
 **Hosted caller.** `managed-files-guard.yml` runs on `ubuntu-24.04`
 directly. `runner-policy` admits that shape on a public repository and on a
 private repository not enrolled for local CI routing. It is managed for
-`melodic-software/.github`, `agent-plugins`, `ci-runner`,
-`claude-code-account-rotation`, `claude-code-plugins`, `codex-plugins`, and
-`cursor-plugins`, all public. `claude-code-plugins` is the one consumer here
+`melodic-software/.github`, `ci-runner`,
+`claude-code-account-rotation`, and `claude-code-plugins`, all public. `claude-code-plugins` is the one consumer here
 that also executes the `runner-policy` gate;
 `components/runner-policy/runner-policy.test.mjs` asserts this caller audits
 clean under a public hosted-only inventory so the sync cannot red that
@@ -62,7 +61,7 @@ target's `ci-status`.
 
 **Fleet-routed caller.** `managed-files-guard-fleet.yml` runs on the managed
 fleet label `melodic-ubuntu-24.04-x64`. It is managed for the private targets
-enrolled for local CI routing: `agent-automations`, `claude-code-proxy`,
+enrolled for local CI routing: `claude-code-proxy`,
 `dotfiles`, `github-iac`, `medley`, and `provisioning`. On a routing-enrolled repository,
 `runner-policy` requires every eligible read-only job either to name the
 managed fleet label or to carry a reviewed hosted exception, so a fixed
