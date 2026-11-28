@@ -1,15 +1,7 @@
 #!/usr/bin/env node
-// MCP package dispatch: cross-platform npx spawn OR worktree-scoped repo server.
-//
-// npx servers:  node launcher.js -y @scope/pkg …
-// repo servers: node launcher.js mcp-servers/<name>/node node build/index.js
-// keyed servers: node launcher.js --vault NAME=vault-secret-name [--vault …] <either form above>
-//
-// MCP hosts spawn fnm exec first (see README.md); set MCP_LAUNCHER_FNM_ACTIVE=1
-// so this file does not double-wrap. Manual dev may invoke launcher.js
-// directly — fnm wrap runs when fnm is on PATH.
-//
-// stdout is the MCP JSON-RPC channel: this file writes only to stderr.
+
+// stdout is the MCP JSON-RPC channel, so this file writes only to stderr:
+// https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
 
 const fs = require("node:fs");
 const os = require("node:os");
@@ -25,7 +17,6 @@ function warn(message) {
   process.stderr.write(`mcp-launcher: ${message}\n`);
 }
 
-// Leading `--vault NAME=secret` pairs, and the args after them (an optional `--` ends the pairs).
 function parseVault(args) {
   const specs = [];
   let rest = args;
@@ -42,7 +33,6 @@ function parseVault(args) {
   return { specs, rest };
 }
 
-// Empty, or a placeholder the host passed through unexpanded (`${NAME}`, `${env:NAME}`).
 function isSet(name) {
   const value = process.env[name];
   return Boolean(value) && !UNEXPANDED_PLACEHOLDER_PATTERN.test(value);
@@ -51,7 +41,6 @@ function isSet(name) {
 function findVaultExec() {
   const bin = path.join(os.homedir(), ".local", "bin");
   if (process.platform === "win32") {
-    // `where` does not find a .ps1, so test for the file.
     const script = path.join(bin, "vault-exec.ps1");
     return fs.existsSync(script)
       ? { command: "pwsh", prefix: ["-NoProfile", "-File", script] }
@@ -92,7 +81,6 @@ function run(forwardArgs) {
       "mcp-launcher",
     );
   } else {
-    // No fnm and no parent fnm-exec wrap — fall back to ambient node.
     warn("fnm not on PATH — using ambient node");
     dispatch(forwardArgs);
   }
@@ -105,7 +93,6 @@ const missing = specs.filter((spec) => !isSet(nameOf(spec)));
 const resolver = missing.length > 0 && !tried ? findVaultExec() : null;
 
 if (resolver) {
-  // One vault-exec round: the child carries TRIED=1, so it never re-enters here.
   const envArgs = missing.flatMap((spec) => ["--env", spec]);
   attachLifecycle(
     spawn(
@@ -129,7 +116,6 @@ if (resolver) {
     const why = tried ? "unset after vault-exec" : "unset and vault-exec not found";
     warn(`${names.join(", ")} ${why}; starting keyless`);
   }
-  // A literal `${NAME}` must not reach the server as its key.
   for (const name of names) delete process.env[name];
   run(rest);
 }

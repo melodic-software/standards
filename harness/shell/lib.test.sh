@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Self-test for the assertion library: the PASS and FAIL paths of every
-# assertion must themselves behave. Deliberate-failure paths run inside $(...)
-# command substitutions, so their FAILED/CASE_NUM increments stay in the
-# subshell and never skew this file's own counters.
 set -uo pipefail
 # shellcheck source=harness/shell/lib.sh
 source "$(git rev-parse --show-toplevel)/harness/shell/lib.sh"
@@ -50,15 +46,12 @@ assert_contains "assert_silent fails on output" "$out" "FAIL:"
 assert_command_fails "false exits non-zero" false
 out="$(assert_command_fails "cf" true 2>&1)"
 assert_contains "assert_command_fails fails when the command succeeds" "$out" "FAIL:"
-# errexit immunity: the failing subject must not abort a `set -e` caller before
-# the assertion records (regression guard for the run-bare refactor).
 out="$(
   set -e
   assert_command_fails "errexit-safe" false
 )"
 assert_contains "assert_command_fails is safe under set -e" "$out" "PASS:"
 
-# --- skip_case (unlike skip_suite, control must continue past it) ---
 out="$(
   skip_case "one case skipped" 2>&1
   printf 'continued\n'
@@ -66,7 +59,6 @@ out="$(
 assert_contains "skip_case emits a SKIP marker" "$out" "SKIP:"
 assert_contains "skip_case does not exit" "$out" "continued"
 
-# --- require_min_version (skip_suite exits 0, so run each in a subshell) ---
 out="$(require_min_version tool 1.2.3 1.2.0 2>&1)"
 assert_silent "require_min_version is silent when have > min" "$out"
 out="$(require_min_version tool 1.2.0 1.2.0 2>&1)"

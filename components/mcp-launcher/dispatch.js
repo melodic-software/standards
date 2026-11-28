@@ -22,10 +22,8 @@ function attachLifecycle(child, label) {
   });
 }
 
-// Quote one argument for npx.cmd. First the C runtime rules node.exe parses
-// argv with: backslashes before a quote or the closing quote are doubled and
-// each quote becomes \". Then every cmd metacharacter, the quotes included, is
-// escaped twice with ^: once for `cmd /c`, once for the shim's `%*` line.
+// C runtime argv quoting (backslashes before a quote doubled, quote as \"), then each cmd metacharacter
+// ^-escaped twice: https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments
 function escapeCmdShimArg(arg) {
   const quoted = `"${arg.replace(QUOTE_RE, '$1$1\\"').replace(TRAILING_BACKSLASHES_RE, "$1$1")}"`;
   return quoted.replace(CMD_META_RE, "^^^$1");
@@ -37,17 +35,8 @@ function runNpx(npxArgs) {
   const npxBinary = path.join(nodeDir, isWindows ? "npx.cmd" : "npx");
   let child;
   if (isWindows) {
-    // On Windows, spawn `cmd /d /s /c` with the entire command line pre-quoted:
-    //   cmd /d /s /c ""C:\Program Files\nodejs\npx.cmd" ^^^"arg1^^^" ..."
-    // cmd's /s flag with /c strips one outer quote pair, then parses the
-    // remaining tokens. The binary is quoted so a path with spaces survives
-    // (default install under `C:\Program Files\nodejs\`); each arg goes
-    // through escapeCmdShimArg.
-    //
-    // windowsVerbatimArguments: true prevents Node from re-escaping the
-    // already-quoted args. Avoids the DEP0190 deprecation from
-    // `{ shell: true }` + args array (Node ≥22 warns; CVE-2024-27980 fix
-    // path).
+    // A .cmd needs cmd.exe; windowsVerbatimArguments stops Node re-quoting, and an args array with `shell: true` is DEP0190:
+    // https://nodejs.org/api/deprecations.html#dep0190-passing-args-to-nodechild_process-execfilespawn-with-shell-option
     const inner = `"${npxBinary}" ${npxArgs.map(escapeCmdShimArg).join(" ")}`;
     child = spawn("cmd.exe", ["/d", "/s", "/c", `"${inner}"`], {
       stdio: "inherit",
@@ -75,13 +64,9 @@ function resolveWorktreeRoot() {
     process.exit(1);
   }
 
-  // Both layouts: --show-toplevel returns the current worktree root.
-  // Standard clone: repo root. Bare-clone hub: the specific worktree CWD is in.
-  // This keeps each worktree isolated — MCP servers resolve from their own checkout.
   try {
     return gitRevParse("--show-toplevel");
   } catch {
-    // Fallback for edge cases (bare repo CWD, detached worktree)
     return path.resolve(gitCommonDir, "..");
   }
 }
@@ -130,10 +115,6 @@ function dispatch(forwardArgs) {
     return;
   }
 
-  // npx mode: first arg must be either an npx flag (-y, -p, --package, etc.)
-  // or a bare package spec (no leading "./", "/", or backslash). Surface a
-  // clear diagnostic from the launcher layer rather than letting npx produce
-  // a confusing ENOENT downstream when an unrecognized path slips through.
   const first = forwardArgs[0];
   if (first.startsWith("./") || first.startsWith("/") || first.includes("\\")) {
     process.stderr.write(

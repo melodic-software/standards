@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# Discover and run *.test.sh files; report per-file status and a summary.
-# Exit non-zero if any file fails. Runs the same locally and in CI.
-#
-# Usage:
-#   harness/shell/run-tests.sh            # all *.test.sh in the repo
-#   harness/shell/run-tests.sh path/a.test.sh path/b.test.sh
-#
-# A test file passes when it exits 0 and emits no `FAIL: ` markers. A file that
-# exits 0 with a `SKIP:` marker and no `PASS:` lines is counted as skipped (no
-# coverage this run). A listed file that does not exist counts as a failure.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd) )"
@@ -22,9 +12,6 @@ else
 fi
 
 total=0 passed=0 failed=0 skipped=0
-# "${tests[@]+...}" guards the empty-array expansion under `set -u` (on bash
-# <= 4.3, including macOS's system bash 3.2, expanding an empty array otherwise
-# aborts with "unbound variable").
 for t in "${tests[@]+"${tests[@]}"}"; do
   total=$((total + 1))
   rel="${t#"$root"/}"
