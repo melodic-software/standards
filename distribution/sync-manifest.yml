@@ -26,6 +26,15 @@ components:
   claude-settings-github-iac:
     files:
       components/claude-settings/targets/github-iac/settings.json: .claude/settings.json
+  # Managed targets take the generic, data-driven script byte-exact; a repo
+  # enriches through its own never-synced .claude/cloud-bootstrap.local.sh, or
+  # goes `locally-owned` to customize the whole file. Deliberate exclusions:
+  # - claude-code-plugins: `locally-owned` — its bootstrap carries
+  #   directory-source dogfooding (same-version commit-drift repair) that must
+  #   not fan out to github-source consumers.
+  # - medley: `locally-owned` — its bootstrap and cloud-bootstrap.test.sh carry
+  #   repo-specific toolchain steps; converge later by moving those into a
+  #   cloud-bootstrap.local.sh, then flip to managed.
   cloud-bootstrap:
     files:
       components/cloud-bootstrap/cloud-bootstrap.sh: .claude/cloud-bootstrap.sh
@@ -38,6 +47,12 @@ components:
   commit-convention:
     files:
       components/commit-convention/commit-convention.yml: docs/conventions/source-control/commit-convention.yml
+  # The reusable reads the Dependabot policy from this repository's `main`
+  # (components/dependabot-policy/policy.json), never a synced copy, so neither
+  # requires another component. Deliberate exclusions:
+  # - ci-workflows: `locally-owned` — hosts the reusable itself at
+  #   .github/workflows/pr-automerge-dependabot.yml and uses a queue workflow.
+  # - medley: `locally-owned` — carries a repo-local second `automerge` job.
   dependabot-automerge-caller:
     files:
       components/dependabot-automerge/dependabot-automerge.yml: .github/workflows/pr-automerge-dependabot-hosted.yml
@@ -83,6 +98,10 @@ components:
   lychee-online-claude-code-plugins:
     files:
       components/lychee-online/targets/claude-code-plugins.yml: .github/workflows/maintenance-check-links-online.yml
+  # Deliberate exclusions:
+  # - ci-workflows: `locally-owned` — it hosts the action and already runs
+  #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
+  #   pinned to its own commit), so a second caller would double the check.
   managed-files-guard-caller:
     files:
       components/managed-files-guard/managed-files-guard.yml: .github/workflows/pr-check-managed-files-hosted.yml
@@ -165,7 +184,14 @@ targets:
       - path-detection-action
       - psscriptanalyzer
       - repository-text
+    # ci-workflows hosts the managed-files-guard action and already runs it
+    # as a job of its own ci.yml, through a `./` action ref that resolves to
+    # the commit under test. A synced caller pinned to an older commit would
+    # run the guard twice per PR, once at each revision. Removal trigger:
+    # ci-workflows retiring its in-repo job in favor of the synced caller.
     locally-owned:
+      # ci-workflows hosts the pr-automerge-dependabot.yml reusable itself and
+      # uses pr-automerge-dependabot-queue.yml for its merge queue.
       - dependabot-automerge-caller
       - managed-files-guard-caller
   melodic-software/claude-code-account-rotation:
@@ -188,10 +214,37 @@ targets:
       - node-runtime
       - path-detection-guardrails
       - repository-text
+    # The hosted lane pair is locally owned here, so this repository's copies
+    # can resolve their models through its own resolve-config action and pass
+    # them as `model-args` (ci-workflows v0.45.0). No other target has that
+    # action and a `models:` block in its pr-pipeline config, so the shared
+    # callers keep the reusable defaults. Removal trigger: a second target
+    # routing its review models that way, which moves the resolve step into
+    # the shared component.
+    #
+    # `ruff`: the canonical policy reports 385 findings against that tree
+    # against 166 under upstream's bare defaults, so adoption is a migration
+    # rather than a config flip — most of the delta is `S`, `ERA`, `FIX`,
+    # `PTH`, `ARG`, `RET`, and the `TID` relative-import ban meeting a codebase
+    # never held to them. The repo owns a `ruff.toml` selecting `E4`, `E7`,
+    # `E9`, and `F`, which is what stops upstream default churn from being a
+    # repo-breaking event (ruff 0.16.0 moved the default set from 59 rules to
+    # 413 and turned two of its contract suites red on an unmodified `main`).
+    # Recorded here rather than left absent because absence is what produced an
+    # implicit policy nobody chose. Removal trigger: that migration being
+    # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
+      # Directory-source dogfooding: this repo's bootstrap carries same-version
+      # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
+      # The repository carries the convention in
+      # `docs/conventions/source-control.yaml` (ADR 0064), which the guardrails
+      # resolver reads first (claude-code-plugins#10134), so the folder-form
+      # file is deleted there and a sync would restore a second, unread copy.
+      # Removal trigger: the guardrails resolver dropping its folder-form
+      # fallback, after which the component can retire fleet-wide.
       - commit-convention
       - ruff
   melodic-software/claude-code-proxy:
@@ -207,6 +260,8 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
+    # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
+    # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
       - ruff
   melodic-software/dotfiles:
@@ -257,11 +312,33 @@ targets:
       - path-detection-tools
       - tsconfig
     locally-owned:
+      # Repo-specific toolchain steps live inside the bootstrap itself (plus a
+      # committed cloud-bootstrap.test.sh over it); converge by moving them
+      # into a cloud-bootstrap.local.sh, then flip to managed.
       - cloud-bootstrap
+      # Medley's pr-automerge-dependabot.yml carries an extra repo-local
+      # `automerge` job beside the reusable call.
       - dependabot-automerge-fleet-caller
+      # The canonical payload lands under eng/dotnet-analysis/ — no collision
+      # with medley's monorepo-tuned root .NET analyzer config is possible.
+      # Locally owned because medley does not consume that destination:
+      # adopting would land unused payloads beside its own tuned config.
+      # Revisit if medley moves to the canonical destination layout.
       - dotnet-analysis
+      # Slightly stale local copy at the canonical destination
+      # (PSScriptAnalyzerSettings.psd1, 138 lines vs 141 — the one counterpart
+      # SMALLER than canonical). Recorded 2026-08-16 (audit); nearest-parity
+      # adoption candidate among them.
       - psscriptanalyzer
+      # Substantially diverged local copies of both payload files at the
+      # canonical destinations (.editorconfig 204 lines vs 67, .gitattributes
+      # 290 vs 61 — monorepo expansion). Recorded 2026-08-16 (audit); the
+      # heaviest divergence of medley's counterpart files.
       - repository-text
+      # The ONLY true root-file overwrite among medley's analyzer exclusions:
+      # canonical ruff.toml at the repo root would clobber medley's tuned
+      # `target-version`, `include`, and per-tree scope. Revisit when medley
+      # adopts the dotfiles extend pattern.
       - ruff
   melodic-software/provisioning:
     managed:
