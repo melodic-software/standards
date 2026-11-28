@@ -782,7 +782,7 @@ jobs:
       # A called workflow can only narrow the caller's permissions, so its grant is made here:
       # https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
       security-events: write
-    # zizmor collects only `.github/workflows`, so the shipped workflow components are named:
+    # zizmor finds workflows only under `.github/workflows`, so the shipped workflow components are named:
     # https://docs.zizmor.sh/usage/
     uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@main
     with:
