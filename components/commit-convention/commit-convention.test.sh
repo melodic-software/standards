@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# Tests the commit-convention component: the convention file's types equal the
-# pr-convention-policy `title.allowedTypes` and the `types` default of the
-# ci-workflows check-contract action at the ref this repository uses; the
-# guardrails resolver reads the file at its well-known path when it is tracked;
-# the guardrails commit-msg hook accepts and rejects the expected subjects; and
-# this repository's own copy at that path is byte-identical to the component.
-# standards is the manifest source, not a sync target, so that equality stands
-# in for the synchronizer here.
-#
-# Needs the pr-convention-policy dependencies (`npm ci --prefix
-# components/pr-convention-policy`) for the YAML parser, and network access to
-# read the check-contract action and the guardrails plugin. A failed
-# fetch fails the suite.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -24,8 +11,6 @@ trap 'exit 143' TERM
 
 source_file="$root/components/commit-convention/commit-convention.yml"
 well_known="docs/conventions/source-control/commit-convention.yml"
-# The hooks repositories run: the guardrails plugin at claude-code-plugins main,
-# the ref of the lefthook remote in lefthook.yml.
 plugins="$TEST_TMPDIR/claude-code-plugins"
 if git clone -q --depth 1 --filter=blob:none --sparse https://github.com/melodic-software/claude-code-plugins "$plugins" &&
   git -C "$plugins" sparse-checkout set plugins/guardrails; then
@@ -39,14 +24,12 @@ hook="$plugins/plugins/guardrails/git-hooks/commit-msg-convention.sh"
 policy="$root/components/pr-convention-policy/policy.json"
 yaml_package="$root/components/pr-convention-policy/package.json"
 
-# Node one-liners resolve `yaml` from the pr-convention-policy dependencies.
 node_eval() {
   node -e "const yaml = require('module').createRequire(process.argv[1])('yaml');
 const fs = require('fs');
 $1" "$yaml_package" "${@:2}"
 }
 
-# Comma-joined, sorted types.
 sorted_csv() { tr ',' '\n' | sed '/^$/d' | LC_ALL=C sort | paste -sd, -; }
 
 parsed="$(node_eval 'const d = yaml.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -84,8 +67,6 @@ assert_eq 'types equal pr-convention-policy title.allowedTypes' "$policy_types" 
 require_scope="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).title.requireScope))' "$policy")"
 assert_eq 'pr-convention-policy keeps the scope optional, as the pattern does' 'false' "$require_scope"
 
-# report-ci-status runs check-contract through `$/` at the ref it is called
-# at, so either ref names the check-contract that gates.
 contract_pin="$(sed -E -n 's#^ *uses: melodic-software/ci-workflows/\.github/actions/pr-require-checks/(check-contract|report-ci-status)@([0-9a-f]{40}|main)([[:space:]].*)?$#\2#p' \
   "$root/.github/workflows/pr-require-checks.yml" | sort -u)"
 if [[ "$contract_pin" =~ ^([0-9a-f]{40}|main)$ ]]; then

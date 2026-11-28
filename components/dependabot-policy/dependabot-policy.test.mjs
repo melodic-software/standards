@@ -54,12 +54,10 @@ function rules(findings) {
 
 const COOLDOWN = "    cooldown:\n      default-days: 3\n";
 
-// CONFORMANT with extra keys appended to its cooldown block.
 function withCooldown(extra) {
   return CONFORMANT.replace(COOLDOWN, `${COOLDOWN}${extra}`);
 }
 
-// CONFORMANT with its groups block replaced.
 function withGroups(groups) {
   return CONFORMANT.replace(/ {4}groups:\n[\s\S]*$/u, `    groups:\n${groups}`);
 }

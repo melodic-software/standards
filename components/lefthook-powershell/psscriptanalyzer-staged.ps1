@@ -28,10 +28,6 @@ param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Files)
 $targets = @($Files | Where-Object { $_ })
 if (-not $targets) { return }
 
-# Resolve the consumer's ruleset from the repo root (Lefthook's working directory); fall back to the
-# analyzer defaults if a repo has none. Validate it PARSES first so a malformed settings file fails
-# loudly here instead of being silently swallowed - which would drop the consumer's ruleset and let the
-# scan report clean while running unruled.
 $settings = Join-Path $PWD 'PSScriptAnalyzerSettings.psd1'
 $settingsPath = $null
 if (Test-Path -LiteralPath $settings -PathType Leaf) {

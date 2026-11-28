@@ -41,7 +41,6 @@ const SCHEMA_VALIDATOR = new Ajv2020({
 const validatePolicyStructure = SCHEMA_VALIDATOR.compile(POLICY_SCHEMA);
 const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 
-// Which policy rule each waive category suppresses.
 const WAIVE_BY_RULE = {
   "schedule-not-standard": "schedule",
   "cooldown-below-minimum": "cooldown",
@@ -84,9 +83,6 @@ async function readDependabot(filePath) {
   return value;
 }
 
-// A stable identifier for one `updates` entry. Dependabot keys an entry by its
-// ecosystem and its directory; the plural `directories` list is joined so an
-// entry that scans several roots still has one deterministic key.
 function entryKey(entry) {
   const ecosystem = entry["package-ecosystem"];
   const prefix = typeof ecosystem === "string" && ecosystem.length > 0 ? ecosystem : "?";
@@ -99,8 +95,6 @@ function entryKey(entry) {
   return `${prefix}:?`;
 }
 
-// The intervals an ecosystem's entries may schedule on: its
-// scheduleIntervalByEcosystem list, else the one standard interval.
 function acceptedIntervals(policy, ecosystem) {
   const overrides = policy.scheduleIntervalByEcosystem ?? {};
   return Object.hasOwn(overrides, ecosystem)
@@ -127,10 +121,6 @@ function entryFindings(file, key, entry, policy) {
       ),
     );
   }
-  // Every configured cooldown day-count must meet the floor. A semver-specific
-  // override (semver-patch-days: 0, say) takes precedence over default-days for
-  // that update type, so a short override reintroduces the bot burst the soak
-  // exists to prevent.
   const cooldown = entry.cooldown;
   const dayKeys = ["default-days", "semver-major-days", "semver-minor-days", "semver-patch-days"];
   const belowFloor = dayKeys.filter((dayKey) => {
@@ -150,10 +140,6 @@ function entryFindings(file, key, entry, policy) {
       ),
     );
   } else {
-    // A default-days floor is only a soak if it actually applies. A match-all
-    // `exclude` skips the soak for every dependency, and an `include` list
-    // inverts the soak to opt-in, so both defeat the control. A narrow exclude
-    // (a fast-tracked first-party owner, say) still soaks everything else.
     const exclude = cooldown?.exclude;
     const include = cooldown?.include;
     const matchAllExclude = Array.isArray(exclude) && exclude.includes("*");
@@ -173,9 +159,6 @@ function entryFindings(file, key, entry, policy) {
   }
   if (policy.requireGroups) {
     const groupValues = isMapping(entry.groups) ? Object.values(entry.groups) : [];
-    // A group only batches version updates when its applies-to is absent (the
-    // default) or version-updates; a security-updates-only group leaves regular
-    // bumps at one pull request per dependency.
     const coversVersionUpdates = groupValues.some((group) => {
       if (!isMapping(group)) {
         return false;
@@ -217,9 +200,6 @@ function entryFindings(file, key, entry, policy) {
       ),
     );
   }
-  // A match-all ignore with no version or update-type narrowing suppresses every
-  // update for the ecosystem, disabling the policy instead of shaping volume. A
-  // narrow ignore (a specific dependency or first-party owner) is unaffected.
   const ignore = Array.isArray(entry.ignore) ? entry.ignore : [];
   const disablingIgnore = ignore.some(
     (rule) =>
@@ -255,8 +235,6 @@ export async function auditRepository({
     validatePolicyStructure,
     "policy",
   );
-  // The floor is the patch class: a policy where they differ would enforce a
-  // soak no reader of cooldownDays expects.
   if (policy.cooldownMinimumDays !== policy.cooldownDays.patch) {
     throw new ConfigurationError(
       `policy.cooldownMinimumDays (${policy.cooldownMinimumDays}) must equal policy.cooldownDays.patch (${policy.cooldownDays.patch})`,
@@ -306,7 +284,6 @@ export async function auditRepository({
     );
   }
 
-  // (entryKey, waivedRule) pairs that suppressed a real finding.
   const consumedWaives = new Set();
   const seenKeys = new Set();
   for (const [index, entry] of updates.entries()) {

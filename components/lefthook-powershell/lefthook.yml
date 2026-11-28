@@ -1,24 +1,5 @@
-# PowerShell adapter — opt-in. Extend it from a consumer root
-# that has PowerShell sources and PSScriptAnalyzer installed.
-#
-# The lane calls a small component-owned runner via `pwsh -File` rather than an inline
-# `-Command "..."`: a complex inline command is split incorrectly by the shells
-# Lefthook spawns on Windows (nested quoting), whereas a script file invokes
-# portably. The runner resolves the repo-root PSScriptAnalyzerSettings.psd1 itself,
-# so the consumer needs no path here. It stays minimal — it does not copy the
-# ci-workflows pwsh action's reusable runner (that would couple a consumer's local
-# hook to ci-workflows). Fast staged-file feedback; CI is the authoritative gate.
-#
-# Adopt psscriptanalyzer-staged.ps1 and its isolated psscriptanalyzer-target.ps1
-# worker alongside the managed hook payload under `.lefthook/`.
-#
-# This fragment declares no `skip`. Whether a lane sits out merge and rebase
-# commits is the CONSUMER's call, made in its own root lefthook.yml -- a `skip`
-# here would win over the consumer's and silently defeat the documented
-# `skip: true` opt-out. See lefthook-base's header for the full rule.
-
-# This fragment's `**/*.ext` glob must match files at the repo root too; the
-# default matcher requires `**` to consume at least one directory.
+# The default matcher's `**` must consume a directory, so `**/*.ext` would miss
+# root files: https://lefthook.dev/configuration/glob_matcher/
 glob_matcher: doublestar
 
 pre-commit:

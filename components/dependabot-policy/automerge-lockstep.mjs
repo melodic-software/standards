@@ -1,11 +1,5 @@
 #!/usr/bin/env node
 
-// Lockstep check: the ci-workflows `pr-automerge-dependabot.yml` reusable
-// carries its own copy of the `tier: auto` keys of `autoMerge.publishers` as
-// the default of its `publisher-allowlist` input. This script fetches the
-// reusable at `main`, the ref every caller runs, and fails when that default
-// differs from those keys. The pure checks are exported for automerge-lockstep.test.mjs.
-
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -50,7 +44,6 @@ export function extractPublisherAllowlist(workflowText) {
   }
 }
 
-// Order-sensitive: the constant lists the auto-tier keys in policy.json order, so a reorder is drift.
 export function checkLockstep(dependabotPolicy, workflowText) {
   const expected = Object.entries(dependabotPolicy.autoMerge.publishers)
     .filter(([, entry]) => entry.tier === "auto")

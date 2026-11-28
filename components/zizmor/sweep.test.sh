@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Tests sweep.sh: under the root-canonical config a clean checkout passes, a
-# third-party tag fails with its path and line, an ignore comment does not
-# hide it, another audit's finding is dropped, and a checkout with no
-# workflows is skipped. Skips when zizmor is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
