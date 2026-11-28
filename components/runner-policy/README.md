@@ -496,7 +496,7 @@ require hosted execution. A grant is keyed by
   for a `melodic-software` action, or a `vN`, `vN.N` or `vN.N.N` tag for an
   official-vendor owner (`actions`, `github`, `dependabot`, `microsoft`,
   `azure`, `anthropics`, `openai`), per the owner decision that first-party and
-  vendor refs run unpinned (architecture owner-decisions L351). The step must
+  vendor refs run unpinned. The step must
   name the granted ref exactly; any other ref of the same action stays
   privileged-hosted, and actions outside the central list cannot be granted.
 
