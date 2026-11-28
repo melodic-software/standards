@@ -63,8 +63,6 @@ export function validateContract(contract) {
     }
   }
   if (forms.size === 0) fail("types must declare at least one form");
-  // GitHub's community profile counts no issue template when every form sets `type:`.
-  // https://github.com/orgs/community/discussions/188484
   const formTypes = Object.values(types).filter((type) => type.form !== null);
   if (formTypes.every((type) => type.nativeType !== null)) {
     fail(
