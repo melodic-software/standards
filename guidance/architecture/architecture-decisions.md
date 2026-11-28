@@ -3,7 +3,7 @@
 ## Design
 
 - Prefer designs that make a choice cheap to reverse. Take the simple path for choices that can change cheaply; spend analysis before committing only on the ones that stay hard to reverse.
-- Choose tools in this order: native platform features used as far as the official docs allow, then a popular existing tool you research, test and wrap, and custom building only where nothing fits. Pick by measured fitness, not fashion. When a vendor ships a feature that overlaps in-house tooling, decide per piece in a decision matrix whether to keep, go hybrid or migrate fully. Avoid depending on a single provider's terms or host: build fallbacks and make locations configurable. Start shared knowledge in the cheapest private store that has a clear growth path.
+- Choose tools in this order: native platform features used as far as the official docs allow, then a popular existing tool you research, test and wrap, and custom building only where nothing fits. Pick by measured fitness, not fashion. When a vendor ships a feature that overlaps in-house tooling, decide per piece in a decision matrix whether to keep, go hybrid or migrate fully. Avoid depending on a single provider's terms or host: build fallbacks and make locations configurable.
 - Adopt no tool, hyped or not, until its required use cases and edge cases pass your own tests, learned from fundamentals rather than hype. State definitively what it gets you. Make a trial's bar for failing as strict as its bar for passing, and record why a candidate failed. Default to the option with the best demonstrated output; keep a weaker one supported but not as the default.
 
 ## Design and review

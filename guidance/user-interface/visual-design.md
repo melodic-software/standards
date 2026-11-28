@@ -20,4 +20,4 @@
   - Use collapsibles and even-height panels.
   - Check each view and each input on small screens and mobile.
   - Do pixel-level cleanup passes on alignment and centering.
-- For UI work, use the available design and brand guidance and prototype several directions the decider can explore. Preview the change in the real app before committing. Start interface and motion design from Emil Kowalski's published design skills.
+- For UI work, use the available design and brand guidance and prototype several directions the decider can explore. Preview the change in the real app before committing. Start interface and motion design from Emil Kowalski's published design skills ([emilkowalski/skills](https://github.com/emilkowalski/skills)).

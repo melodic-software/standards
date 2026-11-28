@@ -2,7 +2,7 @@
 
 ## Design
 
-- Rely on each harness's own default model and effort rather than pinning choices that fall behind, letting callers override. A silent fallback to a weaker model when usage runs out degrades work, so make it visible or stop instead.
+- Sessions run on the harness's own default model and effort rather than pinned choices that fall behind, letting callers override; subagent roles follow ai.agent-design. A silent fallback to a weaker model when usage runs out degrades work, so make it visible or stop instead.
 
 ## Design and review
 

@@ -1,4 +1,4 @@
-# Object oriented
+# Object-oriented design
 
 ## Design
 

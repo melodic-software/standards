@@ -1,4 +1,4 @@
-# Responsible ai
+# Responsible AI
 
 ## Build and operate
 

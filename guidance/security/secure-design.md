@@ -10,5 +10,5 @@
 ## Design and review
 
 - Weigh each security concern by real risk and likelihood. Choose the least friction that stays safe, defer low-likelihood concerns and harden later, and loosen restrictions that guard no serious vulnerability. Never weaken a high or critical requirement or boundary to gain throughput.
-- Rate a risk high or critical only for a leaked secret, a compromised account or something that can bill. Treat anything committed, commented or logged as published.
+- When raising a security or cost risk to a person, rate it high or critical only for a leaked secret, a compromised account or something that can bill; in code review, the severity definitions of the binding review criteria decide. Treat anything committed, commented or logged as published.
 - Keep public repositories safe for anyone to use. Move content that would be a problem in public to a private repository rather than losing it, and never let a public repository or pipeline reach into a private one.

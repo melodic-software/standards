@@ -10,7 +10,7 @@
 
 ## Build
 
-- Require Conventional Commits for commit and pull request titles, with explicit narrow exclusions, and put the ticket number in commits so blame links code to its rationale.
+- Title commits and pull requests in Conventional Commits form, with explicit narrow exclusions; where a repository enforces a title policy, that policy decides (here, [PR titles](https://github.com/melodic-software/standards/blob/main/components/pr-convention-policy/README.md#pr-titles)). Put the ticket number in commits so blame links code to its rationale.
 - Commit and push often at checkpoints. Before each push, fetch main, rebase if it moved, combine conflicting changes from both sides, and verify again. Record a progress step as a pull request update, not an empty commit.
 - Force-push only as a lease pinned to the full remote SHA on a feature branch. Never force-push a branch that several agents commit to; each later finisher merges in the others' changes instead.
 

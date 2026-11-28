@@ -1,4 +1,4 @@
-# Api design
+# API design
 
 ## Design
 

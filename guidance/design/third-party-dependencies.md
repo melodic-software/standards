@@ -1,4 +1,4 @@
-# Third party dependencies
+# Third-party dependencies
 
 ## Design
 

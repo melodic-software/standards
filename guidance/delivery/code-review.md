@@ -2,7 +2,7 @@
 
 ## Design and review
 
-- Let the pull request, with CI and automated review, be the review step and the single gate for what ships. Review lanes never queue or block merges and fail fast when usage limits hit. Remove approval gates and holds that guard no real exposure, and flag sensitive changes (workflows, trust gates, secret handling) for approval rather than blocking them.
+- Let the pull request, with CI and automated review, be the review step and the single gate for what ships. A review lane that hits a usage limit fails fast and never queues or blocks the merge. Remove approval gates and holds that guard no real exposure. A sensitive change (workflows, permissions, trust gates, secret handling) waits for its security review, as ai.model-security says, not for a person's approval.
 
 ## Plan
 
