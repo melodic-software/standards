@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Tests the cloud Key Vault resolver against a stubbed curl on PATH: the argv
-# contract the mcp-launcher depends on, pass-through of stdin and exit code,
-# and that no secret value reaches curl's argv or vault-exec's output.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,12 +11,6 @@ tmp="$(mktemp -d)"
 mkdir -p "$tmp/bin" "$tmp/realbin" "$tmp/home"
 real_curl="$(command -v curl)"
 ln -s "$real_curl" "$tmp/realbin/curl"
-# The stub logs its argv, one line per call, drains its own stdin (so a
-# resolver that passed the caller's stdin to curl would lose it), prints a body
-# plus the -w status line, and exits 22 for a status of 400 or more, as
-# --fail-with-body does. With STUB_SEQ set, call N answers its Nth status
-# (the last one repeats) with an error body until a 200 gets STUB_BODY;
-# STUB_SLEEP delays each call.
 cat >"$tmp/bin/curl" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB_CURL_LOG"
@@ -41,7 +32,6 @@ export STUB_CURL_LOG="$tmp/curl.log"
 export PATH="$tmp/bin:$PATH"
 ok_body="{\"value\": \"$value\", \"id\": \"https://kv/secrets/x/1\"}"
 
-# run <status> <body> <stdin> <vault-exec args...>: sets out, err, rc.
 run() {
   local status="$1" body="$2" input="$3"
   shift 3
@@ -66,10 +56,6 @@ assert_not_contains 'stderr never holds the value' "$err" "$value"
 assert_eq 'curl skips every .curlrc (-q is its first argument)' '-q' \
   "$(head -n 1 "$STUB_CURL_LOG" | cut -d ' ' -f 1)"
 
-# A planted .curlrc, run against the real curl: if curl read it, its
-# trace-ascii line would write the request (and any header the proxy path
-# sees) to a file of the planter's choosing. The proxy is a closed local port,
-# so the read fails fast and nothing leaves the machine.
 cat >"$tmp/home/.curlrc" <<EOF
 trace-ascii = "$tmp/home/planted-trace"
 EOF
@@ -82,8 +68,6 @@ rc=$?
 assert_exit 'a hostile .curlrc does not stop an --optional run' 0 "$rc"
 assert_file_absent 'the real curl never reads a planted .curlrc' "$tmp/home/planted-trace"
 
-# A json.py planted in the working directory or on PYTHONPATH must not replace
-# the parser: it would let anyone who can write a file there forge any value.
 mkdir -p "$tmp/planted"
 cat >"$tmp/planted/json.py" <<'EOF'
 def load(_):
@@ -154,8 +138,6 @@ assert_eq 'a read that keeps failing stops after three attempts' 3 "$(wc -l <"$S
 assert_contains 'the last status is reported' "$err" "secret 'my-secret' in kv-melo-devtools-prod failed (HTTP 503"
 assert_file_absent 'a read that keeps failing never runs the command' "$tmp/ran"
 
-# $SECONDS ticks on whole-second boundaries, so the budget is 2 and the first
-# attempt alone (2 s) is enough to spend it.
 started=$SECONDS
 # shellcheck disable=SC2016 # $A and $B expand in the child shell
 VAULT_EXEC_BUDGET_SEC=2 STUB_SLEEP=2 STUB_SEQ='500' run 200 "$ok_body" '' \

@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Tests the claude lane caller components at the MATERIALIZED consumer shape:
-# the bytes are workflow files that only ever execute after `sync-manifest.sh
-# apply` writes them into a consumer's .github/workflows/, and every
-# workflow-shaped lane in this repository discovers files by that location, so
-# a repo-root scan never sees them. This runs the consumer entrypoint —
-# `apply`, then actionlint over the result — instead of linting the component
-# in place. Skips cleanly when the engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,29 +7,24 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 manifest='distribution/sync-manifest.yml'
 config='.github/actionlint.yaml'
-# The fleet callers and their hosted siblings (components/claude-lanes-hosted/).
 source_prefix_re='components/claude-lanes(-hosted)?/'
 
 if ! command -v actionlint >/dev/null 2>&1; then
   skip_suite 'actionlint not installed'
 fi
-# The `paths` config key shipped in actionlint 1.7.4; older engines reject it.
+# The `paths` config key shipped in actionlint 1.7.4; older engines reject it:
+# https://github.com/rhysd/actionlint/blob/main/CHANGELOG.md
 require_min_version actionlint "$(actionlint -version | awk 'NR == 1 { print $NF }')" 1.7.4
 
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
 
-# `apply` verifies the checkout's origin identifies the target it was asked
-# for, so a consumer stand-in must carry that remote to reach the copy path at
-# all.
 consumer_checkout() {
   local target="$1" dir="$2"
   make_repo "$dir"
   git -C "$dir" remote add origin "https://github.com/$target.git"
 }
 
-# lint_clean <dir> <exit-label> <silent-label>: actionlint over <dir> exits 0
-# and prints nothing.
 lint_clean() {
   local out rc
   out="$(cd "$1" && actionlint -no-color 2>&1)"
@@ -45,12 +33,6 @@ lint_clean() {
   assert_silent "$3" "$out"
 }
 
-# component<TAB>source<TAB>destination for every lane caller, and the targets
-# that manage one. Filtering happens in bash so the yq expressions stay plain
-# traversal. Derived from the manifest rather than hardcoded: managed-target
-# membership can grow (private security-lane adopters) without editing a
-# fixed count here.
-#
 # shellcheck disable=SC2016  # yq expressions; $c/$t are yq variables, not shell
 mapfile -t lane_files < <(
   yq -r '.components | to_entries[] | .key as $c | .value.files | to_entries[]
@@ -62,10 +44,6 @@ mapfile -t lane_components < <(printf '%s\n' "${lane_files[@]}" | cut -f1 | sort
 declare -A is_lane_component=()
 for component in "${lane_components[@]}"; do is_lane_component["$component"]=1; done
 
-# Membership is an exact key lookup, not a substring match: a future component
-# named as an extension of an existing one (`claude-review-caller-v2`) would
-# match a substring test here and fail the exact test used per target below,
-# and that asymmetry would silently drop this target's destination assertions.
 # shellcheck disable=SC2016  # yq expression; $t is a yq variable, not shell
 mapfile -t target_pairs < <(
   yq -r '.targets | to_entries[] | .key as $t | (.value.managed // [])[] | $t + "\t" + .' "$manifest"
@@ -80,10 +58,6 @@ for pair in "${target_pairs[@]}"; do
 done
 assert_nonzero 'at least one target manages a lane caller' "${#lane_targets[@]}"
 
-# Every lane caller's bytes at the destination path they take in a consumer,
-# whether or not a given target manages the component. Standalone lint covers
-# components the per-target loop would otherwise miss when membership is
-# sparse — bytes nothing lints are bytes nothing protects.
 for entry in "${lane_files[@]}"; do
   IFS=$'\t' read -r component source destination <<<"$entry"
   standalone="$scratch/component-$component"
@@ -96,24 +70,12 @@ for entry in "${lane_files[@]}"; do
     "$component emits no findings at $destination"
 done
 
-# Every target receiving a lane caller, materialized the way its own sync PR
-# materializes it. A target that owns actionlint locally receives no config
-# from the manifest, so the canonical one stands in for the local equivalent
-# it is required to carry (medley and github-iac both do today) — the
-# assertion is that the SHIPPED BYTES lint clean under a conforming config,
-# which is the property this repository can own.
 for target in "${lane_targets[@]}"; do
   consumer="$scratch/${target##*/}"
   consumer_checkout "$target" "$consumer"
   bash distribution/sync-manifest.sh apply --target "$target" --target-root "$consumer" >/dev/null
   assert_exit "$target materializes" 0 "$?"
 
-  # Skipping a component this target does not manage is correct — most targets
-  # manage exactly one caller — but the skip must not be able to swallow every
-  # destination assertion silently. Counting what actually ran and asserting
-  # the count is what fails closed: a broken lookup, a renamed component, or a
-  # membership test that stops matching all surface as a FAIL here rather than
-  # as a suite that shrinks quietly and still exits 0.
   mapfile -t managed < <(yq -r ".targets.\"$target\".managed[]" "$manifest")
   declare -A manages=()
   for component in "${managed[@]}"; do manages["$component"]=1; done

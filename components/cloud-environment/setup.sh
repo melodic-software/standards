@@ -1,90 +1,29 @@
 #!/bin/bash
-# Melodic shared cloud environment — canonical setup script (SSOT).
-#
-# Consumed by claude.ai/code environments through the three-line bootstrap
-# documented in README.md: the environment's script field curls this file from
-# raw.githubusercontent.com (on the default allowlist) and runs it, so edits
-# land here by pull request instead of by hand-editing an account-scoped UI
-# field. Contract:
-#   - always exit 0 — a non-zero exit fails the environment cache build;
-#   - stay well under the ~5-minute cache-build budget;
-#   - repo-agnostic: per-repo work lives in each repo's committed
-#     .claude/cloud-bootstrap.sh, which this script bakes into the snapshot
-#     as its final step when the checked-out repo has one.
-#
-# Diagnosability (claude-code-plugins#2654, Blocker 2 — an interrupted cache
-# build left no trace): every step logs a timestamped line to $LOG, the
-# parallel tracks each write to their own temp log (concatenated under a
-# track header after the wait barrier, so their output never interleaves),
-# and the completion stamp is written only as the very last action.
-# Verification starts at the stamp: a missing $STAMP (and no $STAMP_FALLBACK
-# with a WARN in the log) means the build never finished — force a rebuild
-# (any edit to the environment's script field does).
-#
-# Network prerequisite (claude-code-plugins#2654, Blocker 1 — verified live
-# 2026-08-14): the .NET installer redirect chain (dot.net → aka.ms →
-# builds.dotnet.microsoft.com / download.visualstudio.microsoft.com) is
-# 403-blocked under Trusted network access. The environment must use Custom
-# network access with "Also include default list of common package managers"
-# checked plus those four hosts added. github.com is already on the default
-# allowlist, so the pinned gh release asset needs no host of its own; the
-# residual risk it carries is the GitHub proxy's repository scope, which can
-# 403 release assets from repositories not attached to the session. That is
-# why the gh step is best-effort and logs a WARN like every other step.
 # shellcheck disable=SC2030,SC2031 # each parallel track deliberately
 # reassigns LOG subshell-locally to its own temp log so track output never
 # interleaves; the main shell's LOG is untouched by design.
+# Always exit 0 and finish within ~5 minutes, or the environment is not cached:
+# https://code.claude.com/docs/en/cloud-environments#script-requirements
 set -u
 
 SCRIPT_VERSION='2026-11-21.1'
 STAMP='/opt/melodic-env-setup.done'
 STAMP_FALLBACK='/tmp/melodic-env-setup.done'
-# Fleet plugin list: every plugin in the melodic-software marketplace catalog
-# whose entry leaves defaultEnabled unset or true, derived at cache build
-# (fleet_list_from_catalog) into a settings-shaped file every cloud snapshot
-# installs at user scope. It is written into the snapshot at FLEET_PLUGINS so
-# each repo's session bootstrap can repair drift from it without a network
-# round trip. It is the only install source at cache build; a repo's own
-# enabledPlugins block carries deltas beyond the fleet (false to opt out, true
-# to opt in to an off-by-default plugin), which the session bootstrap applies
-# as an overlay on top of this list.
 FLEET_CATALOG_URL='https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/.claude-plugin/marketplace.json'
 FLEET_PLUGINS='/opt/melodic-fleet-plugins.json'
 FLEET_PLUGINS_FALLBACK='/tmp/melodic-fleet-plugins.json'
-# Fleet permission floor: the reviewed allow/deny set of the
-# claude-permissions component, fetched from the same host and unioned into
-# the user settings file sessions boot with (see compose_permissions_floor).
 CLAUDE_PERMISSIONS_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/claude-permissions/claude-permissions.json'
-# Key Vault resolver: this component's vault-exec, fetched from the same host
-# and installed to the container user's ~/.local/bin (see install_vault_exec).
-# The marker line identifies our copy, so a vault-exec someone else put there
-# is never replaced.
 VAULT_EXEC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/vault-exec'
 VAULT_EXEC_MARKER='# melodic-software/standards cloud-environment vault-exec'
-# Page uploader: this component's pages-publish, installed beside vault-exec
-# the same way (see install_pages_publish). It reads its config from Key Vault
-# at run time.
 PAGES_PUBLISH_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/pages-publish'
 PAGES_PUBLISH_MARKER='# melodic-software/standards cloud-environment pages-publish'
-# Rendered-views preference: this component's rendered-views-sync, installed
-# beside vault-exec the same way and registered as a user-scope SessionStart
-# hook (see register_session_hook), since the cache build cannot read Key Vault.
 RENDERED_VIEWS_SYNC_URL='https://raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/rendered-views-sync'
 RENDERED_VIEWS_SYNC_MARKER='# melodic-software/standards cloud-environment rendered-views-sync'
 LOG='/var/log/melodic-env-setup.log'
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$LOG"; }
-# fetch_to <url> <file>: download <url> to <file>, curl's output to $LOG.
 fetch_to() { curl -fsSL --proto '=https' --retry 2 --retry-delay 3 "$1" -o "$2" >>"$LOG" 2>&1; }
-# scratch_file <name>: a fresh temp file, or /tmp/melodic-<name>.<pid> when
-# mktemp fails.
 scratch_file() { mktemp 2>/dev/null || echo "/tmp/melodic-$1.$$"; }
 
-# Plugin CLI listings are fetched once, lazily, on the first source that
-# actually installs. `install_plugins_from` used to call `marketplace list`
-# and `plugin list` itself (and spawn `grep -qxF` per entry): two CLI
-# round-trips per source plus one grep per plugin. New registers and installs
-# are recorded in-process, so a caller that installs from more than one source
-# does not re-query. Same shape as cloud-bootstrap.sh, which reads two.
 plugin_listings_ready=0
 plugin_registered=''
 plugin_have=''
@@ -97,14 +36,6 @@ ensure_plugin_listings() {
   plugin_listings_ready=1
 }
 
-# install_plugins_from <settings-shaped json> <label>: register every
-# declared marketplace and install every enabledPlugins entry set to true at
-# user scope, skipping what is already present. Idempotence-check formats
-# verified against claude CLI 2.1.241 (2026-08-23): `claude plugin list
-# --json` ids are name@marketplace, exactly the enabledPlugins key shape, and
-# `claude plugin marketplace list --json` names match extraKnownMarketplaces
-# keys, so these exact membership checks are true already-installed checks,
-# not format mismatches.
 install_plugins_from() {
   local file="$1" label="$2" mp_name mp_target plugin_id
   ensure_plugin_listings
@@ -138,13 +69,6 @@ install_plugins_from() {
     | select(.value == true) | .key' "$file" 2>/dev/null)
 }
 
-# fleet_list_from_catalog <marketplace.json> <out>: write the fleet list, a
-# settings-shaped file that registers the melodic-software marketplace and
-# enables every catalog entry whose defaultEnabled is absent or true; any other
-# value, a mistyped "false" included, leaves the entry off. A catalog whose
-# entries are all off still yields a list with nothing enabled, so a repo's
-# opt-ins overlay it. Returns non-zero and leaves no <out> when the catalog is
-# unreadable or has no entries.
 fleet_list_from_catalog() {
   jq -e 'select((.plugins | length) > 0) | {
       extraKnownMarketplaces: {"melodic-software": {source: {source: "github",
@@ -157,11 +81,6 @@ fleet_list_from_catalog() {
   return 1
 }
 
-# rewrite_settings <settings json> <tag> <jq args>...: replace <settings> with
-# the output of `jq -n <jq args>` reading it as input (no input when it is
-# missing), through a copy at <settings>.<tag>.<pid> that carries the
-# original's mode and owner and is renamed over it. Returns non-zero and leaves
-# <settings> untouched when jq fails or prints nothing, or any write fails.
 rewrite_settings() {
   local settings="$1" src="$1" tmp="$1.$2.$$"
   shift 2
@@ -181,25 +100,12 @@ rewrite_settings() {
   return 1
 }
 
-# compose_permissions_floor <floor json> <settings json>: union the floor's
-# claudePermissions.allow and .deny into a Claude Code settings file, then drop
-# the floor's withdraw tombstones from allow, the same shape the dotfiles
-# chezmoi modify-template applies. Every other key and every rule already in
-# the file survive, and deny rows are only ever added. A missing file starts
-# from {}. The call returns non-zero and leaves the file untouched when the
-# floor is not schemaVersion 1 with string rows and a non-empty deny, when the
-# file is not a single JSON object, or when any write fails. The new content
-# is written to a copy carrying the original's mode and owner, then renamed
-# over it.
 compose_permissions_floor() {
   local floor="$1"
   jq -e '.claudePermissions | .schemaVersion == 1
     and (.allow | type == "array") and (.deny | type == "array" and length > 0)
     and ([.allow[], .deny[]] | all(type == "string" and length > 0))' \
     "$floor" >/dev/null || return 1
-  # The merge validates the floor again in the parse it merges from. The check
-  # above reports on the last document of a multi-document file, so only this
-  # one guarantees the document checked is the document merged.
   # shellcheck disable=SC2016 # a jq program: $f and $p are jq variables
   rewrite_settings "$2" compose --slurpfile f "$floor" '($f | if length == 1 then .[0].claudePermissions
         else error("floor is not a single JSON document") end) as $p
@@ -216,10 +122,6 @@ compose_permissions_floor() {
       | .permissions.deny = (((.permissions.deny // []) + $p.deny) | unique)'
 }
 
-# install_marked <marker> <fetched script> <dest>: install the fetched script
-# at <dest> with mode 0755. Returns 1 and leaves <dest> untouched when the
-# fetched file does not parse or lacks <marker>, or when any write fails, and 2
-# when <dest> exists without the marker (not ours). A copy of ours is replaced.
 install_marked() {
   local marker="$1" src="$2" dest="$3" tmp="$3.install.$$"
   if ! bash -n "$src" 2>/dev/null || ! grep -qxF "$marker" "$src"; then
@@ -239,13 +141,6 @@ install_vault_exec() { install_marked "$VAULT_EXEC_MARKER" "$@"; }
 install_pages_publish() { install_marked "$PAGES_PUBLISH_MARKER" "$@"; }
 install_rendered_views_sync() { install_marked "$RENDERED_VIEWS_SYNC_MARKER" "$@"; }
 
-# register_session_hook <settings json> <command>: add one SessionStart command
-# hook for <command> to a Claude Code settings file, after removing any earlier
-# entry for the same command, so a re-run leaves the file byte-identical. Every
-# other key, event and hook survives. A missing file starts from {}. Returns
-# non-zero and leaves the file untouched when it is not a single JSON object,
-# when its hooks or hooks.SessionStart has the wrong type, or when a write
-# fails. Written like compose_permissions_floor: a copy, then a rename.
 register_session_hook() {
   # shellcheck disable=SC2016 # a jq program: $docs and $cmd are jq variables
   rewrite_settings "$1" hook --arg cmd "$2" '[inputs] as $docs
@@ -262,10 +157,6 @@ register_session_hook() {
             hooks: [{type: "command", command: $cmd, timeout: 30}]}])'
 }
 
-# log_retired_inputs: one log line per retired setup input that is still set,
-# naming its replacement and never its value. setup.sh no longer reads them:
-# claude.ai passes an environment's variables to the session, not to this
-# script, so they never reached a cloud cache build.
 log_retired_inputs() {
   local var
   [[ -n "${RENDERED_VIEWS_MD+set}" ]] &&
@@ -278,8 +169,6 @@ log_retired_inputs() {
   return 0
 }
 
-# Sourced by setup.test.sh for the plugin-list, permission-floor, installer,
-# session-hook and retired-input helpers only.
 if [[ "${MELODIC_SETUP_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -293,22 +182,9 @@ rm -f "$STAMP" "$STAMP_FALLBACK" 2>/dev/null
 log "start version=$SCRIPT_VERSION"
 log_retired_inputs
 
-# Resolve the repo checkout root explicitly instead of trusting CWD: on a
-# real cache build (SW2030, 2026-08-23, version 2026-08-15.3) the build's
-# working directory was NOT the checkout, so the relative-path bootstrap and
-# plugin steps silently no-opped. Primary: git from $PWD. Fallback: probe for
-# a single git checkout under the container-user homes — the platform places
-# it at /home/<container-user>/<repo> (observed live in remote sessions).
-# Ambiguity or absence is a WARN, never a guess.
 checkout_base='/home'
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || REPO_ROOT=''
 if [[ -n "$REPO_ROOT" && "$REPO_ROOT" != "$checkout_base"/* ]]; then
-  # Sanity constraint: a git root outside the platform checkout area (a stray
-  # dotfiles or tooling repo the build CWD happens to sit in) must not be
-  # trusted — baking some other repo's bootstrap would recreate the silent
-  # wrong-target failure this resolution exists to eliminate. Fall through to
-  # the probe; skipping only costs warm cache (each repo's session bootstrap
-  # stays the correctness guarantee), while a wrong bake is unrecoverable.
   log "repo root candidate $REPO_ROOT (git rev-parse, PWD=$PWD) is outside $checkout_base; distrusted, probing instead"
   REPO_ROOT=''
 fi
@@ -329,12 +205,6 @@ else
   fi
 fi
 
-# Toolchain pins: prefer the resolved checkout's own manifests (global.json,
-# .node-version) so the warm cache tracks each repo without manual sync;
-# fall back to the fleet pins below when the repo declares none (or the root
-# is unresolved). Each repo's cloud-bootstrap still installs its exact pins
-# repo-locally — the env copy is a warm cache, the bootstrap the
-# correctness guarantee.
 DOTNET_FALLBACK_VERSIONS='11.0.100'
 NODE_FALLBACK_VERSION='24.21.0'
 dotnet_versions="$DOTNET_FALLBACK_VERSIONS"
@@ -363,48 +233,23 @@ if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/.node-version" ]]; then
   fi
 fi
 
-# gh pin: a fleet pin with no in-repo manifest to read, so it is declared here
-# and held in lockstep with the other two lanes by hand — the CI runner image
-# (melodic-software/ci-runner, Dockerfile ARG GH_VERSION/GH_SHA256) and local
-# dev machines (melodic-software/dotfiles, mise). All three must carry the same
-# gh, or a script that passes on one lane fails on another. The hash is the
-# sha256 of the exact release asset the install below names; bump version and
-# hash together, and authenticate a new asset against the checksums cli/cli
-# publishes for that release before recording its hash here.
 GH_VERSION='2.98.0'
 GH_SHA256='3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de'
 GH_TARBALL='/tmp/gh.tar.gz'
-# shfmt publishes no checksums file for this release: the hash is sha256sum of
-# the linux_amd64 asset, matched against a second download of that URL.
+# shfmt publishes no checksums file: the hash is sha256sum of the linux_amd64 asset,
+# matched against a second download: https://github.com/mvdan/sh/releases/tag/v3.14.1
 SHFMT_VERSION='3.14.1'
 SHFMT_SHA256='76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf'
 SHFMT_ASSET='/tmp/shfmt'
 
-# Each parallel track writes to its own temp log (LOG is reassigned
-# subshell-locally, so the log() calls and command output inside a track all
-# land in its file); the tracks are concatenated into $LOG after the wait
-# barrier so concurrent output never interleaves.
 track_a_log="$(scratch_file env-track-a)"
 track_b_log="$(scratch_file env-track-b)"
 track_c_log="$(scratch_file env-track-c)"
 
-# Track A: gh CLI (pinned upstream release tarball) + shfmt (pinned upstream
-# release asset) + PowerShell (apt;
-# packages.microsoft.com is on the default allowlist).
+# PowerShell comes from packages.microsoft.com, on the default allowlist:
+# https://code.claude.com/docs/en/cloud-environments#default-allowed-domains
 (
   LOG="$track_a_log"
-  # gh comes from its checksummed upstream release asset, at the version and
-  # hash the CI runner image and local dev machines pin. Ubuntu's own archive
-  # ships a years-stale gh (2.45.0 observed live in a cloud session, 53 minor
-  # versions behind the other two lanes), and cli.github.com — the upstream
-  # apt repo — is NOT on the default allowlist, so the release tarball is the
-  # only install that keeps the three lanes at one version. Direct
-  # /releases/download/ asset URLs do resolve from this build (the repo
-  # bootstrap this script bakes in fetches its own hygiene binaries the same
-  # way); a silent miss is caught by the verification checklist.
-  # amd64 only, mirroring ci-runner's Dockerfile: the pin above is the hash of
-  # that one asset, and substituting an unverified hash for another
-  # architecture would defeat the check it exists to perform.
   arch="$(uname -m)"
   if [[ "$arch" != 'x86_64' ]]; then
     log "WARN gh install skipped: no pinned asset for $arch (amd64 only)"
@@ -425,9 +270,6 @@ track_c_log="$(scratch_file env-track-c)"
     log "gh $GH_VERSION installed"
   fi
   rm -f "$GH_TARBALL" 2>/dev/null
-  # guardrails reads each Bash call from shfmt's parse tree and refuses the call
-  # when shfmt is missing, so every fleet repo needs it, not only a repo whose
-  # own bootstrap installs it. amd64 only, for the same reason as gh.
   if [[ "$arch" != 'x86_64' ]]; then
     log "WARN shfmt install skipped: no pinned asset for $arch (amd64 only)"
   elif ! curl --fail --location --proto '=https' --tlsv1.2 \
@@ -456,9 +298,6 @@ track_c_log="$(scratch_file env-track-c)"
   fi
 ) &
 
-# Track B: .NET SDKs — the resolved repo's global.json pin when present,
-# else the fleet fallback list above (most fleet pins set rollForward:
-# disable, so exact versions matter).
 (
   LOG="$track_b_log"
   if curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh >>"$LOG" 2>&1; then
@@ -474,13 +313,12 @@ track_c_log="$(scratch_file env-track-c)"
       log 'WARN dotnet symlink failed'
     fi
   else
-    log 'WARN dotnet-install.sh fetch failed — check the Custom allowlist (see header)'
+    log 'WARN dotnet-install.sh fetch failed — check the Custom allowlist (see the cloud-environment README, Network prerequisite)'
   fi
 ) &
 
-# Track C: Node — the resolved repo's .node-version pin when present, else
-# the fleet fallback above; the VM image ships Node 20/21/22 only, so this
-# is always an install.
+# The VM image ships Node 20/21/22 only, so this is always an install:
+# https://code.claude.com/docs/en/cloud-environments#installed-tools
 (
   LOG="$track_c_log"
   export NVM_DIR="${NVM_DIR:-/opt/nvm}"
@@ -509,33 +347,11 @@ for track in "A gh + powershell|$track_a_log" \
   rm -f "$track_file" 2>/dev/null
 done
 
-# Generic plugin install from one settings-shaped file (extraKnownMarketplaces
-# + enabledPlugins): the fleet list derived from FLEET_CATALOG_URL, which
-# every snapshot installs whatever repo it was built for. No repo-specific logic — a repo's
-# own enabledPlugins block declares deltas beyond the fleet and the repo
-# bootstrap below applies them as an overlay, so the snapshot itself stays the
-# same for every repo built against it. This must happen here, at cache build:
-# Claude Code reads its plugin registry at process start and never re-reads
-# it, so only snapshot-baked installs are loaded at a session's first turn.
-# It must also happen BEFORE the repo bootstrap: that bootstrap's plugin stage
-# reads this derived list and skips outright when it is absent, so a bootstrap
-# that ran first would bake none of the repo's deltas and leave them to arrive
-# on a later resume.
-# Github-source marketplaces' install/update semantics already handle
-# versions — no snapshot-refresh logic here (the commit-drift refresh in
-# claude-code-plugins' own hook is specific to its directory-source
-# dogfooding).
 if ! command -v claude >/dev/null 2>&1; then
   log 'plugins: claude CLI not on PATH; skipping'
 elif ! command -v jq >/dev/null 2>&1; then
   log 'plugins: jq not available; skipping'
 else
-  # The derived list lands in the snapshot (FLEET_PLUGINS, or its /tmp
-  # fallback with a WARN, mirroring the stamp) so the repo bootstrap below —
-  # and every later drift repair it runs on resume — reads the same list
-  # offline. A fetch failure costs this build's plugin install, never the
-  # build: the next rebuild fetches again, and a session on a snapshot without
-  # the list installs nothing rather than guessing at a set.
   rm -f "$FLEET_PLUGINS" "$FLEET_PLUGINS_FALLBACK" 2>/dev/null
   catalog_file="$(scratch_file fleet-catalog)"
   if fetch_to "$FLEET_CATALOG_URL" "$catalog_file" &&
@@ -555,16 +371,6 @@ else
   rm -f "$catalog_file" 2>/dev/null
 fi
 
-# Bake the checked-out repo's committed bootstrap (.claude/cloud-bootstrap.sh
-# under the resolved repo root) into the cached snapshot. One name, no
-# fallbacks: every fleet repo commits its generic repository setup —
-# dependencies and plugin installs — there. Running it here is load-bearing
-# for plugins: the session's plugin registry is built at process start and
-# never re-read, so plugin installs must land at cache build, not mid-session.
-# It runs AFTER the fleet install above so its plugin stage finds the fetched
-# fleet list and overlays the repo's own deltas onto it — that is what makes
-# those deltas live at a session's first turn instead of only after the
-# session bootstrap re-runs and the operator resumes.
 if [[ -z "$REPO_ROOT" ]]; then
   log 'repo bootstrap skipped: repo root unresolved (see WARN above); nothing baked'
 elif [[ -f "$REPO_ROOT/.claude/cloud-bootstrap.sh" ]]; then
@@ -576,19 +382,9 @@ elif [[ -f "$REPO_ROOT/.claude/cloud-bootstrap.sh" ]]; then
     log 'WARN repo bootstrap .claude/cloud-bootstrap.sh failed (see log)'
   fi
 else
-  # Unambiguous no-op: the root WAS resolved, the repo just has no bootstrap.
-  # The unresolved-root case logs its own distinct line above.
   log "repo root resolved to $REPO_ROOT, no bootstrap present (.claude/cloud-bootstrap.sh) — expected no-op"
 fi
 
-# Permission floor (standards#653): union the fleet's reviewed
-# claude-permissions allow/deny floor into the user settings file the plugin
-# install above wrote at user scope, so a session booted from this snapshot
-# has the deny floor and the unattended-loop grants at its first turn. The
-# dotfiles chezmoi template does the same for local machines, but chezmoi
-# never runs here. This runs after the repo bootstrap so no later build step
-# replaces the file. A fetch failure or a refused compose is a WARN, and the
-# settings file stays as it was.
 floor_file='/tmp/melodic-claude-permissions.json'
 if ! command -v jq >/dev/null 2>&1; then
   log 'WARN permissions floor: jq not available; no floor composed'
@@ -608,11 +404,8 @@ else
 fi
 rm -f "$floor_file" 2>/dev/null
 
-# Key Vault resolver: install this component's vault-exec where the
-# mcp-launcher looks for one (~/.local/bin/vault-exec). Install only: the agent
-# proxy adds the environment's API credential only once Claude Code launches,
-# so no read can happen here. A vault-exec already there without our marker is
-# left alone with a WARN.
+# Install only: setup script requests never get the agent proxy's secrets:
+# https://code.claude.com/docs/en/cloud-environments#requests-that-never-get-the-credential
 if [[ -z "${HOME:-}" ]]; then
   log 'WARN vault-exec: HOME is not set; not installed'
 else
@@ -627,8 +420,6 @@ else
   fi
   rm -f "$vault_exec_file" 2>/dev/null
 
-  # Page uploader, the same way. A pages-publish someone else put there is
-  # left alone with a WARN that names it.
   pages_publish_dest="$HOME/.local/bin/pages-publish"
   pages_publish_file="$(scratch_file pages-publish)"
   if ! fetch_to "$PAGES_PUBLISH_URL" "$pages_publish_file"; then
@@ -643,10 +434,6 @@ else
   fi
   rm -f "$pages_publish_file" 2>/dev/null
 
-  # Rendered-views preference, the same way, then registered as a user-scope
-  # SessionStart hook in the settings file the permission floor was composed
-  # into. Registered only when this build installed it, so no session runs a
-  # hook whose script is missing or someone else's.
   rv_sync_dest="$HOME/.local/bin/rendered-views-sync"
   rv_sync_file="$(scratch_file rendered-views-sync)"
   if ! fetch_to "$RENDERED_VIEWS_SYNC_URL" "$rv_sync_file"; then
@@ -666,17 +453,10 @@ else
   rm -f "$rv_sync_file" 2>/dev/null
 fi
 
-# Temp-file hygiene: without this the fetched installers — and this script
-# itself, which the environment bootstrap curls to /tmp — persist into the
-# snapshot and show up in every live session. Runs after the repo bootstrap,
-# which reuses /tmp/dotnet-install.sh. Unlinking the running script is safe:
-# bash holds its open file descriptor.
 rm -f /tmp/msprod.deb /tmp/dotnet-install.sh "$GH_TARBALL" \
   /tmp/melodic-env-setup.sh 2>/dev/null
 
 log "done version=$SCRIPT_VERSION"
-# Stamp write mirrors the $LOG fallback: /opt unwritable must not present as
-# "build never finished" downstream — fall back to /tmp and WARN.
 stamp_content="$SCRIPT_VERSION $(date -u +%FT%TZ)"
 if ! printf '%s\n' "$stamp_content" >"$STAMP" 2>/dev/null; then
   log "WARN stamp: $STAMP unwritable; falling back to $STAMP_FALLBACK"

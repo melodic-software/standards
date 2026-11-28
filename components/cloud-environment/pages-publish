@@ -1,44 +1,5 @@
 #!/bin/bash
 # melodic-software/standards cloud-environment pages-publish
-#
-# Uploads one rendered page to the operator's page host, installed by setup.sh
-# to ~/.local/bin/pages-publish:
-#
-#   pages-publish <file> --visibility public|private [--id <id>]
-#   pages-publish --delete <id> --visibility public|private
-#
-# Operator values come only from the Key Vault secret pages-publish-config,
-# read with VAULT_EXEC_VAULT unset so a repository's env block cannot point the
-# read at another vault. There is no local file override: the config names the
-# vault secrets this script sends and the hosts it sends them to, and this
-# command runs without a permission prompt, so any writable source would let a
-# process running as the user send any vault secret to any host. Key Vault
-# writes are permission-gated and audited. To change the config, run
-# `az keyvault secret set --name pages-publish-config ...`. The secret holds
-# these KEY=VALUE lines:
-#   PUBLIC_ENDPOINT, PRIVATE_ENDPOINT          https://<host> upload origins
-#   PUBLIC_TOKEN_SECRET, PRIVATE_TOKEN_SECRET  vault names of the bearer tokens
-#   PRIVATE_ACCESS_ID_SECRET, PRIVATE_ACCESS_KEY_SECRET
-#                                              vault names of the Access
-#                                              service-token pair (private only)
-#
-# The page must be a regular file under ${TMPDIR:-/tmp} carrying a builder
-# stamp <!-- rv-gen:<name> sha256:<64 hex> -->. Its bytes, and decoded copies
-# with tags stripped and HTML entities and JSON escapes undone, are scanned
-# before any network call: a credential shape the host would also refuse
-# refuses the upload; any other credential shape, a machine path or a private
-# hostname sends it to the private endpoint. When the visibility sent
-# differs from the one requested, --id is dropped and a new page is created;
-# the caller deletes the old id. A 409 private-required from the public host
-# is retried once as a private create.
-#
-# Secrets are resolved by vault-exec and reach curl only as config lines on
-# its stdin, never in argv. The environment still matters elsewhere: PATH
-# selects vault-exec, curl, awk and gitleaks, TMPDIR sets the temp dir the
-# page must be under, and BASH_ENV is sourced here and by the inner shells.
-# Setting those already runs code as the user; the guarantee is only that no
-# config-file write changes where secrets go. On success stdout is one JSON line
-# {"id":..., "visibility":..., "url":...}; --delete prints nothing.
 # Exit codes: 2 usage, 3 input not a stamped temp-dir page, 4 credential
 # content (here or at the host), 5 config missing or invalid, 6 upload failed.
 set -u
@@ -87,9 +48,6 @@ declare -A cfg=()
 keys=(PUBLIC_ENDPOINT PRIVATE_ENDPOINT PUBLIC_TOKEN_SECRET PRIVATE_TOKEN_SECRET
   PRIVATE_ACCESS_ID_SECRET PRIVATE_ACCESS_KEY_SECRET)
 
-# parse_config <source>: reads KEY=VALUE text on stdin into cfg and validates
-# it, exiting 5 with <source> in the message. A message names a key or a line
-# number, never a value.
 parse_config() {
   local src="$1" line key value n=0
   while IFS= read -r line || [[ -n "$line" ]]; do
@@ -114,9 +72,6 @@ parse_config() {
   done
 }
 
-# load_config: reads the config from the Key Vault secret pages-publish-config,
-# the only source (see the header for why). The value reaches this script
-# through vault-exec's environment and a builtin printf, never argv.
 load_config() {
   local text secret=pages-publish-config
   command -v vault-exec >/dev/null 2>&1 ||
@@ -131,15 +86,9 @@ load_config() {
 
 load_config
 
-# send <visibility> <method> <path> [<file>]: one request to that visibility's
-# upload origin. Sets status and body. The bearer token, and for the private
-# origin the Access service-token pair, are resolved by vault-exec into the
-# environment of an inner shell whose builtin printf writes them as curl config
-# lines on curl's stdin.
 send() {
   local vis="$1" method="$2" path="$3" data="${4:-}" prefix envs resp rc
   prefix="${vis^^}"
-  # The inner shell must see only what vault-exec resolves here, never a caller's PP_*.
   unset PP_TOKEN PP_ACCESS_ID PP_ACCESS_KEY
   envs=(--env "PP_TOKEN=${cfg[${prefix}_TOKEN_SECRET]}")
   if [[ "$vis" == private ]]; then
@@ -147,7 +96,6 @@ send() {
       --env "PP_ACCESS_KEY=${cfg[PRIVATE_ACCESS_KEY_SECRET]}")
   fi
   # shellcheck disable=SC2016 # expanded by the inner shell
-  # VAULT_EXEC_VAULT is unset so every read here uses the default vault, as in load_config.
   resp="$(env -u VAULT_EXEC_VAULT vault-exec "${envs[@]}" -- bash -c '
     set -u
     bad="[\"\\\\[:cntrl:]]"
@@ -189,10 +137,6 @@ real="$(realpath -e -- "$file" 2>/dev/null)" || die 3 "$file does not exist"
 stamp_re='<!-- rv-gen:[A-Za-z0-9._-]+ sha256:[0-9a-f]{64} -->'
 grep -aqE -- "$stamp_re" "$real" || die 3 "$file carries no builder stamp <!-- rv-gen:<name> sha256:<64 hex> -->"
 
-# A copy of the shapes in claude-code-plugins lib/publish-gate.mjs and the
-# upload Worker's scan.js; change all three together. Only these shapes are
-# caught, and the Worker's scan is the binding one. The builder stamp is
-# removed before scanning so its hash never reads as a key.
 w='(^|[^A-Za-z0-9_])'
 hx='[0-9a-f]'
 nhx='[^0-9a-f]'
@@ -231,13 +175,6 @@ private_res=(
   "(^|[^A-Za-z0-9.-])[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.(local|internal|lan)([^A-Za-z0-9_.-]|\.[^A-Za-z0-9_-]|\.?$)"
 )
 
-# The machine-path bodies of components/path-detection/machine-path-patterns.sh,
-# copied verbatim because setup.sh installs this file alone; the test fails
-# when the two drift. They add what the shapes above miss: a home path with no
-# trailing slash, forward-slash and 8.3 Windows forms, and Windows checkout
-# roots. They run on the wide decoded copy only: in the raw bytes an escaped
-# placeholder (/home/&lt;user&gt;) reads as a user segment, while decoded it is
-# the <user> form the bodies leave clean.
 HPP_WIN_USER_BODY='[A-Za-z]:(/|\\\\?)Users(/|\\\\?)[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*(~[0-9]+)?'
 HPP_MACOS_USER_BODY='/Users/[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*'
 HPP_LINUX_USER_BODY='/home/[^\\$%<{~"[:space:]/]([^\\$%<{~"[:space:]/]|%[0-9])*'
@@ -253,20 +190,6 @@ decoded_res=(
   "$HPP_WIN_REPO_BODY" "$HPP_ESCAPED_WIN_REPO_BODY"
 )
 
-# Two decoded copies, so a shape a rendered page splits across highlighter
-# tags, writes as entities or escapes inside inline JSON is still seen. Each is
-# built by passes that split the text on one character, so even a 10 MiB
-# single-line page is read once: tags out (<...> with no < inside, across
-# lines), HTML entities in, then escapes in.
-#   host copy  the Worker's normalize() in scan.js: &#NN; &#xHH; and &amp;
-#              &lt; &gt; &quot; &apos; &nbsp; (the ; required), and \\ to \.
-#              A credential here is one the host already refuses.
-#   wide copy  also &sol; &colon; &period; and the other named ones below,
-#              numeric entities without their ;, and the JS escapes \/ \" \'
-#              \uXXXX \u{X...} \xHH, which the host does not decode.
-# A code point above 0x7F is written as UTF-8. NUL, a value past U+10FFFF or
-# one too long to read becomes U+FFFD, never nothing, so a decoded character
-# neither turns into a shape's ASCII nor joins the text on either side of it.
 # shellcheck disable=SC2016 # an awk program, not shell
 decode_awk='
 function hexval(s, i, v) {
@@ -325,7 +248,6 @@ scan_dir="$(mktemp -d)" || die 6 'cannot create a scan copy'
 trap 'rm -rf "$scan_dir"' EXIT
 scan_copy="$scan_dir/page" host_copy="$scan_dir/host" wide_copy="$scan_dir/wide"
 sed -E "s/$stamp_re//g" "$real" >"$scan_copy" || die 6 'cannot create a scan copy'
-# The added newline keeps a final <, & or \ from reading as a separator.
 { cat "$scan_copy" && printf '\n'; } | awk -v mode=tags "$decode_awk" >"$scan_dir/untagged" ||
   die 6 'cannot create a decoded scan copy'
 for wide in 0 1; do
@@ -336,9 +258,6 @@ for wide in 0 1; do
     die 6 'cannot create a decoded scan copy'
 done
 
-# A credential in the raw page or the host copy refuses. The host refuses the
-# same page with a 422, which also exits 4, so this only refuses it before the
-# upload. The raw page goes first, so a plain-text shape reports its own line.
 for copy in "$scan_copy" "$host_copy"; do
   where=line
   [[ "$copy" == "$scan_copy" ]] || where='decoded line'
@@ -354,11 +273,6 @@ if command -v gitleaks >/dev/null 2>&1; then
   [[ $? -ne 1 ]] || die 4 'refused: gitleaks found a credential'
 fi
 
-# A credential only the wide copy shows is one the host would accept, so the
-# page goes private instead of being refused. A gitleaks finding only a decoded
-# copy shows does the same: its rules are not the host's. A machine path or
-# hostname in any copy, or a path-detection body in the wide copy, sends it
-# private too.
 reason=''
 for i in "${!secret_res[@]}"; do
   hit="$(grep -anE -m1 -- "${secret_res[$i]}" "$wide_copy" | cut -d: -f1)"

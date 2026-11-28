@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Tests pages-publish against stubbed getent, vault-exec, curl and gitleaks on
-# PATH. The stub curl records each call's argv (NUL-separated) and stdin, and
-# the assertions read those records: secrets reach curl only on stdin, the
-# config comes only from the Key Vault secret, and the scan refuses or reroutes.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,18 +10,10 @@ tmp="$(mktemp -d)"
 mkdir -p "$tmp/bin" "$tmp/calls" "$tmp/home" "$tmp/scratch" "$tmp/other"
 pages="$(realpath "$tmp/scratch")"
 
-# getent stub: the passwd home is $STUB_HOME, so a decoy config placed there
-# is found by any lookup the script makes through the passwd database.
 cat >"$tmp/bin/getent" <<'STUB'
 #!/usr/bin/env bash
 printf '%s:x:%s:%s::%s:/bin/bash\n' "$2" "$(id -u)" "$(id -g)" "$STUB_HOME"
 STUB
-# vault-exec stub: each --env NAME=secret sets NAME to SENTINEL-<secret>, then
-# the command runs. STUB_VAULT_RC makes a token read fail. A read of the secret
-# pages-publish-config is logged to $STUB_CALLS/kv-config with the
-# VAULT_EXEC_VAULT it saw, and answers the text of the file $STUB_KV_CONFIG,
-# or exits STUB_KV_RC when that is set. Every call logs the VAULT_EXEC_VAULT it
-# saw to $STUB_CALLS/vault-env.
 cat >"$tmp/bin/vault-exec" <<'STUB'
 #!/usr/bin/env bash
 printf 'VAULT_EXEC_VAULT=%s\n' "${VAULT_EXEC_VAULT-<unset>}" >>"$STUB_CALLS/vault-env"
@@ -44,8 +32,6 @@ done
 shift
 exec "$@"
 STUB
-# curl stub: call N answers the Nth "<status>:<body>" entry of STUB_SEQ
-# (';'-separated; the last one repeats) as body, newline, status.
 cat >"$tmp/bin/curl" <<'STUB'
 #!/usr/bin/env bash
 n=$(($(find "$STUB_CALLS" -name 'argv.*' | wc -l) + 1))
@@ -56,8 +42,6 @@ IFS=';' read -ra seq <<<"$STUB_SEQ"
 entry="${seq[n - 1]}"
 printf '%s\n%s' "${entry#*:}" "${entry%%:*}"
 STUB
-# gitleaks stub: exits STUB_GITLEAKS_RC, or with STUB_GITLEAKS_FIND set, 1 when
-# the scanned path (its last argument) holds that text and 0 otherwise.
 cat >"$tmp/bin/gitleaks" <<'STUB'
 #!/usr/bin/env bash
 if [[ -n "${STUB_GITLEAKS_FIND:-}" ]]; then
@@ -77,7 +61,6 @@ priv_ok="201:https://private.example.test/$pid2/"
 pub_upload='https://public.example.test/_upload'
 priv_upload='https://private.example.test/_upload'
 
-# write_config <file> [KEY=VALUE overrides...]: a valid six-key config, mode 0600.
 write_config() {
   local file="$1"
   shift
@@ -94,13 +77,11 @@ write_config() {
 }
 
 stamp="<!-- rv-gen:explain-change sha256:$(printf 'ab%.0s' {1..32}) -->"
-# page <name> <body line>: a stamped page under the temp dir.
 page() {
   printf '<!doctype html>\n%s\n<p>%s</p>\n' "$stamp" "$2" >"$pages/$1.html"
   printf '%s' "$pages/$1.html"
 }
 
-# run <args...>: sets out, err, rc, calls (curl call count), argv_all, stdin_all.
 run() {
   rm -f "$tmp/calls/"*
   out="$("$script" "$@" 2>"$tmp/err")"
@@ -150,7 +131,6 @@ run "$clean" --visibility public --id "$pid"
 assert_exit 'a republish with --id succeeds' 0 "$rc"
 assert_eq 'the PUT replaces that id' "$pub_upload/$pid" "$(url_of 1)"
 
-# Input rules: exit 3, no network.
 printf '%s\n' "$stamp" >"$tmp/other/outside.html"
 run "$tmp/other/outside.html" --visibility public
 assert_exit 'a page outside the temp dir exits 3' 3 "$rc"
@@ -165,8 +145,6 @@ assert_eq 'an unstamped page makes no call' 0 "$calls"
 run "$pages" --visibility public
 assert_exit 'a directory exits 3' 3 "$rc"
 
-# Credential shapes: one sample per shape, each built at run time so this file
-# holds no credential-shaped literal. Each refuses with exit 4 before any call.
 hex32="$(printf '0123456789abcdef%.0s' 1 2)"
 hex64="$(printf '0123456789abcdef%.0s' 1 2 3 4)"
 cred_samples=(
@@ -203,8 +181,6 @@ assert_exit 'a gitleaks finding refuses with exit 4' 4 "$rc"
 assert_eq 'a gitleaks finding makes no call' 0 "$calls"
 STUB_GITLEAKS_FIND=leakmarker run "$(page leak 'raw leakmarker')" --visibility public
 assert_exit 'a gitleaks finding in the raw page refuses with exit 4' 4 "$rc"
-# A gitleaks rule is not the host's, so a finding only decoding reveals sends
-# the page private instead of refusing it.
 for form in 'leak<span>marker</span>' 'leak&#109;arker'; do
   STUB_GITLEAKS_FIND=leakmarker STUB_SEQ="$priv_ok" run "$(page leak "$form")" --visibility public
   assert_exit "a gitleaks finding only in a decoded copy ($form) uploads" 0 "$rc"
@@ -213,8 +189,6 @@ for form in 'leak<span>marker</span>' 'leak&#109;arker'; do
   assert_contains "a gitleaks finding only in a decoded copy ($form) is named" "$err" 'gitleaks finding'
 done
 
-# Machine paths and private hostnames: the page goes to the private origin.
-# The user segment goes through $u: the repo's machine-path check skips one.
 u=alice
 path_samples=(
   "Linux home path|/home/$u/src/app.ts"
@@ -234,10 +208,6 @@ for sample in "${path_samples[@]}"; do
   assert_contains "a $label is reported private" "$out" '"visibility":"private"'
 done
 
-# Escaped forms: a rendered page writes a shape as HTML entities, splits it
-# across highlighter tags, or escapes it inside inline JSON. None matches the
-# raw bytes. A credential the host's own normalization reveals refuses, as the
-# host would; one only the wider decoding reveals sends the page private.
 a18="$(printf 'a%.0s' {1..18})"
 bs="\\"
 host_creds=(
@@ -266,8 +236,6 @@ for sample in "${wide_creds[@]}"; do
   assert_contains "a credential as a $form names the decoded line" "$err" 'on decoded line 3'
 done
 
-# A character that decodes to nothing valid (NUL, past U+10FFFF) still
-# separates the text around it, so two token halves never join into a shape.
 for sep in '&#0;' '&#x0;' '&#99999999;' '\u{110000}' '\u0000' '\x00'; do
   STUB_SEQ="$pub_ok" run "$(page cred "ghp_$a18$sep$a18")" --visibility public
   assert_exit "token halves around $sep upload" 0 "$rc"
@@ -290,9 +258,6 @@ for sample in "${escaped_paths[@]}"; do
   assert_contains "a $label is sent to the private origin" "$argv_all" "$priv_upload"
 done
 
-# The path-detection bodies, run on the decoded copy, add the shapes the
-# Worker list misses; an escaped placeholder decodes to the <user> form they
-# leave clean.
 hpp_paths=(
   "Linux home path|home is /home/$u"
   "Windows user path|C:/Users/$u"
@@ -312,13 +277,11 @@ STUB_SEQ="$pub_ok" run "$(page path "a &amp;&lt;b&gt; &#0; &#99999999; &bogus; \
 assert_exit 'stray entities and escapes upload' 0 "$rc"
 assert_contains 'stray entities and escapes stay public' "$out" '"visibility":"public"'
 
-# The embedded copy of the path-detection bodies matches the library.
 lib_bodies="$(grep -E '^HPP_[A-Z_]+=' "$root/components/path-detection/machine-path-patterns.sh")"
 own_bodies="$(grep -E '^HPP_[A-Z_]+=' "$script")"
 assert_eq 'pages-publish carries every path-detection body' 5 "$(grep -c . <<<"$lib_bodies")"
 assert_eq 'the path-detection bodies in pages-publish match the library' "$lib_bodies" "$own_bodies"
 
-# Decoding stays linear on a 2 MiB single line of each separator.
 for unit in '<a' '&#' '\u' '&#x2F;'; do
   big="$pages/big.html"
   {
@@ -339,7 +302,6 @@ assert_eq 'a forced-private republish creates on the private origin' \
 assert_not_contains 'a forced-private republish drops the public id' "$argv_all" "$pid"
 assert_contains 'a forced-private republish returns the new id' "$out" "\"id\":\"$pid2\""
 
-# Host answers.
 STUB_SEQ="409:private-required;$priv_ok" run "$clean" --visibility public --id "$pid"
 assert_exit 'a 409 private-required is retried privately' 0 "$rc"
 assert_eq 'a 409 retry makes exactly two calls' 2 "$calls"
@@ -372,7 +334,6 @@ STUB_VAULT_RC=1 run "$clean" --visibility public
 assert_exit 'an unresolvable token exits 6' 6 "$rc"
 assert_eq 'an unresolvable token makes no call' 0 "$calls"
 
-# Delete.
 STUB_SEQ='204:' run --delete "$pid" --visibility public
 assert_exit '--delete exits 0 on 204' 0 "$rc"
 assert_eq '--delete prints nothing' '' "$out"
@@ -385,10 +346,6 @@ assert_not_contains 'a private --delete keeps secrets out of argv' "$argv_all" '
 STUB_SEQ='404:' run --delete "$pid" --visibility public
 assert_exit '--delete exits 6 on anything but 204' 6 "$rc"
 
-# Config comes only from the Key Vault secret pages-publish-config. A valid
-# 0600 config file in the passwd home, HOME or XDG_CONFIG_HOME, naming another
-# endpoint and token secret, is never read: a file any process running as the
-# user can write must not choose which vault secret goes to which host.
 write_config "$tmp/home/.config/pages-publish/config" \
   PUBLIC_ENDPOINT=https://decoy.example.test PUBLIC_TOKEN_SECRET=decoy-token
 mkdir -p "$tmp/xdg/pages-publish"
@@ -407,7 +364,6 @@ assert_eq 'the Key Vault read sees VAULT_EXEC_VAULT unset' 'VAULT_EXEC_VAULT=<un
 assert_eq 'the config and token reads both see VAULT_EXEC_VAULT unset' \
   $'VAULT_EXEC_VAULT=<unset>\nVAULT_EXEC_VAULT=<unset>' "$(cat "$tmp/calls/vault-env" 2>/dev/null)"
 
-# check_kv <label>: the Key Vault read fails or holds bad text.
 check_kv() {
   run "$clean" --visibility public
   assert_exit "Key Vault config exits 5: $1" 5 "$rc"
@@ -430,7 +386,6 @@ printf '\n' >"$STUB_KV_CONFIG"
 check_kv 'an empty secret'
 write_config "$STUB_KV_CONFIG"
 
-# vault-exec missing from PATH fails closed, even with a config file present.
 mkdir -p "$tmp/novault"
 ln -s "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/gitleaks" "$tmp/novault/"
 if PATH="$tmp/novault:/usr/bin:/bin" command -v vault-exec >/dev/null; then

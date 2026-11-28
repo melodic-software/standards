@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests the cloud-environment component: the canonical setup script parses,
-# honors its ordering contract (the completion stamp is written only after the
-# parallel install tracks finish), and the README documents the same bootstrap
-# URL and stamp path the script implements — the drift a copy-paste consumer
-# would actually hit.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -19,16 +14,10 @@ readme="$root/components/cloud-environment/README.md"
 script_text="$(cat "$script")"
 readme_text="$(cat "$readme")"
 
-# setup_value <name> [<value-re>]: the value setup.sh assigns to <name> in a
-# single-quoted top-level line, the first one matching <value-re> (a basic sed
-# regex, default any).
 setup_value() {
   sed -n "s/^$1='\(${2:-.*}\)'\$/\1/p" "$script" | head -n 1
 }
 
-# declared <name> <value-re> <label> <placeholder>: sets decl to
-# setup_value <name> <value-re> and records <label> as passing only when there
-# is one; the failure names <name>='<placeholder>'.
 declared() {
   decl="$(setup_value "$1" "$2")"
   if [[ -n "$decl" ]]; then
@@ -46,8 +35,6 @@ tail -n 1 "$script" | grep -qx 'exit 0'
 rc=$?
 assert_exit 'setup.sh ends with exit 0 (cache-build contract)' 0 "$rc"
 
-# Ordering contract: the stamp write must come after the `wait` barrier, so an
-# interrupted build can never leave a stamp behind.
 wait_ln="$(grep -n '^wait$' "$script" | head -n 1 | cut -d: -f1)"
 stamp_ln="$(grep -n '>"[$]STAMP"' "$script" | head -n 1 | cut -d: -f1)"
 if [[ -n "$wait_ln" && -n "$stamp_ln" && "$stamp_ln" -gt "$wait_ln" ]]; then
@@ -57,22 +44,12 @@ else
     "wait at line '${wait_ln:-none}', stamp write at line '${stamp_ln:-none}'"
 fi
 
-# Pin lockstep: the script now reads pins from the resolved checkout's own
-# manifests, but its FALLBACK Node pin (used when a repo declares none) must
-# still match the fleet pin this repository itself carries in .node-version —
-# the drift the README's update-lifecycle section otherwise leaves to manual
-# diligence. (The .NET fallback list has no in-repo manifest to check against;
-# it stays a documented manual obligation.)
 node_pin_repo="$(tr -d '[:space:]' <"$root/.node-version")"
 declared NODE_FALLBACK_VERSION '[0-9][0-9.]*' \
   "setup.sh declares a Node fallback pin (NODE_FALLBACK_VERSION='<version>')" '<version>'
 assert_eq 'setup.sh Node fallback pin matches the repo .node-version' \
   "$node_pin_repo" "$decl"
 
-# CWD-independence contract: the bootstrap and plugin steps must key off an
-# explicitly resolved repo root, never a relative path from the build's CWD —
-# the regression a real cache build hit (SW2030, 2026-08-23: CWD was not the
-# checkout, so both steps silently no-opped).
 grep -q 'git rev-parse --show-toplevel' "$script"
 rc=$?
 assert_exit 'setup.sh resolves the repo root explicitly (git rev-parse)' 0 "$rc"
@@ -81,19 +58,11 @@ grep -q '\$REPO_ROOT/\.claude/cloud-bootstrap\.sh' "$script"
 rc=$?
 assert_exit 'setup.sh addresses the repo bootstrap via REPO_ROOT, not CWD' 0 "$rc"
 
-# Stamp fallback contract: a failed /opt stamp write must fall back (mirroring
-# the LOG fallback) instead of silently presenting as an unfinished build.
 # shellcheck disable=SC2016 # the $ is a literal in the grep pattern
 grep -q '>"\$STAMP_FALLBACK"' "$script"
 rc=$?
 assert_exit 'setup.sh falls back when the primary stamp write fails' 0 "$rc"
 
-# Fleet plugin list: derived at cache build from the marketplace catalog. An
-# entry set true, or with no defaultEnabled at all, is enabled; false or any
-# non-boolean value leaves it out. The output is settings-shaped and
-# registers the marketplace its entries name, which is what both
-# install_plugins_from here and the repo bootstrap read. Sourced via
-# MELODIC_SETUP_LIBONLY so the apt/dotnet/nvm tracks do not run.
 # Do not `shellcheck source=` this: LIBONLY returns immediately, and following
 # it marks the test bodies below unreachable (SC2317).
 # shellcheck disable=SC1090,SC1091
@@ -149,15 +118,10 @@ assert_contains 'README documents the fleet list snapshot path' \
 assert_contains 'README documents the catalog the fleet list derives from' \
   "$readme_text" '.claude-plugin/marketplace.json'
 
-# README/script drift guards.
 declared STAMP '.*' 'setup.sh declares a stamp path' '...'
 assert_contains 'README documents the stamp path the script writes' \
   "$readme_text" "$decl"
 
-# gh install contract: the fleet runs one gh across three lanes (this script,
-# the ci-runner image, dotfiles/mise). Ubuntu's archive gh is years stale, so
-# an apt install here silently reopens that gap — guard the pinned,
-# checksum-verified release asset instead.
 grep -q 'apt-get install -y gh' "$script"
 rc=$?
 assert_exit 'setup.sh does not install gh from the Ubuntu archive' 1 "$rc"
@@ -175,8 +139,6 @@ assert_contains 'setup.sh verifies the gh asset before installing it' \
 assert_contains 'README documents the gh version the script installs' \
   "$readme_text" "$gh_pin"
 
-# shfmt install contract: guardrails refuses every Bash call without shfmt, so
-# this script installs it for repos whose own bootstrap does not.
 declared SHFMT_VERSION '[0-9][0-9.]*' "setup.sh declares a shfmt pin (SHFMT_VERSION='<version>')" '<version>'
 shfmt_pin="$decl"
 declared SHFMT_SHA256 '[0-9a-f]\{64\}' 'setup.sh declares a 64-hex shfmt asset checksum (SHFMT_SHA256)' '<64 hex chars>'
@@ -192,11 +154,6 @@ assert_contains 'README bootstrap URL matches the component path' \
   "$readme_text" \
   'raw.githubusercontent.com/melodic-software/standards/main/components/cloud-environment/setup.sh'
 
-# This script installs from the fleet list alone. A repo's enabledPlugins block
-# is a deltas overlay the repo's own bootstrap applies, so no call here may
-# install from the checkout's settings file: reintroducing one would make the
-# snapshot repo-specific again and resurrect the block as a whole-set install
-# source.
 # shellcheck disable=SC2016 # the $ is a literal in the needle
 assert_not_contains 'setup.sh does not install from the checkout settings block' \
   "$script_text" 'install_plugins_from "$settings"'
@@ -204,11 +161,6 @@ assert_not_contains 'setup.sh does not install from the checkout settings block'
 assert_not_contains 'setup.sh does not resolve the checkout settings block for install' \
   "$script_text" 'settings="$REPO_ROOT/.claude/settings.json"'
 
-# Ordering contract: the fleet install must precede the repo bootstrap. The
-# repo bootstrap applies the repo's deltas as an overlay on the fleet list and
-# skips entirely when that list is absent, so a bootstrap that runs first bakes
-# no deltas into the snapshot and the repo's own plugins go live only on the
-# next resume.
 # shellcheck disable=SC2016 # the $ is a literal in the grep needle
 fleet_install_ln="$(grep -n -F 'install_plugins_from "$fleet_file" fleet' "$script" | head -n 1 | cut -d: -f1)"
 repo_bootstrap_ln="$(grep -n -F 'bash .claude/cloud-bootstrap.sh' "$script" | head -n 1 | cut -d: -f1)"
@@ -219,10 +171,6 @@ else
     "fleet install at line '${fleet_install_ln:-none}', repo bootstrap at line '${repo_bootstrap_ln:-none}'"
 fi
 
-# Spawn census for install_plugins_from: two sources must share one
-# marketplace list and one plugin list, the memoization cloud-bootstrap.sh
-# relies on when it reads the fleet list and then the repo overlay.
-# Membership is in-process (no grep -qxF per entry).
 plug_tmp="$(mktemp -d "$TEST_TMPDIR/plug_tmp.XXXXXX")"
 mkdir -p "$plug_tmp/bin" "$plug_tmp/counts"
 cat >"$plug_tmp/bin/claude" <<STUB
@@ -282,10 +230,6 @@ assert_contains 'repo pass installs gamma without a second plugin list' \
   "$(cat "$LOG")" 'plugins (repo): installed gamma@stub-market'
 rm -rf "$plug_tmp"
 
-# Permission floor (standards#653): setup.sh fetches the claude-permissions
-# floor this repository publishes and unions it into the user settings file.
-# The union must reproduce the source exactly, keep everything already in the
-# file, and leave the file byte-identical whenever it refuses.
 floor_rel='components/claude-permissions/claude-permissions.json'
 floor_src="$root/$floor_rel"
 assert_file_exists 'the claude-permissions floor exists in this repository' "$floor_src"
@@ -351,7 +295,6 @@ cmp -s "$existing" "$perm_tmp/first.json"
 rc=$?
 assert_exit 'composing twice is byte-identical (idempotent)' 0 "$rc"
 
-# Refusals: each must return non-zero and leave the settings file as it was.
 refused="$perm_tmp/refused.json"
 check_refusal() {
   local label="$1" floor="$2" content="$3" rc
@@ -376,8 +319,6 @@ jq '.claudePermissions.allow += [7]' "$perm_tmp/floor.json" >"$perm_tmp/nonstrin
 check_refusal 'a floor with a non-string rule' "$perm_tmp/nonstring.json" '{}'
 jq '.claudePermissions.withdraw = "Bash(retired *)"' "$perm_tmp/floor.json" >"$perm_tmp/strwithdraw.json"
 check_refusal 'a floor whose withdraw is not an array' "$perm_tmp/strwithdraw.json" '{}'
-# A permissive first document ahead of a valid one: the merge must never use a
-# document other than the one it validated.
 {
   printf '%s\n' '{"claudePermissions":{"schemaVersion":1,"allow":["Bash(rm -rf *)"],"deny":[]}}'
   cat "$perm_tmp/floor.json"
@@ -387,9 +328,6 @@ assert_eq 'refusals leave no temp file behind' '' \
   "$(find "$perm_tmp" -name '*.compose.*' 2>/dev/null)"
 rm -rf "$perm_tmp"
 
-# Key Vault resolver: setup.sh fetches this component's vault-exec from its
-# published path, so the file in this directory is the one source. It installs
-# only a file carrying the marker and never replaces a vault-exec that lacks it.
 vault_exec_rel='components/cloud-environment/vault-exec'
 vault_exec_src="$root/$vault_exec_rel"
 assert_eq 'setup.sh fetches vault-exec from its published path' \
@@ -441,8 +379,6 @@ assert_nonzero 'a fetched file without the marker is refused' "$rc"
 assert_file_absent 'a refused fetch installs nothing' "$ve_tmp/fresh/vault-exec"
 rm -rf "$ve_tmp"
 
-# Page uploader: installed like vault-exec, by its own marker, and a foreign
-# pages-publish is kept with a WARN that names it.
 pp_rel='components/cloud-environment/pages-publish'
 pp_src="$root/$pp_rel"
 assert_eq 'setup.sh fetches pages-publish from its published path' \
@@ -481,8 +417,6 @@ assert_exit 'a fetched file with the wrong marker is refused (1)' 1 "$rc"
 assert_file_absent 'a refused fetch installs no pages-publish' "$pp_tmp/fresh/pages-publish"
 rm -rf "$pp_tmp"
 
-# Rendered-views hook: installed like pages-publish, then registered as a
-# SessionStart hook in the user settings file.
 rv_rel='components/cloud-environment/rendered-views-sync'
 assert_eq 'setup.sh fetches rendered-views-sync from its published path' \
   "https://raw.githubusercontent.com/melodic-software/standards/main/$rv_rel" \
@@ -529,8 +463,6 @@ done
 assert_eq 'refusals leave no temp file behind' '' "$(find "$rv_tmp" -name '*.hook.*')"
 rm -rf "$rv_tmp"
 
-# Retired inputs: a set RENDERED_VIEWS_MD or PAGES_PUBLISH_* logs that it is
-# ignored and names the replacement, never the value; none set logs nothing.
 ri_tmp="$(mktemp -d)"
 LOG="$ri_tmp/setup.log"
 : >"$LOG"

@@ -25,8 +25,8 @@ const MODES = ["advisory", "enforcing"];
 const FORMATS = ["text", "json", "github"];
 
 function parseJson(source, location) {
-  // The yaml parser in strict JSON mode rejects duplicate keys, which
-  // JSON.parse would silently resolve to the last value.
+  // uniqueKeys rejects duplicate keys, which JSON.parse silently resolves to the last
+  // value: https://eemeli.org/yaml/#parse-options
   const document = parseDocument(source, { schema: "json", strict: true, uniqueKeys: true });
   if (document.errors.length > 0) {
     throw new ConfigurationError(`${location} is not valid JSON: ${document.errors[0].message}`);
@@ -46,8 +46,6 @@ function compilePattern(pattern, location) {
   }
 }
 
-// A schema that cannot be read or compiled is a configuration error, reported
-// when a vocabulary is validated so the CLI maps it to exit status 2.
 let validateVocabularyStructure;
 let schemaError;
 try {
@@ -63,9 +61,6 @@ try {
       : new ConfigurationError(`cannot load ${VOCABULARY_SCHEMA_PATH}: ${error.message}`);
 }
 
-// Cross-field rules JSON Schema cannot state: the function table is keyed by
-// exactly the stage list, every function word leads with an accepted verb,
-// and a name exemption says which name it accepts.
 export function validateVocabulary(vocabulary, location = "vocabulary") {
   if (schemaError !== undefined) {
     throw schemaError;
@@ -148,8 +143,6 @@ function scalarText(node) {
   return isScalar(node) ? String(node.value) : undefined;
 }
 
-// Splits `<stage>-<function>[-<modifier>]`. Returns undefined members for the
-// part that does not match, so callers can say which part is wrong.
 export function parseSlotName(name, vocabulary) {
   const stage = leadingStage(name, vocabulary);
   if (stage === undefined || name === stage) {
@@ -167,8 +160,6 @@ export function parseSlotName(name, vocabulary) {
   return { stage, function: fn, modifier };
 }
 
-// A file or directory stem's display name: hyphens become spaces, each word is
-// capitalized, and a word in `displayWords` takes its listed form.
 export function titleCaseName(stem, displayWords) {
   return stem
     .split("-")
@@ -180,8 +171,6 @@ export function titleCaseName(stem, displayWords) {
     .join(" ");
 }
 
-// The words of a display name, with `${{ }}` expressions and backtick spans
-// removed and surrounding punctuation and a possessive `'s` trimmed.
 function displayTokens(name) {
   return name
     .replace(/\$\{\{.*?\}\}/gu, " ")
@@ -200,8 +189,6 @@ function knownNames(vocabulary) {
   ]);
 }
 
-// A job's display name is Title Case: every word starts with a capital letter
-// or a digit, or is a `displayWords` form (`markdownlint`, `yq`).
 export function checkJobName(id, name, vocabulary) {
   const exception = vocabulary.jobNameExceptions.find((entry) => entry.jobId === id);
   if (exception !== undefined) {
@@ -213,7 +200,6 @@ export function checkJobName(id, name, vocabulary) {
   if (name === undefined) {
     return `job \`${id}\` has no \`name:\`; give it a Title Case display name such as \`${suggestion}\``;
   }
-  // The required check's context is this job's name, so it is fixed.
   if (vocabulary.reservedJobIds.includes(id) && name !== suggestion) {
     return `job \`${id}\` is the required check and must be named exactly \`${suggestion}\``;
   }
@@ -227,15 +213,9 @@ export function checkJobName(id, name, vocabulary) {
   return undefined;
 }
 
-// A step name is sentence case, as GitHub's own steps are (`Set up job`): the
-// first word is capitalized unless it is a known lowercase name or an
-// identifier, and a later capitalized word is a proper noun from the
-// vocabulary, an acronym, or a mixed-case identifier.
 export function checkStepName(name, vocabulary) {
   const known = knownNames(vocabulary);
   const tokens = displayTokens(name);
-  // A multi-word proper noun exempts its words where they appear together,
-  // and only there: `Claude Code` passes, `Code` alone does not.
   const exempt = tokens.map((token) => known.has(token));
   for (const noun of vocabulary.properNouns.filter((entry) => entry.includes(" "))) {
     const words = noun.split(" ");
@@ -248,8 +228,6 @@ export function checkStepName(name, vocabulary) {
     }
   }
   const [first] = tokens;
-  // A name that opens with an expression or a code span has no checked first
-  // word: the token after it is not where the sentence starts.
   const opensWithSpan = /^\s*(\$\{\{|`)/u.test(name);
   if (first !== undefined && !opensWithSpan && !exempt[0] && /^\p{Ll}+$/u.test(first)) {
     return `step name \`${name}\` must start with a capital letter (sentence case)`;
@@ -286,9 +264,6 @@ export function checkActivityName(name, vocabulary) {
   if (vocabulary.engines.includes(activity)) {
     return undefined;
   }
-  // Only a leading stage word repeats the slot (`pr-explainer` in slot
-  // `pr-verify`). A stage word later in the name is an ordinary word, as in
-  // `check-release-readiness`.
   const stage = leadingStage(activity, vocabulary);
   if (stage !== undefined) {
     return `activity \`${name}\` starts with the stage word \`${stage}\``;
@@ -459,8 +434,6 @@ async function workflowFindings(root, repository, vocabulary) {
     const name = scalarText(nameNode);
     const nameExemption = waived("workflow-name");
     const titleCase = titleCaseName(stem, vocabulary.displayWords);
-    // A recorded exception is exact: it takes neither the stem nor its Title
-    // Case form.
     const expected = nameExemption ? nameExemption.expectedName : titleCase;
     if (name !== expected) {
       const target = nameExemption
@@ -579,8 +552,6 @@ function checkActionDirectory(segments, vocabulary) {
   return `action directory \`${display}\` is nested too deep; use \`.github/actions/<lane>/<unit>/\` or a flat directory`;
 }
 
-// An action's `name:` is its directory's Title Case form, and its composite
-// steps follow the step-name rule.
 async function actionMetadataFindings(root, file, directory, vocabulary) {
   const lineCounter = new LineCounter();
   const document = parseDocument(await readFile(path.join(root, file), "utf8"), { lineCounter });
