@@ -39,7 +39,7 @@ Every issue meets one rule, whether a person, an agent session or a bot workflow
 
 - a plain title, as above;
 - the Issue Type set;
-- Work status, Size, Complexity, Uncertainty and a priority;
+- native Issue Status (on enrolled repositories), `Work status`, Size, Complexity, Uncertainty and a priority;
 - a parent issue when the work belongs to a larger one;
 - a blocked-by edge when it waits on other work or a decision (see "The status axis" below).
 
@@ -58,13 +58,16 @@ Personal accounts have no native Issue Types, so their repositories retain a lab
 | Job | Mechanism |
 |---|---|
 | Kind of work | Issue Type |
-| A single-value fact about an issue (Work status, Priority, Size, Complexity, Uncertainty) | organization issue field |
+| Universal work lifecycle (`Backlog` -> `Todo` -> `In progress` -> `In review` -> `Done` / `Not planned` / `Duplicate`) | native GitHub Issue Status (and web-UI Repository Boards) |
+| Trusted lane admission and holds (requiring persisted setter identity), plus single-value triage metadata (`Work status`, Priority, Size, Complexity, Uncertainty) | organization issue field |
 | Pull-request state; flags that stack, such as holds | label |
 | Breaking work down | sub-issues under a parent issue |
 | Waiting on other work or a decision | blocked-by relationship |
+| Non-blocking peer relationship between related issues | native symmetric `"Relates to"` link |
+| Versioned plan or rich specification attachment (additive companion to comments) | native Issue Artifact (`gh issue artifact`) |
 | A goal with a due date | milestone |
-| Closed as not planned or as a duplicate | the close state reason |
-| A recurring queue or filter | saved view |
+| Closed as not planned or as a duplicate | the close state reason (and corresponding native Issue Status) |
+| A recurring queue or filter (including board view) | saved view |
 
 Choose a mechanism by what the value means, its scope, the data and metrics it must yield, and whether it must trigger automation. Prefer the one most GitHub entities support, and add as few customizations as possible. The same concept may be a field on issues and a label on pull requests, since pull requests carry no issue fields. A won't-fix bug is the `Bug` type closed as not planned, not a label. Use a milestone only for a goal with a due date; otherwise group work under a parent issue.
 
@@ -74,13 +77,39 @@ Issue fields are defined once for the organization by an organization owner in i
 
 ## The status axis
 
-Prefer a native mechanism over a status label wherever GitHub offers one, because the native mechanism carries behavior the label can only imitate:
+Prefer a native mechanism over a status label wherever GitHub offers one, because the native mechanism carries behavior the label can only imitate. Issue status splits into **two orthogonal axes** because universal work progress and trusted automation admission have different audit requirements:
+
+### Axis 1: Universal work lifecycle (native GitHub Issue Status)
+
+Enrolled repositories use GitHub's native Issue Statuses (`GET /repos/{owner}/{repo}/planning-statuses`) for universal work progression:
+
+- **Fixed progression:** `Backlog` -> `Todo` -> `In progress` -> `In review` -> `Done` / `Not planned` / `Duplicate`.
+- **Automatic pull-request synchronization:** Opening a draft pull request with a closing keyword (`Closes #n`) moves `Todo` -> `In progress`; marking the pull request ready moves `In progress` -> `In review`; closing it unmerged reverts `In review` -> `In progress`.
+- **Repository Boards:** Native statuses power repository-scoped boards via web-UI Saved Views (`View options` -> Board). No public REST or GraphQL API manages board layouts in preview (checked 2026-11-27), so configure boards in the web UI rather than infrastructure-as-code.
+- **API and query contract:** Write native status via REST `PATCH /repos/{owner}/{repo}/issues/{number}` with string `status: "<Name>"` (passing an integer returns HTTP 422) or GraphQL `setIssueStatus`. Filter via search qualifier `status:...`. Open issues created before repository enrollment carry `status: null` until touched; readers must treat `null` or absent status as unset rather than failing.
+- **Workflow trigger watch-out:** Unfiltered `on: issues` workflows fire on `status_changed` (including automatic PR transitions). Workflows scoped to explicit `types:` (such as `[field_added]`) are unaffected.
+
+### Axis 2: Trusted lane admission and holds (`Work status` and hold labels)
+
+Keep the organization issue field `Work status` and hold labels strictly separate from native Issue Status:
+
+- **Why the split is required:** Live verification ([`pr-pipeline-sandbox#456`](https://github.com/melodic-software/pr-pipeline-sandbox/issues/456#issuecomment-7226850153), checked 2026-11-27) confirmed that native Issue Status transitions (both manual `PATCH`/`setIssueStatus` writes and automatic PR transitions) emit **zero** persisted actor or timeline events in REST `/timeline`, REST `/events`, or GraphQL `timelineItems`; only transient `issues: status_changed` webhooks fire. Unattended lanes verify who granted `agent-ready` or set a hold through persisted `fieldEvents` setter identity, so native Issue Status cannot replace `Work status` for trusted admission or holds.
+- **`Work status` holds the single trusted lane state.** Its field and option IDs are recorded in `github-iac` (see "Issue fields" above); the name keeps it apart from native Issue Status and project Status fields.
+- **Hold labels stack beside it.** A hold means *a human must act before work can continue*, such as waiting on the owner's decision or on the reporter's information. Holds can stack and a field holds one value, so each hold is also a flat label, spelled the same as its `Work status` option; the spellings are defined in infrastructure-as-code.
+- **Work that waits on a decision is blocked by a decision issue.** File the decision as its own issue, `Work status` `needs-owner-decision`, assigned to the owner, and add a blocked-by edge from the waiting issue to it. When the owner decides and the decision issue closes, the edge clears and the waiting work becomes startable. A dependency written only in prose stops nothing.
+
+### Dependencies, claims, and peer links
 
 - **Blocking is a dependency edge, not a label.** Model "this cannot proceed until that is done" as a native blocked-by relationship between issues. The edge resolves itself when the blocker closes; a label has to be cleared by hand and silently goes stale.
+- **Peer relationships use native symmetric `"Relates to"` links.** Model non-blocking cross-references between related issues with native `"Relates to"` edges (GraphQL `addRelatesTo` / `removeRelatesTo`, REST `GET /repos/{owner}/{repo}/issues/{number}/relates_to`, emitting `relates_to_added` on `/timeline`), distinct from directional `blocked-by` edges (which gate startability) and parent/sub-issue edges (which decompose work).
 - **Claiming is an assignee plus a lease, not a label.** A worker taking an issue sets themselves as its assignee under a time-boxed lease, so ownership and its freshness live in the native field where a second worker can trust them, rather than in a label anyone can leave behind. The work-items plugin's [tracker-seam lease protocol](https://github.com/melodic-software/claude-code-plugins/blob/main/plugins/work-items/tools/work-item-tracker/CONTRACT.md#lease-protocol) defines the lease semantics (expiration, renewal, concurrent-claim arbitration).
-- **Work status is the one status.** The organization issue field Work status holds an issue's single current status, with no sub-statuses. The name keeps it apart from a project's own Status field.
-- **Hold labels stack beside it.** A hold means *a human must act before work can continue*, such as waiting on the owner's decision or on the reporter's information. Holds can stack and a field holds one value, so each hold is also a flat label, spelled the same as its Work status option; the spellings are defined in infrastructure-as-code.
-- **Work that waits on a decision is blocked by a decision issue.** File the decision as its own issue, Work status `needs-owner-decision`, assigned to the owner, and add a blocked-by edge from the waiting issue to it. When the owner decides and the decision issue closes, the edge clears and the waiting work becomes startable. A dependency written only in prose stops nothing.
+
+### Issue Artifacts
+
+Use native GitHub Issue Artifacts (`gh issue artifact {create,edit,list,view,download,delete}`, backed by REST `/repos/{owner}/{repo}/issues/{number}/artifacts`) for versioned Markdown (`generic`) and HTML (`embedded_html`) plans or rich specifications that benefit from non-destructive revision history (`--restore-version` appends a new version with `actor.login`):
+
+- **Additive companion posture:** Publish Issue Artifacts as additive companion copies alongside existing issue comments so automated readers expecting `planning:plan v1` comments continue working without breaking.
+- **CLI quirk (`gh 2.105.0`):** `gh issue artifact view` rejects combining `--version` with `--json`; use `--json versions` to inspect revision metadata or `download --version <n> --output -` to read a specific revision body.
 
 ### Triage floor: bare `needs-triage`
 

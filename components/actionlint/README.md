@@ -11,10 +11,10 @@ unknown labels.
 
 The engine is the [kjanat/actionlint](https://github.com/kjanat/actionlint)
 fork, in CI and on every host. It accepts the `$/` same-release reference,
-`concurrency.queue`, job-level `cache-mode` and the `issues` activity types
-`field_added` and `field_removed` natively, so the config carries no ignore for
-them; upstream [rhysd/actionlint](https://github.com/rhysd/actionlint) 1.7.12
-rejects all four.
+`parallel:` step blocks, `concurrency.queue`, job-level `cache-mode` and the
+`issues` activity types `field_added` and `field_removed` natively, so the
+config carries no ignore for them; upstream
+[rhysd/actionlint](https://github.com/rhysd/actionlint) 1.7.12 rejects them.
 
 Execution and the engine pin are owned by the actionlint action in
 `ci-workflows`. `fixtures/` and `actionlint.test.sh` prove the allowlist against

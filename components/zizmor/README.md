@@ -22,6 +22,14 @@ repositories. It sets two rules:
 Both rules only relax zizmor's defaults, so reading this file cannot add a
 finding to a repository.
 
+`zizmor` 1.33.1+ recognizes `.github/workflows/actions.lock`
+([workflow lockfiles](https://docs.zizmor.sh/usage/#workflow-lockfiles), read
+2026-11-27) and `parallel:` step blocks
+([parallel steps](https://docs.zizmor.sh/usage/#parallel-step), read 2026-11-27)
+under this config with no additional overrides. Org-wide lockfile adoption and
+workflow authoring conventions live in
+[`standards/engineering/github-actions-workflows.md`](../../standards/engineering/github-actions-workflows.md).
+
 ## Discovery
 
 zizmor reads the file without a `--config` flag. Per its

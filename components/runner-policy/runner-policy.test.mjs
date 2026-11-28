@@ -121,6 +121,7 @@ async function repository({
   requiredReusableCallInputs,
   policyOverrides = {},
   workflows = {},
+  actionsLock,
 } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), "runner-policy-"));
   temporaryRoots.push(root);
@@ -170,6 +171,9 @@ async function repository({
   );
   for (const [name, source] of Object.entries(workflows)) {
     await writeFile(path.join(root, ".github", "workflows", name), source);
+  }
+  if (actionsLock !== undefined) {
+    await writeFile(path.join(root, ".github", "workflows", "actions.lock"), actionsLock);
   }
   return root;
 }
@@ -6721,7 +6725,6 @@ test("each hosted claude lane caller calls pr-review-cli with the expected lane,
     );
   }
 });
-
 test("every managed target of a hosted claude lane caller is public and audits clean", async () => {
   let asserted = 0;
   for (const { component, source, body, manifest } of await claudeLaneCallerComponents(
@@ -7179,4 +7182,347 @@ test("each fleet claude lane caller calls pr-review-cli with melodic-review-ubun
       `${source} review secrets`,
     );
   }
+});
+
+test("parallel step blocks are recursively inspected for credentials, credential actions, and pin provenance", async () => {
+  const cleanReadOnly = await repository({
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  check:
+    runs-on: ${FLEET_LABEL}
+    steps:
+      - parallel:
+          - name: Read-only token step
+            run: ./check.sh
+            env:
+              GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          - parallel:
+              - name: Nested clean step
+                run: ./verify.sh
+                env:
+                  GH_TOKEN: \${{ github.token }}
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(cleanReadOnly),
+    [],
+    "legitimate read-only GITHUB_TOKEN in nested parallel step env stays admitted",
+  );
+
+  for (const scenario of [
+    {
+      label: "secret in parallel step env",
+      steps: `      - parallel:
+          - name: Sneaky secret
+            run: ./check.sh
+            env:
+              TOKEN: \${{ secrets.DEPLOY_KEY }}`,
+    },
+    {
+      label: "secret in deeply nested parallel step run",
+      steps: `      - parallel:
+          - parallel:
+              - name: Deep run interpolation
+                run: echo \${{ secrets.DEPLOY_KEY }}`,
+    },
+    {
+      label: "secret in nested parallel step condition",
+      steps: `      - parallel:
+          - name: Secret condition
+            if: secrets.DEPLOY_KEY != ''
+            run: ./check.sh`,
+    },
+    {
+      label: "secret in parallel wrapper condition",
+      steps: `      - if: secrets.DEPLOY_KEY != ''
+        parallel:
+          - run: ./check.sh`,
+    },
+    {
+      label: "malformed non-array parallel field carrying secret",
+      steps: `      - parallel: \${{ secrets.DEPLOY_KEY }}
+        run: ./check.sh`,
+    },
+    {
+      label: "malformed non-mapping element inside parallel array carrying secret",
+      steps: `      - parallel:
+          - \${{ secrets.DEPLOY_KEY }}`,
+    },
+    {
+      label: "credential-minting action hidden inside parallel block",
+      steps: `      - parallel:
+          - uses: actions/create-github-app-token@${SHA}`,
+    },
+    {
+      label: "credential-minting action hidden inside deeply nested parallel block",
+      steps: `      - parallel:
+          - parallel:
+              - uses: actions/create-github-app-token@${SHA}`,
+    },
+  ]) {
+    const root = await repository({
+      workflows: {
+        "ci.yml": `permissions: read-all
+jobs:
+  check:
+    runs-on: ${FLEET_LABEL}
+    steps:
+${scenario.steps}
+`,
+      },
+    });
+    assert.deepEqual(
+      (await audit(root)).map(({ rule }) => rule),
+      ["hosted-exception-required", "privileged-hosted-only"],
+      scenario.label,
+    );
+  }
+
+  const grantedInsideParallel = await repository({
+    localRoutingGrants: {
+      ".github/workflows/deploy.yml#apply": {
+        permissions: { contents: "read", "id-token": "write" },
+        secrets: ["APP_PRIVATE_KEY"],
+        credentialActions: [`actions/create-github-app-token@${SHA}`],
+        justification: "Verifies grant consumption inside nested parallel steps.",
+      },
+    },
+    workflows: {
+      "deploy.yml": `permissions: read-all
+jobs:
+  apply:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ${FLEET_LABEL}
+    steps:
+      - parallel:
+          - id: app-token
+            uses: actions/create-github-app-token@${SHA}
+            with:
+              private-key: \${{ secrets.APP_PRIVATE_KEY }}
+          - run: ./other.sh
+`,
+    },
+  });
+  assert.deepEqual(
+    await audit(grantedInsideParallel),
+    [],
+    "granted secret and credential action inside parallel block are recognized and consumed",
+  );
+
+  const provenanceDrift = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "ci.yml": `permissions: read-all
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - parallel:
+          - uses: actions/checkout@${SHA} # deadbeef1234
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(provenanceDrift)).map(({ rule }) => rule),
+    ["pin-provenance-drift"],
+    "pin-provenance-drift catches mismatched SHA comments inside parallel blocks",
+  );
+});
+
+test("when .github/workflows/actions.lock is present, non-SHA credentialActions grants require a matching full-SHA lock entry", async () => {
+  const workflowSource = `permissions: read-all
+jobs:
+  apply:
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ${FLEET_LABEL}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          private-key: \${{ secrets.MELODIC_PRIVATE_KEY }}
+`;
+  const grant = {
+    ".github/workflows/bump.yml#apply": {
+      permissions: { contents: "read", "pull-requests": "read" },
+      secrets: ["MELODIC_PRIVATE_KEY"],
+      credentialActions: ["actions/create-github-app-token@v3"],
+      justification: "Verifies actions.lock binding for tag-pinned credential actions.",
+    },
+  };
+
+  const withoutLock = await repository({
+    localRoutingGrants: grant,
+    workflows: { "bump.yml": workflowSource },
+  });
+  assert.deepEqual(
+    await audit(withoutLock),
+    [],
+    "absent actions.lock preserves existing tag-grant behavior before lockfile onboarding",
+  );
+
+  const validLock = await repository({
+    localRoutingGrants: grant,
+    workflows: { "bump.yml": workflowSource },
+    actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/bump.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies:
+  'actions/create-github-app-token@v3':
+    ref: 'v3'
+    commit: 'sha1-${SHA}'
+    owner_id: 44036562
+    repo_id: 622677611
+`,
+  });
+  assert.deepEqual(
+    await audit(validLock),
+    [],
+    "matching full-SHA actions.lock entry admits tag-pinned credential action",
+  );
+
+  for (const scenario of [
+    {
+      label: "actions.lock omitting the workflow fails closed",
+      actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/other.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies:
+  'actions/create-github-app-token@v3':
+    ref: 'v3'
+    commit: 'sha1-${SHA}'
+`,
+    },
+    {
+      label: "actions.lock missing dependencies entry fails closed",
+      actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/bump.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies: {}
+`,
+    },
+    {
+      label: "actions.lock with non-SHA commit value fails closed",
+      actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/bump.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies:
+  'actions/create-github-app-token@v3':
+    ref: 'v3'
+    commit: 'v3.4.0'
+`,
+    },
+    {
+      label: "actions.lock with mismatched ref fails closed",
+      actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/bump.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies:
+  'actions/create-github-app-token@v3':
+    ref: 'main'
+    commit: 'sha1-${SHA}'
+`,
+    },
+  ]) {
+    const root = await repository({
+      localRoutingGrants: grant,
+      workflows: { "bump.yml": workflowSource },
+      actionsLock: scenario.actionsLock,
+    });
+    const findings = await audit(root);
+    assert.deepEqual(
+      findings.map(({ rule }) => rule),
+      ["hosted-exception-required", "local-routing-grant-drift", "privileged-hosted-only"],
+      scenario.label,
+    );
+    assert.ok(
+      findings.some(({ message }) => message.includes(".github/workflows/actions.lock")),
+      `${scenario.label}: expected finding to name .github/workflows/actions.lock`,
+    );
+  }
+
+  const symlinkRoot = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
+  });
+  await writeFile(path.join(symlinkRoot, "external.lock"), "version: 'v0.0.3'\n");
+  await symlink(
+    path.join(symlinkRoot, "external.lock"),
+    path.join(symlinkRoot, ".github", "workflows", "actions.lock"),
+  );
+  assert.deepEqual(
+    (await audit(symlinkRoot)).map(({ rule }) => rule),
+    ["actions-lock-parse"],
+    "symlinked actions.lock fails closed",
+  );
+
+  const duplicateKeyRoot = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: { "ci.yml": HOSTED_WORKFLOW },
+    actionsLock: `version: 'v0.0.3'
+version: 'v0.0.3'
+`,
+  });
+  assert.deepEqual(
+    (await audit(duplicateKeyRoot)).map(({ rule }) => rule),
+    ["actions-lock-parse"],
+    "duplicate keys in actions.lock fail closed",
+  );
+});
+
+test("repository-local reusable workflows using $/ syntax are audited identically to ./", async () => {
+  const validRoot = await repository({
+    workflows: {
+      "caller.yml": `permissions: read-all
+jobs:
+  call:
+    uses: $/.github/workflows/helper.yml
+    with:
+      runner: ${FLEET_LABEL}
+`,
+      "helper.yml": `on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+permissions: read-all
+jobs:
+  work:
+    runs-on: \${{ inputs.runner }}
+    steps: []
+`,
+    },
+  });
+  assert.deepEqual(await audit(validRoot), [], "$/ local reusable workflow passes");
+
+  const traversalRoot = await repository({
+    visibility: "public",
+    selfHostedCi: false,
+    workflows: {
+      "caller.yml": `permissions: read-all
+jobs:
+  call:
+    uses: $/.github/workflows/../evil.yml
+`,
+    },
+  });
+  assert.deepEqual(
+    (await audit(traversalRoot)).map(({ rule }) => rule),
+    ["runner-target-contract"],
+    "$/ traversal fails closed",
+  );
 });

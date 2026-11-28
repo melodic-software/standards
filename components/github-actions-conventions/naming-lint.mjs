@@ -381,7 +381,14 @@ function stepFindings(file, steps, lineCounter, vocabulary) {
   }
   const findings = [];
   for (const step of steps.items) {
-    const nameNode = isMap(step) ? step.get("name", true) : undefined;
+    if (!isMap(step)) {
+      continue;
+    }
+    const parallel = step.get("parallel", true);
+    if (isSeq(parallel)) {
+      findings.push(...stepFindings(file, parallel, lineCounter, vocabulary));
+    }
+    const nameNode = step.get("name", true);
     if (!isScalar(nameNode)) {
       continue;
     }

@@ -182,6 +182,7 @@ repository where it applies to one.
 
 | Rule | Owner |
 | --- | --- |
+| Workflow lockfiles (`actions.lock`), `uses: $/...`, `parallel:` steps, and artifact/cache conventions | [github-actions-workflows.md](../../standards/engineering/github-actions-workflows.md) |
 | Runner labels and reusable workflow approval by path | [runner-policy](../runner-policy/README.md) |
 | The top-level `concurrency` block of pull-request workflows | [concurrency-policy](../concurrency-policy/README.md) |
 | Dependabot configuration for Actions and package roots | [dependabot-policy](../dependabot-policy/README.md) |
@@ -224,7 +225,7 @@ directory under `.github/actions/` that holds an `action.yml` or
 | `job-id-stage-word` | warning | a job id starts with a stage word but is not a known slot name |
 | `job-id-verb-first` | warning | a job id is not verb-first and is not a listed tool, engine or reserved id; whether a word is a verb cannot always be decided, so this never blocks |
 | `job-name` | `displayNameLevel` | a job has no `name:`, its name is not Title Case, the `ci-status` job is not named `CI Status`, or a `jobNameExceptions` job differs from its recorded name |
-| `step-name` | `displayNameLevel` | a step name in a workflow or composite action is not sentence case |
+| `step-name` | `displayNameLevel` | a step name in a workflow (including inside nested `parallel:` blocks) or composite action is not sentence case |
 | `action-directory` | error | an action directory is not kebab-case, not verb-first, an engine or a listed tool, or not a `<lane>/<unit>` pair under a slot name |
 | `action-name` | error | an action's `name:` is not its directory's Title Case form |
 | `action-unparsable` | error | an `action.yml` is not a YAML mapping |

@@ -34,6 +34,39 @@ rc=$?
 assert_exit 'fleet-label workflow lints clean with the config' 0 "$rc"
 assert_silent 'configured run emits no findings' "$out"
 
+mkdir -p "$project/.github/actions/local-check"
+cat <<'EOF' >"$project/.github/actions/local-check/action.yml"
+name: Local Check
+description: Scratch action for same-repository $/ reference check.
+runs:
+  using: composite
+  steps:
+    - name: Run check
+      run: exit 0
+      shell: bash
+EOF
+cat <<'EOF' >"$project/.github/workflows/parallel-and-self-ref.yml"
+name: Parallel And Self Ref
+on: push
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: melodic-ubuntu-24.04-x64
+    steps:
+      - uses: $/.github/actions/local-check
+      - parallel:
+          - name: First check
+            run: exit 0
+          - name: Second check
+            run: exit 0
+EOF
+out="$(lint)"
+rc=$?
+assert_exit 'workflow with $/ action ref and parallel steps lints clean' 0 "$rc"
+assert_silent '$/ and parallel steps emit no findings' "$out"
+rm -rf "$project/.github/actions" "$project/.github/workflows/parallel-and-self-ref.yml"
+
 cp components/actionlint/fixtures/bad/unknown-runner-label.yml "$project/.github/workflows/"
 out="$(lint)"
 rc=$?

@@ -69,7 +69,14 @@ weekly (owner decision, 2026-11-23); only `weekly` is accepted. First-party acti
 official-vendor actions on their major tag (owner decision), so Dependabot moves no first-party ref; the entry
 carries vendor major-tag bumps and the full-commit-SHA pins of third-party
 actions. Those keep their cooldown and grouping, and
-`open-pull-requests-limit` still caps the entry.
+`open-pull-requests-limit` still caps the entry. Repositories onboarded to
+`.github/workflows/actions.lock`
+([workflow authoring standard](../../standards/engineering/github-actions-workflows.md))
+receive lockfile SHA updates natively in Dependabot `github-actions` pull
+requests while keeping major vendor tags in workflow YAML; a private repository
+that grants a major-tagged credential action in `.github/runner-policy.json`
+([runner-policy](../runner-policy/README.md)) may add an `autoMerge.reviewOnly`
+entry if per-release review is desired.
 
 ### Cooldown by change class
 
