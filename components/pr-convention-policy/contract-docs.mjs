@@ -1,11 +1,5 @@
 #!/usr/bin/env node
 
-// Generates the two prose copies of the PR and issue contracts from their records: the org PR
-// template and the harness-neutral filing guide the org standards index lists. `check` (the
-// default) fails when a committed copy differs from what the records generate; `write`
-// regenerates them. Consumers read the committed copies byte-exact, so each is changed in
-// policy.json or contract.json, or in this generator's wording, and nowhere else.
-
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -19,9 +13,6 @@ export const OUTPUTS = {
   guide: "standards/process/filing-prs-and-issues.md",
 };
 
-// The one marker of each kind the prose steers an author to. policy.json keeps the full accepted
-// set for the copies that enforce it; naming one gives the author no choice the gate never asked
-// for (lockstep-drift.mjs holds the template to "at least one").
 export const NO_ISSUE_MARKER = "No related issue";
 export const NON_CLOSING_MARKER = "Refs";
 

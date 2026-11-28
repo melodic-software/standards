@@ -26,9 +26,6 @@ const REUSABLE_REFERENCE = `${REUSABLE_PATH}@${SHA}`;
 const HOSTED_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/osv-scanner.yml@${PRODUCTION_SHA}`;
 const SECRET_REUSABLE_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${PRODUCTION_SHA}`;
 const FLEET_CLAUDE_REVIEW_REFERENCE = `melodic-software/ci-workflows/.github/workflows/claude-review.yml@${FLEET_CLAUDE_REVIEW_SHA}`;
-// A hypothetical runner-input revision of the standards-sync workflow: the
-// secret-capable contract shape a statically read-only caller uses to route
-// the sync lane to the managed fleet.
 const SYNC_RUNNER_INPUT_SHA = "2223456789abcdef0123456789abcdef01234567";
 const SYNC_RUNNER_INPUT_REFERENCE = `melodic-software/ci-workflows/.github/workflows/standards-sync.yml@${SYNC_RUNNER_INPUT_SHA}`;
 const SYNC_RUNNER_INPUT_CONTRACT = {
@@ -40,25 +37,16 @@ const SYNC_RUNNER_INPUT_CONTRACT = {
     "app-private-key": `\${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}`,
   },
 };
-// The governed fleet labels: the only routing targets that reach the managed
-// fleet, written literally in `runs-on` (or in a reviewed reusable's runner
-// input). `FLEET_REVIEW_LABEL` is the review tier of the same fleet.
 const FLEET_LABEL = "melodic-ubuntu-24.04-x64";
 const FLEET_REVIEW_LABEL = "melodic-review-ubuntu-24.04-x64";
-// One job on the explicit hosted image, and one read-only job on the fleet label.
 const HOSTED_WORKFLOW = "jobs:\n  test:\n    runs-on: ubuntu-24.04\n    steps: []\n";
 const FLEET_WORKFLOW = `permissions: read-all\njobs:\n  test:\n    runs-on: ${FLEET_LABEL}\n    steps: []\n`;
 const CANONICAL_OBSERVER_SECRET_EXPRESSION = `\${{ secrets.CI_RUNNER_OBSERVER_PRIVATE_KEY }}`;
 const BASE_POLICY = JSON.parse(await readFile(new URL("./policy.json", import.meta.url), "utf8"));
-// A policy contract key: the reusable workflow path without its @ref.
 const pathOf = (reference) => reference.slice(0, reference.lastIndexOf("@"));
-// Contract shapes reviewed for earlier ci-workflows files, keyed by the
-// reference each was reviewed at. Tests register a shape under its path.
 const HISTORICAL_CONTRACTS = JSON.parse(
   await readFile(new URL("./fixtures/historical-contracts.json", import.meta.url), "utf8"),
 ).approvedReusableWorkflowContracts;
-// Every commit a fixture references; a test contract that names no
-// approvedShas is approved at these. An unlisted SHA stays refused.
 const FIXTURE_SHAS = [
   ...new Set([
     SHA,
@@ -178,7 +166,6 @@ async function repository({
   return root;
 }
 
-// A fixed audit date keeps switchover-date fixtures inside their window.
 const TEST_TODAY = "2026-11-08";
 const SWITCHOVER_UNTIL = "2026-12-08";
 
@@ -516,12 +503,6 @@ for (const managedLabel of [
         "ci.yml": `jobs:\n  test:\n    runs-on: ${managedLabel}\n    steps: []\n`,
       },
     });
-    // Every label-shaped string is refused here. A reviewed fleet label draws
-    // the routing gate as well, because it is a routing target the inventory
-    // does not permit; an unreviewed one is not a routing target at all, so
-    // only the raw-pin scan reports it. A public repository can never enable
-    // routing: the repository-policy schema forces selfHostedCi false when
-    // visibility is public.
     const expected = new Set(BASE_POLICY.approvedManagedRunnerLabels).has(managedLabel)
       ? ["public-self-hosted-routing", "raw-self-hosted-label"]
       : ["raw-self-hosted-label"];
@@ -2180,10 +2161,6 @@ test("hosted matrix expression policy remains required, unique, and structurally
 });
 
 test("a claude-review caller routes to the review tier without findings", async () => {
-  // Executable spec for the Campaign A flip: the claude-review reusable call
-  // names the review-tier fleet label as its runner input under the reviewed
-  // #140 caller-perms waiver. Zero findings proves the review label threads end
-  // to end and never trips the hardcoded default-label routing guards.
   const root = await repository({
     policyOverrides: {
       approvedReusableWorkflowContracts: {
@@ -2700,7 +2677,6 @@ jobs:
 const MIGRATION_OLD_MAP = { contents: "read", "pull-requests": "write" };
 const MIGRATION_NEW_MAP = { contents: "read", "pull-requests": "write", "id-token": "write" };
 
-// An open switchover (more than one listed map) must carry its date field.
 const switchoverDate = (field, maps) =>
   Array.isArray(maps) && maps.length > 1 ? { [`${field}Until`]: SWITCHOVER_UNTIL } : {};
 
@@ -3540,10 +3516,6 @@ test("local permission contract must authorize at least one exact write scope", 
   );
 });
 
-// minimumCallerPermissions is the floor a caller must clear, the complement of
-// the allowedCallerPermissions ceiling. A called workflow can only narrow the
-// caller's GITHUB_TOKEN, so a callee whose whole requested set is read has an
-// obligation no exact write-capable waiver can express.
 const MINIMUM_PERMISSION_CONTRACT = (minimumCallerPermissions, overrides = {}) => ({
   routing: "runner-input",
   runnerInput: "runner",
@@ -3641,8 +3613,6 @@ test("read-all and write-all callers both clear a read floor", async () => {
   );
   assert.deepEqual(await audit(readAllRoot), []);
 
-  // write-all satisfies the floor arithmetically, but the floor is not a
-  // waiver: the ordinary privileged-control-plane rules still reject it.
   const writeAllRoot = await minimumPermissionRepository(
     { actions: "read" },
     minimumPermissionCaller("    permissions: write-all\n"),
@@ -3687,10 +3657,6 @@ test("a minimum caller permission scope must name a real read grant", async () =
   }
 });
 
-// GitHub downgrades a caller's write grants on forked and Dependabot pull
-// requests, so a write floor would admit exactly the callers it exists to
-// catch. Restricting the term to read disposes of that by construction; a
-// write obligation belongs in allowedCallerPermissions.
 test("a minimum caller permission floor cannot require write access", async () => {
   for (const minimumCallerPermissions of [
     { actions: "write" },
@@ -3768,10 +3734,6 @@ jobs:
     },
   });
   const findings = await audit(root);
-  // The mismatched secret mapping takes the call outside its reviewed
-  // contract, so the fleet label it passes as the runner input is no longer an
-  // admitted routing target: it reads as a raw managed pin alongside the
-  // contract failure.
   assert.deepEqual(
     findings.map(({ rule }) => rule),
     [
@@ -3896,8 +3858,6 @@ test("a first-party reusable call matches its path contract at @main or an appro
 });
 
 test("a full commit SHA the contract does not list is refused", async () => {
-  // Any fork of a public repository can push a commit that GitHub serves under
-  // the parent path, so an unlisted 40-hex SHA proves nothing about review.
   const unlisted = "fedcba9876543210fedcba9876543210fedcba98";
   const root = await repository({
     visibility: "public",
@@ -5620,11 +5580,6 @@ test("anchored uses scalars retain provenance enforcement", async () => {
   );
 });
 
-// The `managed-literal` routing target: the governed fleet label written
-// directly, which is the only way a job reaches the managed fleet. Admitted
-// only on a private repository enrolled for local routing; everywhere else the
-// existing routing gate refuses it under its existing rule id.
-
 const FLEET_LANE_CONTRACT = {
   routing: "runner-input",
   runnerInput: "runner",
@@ -5649,20 +5604,12 @@ test("an enrolled private repository may name the governed fleet label directly"
 });
 
 test("an unreviewed near-miss of the fleet label is not admitted on an enrolled repository", async () => {
-  // managedLabelPatterns is a loose detection surface by design, so it matches
-  // far more than the reviewed labels: an unbounded middle segment, an
-  // unbounded suffix, and unanchored ends that match label-shaped text sitting
-  // next to other characters. Admission is exact set membership instead, so
-  // none of these reach the fleet with the reviewed label's trust.
   for (const target of [
     "melodic-totally-unreviewed-ubuntu-24.04-x64",
     "melodic-review-ubuntu-24.04-x64-shadow",
     "kyle-ubuntu-24.04-x64",
     "bogus/melodic-review-ubuntu-24.04-x64",
     "melodic-review-ubuntu-24.04-x64!",
-    // Padded on either side. The comparison is exact, like the hosted-literal
-    // one, and validatePolicy already refuses a set entry carrying whitespace,
-    // so neither end of that pair can drift into accepting this.
     ` ${FLEET_LABEL}`,
     `${FLEET_LABEL} `,
   ]) {
@@ -5672,19 +5619,11 @@ test("an unreviewed near-miss of the fleet label is not admitted on an enrolled 
       },
     });
     const rules = (await audit(root)).map(({ rule }) => rule);
-    // Refused twice over: the raw-pin scan reports the label-shaped string, and
-    // the job is left with no admitted routing target, so it also needs a named
-    // hosted exception it does not have.
     assert.deepEqual(rules, ["hosted-exception-required", "raw-self-hosted-label"], target);
   }
 });
 
 test("a structural requirement on the fleet label never reads as grantable", async () => {
-  // A grant admits a privileged token on the fleet; it never suppresses a
-  // structural requirement (THREAT-MODEL.md). The two rules share this reporting
-  // branch, so the message is pinned here: if the privileged suffix ever leaks
-  // onto the structural rule again, a container author reads "write a grant" and
-  // the inventory grows an entry that cannot work.
   for (const [shape, description] of [
     ["    container: node:24\n", "job container"],
     ["    services:\n      db:\n        image: postgres:18\n", "services"],
@@ -5758,9 +5697,6 @@ test("a fleet literal cannot be reached by a config that claims private under pu
       "ci.yml": FLEET_WORKFLOW,
     },
   });
-  // ConfigurationError, which the CLI reports as exit 2 rather than as a
-  // finding: a repository cannot enroll itself for local routing by lying about
-  // its own visibility in a checked-in file.
   await assert.rejects(
     () => audit(root, { repositoryVisibility: "public" }),
     (error) =>
@@ -5924,9 +5860,6 @@ jobs:
   assert.deepEqual(await audit(root), []);
 });
 
-// A runner-input reusable whose contract records fixedRunsOn runs some jobs on
-// those hosted labels whatever runner it is given, so a fleet-routed call on an
-// enrolled private repository still needs a hosted exception.
 async function fixedHostedLaneRepository({
   visibility,
   selfHostedCi,
@@ -6035,12 +5968,6 @@ test("a runner-input contract's fixedRunsOn must name known GitHub-hosted labels
   );
 });
 
-// The ci-workflows `checks` consolidation reusable. One job, one runner, every
-// content-agnostic hygiene composite as a step: the lane the CI performance
-// program moves five repositories onto. Its contract is drawn at the
-// reusable's whole declared input surface rather than at any one caller's
-// subset, so a later caller needs no second standards round trip.
-
 const CHECKS_REFERENCE =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@b260ba091ca89bb3292eb53abea07ca8f0a51bf1";
 const CHECKS_CONTRACT = HISTORICAL_CONTRACTS[CHECKS_REFERENCE];
@@ -6048,11 +5975,6 @@ const CHECKS_POLICY_OVERRIDES = {
   approvedReusableWorkflowContracts: { [pathOf(CHECKS_REFERENCE)]: CHECKS_CONTRACT },
 };
 
-// A refused contract costs the call its routing target too: the fleet label in
-// a `with:` value is skipped by the raw-pin scan only for an APPROVED call, and
-// a job with no admitted target also needs a hosted exception it does not have.
-// All three rules are asserted so a future change that silently drops one of
-// them is visible, and the contract reason itself is returned for matching.
 async function checksContractRefusal(root) {
   const findings = await audit(root);
   assert.deepEqual(
@@ -6095,8 +6017,6 @@ test("a private fleet caller of the checks reusable at the approved SHA is admit
 });
 
 test("the checks contract admits every input the reusable declares, not one caller's subset", async () => {
-  // The union argument made executable: a caller passing all nineteen at once
-  // is admitted, so none of the five wave repositories can need a widening.
   const root = await repository({
     policyOverrides: CHECKS_POLICY_OVERRIDES,
     workflows: {
@@ -6137,9 +6057,6 @@ test("an input the checks reusable does not declare is refused by name", async (
 });
 
 test("a checks caller that does not grant the contract's read floor is refused", async () => {
-  // pull-requests: read is what change-detection needs to read the pull
-  // request's file list. A called workflow can only narrow the caller's token,
-  // so a caller short of the floor fails here rather than inside the callee.
   const root = await repository({
     policyOverrides: CHECKS_POLICY_OVERRIDES,
     workflows: {
@@ -6149,10 +6066,6 @@ test("a checks caller that does not grant the contract's read floor is refused",
   assert.match(await checksContractRefusal(root), /pull-requests/u);
 });
 
-// The same reusable at the ci-perf wave tag. The file is byte-identical
-// between the two revisions, so the contract is a verbatim copy forward and
-// asserting equality (rather than restating nineteen inputs a second time)
-// is what makes a silent divergence at either key a failing test.
 const CHECKS_REFERENCE_WAVE_TAG =
   "melodic-software/ci-workflows/.github/workflows/checks.yml@906ae7ef379ea4d2b8497f64475dce1d3d8715c4";
 
@@ -6193,10 +6106,6 @@ jobs:
   };
   const root = await repository({ workflows });
   const findings = await audit(root);
-  // Before `managed-literal` existed, the called job matched neither the local
-  // nor the hosted execution test in the permission-flow pass, so a job
-  // inheriting a write-capable caller token ran on a persistent host with no
-  // finding at all.
   assert.ok(
     findings.some(
       ({ rule, file, job }) =>
@@ -6228,12 +6137,6 @@ jobs:
 });
 
 test("a Phase 3.2 ci-status grant admits the fleet-literal ci-status job unchanged", async () => {
-  // The four github-iac/dotfiles/provisioning/medley `ci-status` grants were
-  // written before the fleet label replaced the routing expression, and their
-  // JSON did not change when it did. The same grant must still admit the
-  // fleet-literal `ci-status` job; if it did not, every one of those
-  // repositories would fire an unconsumed-grant drift the moment its wave
-  // landed.
   const grants = {
     ".github/workflows/ci.yml#ci-status": {
       permissions: { contents: "read", "pull-requests": "write", statuses: "write" },
@@ -6260,18 +6163,6 @@ ${jobBody}    runs-on: ${FLEET_LABEL}
   assert.deepEqual(await audit(fleetLiteral), []);
 });
 
-// Repository visibility, keyed by sync-manifest target name. `routingEnabled`
-// admits the governed fleet label only for private self-hosted consumers, and
-// that ban consults neither `exceptions` nor `localRoutingGrants`, so a
-// PUBLIC target has no configuration escape.
-//
-// Checked in rather than read from the GitHub API: these tests must run
-// offline and hermetically like the rest of this suite. The cost is that a
-// visibility flip lands here by hand, so the lookup FAILS CLOSED — a target
-// absent from this map is treated as public and rejected, rather than
-// silently assumed private. Add a repository here when it becomes a sync
-// target; a wrong entry surfaces as a failing test, a missing one as a
-// failing test naming the gap.
 const TARGET_VISIBILITY = new Map([
   ["melodic-software/.github", "public"],
   ["melodic-software/ci-runner", "public"],
@@ -6315,9 +6206,6 @@ async function claudeLaneCallerComponents(directory = "components/claude-lanes/"
   return components;
 }
 
-// A consumer root carrying one caller component, audited against the REAL
-// policy.json rather than the fixture policy `repository()` substitutes —
-// these assertions are about the shipped allowlist, not a synthetic one.
 async function consumerCarrying({ body, visibility, selfHostedCi }) {
   const root = await mkdtemp(path.join(tmpdir(), "claude-lane-caller-"));
   temporaryRoots.push(root);
@@ -6330,10 +6218,6 @@ async function consumerCarrying({ body, visibility, selfHostedCi }) {
   return root;
 }
 
-// Any managed target of a claude lane caller must be one runner-policy
-// actually admits. Assert the property (every managed target audits clean)
-// rather than a fixed count — adding a PRIVATE consumer passes; adding a
-// public one does not.
 test("every managed target of a claude lane caller admits that caller", async () => {
   for (const { component, source, body, manifest } of await claudeLaneCallerComponents()) {
     for (const [target, definition] of Object.entries(manifest.targets)) {
@@ -6352,11 +6236,6 @@ test("every managed target of a claude lane caller admits that caller", async ()
   }
 });
 
-// A caller reaches the managed fleet by naming a managed label directly, in
-// `runs-on` or in a reviewed reusable's runner input. That is private-only, so
-// the public-target assertions below match the label itself rather than any
-// one spelling of a caller, which is what keeps them asserting something as
-// caller shapes change.
 const MANAGED_LABEL_REGEXES = BASE_POLICY.managedLabelPatterns.map(
   (pattern) => new RegExp(pattern, "u"),
 );
@@ -6508,9 +6387,6 @@ ${permissions}
     policyOverrides,
     workflows: { "ci.yml": workflow("      contents: read") },
   });
-  // Dropping the grant fails the contract, and a rejected contract stops
-  // admitting the fleet label with it, so the caller loses its routing
-  // admission too. The caller-permission finding is the cause.
   const findings = await audit(ungranted);
   assert.deepEqual(findings.map((finding) => finding.rule).sort(), [
     "hosted-exception-required",
@@ -6526,17 +6402,6 @@ ${permissions}
   );
 });
 
-// The ci-workflows v0.22.1 patch tag. Every reusable already reviewed at
-// v0.22.0 is re-registered at it so the wave repositories that pin the patch
-// can call them. Read at both revisions through the contents API: all but
-// `checks.yml` are byte-identical, and `checks.yml` differs only by
-// thirteen `uses:` lines re-pinning its own composite steps from v0.20.0 to
-// the v0.22.0 revision. No `on.workflow_call` declaration, workflow
-// `permissions`, job `permissions`, `if` or `runs-on` expression moved on any
-// of them, so the caller-facing contract is unchanged and each entry is a
-// verbatim copy forward. The composite re-pin is why auto-approval declines
-// (`checks.yml` steps are recorded in full by the surface diff), so the entry
-// is written by review instead.
 const OAUTH_SECRET_MAPPING = `CLAUDE_CODE_OAUTH_TOKEN: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`;
 const WAVE_PATCH_TAG_CALLERS = [
   {
@@ -6631,16 +6496,8 @@ ${secrets.length > 0 ? `    secrets:\n${block(secrets, "      ")}\n` : ""}`,
   assert.equal(asserted, 6);
 });
 
-// The hosted lane callers (components/claude-lanes-hosted/) call the hosted-only
-// pr-review-cli.yml reusable (lane `code` / `security`, API-key-first secret
-// contract), managed only for public targets, and never beside the fleet
-// variant of the same lane (distribution/sync-manifest.yml, the public-shape
-// note).
 const HOSTED_LANE_DIR = "components/claude-lanes-hosted/";
 
-// The workflow `name:` is each destination's stem in Title Case, so the hosted
-// file's name is its fleet sibling's plus ` Hosted`; the job ids stay the same
-// (`pr-review` / `pr-review-security`).
 test("each hosted claude lane caller calls pr-review-cli with the expected lane, secrets and Hosted name", async () => {
   const hosted = await claudeLaneCallerComponents(HOSTED_LANE_DIR);
   assert.equal(hosted.length, 2, "expected a hosted code-review and security-review caller");
@@ -6763,9 +6620,6 @@ test("no target manages both the fleet and the hosted caller of one lane", async
   }
 });
 
-// First-party reusable workflows float on main; first-party actions take a
-// full SHA, which the org requires of every action. The registration tests
-// above audit these same bytes against the real policy.json.
 test("the claude lane caller components call ci-workflows reusables at @main and actions at a SHA", async () => {
   for (const { source, body } of [
     ...(await claudeLaneCallerComponents()),
@@ -6783,15 +6637,6 @@ test("the claude lane caller components call ci-workflows reusables at @main and
   }
 });
 
-// The managed-files-guard caller is the hosted-only counterpart: a fixed
-// approved hosted label, a read-only token, and a first-party composite-action
-// step at @main (composite actions are not allowlisted, so no contract entry is
-// involved). It is managed for public targets and for private targets NOT
-// enrolled for local routing, and one of its managed targets
-// (claude-code-plugins) executes this gate, so the shipped bytes must audit
-// clean under exactly those inventories, and must NOT be admitted to an
-// enrolled private consumer, which is why those targets take the
-// fleet-routed sibling instead (components/managed-files-guard/README.md).
 async function managedFilesGuardCaller(component = "managed-files-guard-caller") {
   const manifest = parse(
     await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),
@@ -6832,9 +6677,6 @@ test("the managed-files-guard caller is not admitted to a routing-enrolled priva
   );
 });
 
-// The fleet-routed sibling names the managed fleet label, so every target that
-// manages it must be a private repository enrolled for local routing, and it
-// must audit clean there. On a public consumer it is refused outright.
 test("the fleet-routed managed-files-guard caller audits clean on every target that manages it", async () => {
   const { component, source, body, manifest } = await managedFilesGuardCaller(
     "managed-files-guard-fleet-caller",
@@ -6868,10 +6710,6 @@ test("the fleet-routed managed-files-guard caller is rejected outright on a publ
   assert.ok(rules.has("public-self-hosted-routing"), `${source} is expected to be private-only`);
 });
 
-// Each online link-check caller (components/lychee-online/) calls a
-// ci-workflows reusable, so its pin needs a contract entry, and its managed
-// targets include claude-code-plugins, which runs this gate. The shipped bytes
-// must audit clean on every target that manages them.
 test("every online link-check caller audits clean on every target that manages it", async () => {
   const manifest = parse(
     await readFile(new URL("../../distribution/sync-manifest.yml", import.meta.url), "utf8"),

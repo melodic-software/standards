@@ -42,9 +42,6 @@ test("the sample matrix hides every kind of linkage in every masked shape", () =
   }
 });
 
-// The masked samples exist for these mutations: a copy that scans the raw
-// body, or masks comments but not code, agrees with policy on every plain
-// sample and differs only where linkage is hidden.
 test("a copy that scans unmasked text is behavioral drift", () => {
   const raw = mutate(
     "hookValidator",
@@ -98,8 +95,6 @@ test("every closing keyword is probed in every negation shape", () => {
   }
 });
 
-// Each mutation below reads the policy correctly for the first closing
-// keyword, the only one the matrix once probed for negation.
 test("a copy that detects negation for one closing keyword only is behavioral drift", () => {
   const gate = mutate(
     "gateRun",
@@ -211,7 +206,6 @@ test("a copy that stops at the first closing reference on a line is behavioral d
   assert.match(hook[0], /"This does not closes #12; Closes #11" should be linked \+ negated/);
 });
 
-// The policy spells three keywords, but GitHub closes on all nine forms.
 test("a copy that negates only the policy's keyword spellings is behavioral drift", () => {
   const lines = linkageMatrix(POLICY).map(({ line }) => line);
   for (const form of GITHUB_CLOSING_KEYWORDS) {
@@ -247,7 +241,6 @@ test("a copy that negates only the policy's keyword spellings is behavioral drif
   );
 });
 
-// An opt-out does not excuse a negated closer: GitHub closes the issue anyway.
 test("a copy that skips negation once a body opts out is behavioral drift", () => {
   const texts = goodTexts();
   texts.gateRun = texts.gateRun
@@ -269,8 +262,8 @@ test("a copy that skips negation once a body opts out is behavioral drift", () =
   const hook = mutate(
     "hookValidator",
     '  LINKAGE_NEGATED=()\n  linkage::split_lines "$1"\n',
-    // The hook's own no-issue test, as scan_linkage runs it after the loop;
     // `$$` is a literal `$` in a String.replace replacement.
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
     `  LINKAGE_NEGATED=()\n  [[ $$'\\n'"\${1,,}"$$'\\n' =~ $NO_ISSUE_ERE ]] && return 0\n  linkage::split_lines "$1"\n`,
   );
   assertOnlyBehavior(

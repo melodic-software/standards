@@ -163,17 +163,8 @@ export function validatePolicy(value) {
           throw new ConfigurationError(`${location} must include at least one write permission`);
         }
       }
-      // A floor may only require read. GitHub downgrades write grants to read
-      // (and write-only scopes to none) on forked and Dependabot pull requests
-      // unless repository settings permit otherwise, so a caller's declared
-      // write is not the access the callee receives -- a statically checked
-      // write floor would pass exactly the callers it exists to catch. A write
-      // obligation belongs in allowedCallerPermissions, whose waiver is
-      // reviewed against the calling job rather than inferred from a
-      // declaration. The schema keeps the value domain (a floor names a real
-      // grant); this rule lives here so the author of a rejected contract is
-      // told why, the same split allowedCallerPermissions' write requirement
-      // already uses in the opposite direction.
+      // A floor may only require read: GitHub downgrades write grants to read on forked pull requests.
+      // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
       if (Object.hasOwn(contract, "minimumCallerPermissions")) {
         const writeScopes = Object.entries(contract.minimumCallerPermissions)
           .filter(([, access]) => access !== "read")
@@ -358,10 +349,6 @@ function validateRepositoryConfig(value, policy) {
         `local-routing grant ${key} admits nothing beyond the ordinary read-only local boundary; declare a write permission, environment, secret, or credential action, or remove the grant`,
       );
     }
-    // GitHub evaluates expression-valued environment names (vars, needs,
-    // matrix contexts), so an expression could change the protected
-    // environment without any grant-inventory diff; only a literal name is
-    // an exact reviewed surface.
     if (Object.hasOwn(grant, "environment") && grant.environment.includes("${{")) {
       throw new ConfigurationError(
         `local-routing grant ${key} must name one literal deployment environment, not an expression`,
@@ -477,11 +464,8 @@ function parseReusableWorkflowReference(value) {
   return { workflow: value.slice(0, separator), revision: value.slice(separator + 1) };
 }
 
-// Contracts key on the workflow path. A melodic-software/ci-workflows reusable
-// may be called at @main; any caller may pin a SHA the contract lists in
-// approvedShas. An unlisted SHA is refused because GitHub serves a commit
-// pushed to any fork under the parent repository path. Every other ref (a tag
-// or another branch) is not approved.
+// An unlisted SHA is refused because GitHub serves a commit pushed to any fork under the parent repository path.
+// https://docs.github.com/en/pull-requests/reference/forks
 function reusableWorkflowContract(uses, policy) {
   const parsed = parseReusableWorkflowReference(uses);
   const contract = parsed && policy.approvedReusableWorkflowContracts.get(parsed.workflow);
@@ -955,10 +939,6 @@ function switchoverFindings(contracts, today, policyFile) {
 
 const PERMISSION_ACCESS_RANK = { none: 0, read: 1, write: 2 };
 
-// GITHUB_TOKEN access is ordered (none < read < write), so a caller granting
-// more than a reviewed floor still satisfies it. A scope the caller does not
-// name is granted nothing; read-all and write-all grant every scope at that
-// level.
 function grantedPermissionAccess(permissions, scope) {
   if (permissions === "write-all") {
     return "write";
@@ -970,15 +950,8 @@ function grantedPermissionAccess(permissions, scope) {
   return Object.hasOwn(PERMISSION_ACCESS_RANK, access) ? access : "none";
 }
 
-// A called workflow can only narrow the caller's token, never widen it, so a
-// caller granting less than the callee requests cannot do the work the
-// reviewed contract was approved for. The comparison stays ordered even
-// though a floor may only require read: a caller granting write clears a read
-// floor, because GitHub's event-time downgrade lands on read at worst.
-// Omitted permissions resolve to repository- or organization-defined defaults
-// this surface cannot read, so they can never prove the floor and fail
-// closed. Scopes are reported in sorted order so the message does not depend
-// on how the contract was authored.
+// A called workflow can only narrow the caller's token; omitted permissions resolve to unreadable defaults and fail closed.
+// https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
 function minimumPermissionShortfall(permissions, minimum, location) {
   if (permissions !== "read-all" && permissions !== "write-all" && !isMapping(permissions)) {
     return `${location} must be an explicit mapping, read-all, or write-all to prove the reviewed minimum ${JSON.stringify(minimum)}`;
@@ -2202,14 +2175,8 @@ export async function auditRepository({
         }
       }
 
-      // macOS runners are free only on a public repository and bill at the
-      // macOS rate on a private one, so no private repository may name one,
-      // whatever its enrollment, routing or exception inventory says. The
-      // visibility here is the event-checked inventory value. A value counts
-      // when any token, split on whitespace, commas, brackets and quotes, is
-      // shaped like a macOS label, so a JSON array a reusable workflow passes
-      // to fromJSON is caught; an expression `runs-on` is left to
-      // runner-target-contract.
+      // macOS runners are free only on a public repository and bill at the macOS rate on a private one.
+      // https://docs.github.com/en/billing/reference/actions-runner-pricing
       if (config.visibility === "private") {
         for (const runner of runnerStrings) {
           if (runner.split(/[\s,[\]"']+/).some((token) => /^macos(-|$)/i.test(token))) {
@@ -2330,12 +2297,6 @@ export async function auditRepository({
         continue;
       }
 
-      // An enrolled private repository may name the governed fleet label
-      // directly. Everything that makes such a job privileged has already been
-      // reported above through hostedRequirement, so an admitted fleet literal
-      // needs no exception entry, unless it is the runner input of a reviewed
-      // reusable whose contract records fixedRunsOn: those jobs ignore the
-      // input and spend GitHub-hosted minutes, so the call needs an exception.
       if (target.kind === "managed-literal" && target.approved) {
         const fixedRunsOn = reusable.approved ? reusable.contract.fixedRunsOn : undefined;
         if (!fixedRunsOn || hostedRequirement) {

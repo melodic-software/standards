@@ -21,11 +21,6 @@ import {
   POLICY,
 } from "./lockstep-fixtures.mjs";
 
-// Non-closing references and negated closers (#647). Static extractors diff
-// the declared data; the behavioral layer runs the vendored copies on a
-// policy-generated matrix, so every mutation below that breaks behavior must
-// surface as a `(behavior)` finding whatever source shape it takes.
-
 test("non-closing and negation parsers read the policy's values from both copies", () => {
   const expectedMarkers = POLICY.body.nonClosingMarkers.map((marker) => marker.toLowerCase());
   assert.deepEqual(parseValidatorNonClosing(GOOD_VALIDATOR, "hook").markers, expectedMarkers);
@@ -63,8 +58,6 @@ test("the sample matrix covers every policy value, inside and just outside the w
       delimiter,
     );
   }
-  // Each trigger appears, for each closing keyword, once at the window's edge
-  // (negated) and once a word further out (closing).
   const firstTrigger = body.negatedClosers.triggerWords[0];
   const atEdge = matrix.filter(({ line }) => line.startsWith(`${firstTrigger} alpha `));
   assert.deepEqual(
@@ -86,9 +79,6 @@ test("a composite with the negation call removed is behavioral drift", () => {
 });
 
 test("a hook whose negation helper never writes its result is behavioral drift", () => {
-  // The trigger branch's write into the caller-named variable: without it the
-  // helper still returns 0, the destination stays empty, and every negated
-  // closer counts as a valid one.
   const errors = mutate("hookValidator", `      printf -v "$__plv_dest" '%s' "\${words[i]}"\n`, "");
   assertOnlyBehavior(errors, "hookValidator", /should be unlinked \+ negated by "not", got linked/);
 });
@@ -143,8 +133,6 @@ test("a policy marker no copy implements is drift in both copies, both ways", ()
   assert.match(errors[3], /^hook validator \(behavior\): .*"Part of: #12"/);
 });
 
-// Each of these broke one link earlier review rounds had to find by reading
-// source: the helper's input, a verdict, the exception, the window.
 test("breaking how either copy reaches its verdict is behavioral drift", () => {
   const cases = [
     ["gateRun", "    words[count] = substr(tail, RSTART, RLENGTH)\n", "", /negated by/],
@@ -166,7 +154,6 @@ test("breaking how either copy reaches its verdict is behavioral drift", () => {
       "count - 5 : 1",
       /echo Closes #12" should be closing, got negated/,
     ],
-    // An early return ahead of the intact "not only" exception line.
     [
       "gateRun",
       "    lower = tolower(word)\n",

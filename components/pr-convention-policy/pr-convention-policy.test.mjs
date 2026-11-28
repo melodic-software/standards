@@ -33,8 +33,6 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
       validatePolicy({ schemaVersion: 1, title: { allowedTypes: ["feat"], requireScope: false } }),
     ConfigurationError,
   );
-  // A version-1 policy, with no non-closing or negated-closer record, no
-  // longer validates.
   const { nonClosingMarkers, negatedClosers, ...versionOneBody } = POLICY.body;
   assert.ok(nonClosingMarkers.length > 0 && negatedClosers.wordWindow > 0);
   assert.throws(
@@ -45,8 +43,6 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
     () => validatePolicy({ ...POLICY, body: versionOneBody }),
     /body must have required property 'nonClosingMarkers'/,
   );
-  // The linkage copies implement exactly one affirmative exception and one
-  // trigger suffix, which is all the lockstep extractors can read.
   for (const [field, values] of [
     ["affirmativePhrases", [[], ["not only", "not just"]]],
     ["triggerSuffixes", [[], ["n't", "nt"]]],
@@ -59,17 +55,11 @@ test("policy schema accepts the canonical policy and rejects drift", () => {
       );
     }
   }
-  // The lockstep matrix builds samples proportional to the window, so the
-  // schema bounds it.
   const wide = { ...POLICY.body, negatedClosers: { ...negatedClosers, wordWindow: 51 } };
   assert.throws(() => validatePolicy({ ...POLICY, body: wide }), /wordWindow must be <= 50/);
 });
 
 test("canonical requiredSections mirror the enforced pr-issue-linkage contract", () => {
-  // Lockstep pin against the authoritative gate: ci-workflows'
-  // pr-issue-linkage.yml reusable (v0.14.2, 7107b34) enforces exactly these
-  // four sections. When the reusable's list changes, this policy changes with
-  // it (standards#393).
   assert.deepEqual(POLICY.body.requiredSections, ["Summary", "Fix", "Verification", "Related"]);
 });
 

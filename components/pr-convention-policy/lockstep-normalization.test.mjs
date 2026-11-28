@@ -72,8 +72,6 @@ test("the sample matrix varies case, apostrophes and the window's word rules", (
   }
 });
 
-// Each copy folds case in several places and normalizes the typographic
-// apostrophe; undoing any one of them must change a verdict on the matrix.
 test("undoing any normalization step in either copy is behavioral drift", () => {
   const cases = [
     ["gateRun", "    lower = tolower(word)\n", "    lower = word\n", /"This NOT closes #12"/],
@@ -133,14 +131,12 @@ test("undoing any normalization step in either copy is behavioral drift", () => 
     [
       "hookValidator",
       `  lower=$'\\n'"\${1,,}"$'\\n'`,
-      // `$$` is a literal `$` in a String.replace replacement; a bare `$'`
-      // would splice in the rest of the file.
+      // `$$` is a literal `$` in a String.replace replacement; a bare `$'` splices in the rest of the file.
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
       `  lower=$$'\\n'"$1"$$'\\n'`,
       /"No linked issue: housekeeping" should be linked, got unlinked/,
     ],
   ];
-  // A static extractor may name the same edit too; the behavioral finding
-  // must be there either way, and nothing outside the mutated copy may fire.
   for (const [copy, from, to, expected] of cases) {
     const errors = mutate(copy, from, to);
     const behavior = errors.filter((error) => error.startsWith(`${LOCATION[copy]} (behavior): `));
@@ -318,11 +314,6 @@ test("the composite's analyzer runs sandboxed: system() is refused", () => {
 });
 
 test("the hook runs with no inherited environment", () => {
-  // A probe library that reports what it can see: the lane token must not
-  // reach code fetched from another repository.
-  // The probe passes every body when it sees a clean environment and fails
-  // every body when it sees the token or HOME, so a leak shows up as the very
-  // first sample, a plain closing keyword, reported unlinked.
   process.env.LOCKSTEP_GITHUB_TOKEN = "must-not-leak";
   try {
     const probe = [

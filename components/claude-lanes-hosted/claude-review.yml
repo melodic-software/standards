@@ -7,61 +7,18 @@ name: PR Review Hosted
 # Downstream edits are overwritten by the next sync PR; change the component
 # upstream, or move the component to `locally-owned` in the manifest to
 # customize.
-#
-# Thin caller for the org's pr-review-cli reusable, lane `code`. The reusable
-# workflow owns the launcher, the credential order (the reviews role's API key,
-# then its subscription token after a handoff, then the central fallback
-# subscription), and the secret-handling model; per its header, this caller
-# owns the triggers, concurrency, and the GITHUB_TOKEN permission grant (a
-# called workflow can only downgrade the caller's grant, never elevate it).
-#
-# The reusable skips fork PRs (they receive no secrets and a read-only token),
-# Dependabot, and every `[bot]` actor whose sender id is not in
-# `allowed-bot-sender-ids` (below), so none is reviewed by design. On a public
-# repository that means the lane reviews only pull requests from branches of
-# this repository: fork and Dependabot pull requests get no secrets.
-#
-# RUNNER PLACEMENT: hosted shape. Every job of pr-review-cli.yml defaults to
-# GitHub-hosted `ubuntu-24.04` when `runner` is omitted, which the standards
-# `runner-policy` component admits on a public repository. It is the hosted
-# sibling of components/claude-lanes/claude-review.yml (which passes
-# `runner: melodic-review-ubuntu-24.04-x64` on private fleet-enrolled repos).
-# The workflow `name:` is the destination file's stem in Title Case and the job
-# id stays `pr-review`; both hosted and fleet callers report
-# `PR Review / Publish Review`. A target manages one of the two, never both.
-#
-# This lane is advisory (github-iac ADR 0011: no organization ruleset may make
-# an agentic review a merge prerequisite).
 
 on:
   pull_request:
-    # `synchronize` re-reviews every push, including the push that resolves a
-    # merge conflict: GitHub runs no pull_request workflow while a PR
-    # conflicts with its base, so a once-per-PR trigger set silently skipped
-    # any PR that conflicted when it opened. The reusable narrows a push's
-    # review to the files changed since the lane's last completed review and
-    # skips a push that changed none of the PR's files; opened, reopened and
-    # ready_for_review review the whole PR.
-    #
-    # Re-running the job does NOT review a newer head: a re-run replays the
-    # ORIGINAL event payload. Push to review the current head.
+    # `synchronize`: GitHub runs no pull_request workflow while a PR conflicts with its base.
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
     types: [opened, synchronize, ready_for_review, reopened]
 
+# A called workflow can only downgrade the caller's grant, never elevate it.
+# https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
 permissions:
   contents: read
 
-# Per-PR supersede group: a newer event for the same PR, a push included,
-# cancels the older run, so per-push reviews do not stack. A skipped actor's
-# same-PR event can cancel an in-flight review through this group; that is
-# accepted: with `synchronize`, the cancelled review was of a head the new
-# event has already superseded. The security caller cancels superseded runs
-# the same way.
-#
-# The group is the `${{ github.workflow }}`-prefixed canonical form the
-# standards `concurrency-policy` component requires, so a target enforcing
-# that policy passes without an exemption. A file whose header says
-# downstream edits are overwritten cannot ask its consumers to normalize it
-# themselves.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -69,36 +26,19 @@ concurrency:
 jobs:
   pr-review:
     name: PR Review
-    # A draft is work in progress and does not spend a review; the
-    # ready_for_review trigger above is what delivers one when it is ready.
     if: github.event.pull_request.draft == false
     permissions:
-      actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
-      checks: read           # Publish Review reads its earlier runs' cost notices
-      contents: read         # checkout + read the diff
-      issues: read           # read closing issues on private repositories
-      pull-requests: write   # post review, comments, and the lane's reviewed-head marker comment
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: write
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:
       lane: code
       publish: comments
-      # Bot senders this lane reviews, by numeric user id: the
-      # automation-lanes App, so a commit it pushes to a pull request is
-      # reviewed. Where the repository does not set this variable the value is
-      # empty and the reusable reviews no bot.
       allowed-bot-sender-ids: ${{ vars.AUTOMATION_LANES_APP_SENDER_ID }}
-      # People whose closing issues the review reads in full, by numeric user
-      # id: the `human` entries of components/trusted-actors/trusted-actors.json.
-      # trusted-actors.test.mjs fails when this value, in either claude-review
-      # component or standards' own pr-review.yml, differs from them. Empty
-      # would replace every person's closing issue with a placeholder. The
-      # bot ids in allowed-bot-sender-ids above also mark issues those bots
-      # wrote as trusted closing-issue context.
       allowed-author-ids: '153232337'
-    # Pass only the named secrets (least privilege) rather than
-    # `secrets: inherit`, which would forward every parent secret to the
-    # called workflow. The reviews role's API key runs first, then its
-    # subscription token after a handoff, then the central fallback subscription.
     secrets:
       CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}
