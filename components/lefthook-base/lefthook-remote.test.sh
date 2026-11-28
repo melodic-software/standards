@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Tests the lefthook remote form of lefthook-base: a consumer lists
-# lefthook-remote.yml under `remotes:`, lefthook fetches this repository into
-# .git/info/lefthook-remotes/, and each job's script under .lefthook/pre-commit/
-# passes its tool the consumer's own config when it has one, else the standards
-# config that sits two directories above the script itself.
-#
-# Recording shims stand in for the tools, so the argv each script builds is an
-# artifact on disk; only lefthook gates the suite.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -23,7 +15,6 @@ configs=(.gitleaks.toml .editorconfig-checker.json)
 tools=(gitleaks editorconfig-checker)
 flags=(--config -config)
 
-# The files a consumer fetches, committed on main in a stand-in remote.
 seed_remote() {
   local dest="$1" cfg
   mkdir -p "$dest/components/lefthook-base"
@@ -50,7 +41,6 @@ resolved() {
   [[ -f "$1" ]] && printf '%s/%s' "$(cd "$(dirname "$1")" && pwd -P)" "$(basename "$1")"
 }
 
-# The config a recorded call named, resolved from the directory the hook ran in.
 config_of() {
   (cd "$1" && resolved "$(flag_value "$2" "$3")")
 }
@@ -60,8 +50,6 @@ clear_logs() {
   for tool in "${tools[@]}"; do rm -f "$work/$tool.log"; done
 }
 
-# Case 1: run directly, each script resolves its config from its own location,
-# whichever directory the remote was fetched into, and passes the files on.
 for at in "$work/a/.git/info/lefthook-remotes/standards-main" "$work/b/x/.git/info/lefthook-remotes/r"; do
   seed_remote "$at"
   mkdir -p "$work/cwd"
@@ -79,7 +67,6 @@ for at in "$work/a/.git/info/lefthook-remotes/standards-main" "$work/b/x/.git/in
   done
 done
 
-# Case 1b: a repository with its own config replaces the standards one whole.
 at="$work/a/.git/info/lefthook-remotes/standards-main"
 mkdir -p "$work/own"
 for i in "${!scripts[@]}"; do
@@ -91,8 +78,6 @@ for i in "${!scripts[@]}"; do
     "$(resolved "$work/own/${configs[$i]}")" "$(config_of "$work/own" "$work/${tools[$i]}.log" "${flags[$i]}")"
 done
 
-# Case 2: a copy of a script outside a fetched remote (this repository's own
-# work tree) exits 0 without running its tool, so it never runs twice.
 for script in "${scripts[@]}"; do
   clear_logs
   (cd "$work/cwd" && PATH="$shims:$real_path" sh "$root/.lefthook/pre-commit/$script.sh" doc.md)
@@ -100,8 +85,6 @@ for script in "${scripts[@]}"; do
   assert_eq "$script in a work tree runs no tool" '' "$(ls "$work"/*.log 2>/dev/null)"
 done
 
-# Case 3: a real consumer. lefthook install fetches the stand-in remote at main
-# and a commit's staged files reach each job the way lefthook-base selects them.
 src="$work/standards"
 seed_remote "$src"
 git -C "$src" init -q -b main
@@ -133,8 +116,6 @@ printf '#!/usr/bin/env bash\necho ok\n' >"$consumer/run.sh"
 cp "$consumer/run.sh" "$consumer/lib/deep/x.bash"
 git -C "$consumer" add docs/doc.md NOTES.md README.txt run.sh lib/deep/x.bash
 cp "$consumer/lefthook.yml" "$work/lefthook.yml"
-# The globs select root and nested files once each under either matcher, so a
-# consumer still extending lefthook-base (glob_matcher: doublestar) gets the same.
 for matcher in default doublestar; do
   cp "$work/lefthook.yml" "$consumer/lefthook.yml"
   [[ "$matcher" == default ]] || printf 'glob_matcher: %s\n' "$matcher" >>"$consumer/lefthook.yml"
@@ -153,8 +134,6 @@ for gone in standards-typos standards-markdownlint standards-shellcheck; do
 done
 cp "$work/lefthook.yml" "$consumer/lefthook.yml"
 
-# Case 5: a missing tool fails its job with an install pointer.
-# node stays reachable: an npm-installed lefthook is a node script.
 mkdir -p "$work/bare-bin"
 for bin in git lefthook node; do
   if command -v "$bin" >/dev/null 2>&1; then ln -s "$(command -v "$bin")" "$work/bare-bin/$bin"; fi

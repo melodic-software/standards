@@ -1,21 +1,8 @@
 name: Maintenance Audit Action Pins
 
-# Detective half of the action-pinning policy: each repository's CI Status
-# runs zizmor's unpinned-uses rule on its pull requests, and this sweep checks
-# every default branch with the standards config (.github/zizmor.yml), so a
-# ref that landed without that check (a break-glass merge, a repository whose
-# workflows skip it) is still caught. components/zizmor/sweep.sh runs the
-# audit; its README section "Fleet sweep" states the scope.
-#
-# Repository listing follows maintenance-audit-code-review-rules: the
-# workflow token reads the org's public repositories, and a read-only
-# standards-sync App token reads the private repositories in that App's
-# installation. The sweep covers every non-archived repository, sandbox ones
-# included. A finding fails the run; it opens no issue.
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of the other maintenance schedules here.
     - cron: "53 8 * * *"
 
 permissions:
@@ -30,15 +17,12 @@ jobs:
     name: Audit
     permissions:
       contents: read
-    # The App key lives only in the standards-sync environment, whose branch
-    # policy admits main; schedule and dispatch run there. No deployment record.
     environment:
       name: standards-sync
       deployment: false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      # A boolean, never the credential.
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
@@ -48,8 +32,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # The version and checksum follow ci-workflows' pr-audit-workflows.yml
-      # defaults, so the sweep and each repository's CI read refs alike.
       - name: Install zizmor
         env:
           ZIZMOR_VERSION: 1.30.0
@@ -75,23 +57,18 @@ jobs:
         with:
           client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
-          # `owner` without `repositories` scopes the token to every repository
-          # in the installation, which is the set being checked. It can read
-          # names and file contents, and write nothing.
+          # `owner` without `repositories` scopes the token to every repository in the
+          # installation: https://github.com/actions/create-github-app-token#owner
           owner: melodic-software # zizmor: ignore[github-app] whole-installation scope is the set being checked; the token is read-only
           permission-metadata: read
           permission-contents: read
 
-      # A missing credential leaves private repositories unchecked, which is
-      # a failed sweep, not a partial pass.
       - name: Report the missing App credential
         if: env.HAS_APP_CREDENTIAL != 'true'
         run: |
           echo "::error::STANDARDS_SYNC_APP_* is not configured in the standards-sync environment, so private repositories cannot be checked."
           exit 1
 
-      # Depth 1 and a sparse checkout of the root files and .github: the
-      # workflows and the actions zizmor collects there.
       - name: Check out public repositories
         env:
           GH_TOKEN: ${{ github.token }}

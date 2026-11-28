@@ -4,63 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-    # `edited`, `labeled` and `unlabeled` can change the pr-title,
-    # do-not-merge and issue-linkage answers without a new commit, so the
-    # required check has to re-evaluate. Whether such an event is
-    # CONTRACT-ONLY (lanes gated off, ci-status carrying the recorded
-    # `ci-lanes` verdict forward) is decided by one predicate, repeated
-    # verbatim in `concurrency.group` and in every job's `if:` except
-    # `ci-status`:
-    #
-    #   github.event.pull_request.head.repo.full_name == github.repository &&
-    #   (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) ||
-    #    (github.event.action == 'edited' && !github.event.changes.base))
-    #
-    # An `edited` event carrying `changes.base` is a BASE-BRANCH change: the
-    # merge commit the lanes test changes with it, so that runs in full. A
-    # fork pull request is never contract-only — its token is read-only on
-    # `pull_request` whatever `permissions:` requests, so it cannot record
-    # lane state — and runs the full workflow on every event exactly as
-    # before. No `ready_for_review`: this workflow is not draft-gated.
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
 
-# The concurrency GROUP branches on the contract-only predicate (ci-perf Phase
-# 6b); `cancel-in-progress` is a plain `true` because it takes one value per
-# workflow and cannot branch.
-#
-# Contract-only branch: `ci-contract-<pr>-<run_id>`, unique per run. No
-# contract-only run can be canceled, evict anything, or be evicted. That is
-# deliberate. Eviction of a *pending* run is unconditional in GitHub's queuing
-# ("any existing pending job or workflow in the same concurrency group will be
-# canceled") and is NOT governed by `cancel-in-progress`, so the old shared
-# group let one contract-only event evict another and leave a check suite on the
-# current head with no `CI Status` check run at all, a required check that stops
-# reporting until someone re-runs that specific run (dotfiles#647, 2h14m
-# silent). Uniqueness costs a burst of one-job runs when labels flip repeatedly,
-# seconds each, writing nothing.
-#
-# Full branch: `<workflow>-<pr number || run_id>` with cancel-in-progress true,
-# so a `synchronize` still cancels the run it supersedes. Keying PRs on the
-# number (not head_ref) keeps fork PRs that share a branch name from canceling
-# each other's required runs. The fallback term stays `github.run_id`, which
-# this repository has always used: every push gets its own group and no push run
-# is ever canceled.
-#
-# The cost of the branch: a contract-only run no longer queues behind the full
-# run whose `ci-lanes` status it carries forward, so the two race. The
-# `report-ci-status` composite closes that without waiting: a contract-only run
-# fails at once while a full run is in flight on the same head SHA, whose newer
-# ci-status then decides the gate; see the job below.
-#
-# One hazard the branch does not remove, because no concurrency setting both
-# removes it and keeps supersession: the full branch is keyed on the pull
-# request number, which does not vary with the head SHA, so re-running a STALE
-# run on a superseded head SHA lands in the CURRENT head's group and cancels the
-# run that is actually reporting. Re-run the run on the current head instead.
-# Contract-only runs are immune, being unique per `github.run_id`.
+# A new run cancels any pending run in its group whatever `cancel-in-progress` says:
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
 concurrency:
   group: >-
     ${{ (github.event.pull_request.head.repo.full_name == github.repository &&
@@ -70,31 +20,9 @@ concurrency:
     || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}
   cancel-in-progress: true
 
-# Public repository: every lane runs on GitHub-hosted ubuntu-24.04 (free for
-# public repositories); a managed fleet label is not permitted here. The
-# ci-status gateway aggregates the same lane IDs, so required check names do
-# not change. Workload steps are route-independent: pinned setup/composite
-# actions install every tool, and setup-action caches are GitHub-managed.
 jobs:
-  # Every job except `ci-status` carries the contract-only gate verbatim. It is
-  # explicit on each one rather than transitive: a dependent whose `needs` all
-  # skipped is skipped by default, but a job with `if: always()` or
-  # `!cancelled()` runs regardless, so only the explicit form is reliable.
-  #
-  # One job per ecosystem or domain. Most checks here finish in seconds, so a
-  # job per check spent more time on runner start, checkout and setup than on
-  # the check, and held a runner slot for each. Every step after checkout runs
-  # `if: !cancelled()`, so one failing check does not hide the ones after it
-  # in the same job. check-go is the exception: its steps are one chain (set
-  # up Go, install golangci-lint, test), so they keep the default success().
-  #
-  # The slow jobs (test-lefthook, check-python, check-dotnet, check-go) start
-  # with ci-workflows detect-changes and gate every later step on their filter
-  # group, so a pull request that touches none of a job's inputs runs only the
-  # detection step and the job still reports success to ci-status. On push and
-  # on any other non-pull_request event the action reports every group as
-  # changed, so main always runs everything. Gating is per step, not per job:
-  # a skipped job fails ci-status (`treat-skipped-as: fail`).
+  # Each job repeats the gate: a skipped `needs` does not skip an `always()` job:
+  # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds
   check-shell:
     name: Check Shell
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -145,8 +73,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # Before Set up Node: the markdownlint action installs its own Node, and
-      # the contract tests below run on the repository's .node-version.
       - name: Lint markdown
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/markdownlint@main
@@ -194,11 +120,6 @@ jobs:
       - name: Private-repo inventory contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/lychee/private-repo-inventory.test.sh
-      # A public repository's token lists the org's public repositories, so an
-      # excluded repository that went public fails here, and the two
-      # alternations are held sorted and identical. A new private repository
-      # missing from the list shows up as a 404 in the next online run, and
-      # `generate --write` fixes it (components/lychee/README.md).
       - name: Private-repo inventory agrees with public visibility
         if: ${{ !cancelled() }}
         env:
@@ -265,9 +186,6 @@ jobs:
       - name: Comment-hygiene contract test
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/comment-hygiene/comment-hygiene.test.sh
-      # The pull-request half of the Code Review Rules check: this repository's
-      # own AGENTS.md. Other repositories are checked by the scheduled
-      # maintenance-audit-code-review-rules workflow.
       - name: Test the `Code Review Rules` contract
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/code-review-rules/code-review-rules.test.sh
@@ -313,9 +231,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/psscriptanalyzer/psscriptanalyzer.test.sh
 
-  # Holds the PowerShell staged-adapter regression, the slowest step in this
-  # workflow (about 70 s); it stays out of check-powershell so neither job
-  # becomes the sum of both.
   test-lefthook:
     name: Test Lefthook
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -359,8 +274,6 @@ jobs:
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install ShellCheck 0.11.0
-        # The component test drives the ShellCheck lane as its representative tool,
-        # so the engine must be on PATH (kept in lockstep with check-shell).
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['lefthook'] != 'false' }}
         run: |
           set -euo pipefail
@@ -430,10 +343,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      # Inline install — the component contract test asserts specific rule codes
-      # on bad fixtures, which needs the tool on PATH (the Ruff action only
-      # passes/fails). Keep in lockstep with the action default in ci-workflows
-      # and with medley.
       RUFF_VERSION: 0.15.14
     steps:
       - name: Detect relevant changes
@@ -457,8 +366,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # The action runs before the inline install so the contract test finds
-      # the inline-installed tool first on PATH.
       - name: Lint and format-check Python
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['python'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/ruff@main
@@ -490,10 +397,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      # Inline install — component tests assert specific rule/error codes on
-      # the bad fixture, which needs the tools on PATH (the biome/tsc actions
-      # only pass/fail). Keep in lockstep with the action defaults in ci-workflows
-      # and with medley.
       BIOME_VERSION: 2.5.1
       TYPESCRIPT_VERSION: 6.0.3
     steps:
@@ -502,9 +405,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint and format-check JS/TS
-        # Scope at authored runtime surfaces and the conforming fixture. Bad
-        # fixtures are non-conforming by design; node_modules and locks are
-        # excluded by Biome's normal traversal rules.
         if: ${{ !cancelled() }}
         uses: melodic-software/ci-workflows/.github/actions/biome@main
         with:
@@ -515,8 +415,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-      # Each supported TypeScript release in turn, installed on PATH so the
-      # tsconfig contract test drives that exact tsc.
       - name: Test tsconfig contract on TypeScript 5.9.3
         if: ${{ !cancelled() }}
         run: npm install --global typescript@5.9.3 && test "$(tsc --version)" = "Version 5.9.3" && bash harness/shell/run-tests.sh components/tsconfig/tsconfig.test.sh # zizmor: ignore[adhoc-packages] exact-pinned toolchain installed on PATH so the tsconfig contract test can drive tsc directly
@@ -550,12 +448,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      # The rootless fleet has no write access to setup-dotnet's Linux default.
-      # Keep hosted/local parity by selecting a per-job ephemeral directory.
       DOTNET_INSTALL_DIR: ~/.dotnet
-      # Inline install — the fixtures suite asserts specific rule codes fire on
-      # the bad fixture, which needs the SDK on PATH (the dotnet-build/dotnet-format
-      # actions only pass/fail). Keep in lockstep with ci-workflows and medley.
       DOTNET_VERSION: 11.0.100
     steps:
       - name: Detect relevant changes
@@ -583,9 +476,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # The fixture tests run first on DOTNET_VERSION. The build and format
-      # actions below pass the same pin explicitly because this repo carries no
-      # root global.json.
       - name: Set up .NET
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: actions/setup-dotnet@v6
@@ -612,9 +502,6 @@ jobs:
         env:
           DOTNET_FORMAT_WORKSPACE: components/dotnet-analysis/fixtures/good/good.csproj
       - name: Build .NET (analyzers + code-style as errors)
-        # The shipped base carries no project scope, so scope the build at the
-        # conforming fixture, which imports the base props (the bad fixture is
-        # non-conforming by design).
         if: ${{ !cancelled() && fromJSON(steps.changes.outputs.results || '{}')['dotnet'] != 'false' }}
         uses: melodic-software/ci-workflows/.github/actions/dotnet-build@main
         with:
@@ -745,9 +632,6 @@ jobs:
       - name: Enforce dependabot policy on standards
         if: ${{ !cancelled() }}
         run: npm run lint:dependabot-policy
-      # Reads the public ci-workflows reusable at main, where first-party
-      # callers run it; a change on main can fail this check. Blocking from
-      # admission: see components/dependabot-policy/README.md "Merge lanes".
       - name: Enforce the auto-merge allowlist lockstep with ci-workflows
         if: ${{ !cancelled() }}
         env:
@@ -772,14 +656,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run lint:contract-docs
 
-  # Lockstep drift check (ADR-0008), copy half. Separate job, not a step in
-  # check-policies: the live run fetches the gate composite, the plugin hook
-  # validator and the org PR template over the network, and that
-  # non-hermetic dependency must not contaminate the hermetic component lane.
-  # The fixture tests run first so a parser regression reads as a test
-  # failure, not as drift. Every copy lives in a public repository, so the
-  # workflow token suffices; the caller-pin half reads private repositories
-  # and runs on main in maintenance-audit-pr-convention-pins.yml.
   check-pr-convention-copies:
     name: Check PR Convention Copies
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
@@ -800,16 +676,10 @@ jobs:
           cache-dependency-path: |
             components/pr-convention-policy/package-lock.json
             components/runner-policy/package-lock.json
-      # pr-convention-policy.mjs imports ../runner-policy/policy-input.mjs,
-      # which resolves yaml from the runner-policy dependency root.
       - name: Install pr-convention-policy dependencies
         run: |
           npm ci --prefix components/pr-convention-policy --ignore-scripts
           npm ci --prefix components/runner-policy --ignore-scripts
-      # The lockstep check runs the composite's awk analyzer under
-      # `gawk --sandbox` (system(), pipes and redirection disabled), and the
-      # runner image's awk is not guaranteed to be gawk. Missing gawk fails the
-      # check rather than skipping it, so install it before either step.
       - name: Ensure gawk for the sandboxed analyzer run
         run: |
           set -euo pipefail
@@ -824,8 +694,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run lint:pr-convention-copies
-      # Reads the pinned check-contract action over the network, so it runs
-      # here rather than in a hermetic lane.
       - name: Commit-convention contract test
         if: ${{ !cancelled() }}
         env:
@@ -850,9 +718,6 @@ jobs:
       - name: Test actionlint component
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/actionlint/actionlint.test.sh
-      # The lane caller tests materialize each target through the distribution
-      # engine before linting, so this job needs the engine's yq the same way
-      # test-distribution does.
       - name: Install yq 4.53.3
         if: ${{ !cancelled() }}
         run: |
@@ -865,9 +730,6 @@ jobs:
           sudo install yq /usr/local/bin/yq
           rm yq
           yq --version
-      # Phase 6 cutover prep: once sync-manifest.sh becomes the exec wrapper,
-      # the engine this job runs through claude-lanes.test.sh needs Node and
-      # the distribution dependencies. Inert while the Bash engine is live.
       - name: Set up Node
         if: ${{ !cancelled() }}
         uses: actions/setup-node@v7
@@ -884,16 +746,9 @@ jobs:
           npm ci --prefix distribution --ignore-scripts
           npm ci --prefix components/runner-policy --ignore-scripts
           npm ci --prefix components/github-actions-conventions --ignore-scripts
-      # The lint above covers .github/workflows only, so the lane caller
-      # components — workflow bytes that live outside it until a sync
-      # materializes them — need the consumer entrypoint run over them here,
-      # in the one job that has the pinned engine installed.
       - name: Test claude lane caller components
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/claude-lanes/claude-lanes.test.sh
-      # Same shape, same reason: the managed-files-guard caller is workflow
-      # bytes that live outside .github/workflows until a sync materializes
-      # them, so the consumer entrypoint runs over them here too.
       - name: Test the managed-files-guard caller component
         if: ${{ !cancelled() }}
         run: bash harness/shell/run-tests.sh components/managed-files-guard/managed-files-guard.test.sh
@@ -903,9 +758,6 @@ jobs:
       - name: Test naming conventions
         if: ${{ !cancelled() }}
         run: npm run test:github-actions-conventions
-      # Findings go to the step summary and the log, not annotations: GitHub
-      # shows only ten annotations per step. The last line is the finding
-      # count. Enforcing mode fails the step on any blocking finding.
       - name: Check naming conventions on standards
         if: ${{ !cancelled() }}
         run: |
@@ -927,24 +779,11 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
-      # The reusable's own job declares security-events: write unconditionally;
-      # its upload-sarif step stays gated on the input, but
-      # expressions are not legal in a permissions scope. A called workflow can
-      # only narrow the caller's GITHUB_TOKEN and never widen it, so the grant
-      # has to be here for the job to start. The lane stays annotations-only
-      # (upload-sarif defaults false), so nothing is written to code scanning.
+      # A called workflow can only narrow the caller's permissions, so its grant is made here:
+      # https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
       security-events: write
-    # Actions security lint. Any finding, informational and up, blocks the
-    # lane, matching ci-workflows, ci-runner and medley. Gating runs in-lane,
-    # so it rides the existing ci-status gate — no code-scanning upload.
-    #
-    # `.` audits this repo's own workflows only: zizmor discovers workflow
-    # definitions by their `.github/workflows` location, so the workflow BYTES
-    # under components/claude-lanes/, components/claude-lanes-hosted/,
-    # components/dependabot-automerge/ and components/managed-files-guard/,
-    # which become consumers' .github/workflows/ files, are invisible to a
-    # repo-root scan. They are named explicitly so the lane audits what it
-    # ships.
+    # zizmor finds workflows only under `.github/workflows`, so the shipped workflow components are named:
+    # https://docs.zizmor.sh/usage/
     uses: melodic-software/ci-workflows/.github/workflows/pr-audit-workflows.yml@main
     with:
       runner: ubuntu-24.04
@@ -956,9 +795,6 @@ jobs:
     if: ${{ !(github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))) }}
     permissions:
       contents: read
-    # Advisory dependency vuln scan; reports against package-lock.json without
-    # blocking (fail-on-vuln defaults false). Annotation mode needs no
-    # security-events write grant.
     uses: melodic-software/ci-workflows/.github/workflows/pr-scan-dependencies.yml@main
     with:
       runner: ubuntu-24.04
@@ -1045,15 +881,8 @@ jobs:
     name: CI Status
     if: ${{ !cancelled() }}
     permissions:
-      # The composite lists this workflow's runs on the head SHA (its fixed
-      # `yield-to-full-run`) and re-runs the red contract-only ones once the
-      # full run records `success` (`rerun-contract-only-siblings`). Write
-      # covers the read.
       actions: write
       contents: read
-      # check-contract upserts the advisory linkage comment and moves the
-      # linkage label; ci-status records the `ci-lanes` commit status the
-      # carry-forward branch reads back on the next contract-only event.
       pull-requests: write
       statuses: write
     needs:
@@ -1074,35 +903,14 @@ jobs:
       - test-cloud-environment
       - test-distribution
     runs-on: ubuntu-24.04
-    # No run waits for another, so either run finishes in seconds. The bound
-    # covers the action's worst case when the jobs API lags: a 120 s own-job
-    # lookup plus a 30 s writer wait is about 337 s, and a job that times out
-    # ends `cancelled`, which counts as red.
     timeout-minutes: 8
     steps:
-      # The contract, the draft policy and the aggregation in one step. The
-      # step keeps the aggregation step's old name: a contract-only run finds
-      # the writer step of the full run it carries forward by this name.
-      # The composite fixes `yield-to-full-run: 'true'` and
-      # `carry-forward-wait-seconds: '0'`, the values this job set before
-      # (https://github.com/melodic-software/ci-workflows/blob/ebd0e3bed99ae1365fcb4ef47ce97cfa745fcf2f/.github/actions/pr-require-checks/report-ci-status/action.yml#L128-L129):
-      # a contract-only run never waits; while a full run on the SHA is in
-      # flight it fails with "superseded by full run <url>", and once that run
-      # records `success` it re-runs the red contract-only runs
-      # (`rerun-contract-only-siblings`, default `true`; this workflow is not
-      # draft-gated, so the re-run is unconditional). `treat-skipped-as` stays
-      # at its default `fail`, as before.
       - name: Aggregate lane results
         id: report
         uses: melodic-software/ci-workflows/.github/actions/pr-require-checks/report-ci-status@main
         with:
           step-name: Aggregate lane results
-          # Carried over from the pr-issue-linkage.yml caller the contract step
-          # replaced, so Dependabot's bodies keep skipping the linkage check
-          # rather than starting to fail it. Exact-login match, never a
-          # `*[bot]` pattern.
           exempt-authors: 'dependabot[bot]'
-          # This workflow is not draft-gated (no `ready_for_review` trigger), so a draft passes.
           draft: allow
           results: >-
             ${{ needs.check-shell.result }}
@@ -1121,9 +929,6 @@ jobs:
             ${{ needs.pr-scan-dependencies.result }}
             ${{ needs.test-cloud-environment.result }}
             ${{ needs.test-distribution.result }}
-      # The composite's step concludes on the lanes alone; the contract and
-      # draft results fail the job here. Anything but `success` fails, so an
-      # empty or renamed output fails closed.
       - name: Fail on the contract or draft policy
         if: ${{ !cancelled() && (steps.report.outputs.contract != 'success' || steps.report.outputs.draft != 'success') }}
         run: |

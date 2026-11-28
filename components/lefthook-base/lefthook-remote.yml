@@ -1,17 +1,5 @@
-# Remote form for the two hygiene tools melodic-software/claude-code-plugins'
-# aggregate remote does not run: list this file under a consumer's `remotes:`
-# entry for melodic-software/standards. Each job runs a script under the
-# repository root's .lefthook/pre-commit/, which uses the consumer's own config
-# when it has one and otherwise the standards config fetched beside it.
-#
-# Typos, markdownlint-cli2, ShellCheck and actionlint run from the
-# claude-code-plugins remote, which reads these same standards configs for a
-# repository whose source-control config names standards_repository, so each
-# tool runs once per commit.
-#
-# No top-level settings and no `skip`: remote configs merge after the
-# consumer's lefthook.yml, so either would override the consumer's own call.
-
+# No settings and no `skip`: remotes override the consumer's lefthook.yml:
+# https://lefthook.dev/configuration/extends/
 pre-commit:
   jobs:
     - name: standards-gitleaks

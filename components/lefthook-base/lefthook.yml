@@ -1,86 +1,26 @@
-# Base local git-hook lanes — fast, staged-only mirrors of the cross-cutting
-# hygiene tools this platform standardizes. Extend it from a consumer's own root
-# lefthook.yml; never edit the upstream-owned fragment in place.
-#
-# Decoupled by construction: every lane invokes a tool and lets that tool
-# discover its own standards config from the repo root (no --config paths here),
-# so this file carries no repo-specific or layout-specific knowledge and never
-# re-configures a tool. Each policy component owns its config and contract
-# tests; these lanes only invoke.
-#
-# Strict posture: check-only (no stage_fixed — a hook never silently rewrites and
-# re-stages your work), and assert_lefthook_installed so a missing binary fails
-# loudly instead of skipping a check. Settings live here because base is the
-# mandatory foundation every consumer extends; an extended file's settings win
-# over the consumer's root file, so the strict posture cannot be loosened by
-# accident (only deliberately, via a gitignored lefthook-local.yml).
-#
-# NO fragment in this component set declares a `skip`, at the hook level or the
-# command level, and the omission is the policy rather than an oversight.
-#
-# A hook-level `skip` short-circuits the entire merged pre-commit hook: every
-# lane this fragment declares, every lane a sibling fragment adds, and every
-# lane the CONSUMER declares in its own root file, because `extends` merges
-# them all into one hook and the extended file's setting wins. That is how a
-# `skip: [merge, rebase]` here used to disable `gitleaks` on merge commits, and
-# with it any repository-owned security lane riding the same hook, with nothing
-# in the consumer's own file to suggest it.
-#
-# A per-command `skip` here fixes that but breaks a second contract: because
-# the extended file still wins, a `skip` on a lane defeats the consumer's
-# documented `skip: true` override for that same lane, which
-# lefthook-shellcheck's contract test covers. Both problems have one root, a
-# fragment deciding something only the consumer has the standing to decide.
-#
-# So the opt-out lives in the consumer's root lefthook.yml, per lane, where it
-# composes with the consumer's own lanes and overrides nothing it does not own.
-# A consumer wanting relief from long rebases writes `skip: [merge, rebase]` on
-# the hygiene lanes it chooses. It should never write one on a secret scan: a
-# credential staged while resolving a conflict enters history exactly as
-# permanently as one typed by hand.
-
+# No `skip` here: extended settings override the consumer's lefthook.yml, so the consumer
+# owns opt-outs (lefthook-merge-skip.test.sh): https://lefthook.dev/configuration/extends/
 min_version: "2.0.0"
 assert_lefthook_installed: true
-# doublestar so a `**/*.ext` glob matches files at the repo root and at any depth
-# alike (the default matcher requires `**` to consume at least one directory).
+# The default matcher's `**/*.ext` misses repo-root files; doublestar matches them:
+# https://lefthook.dev/configuration/glob_matcher/
 glob_matcher: doublestar
 
 pre-commit:
   parallel: true
   commands:
     typos:
-      # Spell-check staged files; auto-discovers _typos.toml from the repo root.
       glob: "**/*"
       run: typos {staged_files}
       fail_text: "Spelling issues. Fix them, or record a false positive per the Typos component's escape hatches."
     gitleaks:
-      # Secret-scan the staged diff. gitleaks reads `git diff --cached` itself, so
-      # it takes no file list, and auto-discovers .gitleaks.toml from the root.
-      #
-      # This lane must run on merge and rebase commits, so no consumer should
-      # ever give it a `skip`. See the header.
       run: gitleaks git --pre-commit --staged --no-banner
       fail_text: "Potential secret in staged changes. Remove it, or allowlist a verified false positive in .gitleaks.toml."
     editorconfig:
-      # Enforce .editorconfig on staged files; editorconfig-checker discovers both
-      # .editorconfig and its own .editorconfig-checker.json from the root. Some
-      # installs expose the binary as `ec` (or `ec-windows-amd64` via winget) —
-      # alias it to `editorconfig-checker`, or override this lane's run accordingly.
       glob: "**/*"
       run: editorconfig-checker {staged_files}
       fail_text: "EditorConfig violation. Align with .editorconfig (most editors auto-fix on save)."
     markdownlint:
-      # Resolve the consumer's pinned markdownlint-cli2 directly from
-      # node_modules/.bin (node_modules/.bin is not on a hook's PATH) instead of
-      # npx --no-install, which silently falls back to an arbitrary global
-      # version when the local package is missing. node_modules is per worktree,
-      # so when the binary is missing the lane runs `npm ci` once and lints; if
-      # that install fails or still leaves no binary, it hard-fails with the
-      # "run npm ci" remediation rather than a wrong-version lint. When npm is
-      # missing or resolves under /mnt/* (unpruned Windows interop PATH in a
-      # non-interactive WSL shell), source ~/.config/shell/env.sh first and
-      # refuse /mnt/* npm so hooks never hang on Windows node.exe; Linux runs
-      # get a 120s timeout. The binary still auto-discovers its own config.
       glob: "**/*.{md,markdown}"
       run: "test -x node_modules/.bin/markdownlint-cli2 || { case $(command -v npm 2>/dev/null || true) in ''|/mnt/*) if test -f ~/.config/shell/env.sh; then . ~/.config/shell/env.sh; fi ;; esac; case $(command -v npm 2>/dev/null || true) in /mnt/*) echo 'Refusing npm ci via Windows interop path in WSL.' >&2; false ;; *) case $(uname -s) in Linux) timeout 120 npm ci --no-audit --no-fund >&2 ;; *) npm ci --no-audit --no-fund >&2 ;; esac ;; esac && test -x node_modules/.bin/markdownlint-cli2; } || { echo 'markdownlint-cli2 not found at node_modules/.bin/markdownlint-cli2. Run: npm ci' >&2; exit 1; }; node_modules/.bin/markdownlint-cli2 {staged_files}"
       fail_text: "Markdown lint failures, or markdownlint-cli2 missing and npm ci failed (run: npm ci). Fix violations: node_modules/.bin/markdownlint-cli2 --fix <file>"

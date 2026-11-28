@@ -1,34 +1,12 @@
 name: PR Review Security
 
-# Automated PR security review via the ci-workflows pr-review-cli reusable
-# workflow (lane `security`), the security sibling of pr-review.yml. Advisory:
-# never add any check in this file to required status checks (github-iac
-# ADR 0011).
-#
-# Repo-local rather than the sync-managed `claude-security-review-hosted-caller`
-# component (components/claude-lanes-hosted/claude-security-review.yml): this
-# repository is the manifest SOURCE, not a sync target. It tracks that
-# component except that it passes no `allowed-bot-sender-ids`.
-#
-# Every non-draft same-repository PR is reviewed on GitHub-hosted
-# `ubuntu-24.04` (this repository is PUBLIC); the reusable skips fork PRs
-# (they receive no secrets and a read-only token), Dependabot, and every
-# `[bot]` actor.
-#
-# NEVER add workflow-level `paths:`/`paths-ignore:`: a check whose workflow
-# never triggers stays Pending forever.
-
 on:
   pull_request:
-    # NO `merge_group:`: the reusable runs only on `pull_request`; see
-    # melodic-software/ci-workflows#272 before enabling a merge queue.
     types: [opened, synchronize, ready_for_review, reopened]
 
 permissions:
   contents: read
 
-# Per-PR supersede group, as in the component: a newer event for the same PR
-# cancels the older run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -36,14 +14,13 @@ concurrency:
 jobs:
   pr-review-security:
     name: PR Review Security
-    # A draft does not spend a review; ready_for_review delivers one.
     if: github.event.pull_request.draft == false
     permissions:
-      actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
-      checks: read           # Publish Review reads its earlier runs' cost notices
-      contents: read         # checkout + read the diff
-      issues: read           # read closing issues on private repositories
-      pull-requests: write   # post the security review, comments, and the lane's reviewed-head marker comment
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: write
     uses: melodic-software/ci-workflows/.github/workflows/pr-review-cli.yml@main
     with:
       lane: security
@@ -52,8 +29,6 @@ jobs:
         docs/**/*.md
         **/README.md
         **/CHANGELOG.md
-    # Pass only the named secrets (least privilege) rather than `secrets:
-    # inherit`, which would forward every parent secret to the called workflow.
     secrets:
       CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}

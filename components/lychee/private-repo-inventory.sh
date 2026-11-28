@@ -1,35 +1,4 @@
 #!/usr/bin/env bash
-# Keeps lychee.toml's private-repo exclude inventory in lockstep with actual
-# GitHub repository visibility, so the list is derived from a queryable fact
-# instead of hand-maintained (standards#212, then #483: the same drift twice).
-#
-# The inventory is the repository alternation shared by the two
-# `melodic-software/` exclude entries in lychee.toml (github.com and
-# raw.githubusercontent.com). Both must carry the identical, sorted set.
-#
-# Usage:
-#   private-repo-inventory.sh list     [--config FILE]
-#   private-repo-inventory.sh check    [--config FILE] [--org OWNER]
-#                                      [--public-list FILE]
-#                                      [--private-list FILE]
-#   private-repo-inventory.sh generate [--config FILE] [--org OWNER]
-#                                      [--private-list FILE] [--write]
-#
-# Inputs (each defaults to a live `gh` query when the file is omitted):
-#   --public-list FILE        one public repository name per line
-#                             (default: GET /orgs/OWNER/repos?type=public —
-#                             readable with any token, including a public
-#                             repository's GITHUB_TOKEN)
-#   --private-list FILE       one private repository name per line — the
-#                             complete truth (default for `generate`:
-#                             `gh repo list OWNER --visibility private`, which
-#                             needs a credential that can read the private
-#                             repositories, i.e. a maintainer's `gh auth`)
-#
-# `check` exits 0 when the inventory agrees with every fact it was given, 1 on
-# drift (printing the regenerated entries), 2 on a usage or query error. It
-# never edits the file. `generate` prints the two regenerated exclude entries,
-# or rewrites them in place with --write.
 set -euo pipefail
 
 org='melodic-software'
@@ -39,7 +8,39 @@ private_list=''
 write=false
 
 usage() {
-  sed -n '2,/^set -euo pipefail/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+Keeps lychee.toml's private-repo exclude inventory in lockstep with actual
+GitHub repository visibility, so the list is derived from a queryable fact
+instead of hand-maintained (standards#212, then #483: the same drift twice).
+
+The inventory is the repository alternation shared by the two
+`melodic-software/` exclude entries in lychee.toml (github.com and
+raw.githubusercontent.com). Both must carry the identical, sorted set.
+
+Usage:
+  private-repo-inventory.sh list     [--config FILE]
+  private-repo-inventory.sh check    [--config FILE] [--org OWNER]
+                                     [--public-list FILE]
+                                     [--private-list FILE]
+  private-repo-inventory.sh generate [--config FILE] [--org OWNER]
+                                     [--private-list FILE] [--write]
+
+Inputs (each defaults to a live `gh` query when the file is omitted):
+  --public-list FILE        one public repository name per line
+                            (default: GET /orgs/OWNER/repos?type=public —
+                            readable with any token, including a public
+                            repository's GITHUB_TOKEN)
+  --private-list FILE       one private repository name per line — the
+                            complete truth (default for `generate`:
+                            `gh repo list OWNER --visibility private`, which
+                            needs a credential that can read the private
+                            repositories, i.e. a maintainer's `gh auth`)
+
+`check` exits 0 when the inventory agrees with every fact it was given, 1 on
+drift (printing the regenerated entries), 2 on a usage or query error. It
+never edits the file. `generate` prints the two regenerated exclude entries,
+or rewrites them in place with --write.
+EOF
 }
 
 die() {
@@ -89,14 +90,10 @@ done
 
 [[ -f "$config" ]] || die "config not found: $config"
 
-# Regex-escape the org for the literal-TOML patterns (`.` is the only
-# metacharacter a GitHub owner can carry).
 org_re="${org//./\\.}"
 github_prefix="'^https?://github\\.com/${org_re}/("
 raw_prefix="'^https?://raw\\.githubusercontent\\.com/${org_re}/("
 
-# extract_group <prefix> — the alternation body of the single exclude entry
-# that starts with <prefix>; errors on zero or several matches.
 extract_group() {
   local prefix="$1" matches count
   matches="$(grep -F -- "$prefix" "$config" || true)"
@@ -106,17 +103,14 @@ extract_group() {
   printf '%s' "${rest%%)*}"
 }
 
-# group_to_lines <alternation> — one repository name per line, regex unescaped.
 group_to_lines() {
   printf '%s' "$1" | tr '|' '\n' | sed -e 's/\\\././g' -e '/^$/d'
 }
 
-# lines_to_group — sorted, unique, regex-escaped alternation from stdin lines.
 lines_to_group() {
   LC_ALL=C sort -u | sed -e '/^$/d' -e 's/\./\\./g' | paste -sd '|' -
 }
 
-# sorted_set <lines> — the non-empty lines, sorted and unique.
 sorted_set() {
   printf '%s\n' "$1" | LC_ALL=C sort -u | sed '/^$/d'
 }
@@ -133,9 +127,7 @@ if [[ "$command" == list ]]; then
   exit 0
 fi
 
-# read_list <path> — file lines with blank lines dropped.
 read_list() {
-  # -e, not -f: a process substitution (/dev/fd/N) is a valid list source.
   [[ -e "$1" ]] || die "list not found: $1"
   sed '/^[[:space:]]*$/d' "$1"
 }
@@ -150,7 +142,6 @@ query_private() {
     die "could not list private repositories of ${org} (needs a credential that can read them)"
 }
 
-# render <alternation> — the two exclude entries as they belong in the file.
 render() {
   printf "  %s%s)(\\\\.git)?([/#?]|\$)',\n" "$github_prefix" "$1"
   printf "  %s%s)/',\n" "$raw_prefix" "$1"
@@ -169,8 +160,8 @@ if [[ "$command" == generate ]]; then
     exit 0
   fi
   tmp="$(mktemp)"
-  # Passed through the environment rather than `-v`: awk applies escape
-  # processing to -v values, which would turn every `\.` into a bare `.`.
+  # Environment, not `-v`: awk processes escapes in -v values, turning `\.` into `.`:
+  # https://www.gnu.org/software/gawk/manual/html_node/Assignment-Options.html
   GP="$github_prefix" RP="$raw_prefix" NG="$new_group" awk '
     BEGIN { gp = ENVIRON["GP"]; rp = ENVIRON["RP"]; ng = ENVIRON["NG"] }
     function rewrite(prefix,   i, rest, j) {
@@ -207,8 +198,6 @@ inventory="$(inventory_lines | LC_ALL=C sort -u)"
 missing=''
 wrongly_excluded=''
 
-# 1. Public list: any excluded repository that is public is a wrongly silenced
-#    live link (the "repo went public" direction of drift).
 if [[ -n "$public_list" ]]; then
   public="$(read_list "$public_list")"
 else
@@ -221,7 +210,6 @@ if [[ -n "$public" ]]; then
   done
 fi
 
-# 2. Complete private truth (maintainer credential): exact set equality.
 if [[ -n "$private_list" ]]; then
   private="$(read_list "$private_list" | LC_ALL=C sort -u)"
   missing="$(LC_ALL=C comm -13 <(printf '%s\n' "$inventory") <(printf '%s\n' "$private"))"
