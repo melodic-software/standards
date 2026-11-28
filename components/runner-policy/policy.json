@@ -191,22 +191,13 @@
         "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}",
         "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
       },
-      "allowedCallerPermissions": [
-        {
-          "actions": "read",
-          "checks": "read",
-          "contents": "read",
-          "pull-requests": "write"
-        },
-        {
-          "actions": "read",
-          "checks": "read",
-          "contents": "read",
-          "issues": "read",
-          "pull-requests": "write"
-        }
-      ],
-      "allowedCallerPermissionsUntil": "2027-01-27",
+      "allowedCallerPermissions": {
+        "actions": "read",
+        "checks": "read",
+        "contents": "read",
+        "issues": "read",
+        "pull-requests": "write"
+      },
       "approvedShas": [
         "20a822d73b6e2d7e21d48e609a01b427e0e161e7",
         "3180217076b19bbdfccc43026c7f91c604da673d",
@@ -230,90 +221,6 @@
         "e7f935fc799fc9c78f1dc52646e8bbd54823502a",
         "f1096608192c54cfb3dc252e36670e6f86700b9b",
         "f133c6651f866845e18595d26cf59d4043b5b642"
-      ]
-    },
-    "melodic-software/ci-workflows/.github/workflows/pr-review-security.yml": {
-      "routing": "runner-input",
-      "runnerInput": "runner",
-      "allowedInputs": [
-        "runner",
-        "incremental-review",
-        "allowed-bot-sender-ids",
-        "model-args",
-        "fallback-credential-name"
-      ],
-      "allowedSecrets": {
-        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
-        "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
-      },
-      "allowedCallerPermissions": {
-        "contents": "read",
-        "pull-requests": "write",
-        "id-token": "write"
-      },
-      "approvedShas": [
-        "164c2809f6150429b6f24d4a2777bb377af953d9",
-        "2fe38c031867900824c164e33a140a335ed9ecf0",
-        "3180217076b19bbdfccc43026c7f91c604da673d",
-        "3a2c748fdef9cfb9ceec5a66289e21842189689f",
-        "3c8a4b2aeff5871cf72d35a686692bc6f0d44815",
-        "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d",
-        "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7",
-        "594987abe8657a40bccc13d301f1f0d5cccb5348",
-        "7b362428c76085a160e28656cd2c75c3147a69ff",
-        "82ca5ca9be6e18a1addb7986eae15689339aedbc",
-        "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b",
-        "96b50d451c4483c476f2f963674e0a3ba9d50fe3",
-        "9a886d552706ad0a626e64da0dc27be2f2d0b437",
-        "a621ef8112677a519b662ec5d2547475c0101f7e",
-        "a623e29085a3be885718cf9c0c0eca85bb53dd97",
-        "a92020292976c2e9b50f7adc922693a45a6c1226",
-        "ab83b01273026ab5c23c6f3b40e946d97a863fa2",
-        "b26e355fe98c372f02a13d74c10a785ad8c9ce2d",
-        "bc02e0504d83df70a2c95fcf3651d0f1eac3e252"
-      ]
-    },
-    "melodic-software/ci-workflows/.github/workflows/pr-review.yml": {
-      "routing": "runner-input",
-      "runnerInput": "runner",
-      "allowedInputs": [
-        "runner",
-        "incremental-review",
-        "allowed-bot-sender-ids",
-        "model-args",
-        "allowed-author-ids",
-        "fallback-credential-name"
-      ],
-      "allowedSecrets": {
-        "CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
-        "FALLBACK_CLAUDE_CODE_OAUTH_TOKEN": "${{ secrets.FALLBACK_CLAUDE_CODE_OAUTH_TOKEN }}"
-      },
-      "allowedCallerPermissions": {
-        "contents": "read",
-        "pull-requests": "write",
-        "id-token": "write",
-        "issues": "read"
-      },
-      "approvedShas": [
-        "164c2809f6150429b6f24d4a2777bb377af953d9",
-        "2fe38c031867900824c164e33a140a335ed9ecf0",
-        "3180217076b19bbdfccc43026c7f91c604da673d",
-        "3a2c748fdef9cfb9ceec5a66289e21842189689f",
-        "3c8a4b2aeff5871cf72d35a686692bc6f0d44815",
-        "4cfd14e8b6f8b740f5f0af27f80139a0d40a596d",
-        "58a60eac76cf36ed8ef4f59460acb4a8d34d3ff7",
-        "594987abe8657a40bccc13d301f1f0d5cccb5348",
-        "7b362428c76085a160e28656cd2c75c3147a69ff",
-        "82ca5ca9be6e18a1addb7986eae15689339aedbc",
-        "8bd4d7f963a06627dd2d551ffcd8d9db5e6b881b",
-        "96b50d451c4483c476f2f963674e0a3ba9d50fe3",
-        "9a886d552706ad0a626e64da0dc27be2f2d0b437",
-        "a621ef8112677a519b662ec5d2547475c0101f7e",
-        "a623e29085a3be885718cf9c0c0eca85bb53dd97",
-        "a92020292976c2e9b50f7adc922693a45a6c1226",
-        "ab83b01273026ab5c23c6f3b40e946d97a863fa2",
-        "b26e355fe98c372f02a13d74c10a785ad8c9ce2d",
-        "bc02e0504d83df70a2c95fcf3651d0f1eac3e252"
       ]
     },
     "melodic-software/ci-workflows/.github/workflows/pr-run-checks.yml": {
