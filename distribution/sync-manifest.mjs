@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-// Validate and materialize the standards distribution manifest.
-//
-// Node port of the Bash+yq engine (standards-sync-audit Phase 6, ledger
-// decision Q12). The CLI surface, stdout/stderr bytes, diagnostic text,
-// check precedence, and exit codes are contract surface proven by
-// distribution/sync-manifest.test.sh — change them only with the suite.
-//
-// Parser configuration is pinned (PLAN Phase 6 decision 6-A): YAML 1.2 core
-// schema; merge keys NOT expanded (a plain `<<` key is detected and rejected,
-// mirroring yq's !!merge tag); duplicate keys detected by an explicit
-// whole-tree walk; the control-character class is POSIX [[:cntrl:]] =
-// U+0000-U+001F plus U+007F exactly (never a Unicode Cc class, which also
-// matches C1 and would silently widen the contract). The class and the NUL
-// record separator are constructed from character codes so this source file
-// itself carries no control bytes.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -75,14 +60,10 @@ function requireCommand(name) {
   if (probe.error) die(`required command not found: ${name}`);
 }
 
-// POSIX [:space:] only — JS String.prototype.trim also strips Unicode
-// whitespace and would diverge from the Bash trim().
 function trim(value) {
   return value.replace(/^[ \t\n\v\f\r]+/, "").replace(/[ \t\n\v\f\r]+$/, "");
 }
 
-// The per-segment alphabet also rejects absolute, drive-letter, backslash,
-// empty-segment, and control-character paths.
 function isSafeRepoPath(p) {
   if (!p) return false;
   return p
@@ -112,15 +93,10 @@ function lstatOrNull(p) {
   }
 }
 
-// realpathSync.native also expands Windows 8.3 short names (KYLESE~1 style),
-// which plain realpathSync leaves alone — git rev-parse reports the long form,
-// so both sides must normalize through the same resolver or the worktree-root
-// equality check falsely fails on Windows dev machines.
 function realPath(p) {
   return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
 }
 
-// The worktree root containing dir, or null when git cannot report one.
 function gitToplevel(dir) {
   const probe = runGit(["-C", dir, "rev-parse", "--show-toplevel"]);
   if (probe.error || probe.status !== 0) return null;
@@ -138,10 +114,6 @@ function canonicalGitRoot(requested) {
   }
   return physical;
 }
-
-// One batched ls-files call and one batched hash-object call per root: the
-// spawn-count contract in the suite asserts exactly one of each during a
-// production validate.
 
 let indexCacheRoot = "";
 let indexEntryCache = new Map();
@@ -161,9 +133,8 @@ function useIndexCacheRoot(root) {
   indexCacheRoot = root;
 }
 
-// Load Git index rows for one or more literal paths in a single ls-files call.
-// Directory-shaped pathspecs may also select descendants; only rows whose
-// recorded path exactly equals a requested path are attributed to that path.
+// A directory pathspec also selects its descendants, so only exact path matches are attributed.
+// https://git-scm.com/docs/gitglossary
 function prefetchIndexEntries(root, paths) {
   if (paths.length === 0) return true;
   useIndexCacheRoot(root);
@@ -270,15 +241,9 @@ function rawScalarText(node) {
   return String(node.value);
 }
 
-// Mirror yq's tag resolution for the shapes the manifest contract names.
-// A PLAIN `<<` key is !!merge (go-yaml resolves it that way even though this
-// parser is configured with merge expansion off); quoted scalars are always
-// !!str; int-vs-float is decided by the written form.
 function tagOf(node) {
   const n = deref(node);
   if (n === null || n === undefined) return "!!null";
-  // An explicit core tag wins over value-shape heuristics (e.g. `!!float 2`
-  // resolves to numeric 2 but must classify as !!float, exactly as yq does).
   if (typeof n.tag === "string" && n.tag.startsWith("tag:yaml.org,2002:")) {
     return `!!${n.tag.slice("tag:yaml.org,2002:".length)}`;
   }
@@ -303,10 +268,6 @@ function tagOf(node) {
   return "!!str";
 }
 
-// An explicit collection tag on a scalar (e.g. `!!map oops`) classifies by tag
-// while the node carries no .items, so every shape check must also require the
-// real node shape before descending — otherwise the descent throws instead of
-// reaching the record's own die() diagnostic.
 function isMapShaped(node) {
   return isMap(node) && tagOf(node) === "!!map";
 }
@@ -337,8 +298,6 @@ function mapHasKey(mapNode, name) {
   return findMapValue(mapNode, name) !== undefined;
 }
 
-// Whole-tree duplicate-mapping-key walk, mirroring yq's
-// `[.. | select(tag == "!!map") | ((keys | length) == (keys | unique | length))] | all`.
 function hasDuplicateMapKey(node) {
   const n = deref(node);
   if (isMap(n)) {
@@ -370,7 +329,6 @@ function assertSortedUnique(label, values) {
     if (!value) die(`${label} contains an empty element`);
     if (seen.has(value)) die(`${label} contains duplicate '${value}'`);
     seen.add(value);
-    // previous starts empty, which sorts before every non-empty value.
     if (previous > value) {
       die(`${label} must be sorted ('${previous}' appears before '${value}')`);
     }
@@ -402,8 +360,6 @@ const managedByTarget = new Map();
 const localByTarget = new Map();
 const automergeByTarget = new Map();
 
-// Check every node is a string scalar free of control characters (in that
-// order, across all nodes) and return the string values.
 function stringValues(label, nodes) {
   if (!nodes.every((node) => tagOf(node) === "!!str")) die(`${label} must be strings`);
   if (nodes.some((node) => CONTROL_RE.test(node.value))) {
@@ -419,7 +375,6 @@ function mapKeyValues(label, mapNode) {
   );
 }
 
-// A non-empty, sorted, duplicate-free sequence of strings.
 function stringSeq(seqNode, shapeMessage, entriesLabel, sortedLabel) {
   const node = deref(seqNode);
   if (!isSeqShaped(node) || node.items.length === 0) die(shapeMessage);
@@ -528,10 +483,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
       if (!isSafeRepoPath(destination)) {
         die(`component '${component}' has unsafe destination path '${destination}'`);
       }
-      // A source MAY back multiple components: one canonical file fanning out
-      // to per-destination components is the manifest's own answer to
-      // consumers with different layouts. Destinations stay globally unique —
-      // that is the write-conflict invariant.
       if (destinationOwner.has(destination)) {
         die(
           `destination '${destination}' is owned by both '${destinationOwner.get(destination)}' and '${component}'`,
@@ -548,9 +499,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     }
     filesByComponent.set(component, fileRows);
 
-    // Paths this component's files lived at before a relocation. apply
-    // deletes each one the target still tracks, in the same sync commit that
-    // writes the new path; remove an entry once every target has converged.
     let previous = [];
     if (keys.includes("previous-destinations")) {
       previous = stringSeq(
@@ -587,8 +535,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     requiresByComponent.set(component, dependencies);
   }
 
-  // A previous destination is deleted on apply, so it may neither be, contain,
-  // nor sit inside any current destination, nor belong to two components.
   const previousOwner = new Map();
   for (const component of componentNames) {
     for (const previousPath of previousByComponent.get(component)) {
@@ -645,8 +591,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     const state = visitState.get(component);
     if (state === "done") return;
     if (state === "visiting") {
-      // The Bash engine joins the cycle path with the FIRST character of its
-      // multi-character IFS — a single space — then appends the closing arrow.
       die(`component dependency cycle: ${visitPath.join(" ")} -> ${component}`);
     }
     visitState.set(component, "visiting");
@@ -689,18 +633,12 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
       );
     }
 
-    // Absent means true: automerge is opt-out policy-as-data, so a target that
-    // never mentions the key keeps the fleet-default armed behavior.
     let automergeValue = "true";
     if (keys.includes("automerge")) {
       const automergeNode = deref(findMapValue(node, "automerge"));
       if (tagOf(automergeNode) !== "!!bool") {
         die(`target '${target}' automerge must be a boolean`);
       }
-      // Dual-engine window hardening (Phase 6.1 stress-test finding): yq's
-      // @tsv emits a capitalized boolean verbatim into the matrix JSON while
-      // this parser normalizes it — restrict the scalar to the two literal
-      // spellings so both engines emit identical bytes.
       const raw = rawScalarText(automergeNode);
       if (raw !== "true" && raw !== "false") {
         die(`target '${target}' automerge must be the literal true or false`);
@@ -728,8 +666,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     managedByTarget.set(target, managed);
     localByTarget.set(target, locallyOwned);
 
-    // A locally-owned implementation may satisfy a managed component's required
-    // capability, but its own internal dependency closure remains downstream's.
     for (const component of managed) {
       for (const dependency of requiresByComponent.get(component) ?? []) {
         if (!selected.has(dependency)) {
@@ -741,10 +677,6 @@ function validateManifest(sourceRoot, manifest, manifestAbs) {
     }
   }
 
-  // Every component must be reachable from at least one target selection —
-  // directly managed or locally-owned, or inside the dependency closure of a
-  // selected component. An unreferenced definition is dead weight the catalog
-  // silently carries; delete it or adopt it.
   const reachable = new Set();
   const reachableQueue = targetNames.flatMap((target) => [
     ...managedByTarget.get(target),
@@ -799,10 +731,6 @@ function emitManagedMappings(target) {
   }
 }
 
-// Machine-readable companion to mappings: one destination path per line,
-// sorted uniquely (code-unit order — destinations are ASCII by the safe-path
-// contract, so this equals LC_ALL=C byte order), with no Markdown. Unknown
-// targets are handled by the dest-paths dispatcher (exit 0, no output).
 function emitManagedDestPaths(target) {
   const seen = new Set();
   for (const component of managedByTarget.get(target)) {
@@ -814,8 +742,6 @@ function emitManagedDestPaths(target) {
   for (const destination of paths) process.stdout.write(`${destination}\n`);
 }
 
-// The previous destinations of one target's managed components, sorted
-// uniquely like dest-paths: the only paths apply may delete there.
 function retiredPaths(target) {
   const paths = managedByTarget.get(target).flatMap((c) => previousByComponent.get(c));
   return [...new Set(paths)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -860,7 +786,6 @@ function verifyTargetIdentity(targetRoot, expected) {
   }
 }
 
-// Every ancestor directory of a safe repo path, outermost first.
 function parentPrefixes(destination) {
   const segments = destination.split("/").slice(0, -1);
   return segments.map((_, i) => segments.slice(0, i + 1).join("/"));
@@ -902,9 +827,6 @@ function preflightDestination(targetRoot, destination) {
   }
 }
 
-// A previous destination is deleted only when the target tracks it as a
-// stage-0 regular file and the worktree holds a regular file there. Absent is
-// a no-op (already converged); anything else is a file the sync did not write.
 function retiredPathPresent(targetRoot, retired) {
   const stat = lstatOrNull(path.join(targetRoot, retired));
   const entries = readExactIndexEntries(targetRoot, retired);
@@ -938,8 +860,6 @@ function applyTarget(sourceRoot, target, targetRootRequested) {
   if (indexPaths.length > 0 && !prefetchIndexEntries(targetRoot, indexPaths)) {
     die(`could not inspect Git index path: ${indexPaths[0]}`);
   }
-  // Validate all destinations before the first mutation. A later I/O error stops
-  // the workflow before PR creation, so no partial component update is published.
   for (const [, destination] of mappings) preflightDestination(targetRoot, destination);
   const toDelete = retired.filter((p) => retiredPathPresent(targetRoot, p));
   for (const [source, destination] of mappings) {
@@ -1042,8 +962,6 @@ function main() {
     if (!targetExists.has(target)) die(`unknown manifest target '${target}'`);
     emitManagedMappings(target);
   } else if (command === "dest-paths") {
-    // Unknown targets are a successful empty result so shared PR checks can
-    // no-op outside the manifest. mappings/apply keep the hard error.
     if (targetExists.has(target)) emitManagedDestPaths(target);
   } else if (command === "retired-paths") {
     if (targetExists.has(target)) {

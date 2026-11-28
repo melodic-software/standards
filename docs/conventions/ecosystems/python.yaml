@@ -1,10 +1,3 @@
-# Python in this repository. Contract and schema:
-# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
-# The only Python is the ruff component fixtures. Lint is ruff check
-# plus ruff format --check against the root ruff.toml, as the claude-code-plugins
-# python-format hook runs them, with components/ruff/fixtures/bad excluded as CI's
-# check-python ruff step excludes it. The test is the component's contract
-# suite, as CI runs it. Commands run from the repository root.
 globs: ["*.py", "*.pyi"]
 build-cmd: null
 test-cmd: "bash harness/shell/run-tests.sh components/ruff/ruff.test.sh"

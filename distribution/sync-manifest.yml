@@ -1,122 +1,16 @@
-# Exact materializations owned by melodic-software/standards.
-# Native package, GitHub Actions, and IaC adoption remain authoritative in
-# their respective consumer manifests and are intentionally absent here.
 version: 2
 
 components:
-  # Not synced: the lint configs (typos, markdownlint, gitleaks,
-  # editorconfig-checker, actionlint, shellcheck) and the lefthook-base and
-  # lefthook-shellcheck fragments. Their readers (the ci-workflows composites,
-  # the claude-code-plugins aggregate lefthook remote and this repository's
-  # lefthook remote) read this repository's root configs at run time, and a
-  # repository's own file layers over or replaces them per each component's
-  # README.
   architecture-decisions:
     files:
       docs/adr/README.md: docs/adr/README.md
       docs/adr/adr-template.md: docs/adr/adr-template.md
-  # Shared Biome policy (`root: false`); a target's root biome.json extends it
-  # by relative path and keeps its own scope.
   biome:
     files:
       components/biome/biome.json: .github/standards/biome/biome.json
   claude-permissions:
     files:
       components/claude-permissions/claude-permissions.json: .chezmoidata/claude-permissions.json
-  # Claude review-lane callers (ci-workflows claude-review-lanes plan, Phase
-  # 3a): thin sync-managed callers for the ci-workflows reusable review lanes.
-  # The callers reference the reusables at `@main`; their contracts are in
-  # components/runner-policy/policy.json (approvedReusableWorkflowContracts),
-  # keyed by path. Managed — a recorded exception to
-  # the workflow-caller exclusion in README.md — because hand-written lane
-  # callers empirically drifted: medley's missing `reopened` trigger,
-  # divergent skip-actors lists, and pin skew across targets.
-  #
-  # Both callers trigger on `synchronize`, so every push to a non-draft PR is
-  # reviewed.
-  # A re-run replays the original event rather than reviewing a newer head;
-  # the component files state why.
-  #
-  # Each component targets the repos that run that lane TODAY. Deliberate
-  # exclusions:
-  # Every repository runs both lanes: the guarded-merge rule requires a
-  # finished AI review check, so a repository without the lanes cannot have
-  # its pull requests merged by an agent. Exceptions to management:
-  # - standards: manifest source, not a target — keeps its repo-local caller.
-  # - Public targets: .github, ci-runner, and
-  #   claude-code-account-rotation take the
-  #   HOSTED lane callers below, never these fleet-label ones (see the
-  #   public-shape note below); claude-code-plugins owns its copies of them
-  #   (its target block).
-  #   ci-runner's earlier runner-infra exemption (a stuck lane job could
-  #   block its own runners) does not apply to the hosted shape: those jobs
-  #   run on GitHub-hosted runners, not on the fleet ci-runner provisions.
-  # - knowledge-corpus, songwriting: sync targets for the Dependabot automerge
-  #   caller and the fleet-routed guard only (the Phase 4 note near `targets:`), so neither takes these components.
-  #   songwriting carries repo-local copies of the fleet callers by owner
-  #   decision 2026-10-19; its earlier "no code, near-zero signal" drop no
-  #   longer holds. knowledge-corpus stays DEFERRED by owner decision
-  #   2026-10-19: it has no code, and its scraped third-party HTML is content
-  #   an agent later reads, which is a prompt-injection surface rather than a
-  #   code-quality one. Its repo-local lane PR (knowledge-corpus#53) is
-  #   closed. Removal trigger: prompt-injection hardening for a
-  #   review lane over untrusted third-party content — and then for a security
-  #   or content-scanning lane, not for claude-review as written.
-  #
-  # PUBLIC SHAPE (`claude-review-hosted-caller` and
-  # `claude-security-review-hosted-caller`), sourced from
-  # `components/claude-lanes-hosted/`: both call `pr-review-cli.yml@main`
-  # (`lane: code` / `lane: security`), omitting `runner` so the reusable
-  # defaults to GitHub-hosted `ubuntu-24.04`, and run the reviews role's API key
-  # first, then its subscription token, then `FALLBACK_CLAUDE_CODE_OAUTH_TOKEN`
-  # (melodic-software/control-hub#13). runner-policy admits `pr-review-cli.yml`
-  # on public repositories, matching GitHub's recommendation against self-hosted
-  # runners on public repos
-  # (docs.github.com/en/actions/reference/security/secure-use). Same job ids as
-  # the fleet callers (`pr-review` / `pr-review-security`). The destinations
-  # differ (`.github/workflows/pr-review-hosted.yml`,
-  # `.github/workflows/pr-review-security-hosted.yml`) because a destination
-  # has exactly one owning component; each workflow `name:` is its stem in Title Case. The files live outside
-  # `components/claude-lanes/` so the fleet-only runner-policy tests keyed on
-  # that directory stay as strict as they are; runner-policy.test.mjs holds
-  # the hosted pair to its own rules and forbids a target managing both
-  # variants of a lane.
-  # Known limit: on a public repository the lanes review only pull requests
-  # from same-repository branches. Fork and Dependabot pull requests get no
-  # secrets (code.claude.com/docs/en/github-actions), so they get no review.
-  # Deselecting a component never deletes its file: a target that moves between the hosted and
-  # fleet variants keeps the old caller, and double-reviews, until a one-time
-  # repo-local pull request deletes it by hand, as claude-code-proxy#269
-  # tracks for the managed-files-guard pair.
-  # Removal trigger: option A of #622 landing, that is blockers (1) and (2)
-  # below, so one caller serves both visibilities. Then the hosted pair and
-  # its destinations retire.
-  #
-  # The security lane has no path gating: it reviews every non-draft
-  # same-repository PR whose actor is not a bot (or is a bot whose sender id
-  # the caller lists in `allowed-bot-sender-ids`), and a target's
-  # `.github/claude-security-paths` file has no effect. The manifest never
-  # synced that file, so a target removes its copy in a repo-local PR if it
-  # wants to.
-  #
-  # `claude-security-review-caller` is managed for the private targets
-  # (their target blocks below). One shared shape for both visibilities is still blocked: both callers pass
-  # the fleet label `melodic-review-ubuntu-24.04-x64` as a literal
-  # `with.runner`, and runner-policy admits a fleet label only for an enrolled
-  # private consumer (`public-self-hosted-routing` otherwise), consulting
-  # neither `exceptions` nor `localRoutingGrants`. A synced caller is the same
-  # bytes on every target, so it cannot name the fleet label for private
-  # targets and a hosted label for public ones. One caller shape across both
-  # visibilities (#377) therefore needs:
-  # (1) the runner choice to move inside the ci-workflows reusable, so the
-  # caller names no label, AND a new cross-repo reusable routing kind in
-  # runner-policy to admit that call (schema, analyzer, tests, schemaVersion,
-  # contract entries); `internal-routing` today is
-  # repository-local only;
-  # (2) narrow `runner-policy.test.mjs`'s blanket
-  # "every managed target of a claude lane caller admits that caller" rule,
-  # which rejects EVERY `components/claude-lanes/` public managed target
-  # whatever label the caller names.
   claude-review-caller:
     files:
       components/claude-lanes/claude-review.yml: .github/workflows/pr-review.yml
@@ -129,26 +23,9 @@ components:
   claude-security-review-hosted-caller:
     files:
       components/claude-lanes-hosted/claude-security-review.yml: .github/workflows/pr-review-security-hosted.yml
-  # Per-target exact settings.json (issue 404). Not a transform: each
-  # consumer has its own source file. Shared marketplace + bootstrap hook
-  # are asserted against components/claude-settings/base/settings.json.
-  # First consumer: github-iac. Add targets/<repo>/settings.json + a
-  # dest-mapping component to extend the fleet.
   claude-settings-github-iac:
     files:
       components/claude-settings/targets/github-iac/settings.json: .claude/settings.json
-  # Canonical per-repo cloud bootstrap (components/cloud-bootstrap/README.md).
-  # Managed targets take the generic, data-driven script byte-exact; a repo
-  # enriches through its own never-synced .claude/cloud-bootstrap.local.sh, or
-  # goes `locally-owned` to customize the whole file. Deliberate exclusions:
-  # - standards: manifest source, not a target — its copy is held byte-identical
-  #   to the component by cloud-bootstrap.test.sh instead.
-  # - claude-code-plugins: `locally-owned` — its bootstrap carries
-  #   directory-source dogfooding (same-version commit-drift repair) that must
-  #   not fan out to github-source consumers.
-  # - medley: `locally-owned` — its bootstrap and cloud-bootstrap.test.sh carry
-  #   repo-specific toolchain steps; converge later by moving those into a
-  #   cloud-bootstrap.local.sh, then flip to managed.
   cloud-bootstrap:
     files:
       components/cloud-bootstrap/cloud-bootstrap.sh: .claude/cloud-bootstrap.sh
@@ -158,32 +35,9 @@ components:
   comment-hygiene-tools:
     files:
       components/comment-hygiene/comment-hygiene-patterns.sh: tools/shared/comment-hygiene/comment-hygiene-patterns.sh
-  # The org commit-subject convention at the well-known path the guardrails
-  # commit-msg hook and the source-control plugin read
-  # (components/commit-convention/README.md). Every target takes it except
-  # claude-code-plugins, which owns its convention locally.
-  # standards: manifest source, not a target — its copy is held
-  # byte-identical to the component by commit-convention.test.sh instead.
   commit-convention:
     files:
       components/commit-convention/commit-convention.yml: docs/conventions/source-control/commit-convention.yml
-  # Thin callers for ci-workflows' pr-automerge-dependabot.yml reusable
-  # (components/dependabot-automerge/README.md), the fourth recorded exception
-  # to the consumer-owned workflow-caller rule: 14 hand-maintained callers
-  # drifted across repositories. One component per runner-policy inventory:
-  # - dependabot-automerge-caller: hosted (`ubuntu-24.04`), for public targets.
-  # - dependabot-automerge-fleet-caller: managed fleet
-  #   (`melodic-ubuntu-24.04-x64`), for fleet-enrolled private targets.
-  # The reusable reads the Dependabot policy from this repository's `main`
-  # (components/dependabot-policy/policy.json), never a synced copy, so neither
-  # requires another component. Deliberate exclusions:
-  # - ci-workflows: `locally-owned` — hosts the reusable itself at
-  #   .github/workflows/pr-automerge-dependabot.yml and uses a queue workflow.
-  # - medley: `locally-owned` — carries a repo-local second `automerge` job.
-  # - standards: manifest source, not a target — keeps its repo-local caller
-  #   with explicit `review-only-dependencies: '["yaml"]'`.
-  # - claude-code-plugins: merge queue (GITHUB_TOKEN cannot add PRs to a queue).
-  # - azure-iac: no Dependabot automerge workflow.
   dependabot-automerge-caller:
     files:
       components/dependabot-automerge/dependabot-automerge.yml: .github/workflows/pr-automerge-dependabot-hosted.yml
@@ -197,13 +51,6 @@ components:
   go-analysis:
     files:
       .golangci.yml: .golangci.yml
-  # Issue-body contract (components/issue-body-contract/README.md). The org
-  # forms are generated from contract.json at authoring time and land byte-exact
-  # in the org-defaults repository with the contract beside them for its local
-  # drift check. config.yml stays repo-owned there. The two plugin copies are
-  # the canonical claude-code-plugins fans out with its sync-shared-copies.sh into
-  # the plugins that read it (bugs:write, the work-items skills), since a byte-
-  # identical file in two plugins must be registered in the same change.
   issue-body-contract-plugins:
     files:
       components/issue-body-contract/contract.json: docs/contracts/issue-body/contract.json
@@ -233,47 +80,9 @@ components:
       - ruff
     files:
       components/lefthook-python/lefthook.yml: .lefthook/python.yml
-  # Weekly online link-check callers (ci-workflows#739), the third recorded
-  # exception to the workflow-caller exclusion in README.md: one source file
-  # per opted-in target, because the cron minute and day differ per target
-  # and a component has exact bytes. The destination is
-  # `maintenance-check-links-online.yml`, so the workflow `name:` is its stem
-  # in Title Case; destinations are unique across components, so only one
-  # component can ship it (components/lychee-online/README.md). The schedule
-  # also needs the target's `link-check-online` org property set to true; the
-  # reusable reads it at run time (components/lychee-online/README.md).
   lychee-online-claude-code-plugins:
     files:
       components/lychee-online/targets/claude-code-plugins.yml: .github/workflows/maintenance-check-links-online.yml
-  # Advisory managed-files-guard caller (standards#496, ADR-0007): a thin
-  # workflow calling the ci-workflows `check-managed-files` composite action,
-  # which fails a consumer PR that hand-edits one of that repository's
-  # managed destinations. The second recorded exception to the
-  # workflow-caller exclusion in README.md, for the same reason as the first:
-  # the guard is only a fleet signal if every target carries the same caller
-  # at the same pin, and the sync is the one mechanism that holds that.
-  #
-  # Two components, one per runner-policy inventory. The files are identical
-  # except for `runs-on`, the workflow `name:` and their headers, and carry
-  # no `paths` filter (the action resolves destinations at run time): same
-  # action pin, same job name, so the check context is `PR Check Managed Files` on
-  # every target. Destinations must be unique across components, so each has
-  # its own path (`pr-check-managed-files-hosted.yml` for the hosted caller).
-  # A target takes one or the other, never both.
-  # - managed-files-guard-caller: the approved hosted label, which
-  #   runner-policy admits on a public repository and on a private one not
-  #   enrolled for local routing.
-  # - managed-files-guard-fleet-caller: the managed fleet label, for the
-  #   private targets enrolled for local routing (claude-code-proxy,
-  #   dotfiles, github-iac, medley, provisioning), where a
-  #   fixed hosted read-only job fails the runner-policy gate.
-  # Deliberate exclusions:
-  # - ci-workflows: `locally-owned` — it hosts the action and already runs
-  #   the guard as a job of its own ci.yml (dogfood via a `./` action ref
-  #   pinned to its own commit), so a second caller would double the check.
-  # - standards: manifest source, not a target.
-  # Not in `ci-status` anywhere during soak; promotion is per-target and
-  # recorded in components/managed-files-guard/README.md.
   managed-files-guard-caller:
     files:
       components/managed-files-guard/managed-files-guard.yml: .github/workflows/pr-check-managed-files-hosted.yml
@@ -283,8 +92,6 @@ components:
   markdownlint-home:
     files:
       components/markdownlint/home/.markdownlint-cli2.jsonc: dot_markdownlint-cli2.jsonc
-  # Project MCP stdio entry with --vault key resolution
-  # (components/mcp-launcher/README.md). The tests and stubs stay upstream.
   mcp-launcher:
     requires:
       - node-runtime
@@ -294,8 +101,6 @@ components:
   node-runtime:
     files:
       .node-version: .node-version
-  # The rendered-page uploader (components/cloud-environment/README.md), for
-  # local machines; cloud sessions get it from setup.sh instead.
   pages-publish:
     files:
       components/cloud-environment/pages-publish: dot_local/bin/executable_pages-publish
@@ -308,12 +113,6 @@ components:
   path-detection-tools:
     files:
       components/path-detection/machine-path-patterns.sh: tools/shared/path-detection/machine-path-patterns.sh
-  # The org default PR template, generated from policy.json by
-  # components/pr-convention-policy/contract-docs.mjs, which also generates the
-  # filing guide standards/process/filing-prs-and-issues.md. The lockstep copy
-  # check fails when the delivered template differs from the generated bytes.
-  # Target: melodic-software/.github only, whose template is the fallback every
-  # repository without its own uses.
   pr-template:
     files:
       components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md: .github/PULL_REQUEST_TEMPLATE.md
@@ -327,28 +126,10 @@ components:
   ruff:
     files:
       ruff.toml: ruff.toml
-  # Shared strict TypeScript base; a target's tsconfig extends it by relative
-  # path and sets its own runtime, module and scope options.
   tsconfig:
     files:
       components/tsconfig/tsconfig.json: .github/standards/tsconfig/tsconfig.json
 
-# Automerge is restored: the watchdog's tracking-issue
-# create/update/close/fail lifecycle is PROVEN via dispatched test-mode runs
-# (proof artifact in that plan, 2026-08-17), and the melodic-software/.github
-# canary was observed end-to-end on 2026-08-23 — PR 62 armed on open and
-# self-merged 31 seconds later with all four required contexts green. An
-# absent automerge key is the armed default, and the fleet is armed. The
-# watchdog caller was removed on 2026-09-14 with the other automated
-# issue-opening processes; nothing now reports a stuck sync PR.
-#
-# No per-target opt-out remains as of 2026-09-04. The last three
-# (agent-plugins, cursor-plugins, claude-code-proxy) were disarmed only because
-# their default branches sat outside the org ci-gate ruleset; github-iac#367
-# extended the ruleset to them once each carried the four required contexts,
-# and their keys were dropped with the dated evidence recorded at each target.
-# The key stays available fleet-wide as a per-target opt-out for any future
-# staged rollout.
 targets:
   melodic-software/.github:
     managed:
@@ -384,31 +165,9 @@ targets:
       - path-detection-action
       - psscriptanalyzer
       - repository-text
-    # ci-workflows hosts the managed-files-guard action and already runs it
-    # as a job of its own ci.yml, through a `./` action ref that resolves to
-    # the commit under test. A synced caller pinned to an older commit would
-    # run the guard twice per PR, once at each revision. Removal trigger:
-    # ci-workflows retiring its in-repo job in favor of the synced caller.
     locally-owned:
-      # ci-workflows hosts the pr-automerge-dependabot.yml reusable itself and
-      # uses pr-automerge-dependabot-queue.yml for its merge queue.
       - dependabot-automerge-caller
       - managed-files-guard-caller
-  # Renamed from account-rotation on 2026-09-07 (github-iac aliases the old name).
-  # Adopted 2026-09-05 at repository creation (github-iac governs it; the
-  # Pulumi entry and this target land in the same window). A public .NET tool
-  # repo, so the set is github-iac's minus two things.
-  # `claude-settings-github-iac` is that target's own settings file.
-  # The runner-policy gate is an adoption, not a visibility class (README
-  # "Runner-policy consumers"; claude-code-plugins is public and
-  # enrolled). claude-code-account-rotation enrolled with
-  # claude-code-account-rotation#98: a repo-local `.github/runner-policy.json`
-  # with `selfHostedCi: false` and the gate steps in its CI. Both
-  # `components/claude-lanes/` callers name the private fleet's runner label
-  # and are refused on a public repository, so it takes the hosted lane
-  # callers (see the public-shape note above), which audit clean under its
-  # gate. Plus the hosted-only `managed-files-guard-caller`, which every
-  # public target carries.
   melodic-software/claude-code-account-rotation:
     managed:
       - claude-review-hosted-caller
@@ -421,10 +180,6 @@ targets:
       - managed-files-guard-caller
       - node-runtime
       - repository-text
-    # Armed as of 2026-09-22: claude-code-account-rotation#95 landed the ci.yml
-    # whose ci-status job aggregates every lane and carries the pull-request
-    # contract as steps of that one check, and github-iac#528 extends the org
-    # ci-gate ruleset to this repository so ci-status is required.
   melodic-software/claude-code-plugins:
     managed:
       - issue-body-contract-plugins
@@ -433,68 +188,12 @@ targets:
       - node-runtime
       - path-detection-guardrails
       - repository-text
-    # The hosted lane pair is locally owned here, so this repository's copies
-    # can resolve their models through its own resolve-config action and pass
-    # them as `model-args` (ci-workflows v0.45.0). No other target has that
-    # action and a `models:` block in its pr-pipeline config, so the shared
-    # callers keep the reusable defaults. Removal trigger: a second target
-    # routing its review models that way, which moves the resolve step into
-    # the shared component.
-    #
-    # `ruff`: the canonical policy reports 385 findings against that tree
-    # against 166 under upstream's bare defaults, so adoption is a migration
-    # rather than a config flip — most of the delta is `S`, `ERA`, `FIX`,
-    # `PTH`, `ARG`, `RET`, and the `TID` relative-import ban meeting a codebase
-    # never held to them. The repo owns a `ruff.toml` selecting `E4`, `E7`,
-    # `E9`, and `F`, which is what stops upstream default churn from being a
-    # repo-breaking event (ruff 0.16.0 moved the default set from 59 rules to
-    # 413 and turned two of its contract suites red on an unmodified `main`).
-    # Recorded here rather than left absent because absence is what produced an
-    # implicit policy nobody chose. Removal trigger: that migration being
-    # scheduled — moving this to `managed` restores the canonical payload.
     locally-owned:
       - claude-review-hosted-caller
       - claude-security-review-hosted-caller
-      # Directory-source dogfooding: this repo's bootstrap carries same-version
-      # commit-drift repair the canonical github-source script must not.
       - cloud-bootstrap
-      # The repository carries the convention in
-      # `docs/conventions/source-control.yaml` (ADR 0064), which the guardrails
-      # resolver reads first (claude-code-plugins#10134), so the folder-form
-      # file is deleted there and a sync would restore a second, unread copy.
-      # Removal trigger: the guardrails resolver dropping its folder-form
-      # fallback, after which the component can retire fleet-wide.
       - commit-convention
       - ruff
-  # Phase 4 fleet expansion (standards-sync-audit plan, Brief line "Phase 4"):
-  # claude-code-proxy, codex-plugins, and cursor-plugins enter with the
-  # hygiene set plus cloud-bootstrap (each held an unmanaged, drifting copy of
-  # .claude/cloud-bootstrap.sh — 2026-08-16 fleet audit). The sync App's
-  # selected-repo grant covers them as of 2026-08-19 (grant-first per the
-  # plan's exact-set attestation constraint). Deliberate NON-adoptions, per
-  # the same locked plan:
-  # - knowledge-corpus: takes the fleet-routed Dependabot automerge caller and guard only (owner decision 2026-11-15); the hygiene set stays deferred: structural LFS
-  #   blocker recorded; no extend mechanism exists. The separate review-LANE
-  #   question is answered at the claude-review caller comment above.
-  # - songwriting: takes the fleet-routed Dependabot automerge caller and guard only (owner decision 2026-11-15); the hygiene set stays out (github-iac ADR-0006); its two drifted
-  #   files were hand-fixed once (plan Phase 0.6), not adopted.
-  # - claude-lane-sandbox: a disposable lane-testing sandbox, not a
-  #   convergence target — sync PRs there are churn against throwaway state.
-  #   Rationale mirrored here per the plan so the manifest, not only the
-  #   plan file, records why it is absent.
-  # Beyond the Phase 4 hygiene set, claude-code-proxy manages the lefthook
-  # lanes and psscriptanalyzer per its own Phase 1 adoption:
-  # lefthook-powershell + lefthook-python with their closure
-  # (psscriptanalyzer). ruff stays locally-owned (below) and
-  # satisfies lefthook-python's requirement as a repo-owned implementation.
-  # claude-code-proxy is private and fleet-enrolled in github-iac (its ci.yml
-  # runs on the fleet label), so it takes the fleet-routed guard and both
-  # lane callers. The sync overwrites its former repo-local lane copies at
-  # the same paths. Deselection never deletes, so its old hosted
-  # `.github/workflows/managed-files-guard.yml` stays until a one-time
-  # claude-code-proxy PR deletes it (claude-code-proxy#269). Until then
-  # both workflows share the name `managed-files-guard` and so one
-  # concurrency group, and each PR event cancels one of the two runs.
   melodic-software/claude-code-proxy:
     managed:
       - claude-review-caller
@@ -508,14 +207,8 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
-    # ruff stays repo-owned per the plan's Phase 4 line (ccproxy: ruff
-    # locally-owned) — same shape as claude-code-plugins' entry above.
     locally-owned:
       - ruff
-    # Armed as of 2026-09-04: main CI has been green since 2026-09-03,
-    # claude-code-proxy#214 landed the three metadata callers beside the
-    # existing ci-status emitter, and github-iac#367 extended the org ci-gate
-    # ruleset to this repository so the four contexts are required.
   melodic-software/dotfiles:
     managed:
       - claude-permissions
@@ -546,7 +239,6 @@ targets:
       - managed-files-guard-fleet-caller
       - node-runtime
       - repository-text
-  # Takes the fleet-routed Dependabot automerge caller and guard only.
   melodic-software/knowledge-corpus:
     managed:
       - dependabot-automerge-fleet-caller
@@ -555,58 +247,21 @@ targets:
     managed:
       - architecture-decisions
       - biome
-      # claude-review-caller replaces medley's hand-written caller: its
-      # missing `reopened` trigger and skip-actors divergence normalize away;
-      # its `paths-ignore` tuning is an ACCEPTED LOSS (the component carries
-      # no workflow-level path filtering), so medley's review volume rises
-      # slightly.
       - claude-review-caller
       - claude-security-review-caller
-      # The destination file is byte-canonical since medley's wrapper refactor
-      # (medley ADR-0023, the ADR-0019 "share bodies, NOT wrapping" shape):
-      # medley policy lives in a repo-owned comment-hygiene-local.sh that
-      # sources this managed file and overrides chp::scan_text, so a managed
-      # overwrite here breaks nothing. Managed = clobber containment, NOT
-      # policy convergence — medley's enforcement policy stays its own in the
-      # wrapper.
       - comment-hygiene-tools
       - commit-convention
       - managed-files-guard-fleet-caller
-      # Overwrites medley's tools/mcp-launcher/{launcher,dispatch}.js. Without
-      # --vault the behavior is unchanged, and medley's *-dispatch.test.sh
-      # suites pass against these files.
       - mcp-launcher
       - node-runtime
       - path-detection-tools
       - tsconfig
     locally-owned:
-      # Repo-specific toolchain steps live inside the bootstrap itself (plus a
-      # committed cloud-bootstrap.test.sh over it); converge by moving them
-      # into a cloud-bootstrap.local.sh, then flip to managed.
       - cloud-bootstrap
-      # Medley's pr-automerge-dependabot.yml carries an extra repo-local
-      # `automerge` job beside the reusable call.
       - dependabot-automerge-fleet-caller
-      # The canonical payload lands under eng/dotnet-analysis/ — no collision
-      # with medley's monorepo-tuned root .NET analyzer config is possible.
-      # Locally owned because medley does not consume that destination:
-      # adopting would land unused payloads beside its own tuned config.
-      # Revisit if medley moves to the canonical destination layout.
       - dotnet-analysis
-      # Slightly stale local copy at the canonical destination
-      # (PSScriptAnalyzerSettings.psd1, 138 lines vs 141 — the one counterpart
-      # SMALLER than canonical). Recorded 2026-08-16 (audit); nearest-parity
-      # adoption candidate among them.
       - psscriptanalyzer
-      # Substantially diverged local copies of both payload files at the
-      # canonical destinations (.editorconfig 204 lines vs 67, .gitattributes
-      # 290 vs 61 — monorepo expansion). Recorded 2026-08-16 (audit); the
-      # heaviest divergence of medley's counterpart files.
       - repository-text
-      # The ONLY true root-file overwrite among medley's analyzer exclusions:
-      # canonical ruff.toml at the repo root would clobber medley's tuned
-      # `target-version`, `include`, and per-tree scope. Revisit when medley
-      # adopts the dotfiles extend pattern.
       - ruff
   melodic-software/provisioning:
     managed:
@@ -620,7 +275,6 @@ targets:
       - node-runtime
       - psscriptanalyzer
       - repository-text
-  # Takes the fleet-routed Dependabot automerge caller and guard only.
   melodic-software/songwriting:
     managed:
       - dependabot-automerge-fleet-caller

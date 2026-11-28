@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Tests the cloud-bootstrap component: the canonical script parses, stays
-# generic (no repo or marketplace identifiers — everything is data-driven from
-# the consuming repo's own manifests), keeps its calling-contract landmarks
-# (cloud-only guard, enrich seam, hook-output JSON), reads the same
-# environment stamp the cloud-environment component writes, and this
-# repository's own materialized copy is byte-identical to the component —
-# standards is the manifest source, not a sync target, so this equality is
-# what stands in for the synchronizer here.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -23,9 +15,6 @@ readme="$root/components/cloud-bootstrap/README.md"
 env_setup="$root/components/cloud-environment/setup.sh"
 script_text="$(cat "$script")"
 
-# The cloud-mode runs below execute the real script, which may write
-# `git config --global`; point it at a scratch file so the suite never touches
-# the host's real global config.
 GIT_CONFIG_GLOBAL="$(mktemp "$TEST_TMPDIR/gitconfig.XXXXXX")"
 export GIT_CONFIG_GLOBAL
 
@@ -37,9 +26,6 @@ cmp -s "$script" "$materialized"
 rc=$?
 assert_exit 'repo .claude/cloud-bootstrap.sh is byte-identical to the component' 0 "$rc"
 
-# Generic-by-construction: the canonical script must not name a marketplace,
-# a repository, or a pinned tool version — those live in each repo's own
-# manifests and settings, or in its cloud-bootstrap.local.sh extension.
 if grep -qE 'claude-code-plugins|marketplace=|source_repo=' "$script"; then
   fail 'canonical script carries no hardcoded marketplace or repo identifiers' \
     "$(grep -nE 'claude-code-plugins|marketplace=|source_repo=' "$script" | head -n 3)"
@@ -54,15 +40,9 @@ assert_contains 'enrich seam runs .claude/cloud-bootstrap.local.sh' \
 assert_contains 'SessionStart hook output JSON is emitted' \
   "$script_text" 'hookSpecificOutput'
 
-# The catalog inventory line reads a machine-global marketplace listing to
-# answer a repo-scoped question. Without narrowing it to what this repo
-# declares, a machine carrying another repo's user-scoped marketplace reports
-# that whole catalog as undeclared on every session.
 assert_contains 'catalog inventory is scoped to declared marketplaces' \
   "$script_text" 'declared_mps'
 
-# setup_decl <name> <label> — sets decl to the single-quoted value setup.sh
-# assigns to <name>, and records <label> as passing only when there is one.
 setup_decl() {
   decl="$(sed -n "s/^$1='\(.*\)'\$/\1/p" "$env_setup")"
   if [[ -n "$decl" ]]; then
@@ -72,8 +52,6 @@ setup_decl() {
   fi
 }
 
-# Cross-component lockstep: the environment stamp this script reports is the
-# stamp path the cloud-environment component declares and writes.
 setup_decl STAMP 'cloud-environment setup.sh declares a stamp path'
 assert_contains 'bootstrap reads the stamp path cloud-environment writes' \
   "$script_text" "$decl"
@@ -81,18 +59,9 @@ setup_decl STAMP_FALLBACK 'cloud-environment setup.sh declares a fallback stamp 
 assert_contains 'bootstrap reads the fallback stamp path cloud-environment writes' \
   "$script_text" "$decl"
 
-# Cross-component lockstep: the fleet plugin list this script installs from is
-# the snapshot path the cloud-environment component writes at cache build, and
-# the repo declaration stays as the deltas overlay on top of it.
 setup_decl FLEET_PLUGINS 'cloud-environment setup.sh declares a fleet list snapshot path'
 assert_contains 'bootstrap reads the fleet list path cloud-environment writes' \
   "$script_text" "$decl"
-# The fallback copy the environment still writes when the snapshot path is
-# unwritable at cache build is deliberately NOT read here: it lands in a
-# world-writable directory at a predictable path, so any code running in a
-# session could plant a list there and have the next drift-repair run install
-# and enable a plugin with no settings diff. Such a snapshot gets the
-# repo-declaration-only path instead.
 setup_decl FLEET_PLUGINS_FALLBACK 'cloud-environment setup.sh declares a fleet list fallback path'
 assert_not_contains 'bootstrap does not read the world-writable fleet list fallback path' \
   "$script_text" "$decl"
@@ -100,12 +69,6 @@ assert_not_contains 'bootstrap does not read the world-writable fleet list fallb
 assert_contains 'bootstrap keeps the repo enabledPlugins block as the deltas overlay' \
   "$script_text" 'install_plugins_from "$settings"'
 
-# Runtime behavior of the catalog inventory with the repo settings file
-# absent: the fleet list alone must still name the catalog gap. Driven with a
-# stub `claude` on PATH, a fleet list handed to the script through its
-# CLOUD_BOOTSTRAP_FLEET_LIST seam (so no case ever reads, or needs to write,
-# a real snapshot path on the host), and a scratch repo with no
-# .claude/settings.json.
 inv_tmp="$(mktemp -d "$TEST_TMPDIR/inv_tmp.XXXXXX")"
 mkdir -p "$inv_tmp/bin" "$inv_tmp/mp/.claude-plugin" "$inv_tmp/repo"
 cat >"$inv_tmp/mp/.claude-plugin/marketplace.json" <<'JSON'
@@ -138,8 +101,6 @@ case "\$1 \$2 \$3" in
 esac
 STUB
 chmod +x "$inv_tmp/bin/claude"
-# run_inv <repo> <fleet-file> — the script in cloud mode at <repo>, the stub
-# `claude` first on PATH; callers redirect its streams.
 run_inv() {
   (cd "$1" && PATH="$inv_tmp/bin:$PATH" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$1" \
     CLOUD_BOOTSTRAP_FLEET_LIST="$2" bash "$script")
@@ -155,29 +116,15 @@ assert_eq 'warm catalog inventory lists marketplaces once' '1' \
 assert_eq 'warm catalog inventory lists plugins once' '1' \
   "$(cat "$inv_tmp/counts/plugin-list")"
 
-# A fleet list that is absent, unparsable, or valid JSON of the wrong shape
-# ends the plugin stage: an existence-and-parse check alone lets a bare array
-# or an `enabledPlugins` array through to fail inside every jq read below it,
-# and there is no set for drift repair to repair against, so nothing is
-# installed from anywhere. Each case runs against a scratch repo that DOES
-# declare a plugin the stub reports as not installed, so a reintroduced
-# settings-only install path would show up as an install attempt here rather
-# than passing as a warm skip.
 mkdir -p "$inv_tmp/degrade/.claude"
 cat >"$inv_tmp/degrade/.claude/settings.json" <<'JSON'
 { "enabledPlugins": { "gamma@stub-market": true } }
 JSON
 git init -q "$inv_tmp/degrade"
 degrade_case() {
-  # degrade_case <label> <fleet-file> <expected-stderr-fragment>
-  # The fleet file must be a non-empty path: an empty value would fall through
-  # the seam's default and read the host's real snapshot list.
   local label="$1" fleet="$2" expected="$3" out hook_out
   rm -f "$inv_tmp/counts/plugin-install"
   out="$(run_inv "$inv_tmp/degrade" "$fleet" 2>&1 >/dev/null)"
-  # Ending the plugin stage must not end the hook: the toolchain steps and the
-  # repo's own cloud-bootstrap.local.sh ran before it and may have
-  # materialized skills, so the re-scan request still has to reach stdout.
   hook_out="$(run_inv "$inv_tmp/degrade" "$fleet" 2>/dev/null)"
   assert_contains "$label still emits the SessionStart reloadSkills output" \
     "$hook_out" '"reloadSkills":true'
@@ -202,13 +149,6 @@ printf '%s\n' '[]' >"$inv_tmp/bare-array.json"
 degrade_case 'a fleet list that is a bare array' "$inv_tmp/bare-array.json" \
   'is not a settings-shaped object'
 
-# The permissive side of the same gate: it is a shape test, not a content
-# test, so a settings-shaped object that declares no enabledPlugins is a valid
-# empty source and must pass. Pinned here because it is the one branch a later
-# tightening (requiring the key to be present) would silently turn into a
-# refusal, and the refusal cases above would all still pass. It doubles as the
-# overlay case: with the list present, a repo `true` entry the list does not
-# carry is installed.
 printf '%s\n' '{"extraKnownMarketplaces":{}}' >"$inv_tmp/no-enabled.json"
 rm -f "$inv_tmp/counts/plugin-install"
 empty_out="$(run_inv "$inv_tmp/degrade" "$inv_tmp/no-enabled.json" 2>&1 >/dev/null)"
@@ -222,12 +162,6 @@ assert_eq 'the overlay install reaches the plugin CLI' '1' \
   "$(cat "$inv_tmp/counts/plugin-install" 2>/dev/null || echo 0)"
 rm -rf "$inv_tmp"
 
-# Git author from the connected GitHub account. A stub `gh` on PATH answers
-# `gh api user` through the script's own --jq filter, and each case writes to
-# an isolated global git config, so the host's identity is never read or
-# touched. Only author.* may be set: committer.* and user.* stay unset so the
-# committer's SSH signature keeps verifying. The fleet list points at a
-# missing file so the plugin stage ends before any `claude` call.
 author_tmp="$(mktemp -d "$TEST_TMPDIR/author_tmp.XXXXXX")"
 mkdir -p "$author_tmp/bin" "$author_tmp/repo"
 cat >"$author_tmp/bin/gh" <<'STUB'
@@ -239,8 +173,6 @@ STUB
 chmod +x "$author_tmp/bin/gh"
 git init -q "$author_tmp/repo"
 author_case() {
-  # author_case <label> <remote> <gh user json, empty = gh fails> [stale]
-  # A fourth argument seeds a stale author from an earlier run first.
   local cfg="$author_tmp/$1.gitconfig"
   if [[ -n "${4:-}" ]]; then
     GIT_CONFIG_GLOBAL="$cfg" git config --global author.name 'Stale Author'
@@ -268,7 +200,6 @@ assert_eq 'a non-remote session sets nothing' '' \
   "$(author_case local false '{"login":"octo","id":42,"name":"Octo Cat"}')"
 rm -rf "$author_tmp"
 
-# README/script drift guards.
 assert_contains 'README documents the materialized path' \
   "$(cat "$readme")" '.claude/cloud-bootstrap.sh'
 assert_contains 'README documents the enrich seam filename' \

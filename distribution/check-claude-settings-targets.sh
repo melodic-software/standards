@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Assert every per-target Claude settings file carries the shared base
-# marketplace and SessionStart bootstrap hook. enabledPlugins may diverge.
-# Apply never merges; this is authoring-time conformance only.
-#
-# Usage:
-#   distribution/check-claude-settings-targets.sh
-#     Check every settings.json under components/claude-settings/targets/.
-#   distribution/check-claude-settings-targets.sh --file <settings.json>
-#     Check one candidate against the committed base (also what the test uses).
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -29,14 +20,6 @@ jq empty "$base" >/dev/null 2>&1 || {
   exit 2
 }
 
-# check_one <file> <label>
-# Always returns 0 so callers under set -e need no condition context
-# (.shellcheckrc's SC2310). Signals through CHECK_RC: 0 conform, 1 missing
-# shared keys, 2 unparsable JSON.
-# One jq pass on the success path parses the candidate and checks the shared
-# keys. A failing pass falls back to `jq empty` so a parse error (exit 2)
-# stays distinct from a false policy result (exit 1), including valid JSON
-# that is not an object (jq -e then exits 5, the same code as a parse error).
 CHECK_RC=0
 check_one() {
   local cand="$1" label="$2"
