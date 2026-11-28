@@ -1,43 +1,14 @@
 name: PR Review
 
-# Automated PR code review via the ci-workflows pr-review-cli reusable workflow
-# (lane `code`). The caller owns the triggers + GITHUB_TOKEN permission grant
-# (a called workflow can only downgrade them, never elevate); the reusable
-# workflow owns the launcher, the credential order (reviews API key, then
-# subscription token, then central fallback), and the secret-handling model.
-#
-# Repo-local rather than the sync-managed `claude-review-hosted-caller`
-# component (melodic-software/standards,
-# components/claude-lanes-hosted/claude-review.yml): this repository is the
-# manifest SOURCE, not a sync target. It tracks that component except where a
-# documented choice differs (this caller passes no `allowed-bot-sender-ids`).
-#
-# The reusable runs on GitHub-hosted `ubuntu-24.04` (this repository is
-# PUBLIC) and skips drafts, fork PRs (they receive no secrets and a read-only
-# token), Dependabot, and every `[bot]` actor, so none of them is reviewed by
-# design.
-
 on:
   pull_request:
-    # `synchronize` reviews every push, including the push that resolves a
-    # merge conflict, matching components/claude-lanes-hosted/claude-review.yml:
-    # GitHub runs no pull_request workflow while a PR conflicts with its base.
-    #
-    # Re-running the job does NOT review a newer head: a re-run replays the
-    # ORIGINAL event payload. Push, reopen, or mark the PR draft and ready
-    # again.
+    # `synchronize` covers the conflict-resolving push: no pull_request run fires while a PR conflicts:
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
     types: [opened, synchronize, ready_for_review, reopened]
 
 permissions:
   contents: read
 
-# Per-PR supersede group: a newer event for the same PR cancels the older run,
-# so a rapid open→ready→reopen burst spends one review, not several.
-#
-# The `${{ github.workflow }}`-prefixed canonical group is what this
-# repository's own `concurrency-policy` component requires
-# (`.github/workflows/pr-require-checks.yml`, `Enforce concurrency policy on standards`),
-# and it is the form the component ships.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -45,8 +16,6 @@ concurrency:
 jobs:
   pr-review:
     name: PR Review
-    # A draft is work in progress and does not spend a review; the
-    # ready_for_review trigger above is what delivers one when it is ready.
     if: github.event.pull_request.draft == false
     permissions:
       actions: read          # check-key-credit reads its marker; Publish Review reads this workflow's runs
@@ -58,16 +27,7 @@ jobs:
     with:
       lane: code
       publish: comments
-      # People whose closing issues the review reads in full, by numeric user
-      # id: the `human` entries of components/trusted-actors/trusted-actors.json.
-      # trusted-actors.test.mjs fails when this value, or the one in either
-      # claude-review component, differs from them. Empty would replace every
-      # person's closing issue with a placeholder. allowed-bot-sender-ids would
-      # also mark issues its bots wrote as trusted closing-issue context; this
-      # caller passes none, so no bot's closing issue is read in full.
       allowed-author-ids: '153232337'
-    # Pass only the named secrets (least privilege) rather than `secrets:
-    # inherit`, which would forward every parent secret to the called workflow.
     secrets:
       CLAUDE_API_KEY: ${{ secrets.REVIEWS_CLAUDE_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.REVIEWS_CLAUDE_CODE_OAUTH_TOKEN }}

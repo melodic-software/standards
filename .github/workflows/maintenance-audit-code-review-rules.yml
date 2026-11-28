@@ -1,18 +1,8 @@
 name: Maintenance Audit Code Review Rules
 
-# Flags a repository whose root AGENTS.md lacks the `## Code Review Rules`
-# section that components/code-review-rules/README.md defines, so a new
-# repository is caught without anyone remembering to add it. Same shape as
-# lychee-private-inventory: the workflow token reads the org's public
-# repositories, and a read-only standards-sync App token reads the private
-# repositories in that App's installation (every private sync target). A
-# private repository outside the installation is visible to neither token.
-# Both listings skip a `sandbox`-topic test bed (code-review-rules.sh names).
-# Drift fails the run; it opens no issue.
 on:
   workflow_dispatch:
   schedule:
-    # Off-minute daily poll, clear of maintenance-sync-standards.yml's `17 6 * * 1`.
     - cron: "47 15 * * *"
 
 permissions:
@@ -27,15 +17,12 @@ jobs:
     name: Audit
     permissions:
       contents: read
-    # The App key lives only in the standards-sync environment, whose branch
-    # policy admits main; schedule and dispatch run there. No deployment record.
     environment:
       name: standards-sync
       deployment: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # A boolean, never the credential.
       HAS_APP_CREDENTIAL: >-
         ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID != ''
             && secrets.STANDARDS_SYNC_APP_PRIVATE_KEY != '' }}
@@ -52,9 +39,8 @@ jobs:
         with:
           client-id: ${{ secrets.STANDARDS_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.STANDARDS_SYNC_APP_PRIVATE_KEY }}
-          # `owner` without `repositories` scopes the token to every repository
-          # in the installation, which is the set being checked. It can read
-          # names, visibility and file contents, and write nothing.
+          # `owner` without `repositories` scopes the token to every repository in the
+          # installation: https://github.com/actions/create-github-app-token#owner
           owner: melodic-software # zizmor: ignore[github-app] whole-installation scope is the set being checked; the token is read-only
           permission-metadata: read
           permission-contents: read

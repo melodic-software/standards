@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests the lychee component: the good fixture's local links and anchors resolve
-# on disk, the bad fixture's broken references are flagged, JavaScript-rendered
-# fragments are remapped away, and an online run passes a 429, a 5xx or a
-# timeout while a 404 or 410 still fails it.
-# Skips cleanly when the engine or the fixture server's runtime is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,36 +9,25 @@ config='lychee.toml'
 
 command -v lychee >/dev/null 2>&1 || skip_suite 'lychee not installed'
 command -v python3 >/dev/null 2>&1 || skip_suite 'python3 not installed (serves the status-code HTTP fixture)'
-# The include_fragments = "full" config key requires a recent lychee.
 require_min_version lychee "$(lychee --version | awk '{ print $2 }')" 0.24.2
 
 path_fixture_root="$(mktemp -d)"
 http_fixture_root="$(mktemp -d)"
-# Without errexit a failed mktemp leaves the variable empty, and every scratch
-# path built from it would then resolve against the filesystem root.
 if [[ -z "$path_fixture_root" || -z "$http_fixture_root" ]]; then
   printf 'ERROR: could not create scratch fixture directories\n' >&2
   exit 1
 fi
-# Armed before the fixture server launches, so an abort in between still reaps
-# both scratch trees; the PID stays empty until there is a process to kill.
 http_server_pid=''
 cleanup() {
   if [[ -n "$http_server_pid" ]]; then
     kill "$http_server_pid" 2>/dev/null
-    # Reap before removing the tree: kill only requests termination, and a
-    # still-running child would otherwise outlive the script as an orphan.
     wait "$http_server_pid" 2>/dev/null
   fi
   rm -rf "$path_fixture_root" "$http_fixture_root"
 }
 trap cleanup EXIT
-# A canceled CI job signals rather than exits, and bash does not run an EXIT
-# trap for a signal it has no handler for; converting each to an exit keeps
-# cleanup on one path instead of duplicating it per signal.
 trap 'exit 130' INT
 trap 'exit 143' TERM
-# Each case is <directory>:<boundary tag>; the tag names the link it holds.
 boundary_cases=(
   components/lychee/fixtures:intended
   components/lychee/fixtures-old:fixtures-old
@@ -77,9 +61,6 @@ assert_contains 'nested fixture lookalike remains checked' \
 assert_contains 'nested components prefix remains checked' \
   "$path_dump" 'https://www.rfc-editor.org/rfc/rfc3986?boundary=nested-prefix'
 
-# Consumers pass a `**/*.md` glob, so only a glob input exercises `hidden` and
-# the `.work/` and `.claude/worktrees/` path excludes; explicit file paths
-# bypass both. One link per location names where it came from.
 dot_root="$path_fixture_root/dot-directories"
 mkdir -p "$dot_root/.github" "$dot_root/.work" "$dot_root/nested/.work" \
   "$dot_root/.claude/worktrees/lane" "$dot_root/.claude/rules" "$dot_root/.workshop"
@@ -96,24 +77,15 @@ assert_contains '.work lookalike directory stays checked' "$glob_dump" 'dot=.wor
 assert_not_contains 'root .work/ is excluded' "$glob_dump" 'dot=.work>'
 assert_row_count 'no .work/ link at any depth is checked' "$glob_dump" 0 'dot=(nested/)?\.work$'
 assert_not_contains '.claude/worktrees/ is excluded' "$glob_dump" 'dot=.claude/worktrees'
-# Control: the same glob without `hidden` skips the dot-directories, so the
-# .github/ assertion above passes because of the config key.
 unhidden_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" --hidden=false \
   './**/*.md' 2>&1)"
 assert_not_contains 'without hidden the glob skips .github/' "$unhidden_dump" 'dot=.github'
 
-# Layering, the contract in components/lychee/README.md: a repository's own
-# lychee.toml is a second --config after this one. Its arrays add to these
-# (extension), its scalars replace these (partial override), and a file read
-# alone drops these entirely (complete override). .lycheeignore adds in every
-# mode.
 layer_root="$path_fixture_root/layers"
 mkdir -p "$layer_root"
 printf "exclude = ['dot=\\\\.workshop']\n" >"$layer_root/extend.toml"
 printf 'hidden = false\n' >"$layer_root/partial.toml"
 printf 'hidden = true\n' >"$layer_root/complete.toml"
-# A link only a standards `exclude` entry matches, so a layered `exclude` that
-# replaced the standards list instead of adding to it would let it through.
 printf '<https://bsky.app/profile/layer-probe>\n' >"$dot_root/Bsky.md"
 extend_dump="$(cd "$dot_root" && lychee --dump --config "$root/$config" \
   --config "$layer_root/extend.toml" --exclude 'dot=\.claude/rules' './**/*.md' 2>&1)"
@@ -140,13 +112,6 @@ rm -f -- "$dot_root/.lycheeignore"
 assert_not_contains '.lycheeignore adds to layered configs' "$ignore_dump" 'dot=.claude/rules'
 assert_contains '.lycheeignore leaves other links checked' "$ignore_dump" 'dot=.github'
 
-# The private-repo inventory is derived, not copied: the two entries must be
-# byte-identical to what private-repo-inventory.sh renders for the set it reads
-# back from the file (sorted, unique, both hosts carrying the same set). Whether
-# that set matches actual repository visibility is the inventory check's job
-# (the `check` step in the same CI lane and the scheduled workflow), so no
-# repository name is hard-coded here — the earlier copy of the list in this
-# test was exactly the drift the script exists to remove.
 inventory_script="$root/components/lychee/private-repo-inventory.sh"
 inventory_list="$(bash "$inventory_script" list --config "$config")"
 assert_nonzero 'private-repo inventory is non-empty' "${#inventory_list}"
@@ -169,8 +134,6 @@ rc=$?
 assert_exit 'URL exclusion boundary dump needs no network and exits 0' 0 "$rc"
 exclusions_fixture="$(<components/lychee/fixtures/good/Exclusions.md)"
 for repo in $inventory_list; do
-  # The fixture must actually cite each inventoried repo, or the exclusion
-  # assertion below would pass on an absent link rather than an excluded one.
   assert_contains "exclusions fixture cites melodic-software/$repo" \
     "$exclusions_fixture" "<https://github.com/melodic-software/$repo>"
   assert_not_contains "private inventory excludes melodic-software/$repo" \
@@ -182,8 +145,6 @@ for repo in claude-code-plugins standards; do
 done
 assert_not_contains 'private raw-content URL is excluded' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/dotfiles/'
-# medley-archive is a superstring of medley: proves the longer name is matched
-# on its own and not shadowed by the shorter alternation arm.
 assert_not_contains 'private raw-content URL is excluded for a prefixed name' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/medley-archive/'
 assert_contains 'public raw-content URL stays checked' \
@@ -204,21 +165,14 @@ assert_not_contains 'current ACM DL paper is excluded' "$dump_out" \
   'https://dl.acm.org/doi/10.1145/3611643.3613871'
 assert_not_contains 'current ACM Queue article is excluded' "$dump_out" \
   'https://queue.acm.org/detail.cfm?id=3454124'
-# Row count, not a substring absence: the excluded URL is the host ROOT, so
-# every sibling path that must stay checked contains it as a prefix and would
-# satisfy assert_not_contains only by deleting the sibling control. A
-# line-anchored count asserts the root itself is gone while the sibling below
-# proves the rest of the host is still checked.
 assert_row_count 'current Genius API docs root is excluded' "$dump_out" 0 \
   '^https://docs\.genius\.com/?$'
-# Row count: the profile URL is a prefix of the status URL that stays checked.
 assert_row_count 'x.com profile is excluded' "$dump_out" 0 '^https://x\.com/ExampleHandle/?$'
 assert_not_contains 'x.com article is excluded' "$dump_out" \
   'https://x.com/ExampleHandle/article/1'
 assert_not_contains 'x.com i/ article is excluded' "$dump_out" 'https://x.com/i/article/1'
 assert_not_contains 'GitHub REST API endpoint is excluded' "$dump_out" \
   'https://api.github.com/repos/melodic-software/standards'
-# Each URL below passed a GitHub-runner retest, so its exclude was dropped.
 for checked in \
   'https://isdown.app/status/anthropic' \
   'https://www.w3.org/International/wiki/WorkingWithTimeZones' \
@@ -254,9 +208,6 @@ assert_contains 'stale personal-owner URL remains checked' \
 assert_contains 'public raw-content sibling remains checked' \
   "$dump_out" 'https://raw.githubusercontent.com/melodic-software/ci-runner/'
 
-# Expected rows are the fixture URLs with the fragment cut by hand, as the
-# remap rule in components/lychee/README.md states; the second group proves each rule is
-# scoped and does not strip every fragment on its host.
 remap_dump="$(lychee --dump --config "$config" components/lychee/fixtures/good/Remap.md 2>&1)"
 rc=$?
 assert_exit 'remap dump needs no network and exits 0' 0 "$rc"
@@ -292,12 +243,6 @@ assert_exit 'bad fixture exits 2' 2 "$rc"
 assert_contains 'bad fixture flags the missing fragment' "$out" 'Cannot find fragment'
 assert_contains 'bad fixture flags the missing file' "$out" 'does-not-exist.md'
 
-# Status handling only takes effect against a real response, so nothing above can
-# reach it. A local server answers the status code named by the path's last
-# segment (`hang` sleeps past the client timeout) and records every request
-# path. The expected outcomes are the rule components/lychee/README.md states: a
-# 429, a 5xx or a timeout passes the run, a 404 or 410 fails it, and a 200 still
-# passes because the default 2xx range is restated.
 python3 - "$http_fixture_root/port" "$http_fixture_root/hits" \
   <<'PY' >/dev/null 2>"$http_fixture_root/server.err" &
 import socketserver
@@ -346,17 +291,9 @@ if [[ -s "$http_fixture_root/port" ]]; then
 fi
 
 if [[ -z "$http_port" ]]; then
-  # A silent skip would let the status-code contract go unexercised while the
-  # suite reports green, so an unbindable server is a harness defect, not an
-  # environmental skip. The captured stderr carries the only account of why the
-  # bind never happened.
   fail 'status-code fixture server reports its bound port' \
     "no port after 5s; server stderr: $(cat "$http_fixture_root/server.err" 2>/dev/null)"
 else
-  # The config excludes loopback, so the fixture URL needs --include to be
-  # checked at all; that keeps the production exclusion intact. The pattern is a
-  # bare token because MSYS/git-bash rewrites backslashes inside an argument
-  # containing `://`, which would silently mangle an anchored URL regex.
   status_probe='lychee-status-probe'
   for code in 200 429 500 503 599 404 410 hang; do
     printf '<http://127.0.0.1:%s/%s/%s>\n' "$http_port" "$status_probe" "$code" \
@@ -368,19 +305,14 @@ else
   assert_contains 'status fixture URL is checked, not silently excluded' \
     "$status_dump" "http://127.0.0.1:$http_port/$status_probe/429"
 
-  # probe <lychee args...> — a real run against the fixture server, stderr merged.
   probe() { lychee --no-progress --config "$config" --include "$status_probe" "$@" 2>&1; }
 
-  # Exit 0 alone is also what checking nothing looks like; the OK count proves a
-  # request was made and its status was accepted.
   for code in 200 429 500 503 599; do
     status_out="$(probe "$http_fixture_root/Status$code.md")"
     rc=$?
     assert_exit "$code passes the run" 0 "$rc"
     assert_contains "$code is counted as a checked OK link" "$status_out" '1 OK'
   done
-  # The cost components/lychee/README.md names: an accepted 429 is final on the first
-  # reply, so lychee does not retry it.
   assert_row_count 'accepted 429 is requested once, not retried' \
     "$(<"$http_fixture_root/hits")" 1 "/$status_probe/429\$"
 
@@ -388,20 +320,14 @@ else
     status_out="$(probe "$http_fixture_root/Status$code.md")"
     rc=$?
     assert_nonzero "dead link $code fails the run" "$rc"
-    # An unreachable server also exits non-zero; naming the status keeps the
-    # case from passing for the wrong reason.
     assert_contains "dead link $code fails on the status code itself" \
       "$status_out" "Rejected status code: $code"
   done
 
-  # A short timeout and no retries keep the case fast; the timeout is still
-  # reported, it just does not fail the run.
   status_out="$(probe --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md")"
   rc=$?
   assert_exit 'timeout passes the run' 0 "$rc"
   assert_contains 'timeout is still reported' "$status_out" '1 Timeouts'
-  # Control: the same request without accept_timeouts fails, so the pass above
-  # comes from the config key.
   probe --accept-timeouts=false --timeout 1 --max-retries 0 "$http_fixture_root/Statushang.md" >/dev/null
   rc=$?
   assert_nonzero 'without accept_timeouts a timeout fails the run' "$rc"

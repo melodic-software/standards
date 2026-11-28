@@ -1,12 +1,5 @@
 version: 2
 updates:
-  # First-party `melodic-software/*` refs track `@main`, vendor actions
-  # (`actions/*`, `github/*`, `anthropics/*`) use major tags, and other
-  # third-party actions stay hash-pinned and move by Dependabot. Merge lanes per
-  # components/dependabot-policy: the vendor-actions group (non-major only) may
-  # auto-merge once CI Status passes; every other PR is reviewed by hand.
-  # Delay version bumps so a compromised or yanked release is caught before we
-  # adopt it; security updates bypass cooldown.
   - package-ecosystem: github-actions
     directory: /
     labels: ["dependencies"]
@@ -15,21 +8,18 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    # Vendor bumps get their own PR so a community bump never blocks the
-    # auto-merge lane; a dependency joins the first group that matches it.
+    # A dependency joins the first group it matches, so majors fall through to `github-actions`:
+    # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
     groups:
       vendor-actions:
         patterns:
           - "actions/*"
           - "github/*"
           - "anthropics/*"
-        # Majors fall through to the reviewed group below.
         update-types: ["minor", "patch"]
       github-actions:
         patterns:
           - "*"
-  # Keep the npm dev-dependencies current — the root devDependency pins
-  # (linters, parsers, and the lefthook hooks runner).
   - package-ecosystem: npm
     directory: /
     labels: ["dependencies"]
@@ -38,16 +28,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    # Batch minor and patch bumps into one PR; majors stay individual so
-    # breaking changes get their own review.
     groups:
       npm-minor-patch:
         update-types:
           - "minor"
           - "patch"
-  # The runner policy has its own runtime lockfile, so it is a separate npm
-  # dependency root. Consumers run it from a checkout of this repository, so
-  # this entry is its only version-update coverage.
   - package-ecosystem: npm
     directory: /components/runner-policy
     labels: ["dependencies"]
@@ -61,10 +46,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # The concurrency policy analyzer is distributed with its own runtime
-  # lockfile, so it is a separate npm dependency root. Keep this entry in sync
-  # with that component; every downstream materialization must add the
-  # equivalent destination path.
   - package-ecosystem: npm
     directory: /components/concurrency-policy
     labels: ["dependencies"]
@@ -78,8 +59,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # The naming-lint analyzer carries its own runtime lockfile, so it is a
-  # separate npm dependency root.
   - package-ecosystem: npm
     directory: /components/github-actions-conventions
     labels: ["dependencies"]
@@ -93,10 +72,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # The pr-convention policy analyzer is distributed with its own runtime
-  # lockfile, so it is a separate npm dependency root. Keep this entry in sync
-  # with that component; every downstream materialization must add the
-  # equivalent destination path.
   - package-ecosystem: npm
     directory: /components/pr-convention-policy
     labels: ["dependencies"]
@@ -110,10 +85,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # The dependabot policy analyzer is distributed with its own runtime
-  # lockfile, so it is a separate npm dependency root. Keep this entry in sync
-  # with that component; every downstream materialization must add the
-  # equivalent destination path.
   - package-ecosystem: npm
     directory: /components/dependabot-policy
     labels: ["dependencies"]
@@ -127,7 +98,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  # Distribution validation is an independent runtime dependency root.
   - package-ecosystem: npm
     directory: /distribution
     labels: ["dependencies"]

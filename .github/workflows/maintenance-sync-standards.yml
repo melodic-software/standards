@@ -1,9 +1,5 @@
 name: Maintenance Sync Standards
 
-# Exact-file distribution: standards owns desired bytes and ci-workflows owns
-# GitHub orchestration. Every real run opens or refreshes one reviewed PR per
-# target; it never writes directly to a target's default branch. Public repo:
-# runs on the reusable's hosted default runner.
 on:
   push:
     branches: [main]
@@ -20,21 +16,14 @@ on:
         type: string
         default: ''
   schedule:
-    # Off-minute weekly reconciliation catches interrupted or missed cascades.
     - cron: "17 6 * * 1"
 
 permissions:
   contents: read
 
 jobs:
-  # A burst of merges would otherwise start one full sync (and refresh every
-  # target PR, re-running its CI) per push. Each push waits a window first, one
-  # wait at a time: GitHub keeps one pending run per group and a newer push
-  # replaces it, so a burst yields about one sync per window. A wait is never
-  # cancelled, so a steady stream of merges cannot postpone syncing
-  # indefinitely. Schedule and dispatch skip the wait.
-  # Tune the window with the STANDARDS_SYNC_SETTLE_SECONDS repo variable
-  # (integer seconds, 0-3600; default 600).
+  # A group holds one pending run and a newer push replaces it, so a burst yields one sync:
+  # https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
   collect-merge-burst:
     name: Collect Merge Burst
     if: ${{ github.event_name == 'push' }}
@@ -59,15 +48,11 @@ jobs:
     name: Maintenance Sync Standards
     needs: collect-merge-burst
     if: ${{ !cancelled() && (needs.collect-merge-burst.result == 'success' || needs.collect-merge-burst.result == 'skipped') }}
-    # Real runs attest App access for the complete unfiltered manifest before
-    # mutation; `targets` limits reconciliation only, never attestation.
     uses: melodic-software/ci-workflows/.github/workflows/maintenance-sync-standards.yml@main
     with:
       runner: ubuntu-24.04
-      # Schedule and push run for real (inputs is empty on those events, so
-      # `|| false` makes them real runs); manual dispatch keeps its dry-run
-      # preview default. Do NOT flip to `== 'schedule'` — that inverts it and
-      # the weekly cascade would silently never fire.
+      # `inputs` is unavailable on push and schedule, so `|| false` makes those real runs:
+      # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#inputs-context
       dry-run: ${{ inputs.dry-run || false }}
       targets: ${{ inputs.targets || '' }}
     secrets:

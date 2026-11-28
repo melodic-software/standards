@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Tests private-repo-inventory.sh offline: every visibility fact comes from a
-# fixture file, so no test needs a GitHub credential or the network.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -16,7 +14,6 @@ trap 'rm -rf "$work"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# write_config <path> <github-alternation> <raw-alternation>
 write_config() {
   cat >"$1" <<EOF
 include_fragments = "full"
@@ -45,7 +42,6 @@ out="$(bash "$script" check --config "$config" --public-list "$work/public.txt" 
 assert_exit 'check passes on the public half alone' 0 $?
 assert_contains 'public-only check names the entries it could not verify' "$out" 'not verifiable'
 
-# --- check: a private repo missing from the inventory (the #212 / #483 class)
 printf '%s\n' alpha beta gamma delta >"$work/private-plus.txt"
 out="$(bash "$script" check --config "$config" --public-list "$work/public.txt" --private-list "$work/private-plus.txt" 2>&1)"
 assert_exit 'check fails when a private repo is missing' 1 $?

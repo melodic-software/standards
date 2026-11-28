@@ -1,21 +1,7 @@
-# Standards-specific adapter. Each hygiene tool runs once per commit, from a
-# remote, reading this repository's own root configs:
-# - the melodic-software/claude-code-plugins aggregate remote runs typos,
-#   markdownlint-cli2, ShellCheck, actionlint, Ruff, Biome and the guardrails
-#   checks;
-# - this repository's own remote (components/lefthook-base/lefthook-remote.yml,
-#   fetched from main) runs Gitleaks and EditorConfig-checker. Its scripts act
-#   only from the fetched copy, so it is listed as a remote, not extended.
-# The component fragments (components/lefthook-*/lefthook.yml) are proven by
-# their contract tests, not extended here. This root also owns the
-# catalog-only fixture exclusions and the two source-slice adapters below.
-#
-# Settings live here because remote configs declare none. Override anything for
-# one machine via a gitignored lefthook-local.yml.
 min_version: "2.0.5"
 assert_lefthook_installed: true
-# doublestar so a `**/*.ext` glob matches files at the repo root and at any depth
-# alike (the default matcher requires `**` to consume at least one directory).
+# The default matcher's `**/*.ext` misses repo-root files; doublestar matches them:
+# https://lefthook.dev/configuration/glob_matcher/
 glob_matcher: doublestar
 
 remotes:
@@ -32,13 +18,9 @@ remotes:
 
 pre-commit:
   parallel: true
-  # Intentionally non-conforming fixtures are exercised by component contract
-  # tests, not by the ordinary staged-file lanes.
   exclude:
     - "components/*/fixtures/bad/**"
   commands:
-    # These two catalog-local adapters use source-slice paths. Consumers adopt
-    # the reusable fragments at their managed destinations instead.
     psscriptanalyzer:
       glob: "**/*.{ps1,psm1,psd1}"
       run: >-
