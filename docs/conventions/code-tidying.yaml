@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/melodic-software/claude-code-plugins/main/plugins/code-tidying/schemas/code-tidying.schema.json
+comment_posture: necessary
+comment_lint: block
+comment_lint_allow:
+  -'^(#|//)[[:space:]]*cant-fail-ok:[[:space:]]*[^[:space:]]'
