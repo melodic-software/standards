@@ -1592,20 +1592,6 @@ jobs:
 
 test("a local-routing grant admits exact named secrets and credential-minting actions", async () => {
   for (const ref of [SHA, "v3"]) {
-    const actionsLock =
-      ref === "v3"
-        ? `version: 'v0.0.3'
-workflows:
-  '.github/workflows/deploy.yml':
-    - 'actions/create-github-app-token@v3'
-dependencies:
-  'actions/create-github-app-token@v3':
-    ref: 'v3'
-    commit: 'sha1-${SHA}'
-    owner_id: 44036562
-    repo_id: 622677611
-`
-        : undefined;
     const root = await repository({
       localRoutingGrants: {
         ".github/workflows/deploy.yml#apply": {
@@ -1636,7 +1622,6 @@ jobs:
           GH_TOKEN: \${{ steps.app-token.outputs.token }}
 `,
       },
-      actionsLock,
     });
     assert.deepEqual(await audit(root), [], ref);
   }
@@ -7349,7 +7334,7 @@ jobs:
   );
 });
 
-test("non-SHA credentialActions grants require a matching full-SHA entry in .github/workflows/actions.lock", async () => {
+test("when .github/workflows/actions.lock is present, non-SHA credentialActions grants require a matching full-SHA lock entry", async () => {
   const workflowSource = `permissions: read-all
 jobs:
   apply:
@@ -7372,11 +7357,38 @@ jobs:
     },
   };
 
+  const withoutLock = await repository({
+    localRoutingGrants: grant,
+    workflows: { "bump.yml": workflowSource },
+  });
+  assert.deepEqual(
+    await audit(withoutLock),
+    [],
+    "absent actions.lock preserves existing tag-grant behavior before lockfile onboarding",
+  );
+
+  const validLock = await repository({
+    localRoutingGrants: grant,
+    workflows: { "bump.yml": workflowSource },
+    actionsLock: `version: 'v0.0.3'
+workflows:
+  '.github/workflows/bump.yml':
+    - 'actions/create-github-app-token@v3'
+dependencies:
+  'actions/create-github-app-token@v3':
+    ref: 'v3'
+    commit: 'sha1-${SHA}'
+    owner_id: 44036562
+    repo_id: 622677611
+`,
+  });
+  assert.deepEqual(
+    await audit(validLock),
+    [],
+    "matching full-SHA actions.lock entry admits tag-pinned credential action",
+  );
+
   for (const scenario of [
-    {
-      label: "missing actions.lock fails closed",
-      actionsLock: undefined,
-    },
     {
       label: "actions.lock omitting the workflow fails closed",
       actionsLock: `version: 'v0.0.3'

@@ -17,9 +17,10 @@ fixtures='components/zizmor/fixtures'
 if ! command -v zizmor >/dev/null 2>&1; then
   skip_suite 'zizmor not installed'
 fi
-# Discovery from the repository root for any input inside it holds from 1.29.0.
+# Discovery from the repository root holds from 1.29.0; actions.lock and
+# parallel: step support hold from 1.33.1.
 version_output="$(zizmor --version)"
-require_min_version zizmor "${version_output##* }" 1.29.0
+require_min_version zizmor "${version_output##* }" 1.33.1
 
 # zizmor discovers .github/zizmor.yml from the Git root, so the fixtures run
 # inside a scratch repo mirroring a consumer checkout.
@@ -40,17 +41,25 @@ for input in . .github .github/workflows; do
   assert_not_contains "no unpinned-uses finding (input $input)" "$out" 'unpinned-uses'
 done
 
-cat <<'EOF' >"$project/.github/workflows/locked-parallel.yml"
-name: locked-parallel
+cp "$fixtures/bad/third-party-tag.yml" "$project/.github/workflows/"
+out="$(audit .)"
+rc=$?
+assert_nonzero 'a third-party tag still fails with the config' "$rc"
+assert_contains 'the third-party tag is rejected' "$out" 'third-party-tag.yml:'
+assert_not_contains 'first-party refs stay admitted' "$out" 'first-party-float.yml:'
+assert_not_contains 'vendor refs stay admitted' "$out" 'vendor-float.yml:'
+
+# Locking the same third-party tag in actions.lock clears the unpinned-uses
+# finding that just failed above, proving zizmor actually reads actions.lock;
+# a parallel: step block also audits clean under the shipped config.
+cat <<'EOF' >"$project/.github/workflows/parallel-steps.yml"
+name: parallel-steps
 on: push
 permissions: {}
 jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
       - parallel:
           - name: First check
             run: exit 0
@@ -60,28 +69,20 @@ EOF
 cat <<'EOF' >"$project/.github/workflows/actions.lock"
 version: 'v0.0.3'
 workflows:
-  '.github/workflows/locked-parallel.yml':
-    - 'actions/checkout@v7'
+  '.github/workflows/third-party-tag.yml':
+    - 'docker/setup-buildx-action@v3'
 dependencies:
-  'actions/checkout@v7':
-    ref: 'v7'
-    commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
-    owner_id: 44036562
-    repo_id: 197814629
+  'docker/setup-buildx-action@v3':
+    ref: 'v3'
+    commit: 'sha1-0123456789abcdef0123456789abcdef01234567'
+    owner_id: 5429470
+    repo_id: 295610011
 EOF
 out="$(audit .)"
 rc=$?
-assert_exit 'workflow with actions.lock and parallel steps audits clean with the config' 0 "$rc"
-assert_not_contains 'no unpinned-uses finding on locked parallel workflow' "$out" 'unpinned-uses'
-rm "$project/.github/workflows/locked-parallel.yml" "$project/.github/workflows/actions.lock"
-
-cp "$fixtures/bad/third-party-tag.yml" "$project/.github/workflows/"
-out="$(audit .)"
-rc=$?
-assert_nonzero 'a third-party tag still fails with the config' "$rc"
-assert_contains 'the third-party tag is rejected' "$out" 'third-party-tag.yml:'
-assert_not_contains 'first-party refs stay admitted' "$out" 'first-party-float.yml:'
-assert_not_contains 'vendor refs stay admitted' "$out" 'vendor-float.yml:'
+assert_exit 'third-party tag locked in actions.lock and parallel steps audit clean' 0 "$rc"
+assert_not_contains 'actions.lock clears unpinned-uses for the third-party tag' "$out" 'unpinned-uses'
+rm "$project/.github/workflows/parallel-steps.yml" "$project/.github/workflows/actions.lock"
 
 # Control: without the config zizmor's default hash-pins every ref and wants a
 # 7-day cooldown. When this fails, the default changed; recheck the policy.

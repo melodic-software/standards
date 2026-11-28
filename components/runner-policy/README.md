@@ -500,12 +500,16 @@ require hosted execution. A grant is keyed by
   vendor refs run unpinned (architecture owner-decisions L351). The step must
   name the granted ref exactly; any other ref of the same action stays
   privileged-hosted, and actions outside the central list cannot be granted.
-  When the granted ref is not a full 40-hex SHA, `.github/workflows/actions.lock`
-  must also be present as a regular file and lock that exact workflow and action
-  reference to a full commit SHA (`sha1-<40-hex>` or `sha256-<64-hex>`) with a
-  matching `ref` field; otherwise the job stays privileged-hosted. That binds
-  tag-pinned credential actions to reviewed full-SHA lock entries that
-  Dependabot updates in place without churning `.github/runner-policy.json`.
+  When `.github/workflows/actions.lock` is present and the granted ref is not a
+  full 40-hex SHA, `.github/workflows/actions.lock` must be a regular file and
+  lock that exact workflow and action reference to a full commit SHA
+  (`sha1-<40-hex>` or `sha256-<64-hex>`) with a matching `ref` field; otherwise
+  the job stays privileged-hosted. While `.github/workflows/actions.lock` is
+  absent (before a repository onboards the lockfile), existing tag-grant
+  behavior is preserved so consumers can onboard incrementally without breaking
+  CI. Once onboarded, tag-pinned credential actions stay bound to reviewed
+  full-SHA lock entries that Dependabot updates in place without churning
+  `.github/runner-policy.json`.
 
 A grant applies only while the job genuinely routes to the managed fleet, that
 is while it names the fleet

@@ -1765,7 +1765,11 @@ function privilegedHostedRequirement(
     }
     const separator = uses.lastIndexOf("@");
     const refPart = separator === -1 ? "" : uses.slice(separator + 1);
-    if (!FULL_SHA.test(refPart) && !isActionLockedInWorkflow(actionsLock, file, uses)) {
+    if (
+      !FULL_SHA.test(refPart) &&
+      actionsLock?.present &&
+      !isActionLockedInWorkflow(actionsLock, file, uses)
+    ) {
       return privilegedControlPlane(
         `credential-minting action ${reference} without a matching full-SHA entry in ${ACTIONS_LOCK_PATH}`,
       );
