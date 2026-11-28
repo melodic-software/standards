@@ -1,9 +1,3 @@
-# Repository-wide text checks in this repository. Contract and schema:
-# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
-# Lint-only: /toolchain:lint runs it, /toolchain:check does not. Each tool reads
-# its root config; the intentionally bad fixtures are excluded the way CI's
-# check-repo-hygiene and check-markdown-and-links jobs exclude them. Every check
-# runs and any failure fails the command. Commands run from the repository root.
 globs: ["**"]
 build-cmd: null
 test-cmd: null

@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Prove the engine's control-character class is exactly POSIX [[:cntrl:]] —
-// C0 plus DEL, bytes 0-31 and 127 — over the same fixture the retired
-// Bash/grep equivalence proof consumed. The class below is constructed the
-// same way sync-manifest.mjs pins it (from character codes, never a Unicode
-// Cc class, which would also match C1 and silently widen the contract).
-// Unlike the shell proof, no NUL or LF carve-outs are needed: a JS string
-// embeds every byte, so the class is asserted uniformly for all 256.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";

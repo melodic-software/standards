@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Tests check-claude-settings-targets.sh: the committed github-iac target
-# conforms, a candidate missing the marketplace or bootstrap hook fails, and
-# an unparsable file is a loud usage error.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -50,10 +47,6 @@ out="$(bash "$script" --file "$tmp/good.json")"
 rc=$?
 assert_exit 'fixture with marketplace and bootstrap hook exits 0' 0 "$rc"
 
-# Spawn census: --file used to run jq empty on the base, jq empty on the
-# candidate, then jq -e for the policy. The success path is now one policy
-# pass plus the base parse check; jq empty on the candidate runs only when
-# the policy pass fails.
 mkdir -p "$tmp/jq-bin" "$tmp/jq-count"
 cat >"$tmp/jq-bin/jq" <<'SH'
 #!/usr/bin/env bash
@@ -63,9 +56,8 @@ exec "$REAL_JQ" "$@"
 SH
 chmod +x "$tmp/jq-bin/jq"
 echo 0 >"$tmp/jq-count/jq"
-# Resolve the real jq on the caller's PATH before the shim dir is prepended:
-# `command -p` searches only the default system PATH and misses a jq a tool
-# manager (mise, Homebrew, ...) installed elsewhere.
+# Resolve jq before the shim dir is prepended; `command -p` would search only the standard-utility PATH.
+# https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
 real_jq="$(command -v jq)"
 if [[ -z "$real_jq" ]]; then
   fail 'real jq resolves for the spawn-census shim' 'jq not found on PATH'

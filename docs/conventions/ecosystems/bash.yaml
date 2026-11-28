@@ -1,8 +1,3 @@
-# Shell in this repository. Contract and schema:
-# https://github.com/melodic-software/claude-code-plugins/tree/main/docs/contracts/ecosystem-commands
-# shellcheck reads the root .shellcheckrc, as CI's check-shell job and the
-# claude-code-plugins bash-format hook run it. Commands run from the
-# repository root: the test suites name their sourced helpers relative to it.
 globs: ["*.sh", "*.bash"]
 build-cmd: null
 test-cmd: null

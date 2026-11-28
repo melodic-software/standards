@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# Contract tests for the schema-v2 validator/materializer.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
 source "$root/harness/shell/lib.sh"
-# SYNC_ENGINE_PATH selects the engine under test: default is the sync-manifest.sh
-# wrapper, which runs the Node engine; a run may point it at sync-manifest.mjs.
-# A relative value resolves against the repo root so the suite stays cwd-independent.
 if [[ -n "${SYNC_ENGINE_PATH:-}" ]]; then
   if [[ "$SYNC_ENGINE_PATH" == /* || "$SYNC_ENGINE_PATH" =~ ^[A-Za-z]: ]]; then
     engine="$SYNC_ENGINE_PATH"
@@ -23,9 +19,6 @@ trap 'rm -rf "$tmp_root"' EXIT
 command -v yq >/dev/null 2>&1 || skip_suite 'Mike Farah yq v4 is not installed'
 [[ "$(yq --version 2>/dev/null)" =~ version[[:space:]]+v?4\. ]] ||
   skip_suite 'Mike Farah yq v4 is required'
-# A missing install is a configuration error, not a skippable environment:
-# the Node deps are the production engine's own runtime, and skip_suite exits
-# 0 — a silent skip would turn this whole production gate into a false green.
 [[ -f "$root/distribution/node_modules/ajv/package.json" ]] || {
   echo 'ERROR: distribution dependencies are not installed (run npm ci --prefix distribution)' >&2
   exit 1
@@ -86,10 +79,6 @@ run_engine() {
   "$engine" "$@" --source-root "$source" --manifest manifest.yml
 }
 
-# Fixture-agreement contract (schema ∩ engine on fixtures).
-# validate-sync-manifest.mjs checks an overlapping structural subset of the
-# Bash engine's rules. Where both validators apply on a fixture manifest they
-# must agree; the engine alone gates distribution/sync-manifest.yml in CI.
 schema_rc_for_yaml() {
   local yaml="$1" stderr_file="${2:-/dev/null}"
   { printf '%s\n' "$yaml" | yq eval -o=json -I=0 '.' -; } |
@@ -158,8 +147,6 @@ assert_contains 'plan logs managed mapping' "$out" 'consumer.txt -> consumer.txt
 assert_contains 'plan identifies local ownership' "$out" 'locally-owned base (not modified)'
 assert_not_contains 'plan excludes unselected target' "$out" 'alpha/one'
 
-# Regression: target selection must not inherit the false status of the last
-# manifest target when that target is outside the filter.
 out="$(run_engine "$source_repo" matrix --targets alpha/one 2>&1)"
 rc=$?
 assert_exit 'filtered matrix succeeds when the last manifest target is omitted' 0 "$rc"
@@ -197,10 +184,6 @@ rc=$?
 assert_exit 'dest-paths unknown target is a successful no-op' 0 "$rc"
 assert_eq 'dest-paths unknown target emits no paths' '' "$out"
 
-# Full-output byte assertions for the renderers the sync PR bodies and logs
-# consume verbatim (Phase 6 dual-gate hardening: needle checks alone would let
-# an engine drift the arrow glyph, ordering, or field layout while staying
-# green).
 out="$(run_engine "$source_repo" mappings --target alpha/one 2>&1)"
 rc=$?
 assert_exit 'full mappings render succeeds' 0 "$rc"
@@ -265,8 +248,6 @@ else
   skip_case 'worktree executable-bit assertion requires a mode-preserving filesystem'
 fi
 
-# Destination checks are a complete preflight: a later unsafe destination must
-# stop the operation before an earlier valid mapping is copied.
 target_repo="$tmp_root/target-preflight"
 make_target "$target_repo"
 printf 'untracked collision\n' >"$target_repo/consumer.txt"
@@ -322,11 +303,6 @@ assert_nonzero 'target index inspection failure is rejected' "$rc"
 assert_contains 'index failure diagnostic is explicit' "$out" 'could not inspect Git index path'
 assert_file_absent 'index inspection failure writes no destination' "$target_repo/.policy"
 
-# The production workflows install yq for authoring-side checks only. Prove
-# the production engine path — the exec wrapper plus the Node engine and its
-# locked dependencies, relocated the way the reusables consume them — never
-# discovers or invokes yq (Phase 6 decision 6-D: the inversion of the retired
-# Bash-era no-Node control).
 runtime_bin="$tmp_root/node-only-bin"
 mkdir -p "$runtime_bin"
 cat >"$runtime_bin/yq" <<'SH'
@@ -376,10 +352,6 @@ done
 bad="${manifest/version: 2/version: 1}"
 invalid_case 'wrong version' "$bad" 'manifest version must be the integer 2'
 
-# An explicit core tag must win over the resolved value's shape: `!!float 2`
-# resolves to numeric 2 in both engines but is tagged !!float, not !!int.
-# The authoring schema sees only the converted JSON (an integer), hence
-# engine-only.
 bad="${manifest/version: 2/version: !!float 2}"
 invalid_case 'explicitly tagged float version' "$bad" \
   'manifest version must be the integer 2' engine-only
@@ -405,8 +377,6 @@ invalid_case 'unsafe traversal source' "$bad" 'unsafe source path' engine-only
 bad="${manifest/consumer.txt: consumer.txt/consumer.txt: .policy}"
 invalid_case 'destination ownership collision' "$bad" 'owned by both' engine-only
 
-# One canonical source MAY back multiple components (per-destination fan-out);
-# only destinations are single-owner.
 shared="${manifest/consumer.txt: consumer.txt/policy.txt: consumer-policy.txt}"
 valid_case 'shared source across components' "$shared"
 
@@ -421,8 +391,6 @@ invalid_case 'destination child before file collision' "$bad" 'file/directory co
 bad="${manifest/policy.txt: .policy/policy.txt: bad\"name}"
 invalid_case 'destination outside portable path alphabet' "$bad" 'unsafe destination path' engine-only
 
-# An escaped NUL must fail both authoring-schema and production Bash validation,
-# and apply must not reach target mutation.
 bad_control="${manifest/policy.txt: .policy/policy.txt: \".policy\\u0000managed\\u0000consumer\"}"
 invalid_case 'control-character mapping injection' "$bad_control" \
   'may not contain control characters' structural 'must match pattern'
@@ -441,9 +409,6 @@ assert_file_absent 'control-character mapping writes no consumer destination' \
 bad="$(printf '%s\n' "$manifest" | sed 's|^  alpha/one:|  Alpha/one:|')"
 invalid_case 'noncanonical uppercase target' "$bad" "invalid target repository 'Alpha/one'"
 
-# Remove alpha/one's selected base while retaining consumer's dependency. Keep
-# beta/two's locally-owned base so the fixture remains schema-valid and reaches
-# the dependency-graph validator.
 bad="$(printf '%s\n' "$manifest" |
   awk 'BEGIN { in_alpha = 0 }
        /^  alpha\/one:$/ { in_alpha = 1 }
@@ -451,29 +416,20 @@ bad="$(printf '%s\n' "$manifest" |
        !(in_alpha && $0 == "      - base") { print }')"
 invalid_case 'missing target dependency' "$bad" "does not select required 'base'" engine-only
 
-# Make base depend on consumer, completing a two-node cycle.
 bad="$(printf '%s\n' "$manifest" |
   sed '/^  base:$/a\    requires:\n      - consumer')"
 invalid_case 'dependency cycle' "$bad" 'dependency cycle' engine-only
 
-# Reachability is a whole-manifest property JSON Schema cannot express: a
-# defined component no target selects (directly or through a selected
-# component's dependency closure) is rejected by the engine alone.
 bad="$(printf '%s\n' "$manifest" |
   sed '/^targets:$/i\  orphan:\n    files:\n      policy.txt: .orphan\n')"
 invalid_case 'unreferenced component' "$bad" \
   "component 'orphan' is referenced by no target" engine-only
 
-# Closure credit: 'extra-dep' is selected by no target, but 'helper' —
-# locally-owned by beta/two — requires it, and a locally-owned selection
-# credits its dependency closure (the per-target managed check deliberately
-# does not reach locally-owned internals).
 good="$(printf '%s\n' "$manifest" |
   sed '/^targets:$/i\  extra-dep:\n    files:\n      policy.txt: .extra-dep\n  helper:\n    files:\n      consumer.txt: .helper\n    requires:\n      - extra-dep\n' |
   sed '$a\      - helper')"
 valid_case 'dependency-closure reachability' "$good"
 
-# The source must be tracked even if a same-named worktree file exists.
 source_repo="$tmp_root/untracked-source"
 make_source "$source_repo" "$manifest"
 git -C "$source_repo" rm --cached policy.txt -q
@@ -513,8 +469,6 @@ assert_nonzero 'manifest FIFO is rejected before parsing' "$rc"
 assert_contains 'manifest FIFO diagnostic identifies worktree shape' \
   "$out" 'must exist as a non-symlink regular worktree file'
 
-# Batched index reads attribute exact recorded paths even when a shared
-# directory prefix would also select descendants under ls-files pathspec rules.
 nested_manifest="$(
   cat <<'YAML'
 version: 2
@@ -606,11 +560,6 @@ lefthook_dotnet_destination='.lefthook/dotnet-format-staged.mjs'
 assert_eq 'lefthook-dotnet production CLI source is executable in the Git index' '100755' \
   "$(git -C "$root" ls-files --stage -- "$lefthook_dotnet_source" | awk '{print $1}')"
 
-# Exercise every production target that carries the lefthook-dotnet CLI, not
-# only the generic executable fixture. Linux is the deployment environment that
-# records worktree modes in materialization PR indexes; the source-index
-# assertion remains platform-independent and fails before apply if the
-# production mode regresses.
 while IFS= read -r production_slug; do
   production_target="$tmp_root/production-${production_slug//\//-}"
   make_target "$production_target" "$production_slug"
@@ -642,14 +591,12 @@ done < <(
     "$actual_manifest"
 )
 
-# managing_targets <component>: compact JSON array of the targets managing it.
 managing_targets() {
   COMPONENT="$1" yq -o=json -I=0 \
     '[.targets | to_entries[] | select(.value.managed[]? == strenv(COMPONENT)) | .key]' \
     "$actual_manifest"
 }
 
-# Consumers run the runner policy from a standards checkout; the sync carries no copy.
 assert_eq 'runner-policy is not a sync component' 'false' \
   "$(yq -r '.components | has("runner-policy")' "$actual_manifest")"
 assert_eq 'source Dependabot covers the runner-policy dependency root exactly once' '1' \
@@ -708,16 +655,6 @@ assert_eq 'ci-runner enrolls the managed Go analyzer policy exactly once' '1' \
 assert_eq 'Go analysis covers exactly the ci-runner target' \
   '["melodic-software/ci-runner"]' "$(managing_targets go-analysis)"
 
-# Retired components: agent-orientation (no component ships AGENTS.md);
-# engineering-standards, filing-guide and review-instructions, whose readers
-# take standards/README.md and REVIEW.md from this repository's main as the
-# org layer instead of a synced copy; the lint configs and lefthook
-# fragments, whose readers (ci-workflows composites, the claude-code-plugins
-# and standards lefthook remotes) read this repository's root configs;
-# pyright, whose one reader (dotfiles) owns its whole config; and
-# pr-body-contract-rule, retired by ADR-0008's 2026-11-27 amendment in favor of
-# standards/process/filing-prs-and-issues.md, the org PR template, and the
-# check-contract gate.
 for component in agent-orientation engineering-standards filing-guide review-instructions \
   actionlint editorconfig-checker gitleaks lefthook-base lefthook-shellcheck markdownlint \
   shellcheck typos pyright dependabot-policy pr-body-contract-rule; do
@@ -726,11 +663,6 @@ for component in agent-orientation engineering-standards filing-guide review-ins
       "$actual_manifest")"
 done
 
-# automerge is optional policy-as-data: absent means true (exercised by every
-# prior matrix assertion above), an explicit value is emitted verbatim, and a
-# non-boolean value is rejected by both the Bash validator and the authoring
-# JSON Schema. A target-level unknown key is also re-verified here as a
-# regression check on the generalized validate_record_keys optional-key set.
 automerge_manifest="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: false'$'\n''    managed:'}"
 automerge_dir="$tmp_root/automerge-source"
 make_source "$automerge_dir" "$automerge_manifest"
@@ -747,11 +679,6 @@ bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    autome
 invalid_case 'non-boolean automerge value' "$bad" \
   "target 'alpha/one' automerge must be a boolean" structural automerge
 
-# Both engines must emit identical matrix bytes across the Phase 6 dual-gate
-# window: yq's @tsv passes a capitalized boolean through verbatim (producing
-# invalid matrix JSON) while a YAML-1.2 parser normalizes it, so the scalar is
-# restricted to the two literal spellings. The authoring schema cannot see the
-# raw scalar (yq normalizes it during the JSON conversion), hence engine-only.
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    automerge: False'$'\n''    managed:'}"
 invalid_case 'automerge boolean must be spelled true or false' "$bad" \
   "target 'alpha/one' automerge must be the literal true or false" engine-only
@@ -759,11 +686,6 @@ invalid_case 'automerge boolean must be spelled true or false' "$bad" \
 bad="${manifest/'  alpha/one:'$'\n''    managed:'/'  alpha/one:'$'\n''    unknown: true'$'\n''    managed:'}"
 invalid_case 'unknown target key' "$bad" "target 'alpha/one' contains unknown key 'unknown'"
 
-# Malformed-shape coverage for the consolidated structural pass. Validation reads
-# the whole manifest in one yq pass per section, so a record whose shape cannot be
-# descended into must still produce that record's own diagnostic rather than
-# collapsing the pass itself. Every shape below is one that a naive single-pass
-# expression evaluates as an error instead of a finding.
 component_block='  consumer:'$'\n''    files:'$'\n''      consumer.txt: consumer.txt'$'\n''    requires:'$'\n''      - base'
 requires_block='    requires:'$'\n''      - base'
 target_block='  beta/two:'$'\n''    managed:'$'\n''      - consumer'$'\n''    locally-owned:'$'\n''      - base'
@@ -827,10 +749,6 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned:'$'\n
 invalid_case 'target locally-owned entry is not a string' "$bad" \
   "target 'beta/two' locally-owned entries must be strings"
 
-# Regression: probing an absent optional key must not materialize it. yq creates
-# a node for a traversed missing path, so a structural pass that reaches for
-# `.requires` before reading a component's keys would report every component as
-# carrying `requires` — and then reject the null it just created.
 absent_optional_dir="$tmp_root/absent-optional-keys"
 make_source "$absent_optional_dir" "$manifest"
 out="$(run_engine "$absent_optional_dir" validate 2>&1)"
@@ -841,12 +759,6 @@ assert_not_contains 'absent requires is never reported as an empty sequence' \
 assert_not_contains 'absent locally-owned is never reported as an empty sequence' \
   "$out" 'locally-owned must be a non-empty sequence'
 
-# Empty-string paths. These frame the structural pass rather than the validator:
-# `@tsv` renders an empty string as a genuinely empty column, and tab is an IFS
-# *whitespace* character, so reading a row with `IFS=$'\t' read` would merge the
-# empty column into its neighbor and reconstruct a path pair that the manifest
-# never declared — turning a rejection into a silent acceptance that `apply`
-# would then materialize.
 bad="${manifest/policy.txt: .policy/policy.txt: \"\"}"
 invalid_case 'file destination is the empty string' "$bad" \
   "component 'base' has unsafe destination path ''"
@@ -855,10 +767,6 @@ bad="${manifest/policy.txt: .policy/\"\": .policy}"
 invalid_case 'file source is the empty string' "$bad" \
   "component 'base' has unsafe source path ''" structural 'must match pattern'
 
-# Every remaining list a manifest can drive into `assert_sorted_unique`. Bash
-# refuses an empty associative-array subscript rather than treating it as a key,
-# so an unguarded empty element aborts the whole run with a bash internal error
-# naming neither the record nor the offending list.
 bad="${manifest/'components:'$'\n''  base:'/'components:'$'\n''  "":'$'\n''    files:'$'\n''      consumer.txt: consumer.txt'$'\n''  base:'}"
 invalid_case 'component name is the empty string' "$bad" \
   'component names contains an empty element'
@@ -879,12 +787,6 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    locally-owned:'$'\n
 invalid_case 'target locally-owned entry is the empty string' "$bad" \
   "target 'beta/two' locally-owned components contains an empty element"
 
-# A record's own key list is the one payload `@tsv` emits unescaped, so a key
-# carrying a literal newline splits its row in two. Where the injected text
-# continues with a recognized row kind, the forged second row satisfies the
-# column-count check and reaches the `case`, which then writes an
-# associative-array subscript Bash refuses. The YAML here is double-quoted so
-# `\n` and `\t` become real control characters rather than two-character escapes.
 bad="${manifest/"$requires_block"/'    "x\nctag\t\tboom": 1'}"
 invalid_case 'component key forges a row with an empty record name' "$bad" \
   "component 'consumer' keys may not contain control characters"
@@ -893,9 +795,6 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    "y\nttag\t\tboom": 
 invalid_case 'target key forges a row with an empty record name' "$bad" \
   "target 'beta/two' keys may not contain control characters"
 
-# Naming a real record instead of an empty one does not crash — `record_count`
-# rises above the separately-read name count and the fail-loud assertion catches
-# it — but the key is still rejected, and rejected for the right reason.
 bad="${manifest/"$requires_block"/'    "x\nctag\tconsumer\tboom": 1'}"
 invalid_case 'component key forges a row naming a real record' "$bad" \
   "component 'consumer' keys may not contain control characters"
@@ -904,9 +803,6 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    "y\nttag\tbeta/two\
 invalid_case 'target key forges a row naming a real record' "$bad" \
   "target 'beta/two' keys may not contain control characters"
 
-# A non-string key must be reported before the control-character test runs: `test`
-# only matches strings and aborts the entire pass on anything else, which would
-# lose the record name along with the diagnostic.
 bad="${manifest/"$requires_block"/'    7: 1'}"
 invalid_case 'component key is an integer' "$bad" \
   "component 'consumer' keys must be strings"
@@ -939,17 +835,10 @@ bad="${manifest/'    locally-owned:'$'\n''      - base'/'    <<: &defaults'$'\n'
 invalid_case 'target merge key is not supported' "$bad" \
   "target 'beta/two' merge keys are not supported" engine-only
 
-# A bare newline with no forged continuation used to surface as a malformed-row
-# internal error; it now reports the offending record like every other key.
 bad="${manifest/"$requires_block"/'    "x\nplain": 1'}"
 invalid_case 'component key with a bare newline' "$bad" \
   "component 'consumer' keys may not contain control characters"
 
-# Regression: an explicit collection tag on a scalar (e.g. `!!map "oops"`)
-# classifies by tag while the node carries no items, so every shape check must
-# reject it with the record's own diagnostic instead of crashing on the descent.
-# The authoring schema sees yq's converted JSON (a plain string) and rejects the
-# same fixtures structurally.
 bad="${manifest/"$component_block"/'  consumer: !!map "oops"'}"
 invalid_case 'component is a scalar with an explicit map tag' "$bad" \
   "component 'consumer' must be a mapping"
@@ -970,7 +859,6 @@ bad="${manifest/'    managed:'$'\n''      - consumer'/'    managed: !!seq "oops"
 invalid_case 'target managed is a scalar with an explicit seq tag' "$bad" \
   "target 'beta/two' managed must be a non-empty sequence"
 
-# --- previous-destinations: a relocation deletes the old path in the same apply
 retired_manifest() {
   cat <<'YAML'
 version: 2

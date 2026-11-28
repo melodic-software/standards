@@ -1,35 +1,6 @@
 #!/usr/bin/env bash
-# Canonical repo cloud bootstrap (SSOT). Materialized to each fleet repo's
-# .claude/cloud-bootstrap.sh by distribution/sync-manifest.yml, so edits land
-# here by pull request and fan out as reviewed sync PRs; never by patching a
-# repo's materialized copy. Repo-specific work does not belong here: a repo
-# enriches through its own .claude/cloud-bootstrap.local.sh (run below,
-# never synced), or takes the component locally-owned in the manifest to
-# customize the whole file.
-#
-# Two callers, both with CLAUDE_CODE_REMOTE=true:
-#   1. The account environments' setup scripts, after clone and before the
-#      session process launches. Claude Code builds its plugin/command/skill
-#      registry at process start and never re-reads it, so this pre-launch
-#      call is the only path that gets plugins loaded at turn one.
-#   2. The SessionStart hook (startup|resume), as drift repair: the
-#      environment cache can be ~7 days stale. Plugins it installs go live
-#      at the next resume, not in the session that ran the hook.
-# Outside cloud sessions this exits immediately: declaring a marketplace is
-# gated on workspace trust, and on trusted local machines the marketplace and
-# enabledPlugins declared in settings.json load on their own. Cloud sessions
-# arrive untrusted, so there the declaration alone can load nothing.
-# Idempotent and best effort: a failed step costs a tool or a plugin, never
-# the session.
-#
-# Everything below is data-driven from the repo's own manifests (.node-version,
-# package-lock.json, global.json, .claude/settings.json), so this file carries
-# no repo names, no pinned versions, and no marketplace identifiers.
-#
-# Both callers run `bash <this script>`, so the interpreter is whatever `bash`
-# resolves to rather than the shebang's. Stock macOS still ships bash 3.2, which
-# has no `mapfile`, and errors on an empty "${array[@]}" under `set -u` before
-# 4.4. Both are avoided here: newline-delimited strings, no arrays.
+# Callers run `bash <this script>`; stock macOS bash 3.2 has no `mapfile` (bash 4.0), so no arrays.
+# https://tiswww.case.edu/php/chet/bash/NEWS
 set -euo pipefail
 
 [[ "${CLAUDE_CODE_REMOTE:-}" == "true" ]] || exit 0
@@ -37,11 +8,6 @@ set -euo pipefail
 repo_root="${CLAUDE_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd -- "$repo_root"
 
-# Environment-snapshot inventory line: the shared environment's setup script
-# writes its version + build time to this stamp as its last action, falling
-# back to /tmp when /opt is unwritable at cache build. Logging it from every
-# session makes "which snapshot is this account booting" visible without a
-# per-account audit.
 if [[ -f /opt/melodic-env-setup.done ]]; then
   echo "cloud-bootstrap: env snapshot $(cat /opt/melodic-env-setup.done)" >&2
 elif [[ -f /tmp/melodic-env-setup.done ]]; then
@@ -50,34 +16,16 @@ else
   echo "cloud-bootstrap: no env setup stamp (unmanaged environment or interrupted cache build)" >&2
 fi
 
-# --- Repo toolchain ---------------------------------------------------------
-# Ahead of the plugin-CLI guards below on purpose: those `command -v` checks
-# exit 0 when `claude` or `jq` is missing, and the toolchain must not be
-# collateral damage of an unrelated CLI being absent. The cloud VM is a fresh
-# Ubuntu image shipping Node 20/21/22 and no .NET, so without this a session
-# builds and lints on the wrong toolchain: the failure a live cloud
-# verification run confirmed across the fleet. The shared environment's setup
-# script pre-installs a warm cache of common pins; this stage is the
-# correctness guarantee and must not assume the cache installed anything.
-#
-# Subshell with its own errexit posture: this file runs under `set -e`, and a
-# failed optional install must cost a toolchain, never the session. The
-# subshell ends in an explicit `exit 0` rather than being wrapped in
-# `|| true`: wrapping would put every call inside it in an `||` context,
-# which is what .shellcheckrc's check-set-e-suppressed (SC2310) exists to flag.
 (
   set +e
 
   toolchain_warn() { printf 'cloud-bootstrap: %s\n' "$*" >&2; }
 
-  # env_line <export-line>: append to the session env file once. Dedup-guarded
-  # because SessionStart fires again on resume.
   env_line() {
     [[ -n "${CLAUDE_ENV_FILE:-}" ]] || return 0
     grep -qxF "$1" "$CLAUDE_ENV_FILE" 2>/dev/null || printf '%s\n' "$1" >>"$CLAUDE_ENV_FILE"
   }
 
-  # Node from .node-version, via the VM's nvm.
   if [[ -f .node-version ]]; then
     node_pin="$(tr -d '[:space:]' <.node-version)"
     if [[ "$(node --version 2>/dev/null)" != "v$node_pin" ]]; then
@@ -103,17 +51,10 @@ fi
     fi
   fi
 
-  # npm dependencies from the root lockfile, skipped when already in sync.
-  # Additional lockfile locations are a repo concern: install them from
-  # .claude/cloud-bootstrap.local.sh.
   if [[ -f package-lock.json ]]; then
     if [[ ! -f node_modules/.package-lock.json ]] ||
       [[ package-lock.json -nt node_modules/.package-lock.json ]]; then
       if npm ci --no-audit --no-fund >/dev/null 2>&1; then
-        # A repo whose .npmrc sets ignore-scripts=true skips Lefthook's
-        # postinstall, so install the hooks through `prepare`, skipped under
-        # the same condition as that postinstall: CI set and LEFTHOOK unset
-        # (a value of "", 0 or false counts as unset).
         hooks_skipped=false
         case "${CI:-}" in
           '' | 0 | false) ;;
@@ -130,18 +71,13 @@ fi
     fi
   fi
 
-  # .NET SDK exactly as global.json pins, repo-local.
   if [[ -f global.json ]] && command -v jq >/dev/null 2>&1; then
     sdk="$(jq -r '.sdk.version // empty' global.json 2>/dev/null)"
     if [[ -n "$sdk" ]]; then
-      # -F: the version is a literal, and its dots are not regex wildcards.
       if [[ ! -x .dotnet/dotnet ]] || ! .dotnet/dotnet --list-sdks 2>/dev/null | grep -qF "$sdk "; then
         installer=/tmp/dotnet-install.sh
-        # The cloud egress proxy can return an error body with HTTP 200 from
-        # dot.net, which `curl -f` cannot catch (-f only trips on >= 400), so a
-        # real installer's shebang is checked before it is executed.
-        # --proto/--proto-redir pin the redirect chain (dot.net -> aka.ms ->
-        # builds.dotnet.microsoft.com) to HTTPS end to end.
+        # A proxy error body can arrive as HTTP 200, which `curl -f` (>= 400 only) passes; check the shebang.
+        # https://curl.se/docs/manpage.html#-f
         if curl -fsSL --proto '=https' --proto-redir '=https' \
           --retry 2 --retry-delay 3 https://dot.net/v1/dotnet-install.sh -o "$installer" 2>/dev/null &&
           [[ -s "$installer" ]] &&
@@ -161,31 +97,21 @@ fi
     fi
   fi
 
-  # Git history: base-ref diffs (several plugin suites use origin/main) break
-  # on the shallow single-branch cloud clone; deepen it and make origin/main
-  # resolve. The explicit destination refspec matters: in a single-branch
-  # clone a bare `fetch origin main` only writes FETCH_HEAD and never creates
-  # refs/remotes/origin/main. `main` is the fleet's default branch.
   git_dir="$(git rev-parse --git-dir 2>/dev/null)"
   if [[ -n "$git_dir" && -f "$git_dir/shallow" ]]; then
     git fetch --quiet --unshallow 2>/dev/null ||
       toolchain_warn 'could not unshallow; base-ref diffs may fail'
   fi
+  # A bare `fetch origin main` updates no remote-tracking ref in a single-branch clone; name the destination.
+  # https://git-scm.com/docs/git-fetch#_configured_remote_tracking_branches
   git fetch --quiet origin "+main:refs/remotes/origin/main" 2>/dev/null ||
     toolchain_warn 'could not fetch origin/main'
 
-  # Git author: cloud sessions don't author commits as the connected GitHub
-  # account (undocumented). This derives the author from the account the
-  # session is connected to, so each person is attributed to themselves.
-  # Author-only so the committer's SSH signature keeps verifying. Remove once
-  # upstream fixes it.
-  # The select drops a response missing login or id, so an empty field can
-  # never shift the tab-split fields below.
+  # Cloud sessions don't author commits as the connected account; set author only, remove once fixed upstream.
+  # https://github.com/anthropics/claude-code/issues/104719
   gh_user="$(gh api user --jq 'select((.login // "") != "" and (.id // "" | tostring) != "")
     | [.login, (.id | tostring), (.name // "")] | @tsv' 2>/dev/null)" || gh_user=''
   IFS=$'\t' read -r gh_login gh_id gh_name <<<"$gh_user"
-  # On any failure both keys are cleared, so neither a stale author from an
-  # earlier run nor a half-written pair survives.
   if [[ -z "$gh_login" || -z "$gh_id" ]] ||
     ! git config --global author.name "${gh_name:-$gh_login}" ||
     ! git config --global author.email "$gh_id+$gh_login@users.noreply.github.com"; then
@@ -194,15 +120,6 @@ fi
     toolchain_warn 'could not derive the git author from the connected GitHub account; author.* cleared'
   fi
 
-  # --- Repo extension (enrich seam) -----------------------------------------
-  # A repo appends its own setup (extra lockfiles, pinned hygiene binaries,
-  # symlinks) in this committed, never-synced sibling. Same contract as this
-  # file: idempotent, best effort, bash-3.2-safe. Deliberately inside this
-  # subshell so it inherits the nvm-selected Node on PATH and the
-  # warn-never-fatal posture, plus this script's environment
-  # (CLAUDE_CODE_REMOTE, CLAUDE_PROJECT_DIR, CLAUDE_ENV_FILE when the
-  # SessionStart hook is the caller). Its failure costs the extension, never
-  # the session.
   if [[ -f .claude/cloud-bootstrap.local.sh ]]; then
     if bash .claude/cloud-bootstrap.local.sh >&2; then
       toolchain_warn 'local extension completed'
@@ -214,56 +131,15 @@ fi
   exit 0
 )
 
-# --- Session-start hook output ----------------------------------------------
-# When the SessionStart hook is the caller, stdout is parsed as hook output
-# (that is why every summary in this script goes to stderr), and this line asks
-# for a skills re-scan for whatever the harness can pick up mid-session (the
-# plugin registry itself is only rebuilt at the next process start). From the
-# pre-launch caller it lands harmlessly in the setup log.
-#
-# Emitted here, before the plugin stage, because the toolchain subshell and
-# the repo's own cloud-bootstrap.local.sh above may already have materialized
-# skills worth rescanning, and every way the plugin stage can end early (no
-# `claude`, no `jq`, no fleet list, or an unexpected failure under `set -e`)
-# would otherwise swallow the request along with the installs. Nothing below
-# writes to stdout, so this stays the only line the harness parses.
+# SessionStart parses this script's stdout as hook output, so every summary goes to stderr.
+# https://code.claude.com/docs/en/hooks
 printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","reloadSkills":true}}'
 
-# --- Plugins ----------------------------------------------------------------
-# Data-driven from two settings-shaped files, in this order:
-#   1. the fleet list the cloud-environment component fetched into the
-#      snapshot at cache build. It is the required source: it defines the set
-#      this drift repair repairs against, so a session without it installs
-#      nothing at all rather than treating some other file as the whole set;
-#   2. the repo's committed .claude/settings.json, an overlay of the deltas
-#      that repo declares beyond the fleet. A true entry outside the list
-#      installs; a false entry is native project-scope precedence over the
-#      user-scope install and needs nothing here.
-# Every declared marketplace is registered and every enabledPlugins entry set
-# to true is installed, whichever marketplace it names. Explicit installs also
-# sidestep the platform rule that adding a marketplace never auto-installs
-# externally-sourced plugins.
 command -v claude >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 settings='.claude/settings.json'
-# Only the snapshot path under /opt is read. The environment component also
-# leaves a copy under /tmp when /opt was unwritable at cache build, but /tmp
-# is world-writable and a list at a predictable path there is an input any
-# code running in the session could plant to enable a plugin with no settings
-# diff; a snapshot whose /opt was unwritable keeps the fleet the cache build
-# installed from that /tmp copy and simply gets no drift repair or repo
-# overlay until it is rebuilt. CLOUD_BOOTSTRAP_FLEET_LIST is the test seam.
 fleet_plugins="${CLOUD_BOOTSTRAP_FLEET_LIST:-/opt/melodic-fleet-plugins.json}"
-# A list that is absent, unparsable (a partial write at cache build), or valid
-# JSON of the wrong shape (a bare array, enabledPlugins as an array) ends the
-# plugin stage: every read below is a jq expression that expects the settings
-# shape, and an existence check alone lets a wrong-shaped file through to fail
-# there. Skipping is the whole answer: drift repair has no set to repair
-# against without the list, and the repo file declares deltas, not a set. The
-# gate is a shape test, not a content test: an object carrying no
-# enabledPlugins at all is a valid empty source and passes. Exiting here
-# matches the CLI guards above, which also leave the plugin stage undone.
 if [[ ! -f "$fleet_plugins" ]]; then
   echo 'cloud-bootstrap: no fleet plugin list in this snapshot; plugin install skipped' >&2
   exit 0
@@ -273,15 +149,6 @@ elif ! jq -e 'type == "object" and ((.enabledPlugins // {}) | type == "object")'
   exit 0
 fi
 
-# Plugin CLI listings are shared across both sources and the catalog
-# inventory. Each `install_plugins_from` used to call `marketplace list` and
-# `plugin list` itself, and inventory listed marketplaces again: five CLI
-# round-trips on every session, including the warm path where everything is
-# already installed. One of each up front is enough to skip; a second
-# marketplace list runs only when this session registered a new marketplace
-# (so inventory can see its installLocation). New installs are recorded in
-# plugin_have so the second source does not re-install them. Bash 3.2: no
-# arrays, newline-delimited strings.
 plugin_registered=''
 plugin_have=''
 plugin_mps=''
@@ -293,10 +160,6 @@ plugin_mps=$(printf '%s' "$mp_json" | jq -r '.[] | select((.installLocation // "
     | [.name, .installLocation] | @tsv' 2>/dev/null || true)
 plugin_have=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)
 
-# install_plugins_from <settings-shaped json> <label>: register the file's
-# marketplaces and install its true entries at user scope, skipping what is
-# already present, and print one summary line per source so a session log
-# says which list each plugin came from.
 install_plugins_from() {
   local file="$1" label="$2" declared wanted
   local mp_name mp_target id declared_count installed
@@ -350,19 +213,6 @@ EOF
 install_plugins_from "$fleet_plugins" "fleet list $fleet_plugins"
 install_plugins_from "$settings" "repo $settings"
 
-# Catalog inventory line. Everything above installs strictly what the fleet
-# list and the repo declare, so a plugin added to a marketplace after both
-# were written is not installed and nothing says so: the gap surfaces only
-# when someone types a slash command that does not resolve, which is exactly
-# how it has surfaced. Each registered marketplace is already cloned to disk
-# by the `marketplace add` above, so naming the difference costs one jq pass
-# and no network. Deliberately an inventory line and not a WARN: a repo may
-# declare a subset on purpose, and this must not read as a defect on every
-# session. Both sources count as "declared"; the fleet list stands in for a
-# repo with no committed settings file, which is the only absence reachable
-# here (the stage exits above without the list). `--slurpfile` opens every
-# file before the filter runs, so a missing one would otherwise silence this
-# whole inventory rather than degrade it.
 repo_src="$settings"
 [[ -f "$repo_src" ]] || repo_src="$fleet_plugins"
 declared_from="$fleet_plugins"
@@ -374,19 +224,11 @@ fi
 declared_mps=$(jq -r '(.extraKnownMarketplaces // {}) | keys[]' "$repo_src" "$declared_from" 2>/dev/null | sort -u || true)
 while IFS=$'\t' read -r mp_name mp_dir; do
   [[ -n "$mp_name" ]] || continue
-  # That listing is machine-global while this question is repo-scoped: the
-  # `marketplace add --scope user` above registers into the user scope, so a
-  # machine that has bootstrapped other repos carries their marketplaces here
-  # too. This repo enables nothing from a marketplace it never declared, so
-  # comparing against one would report its entire catalog as undeclared every
-  # session and bury the real signal. Same scoping the fleet-side check
-  # applies, and the same membership idiom used for `registered` above.
   [[ $'\n'"$declared_mps"$'\n' == *$'\n'"$mp_name"$'\n'* ]] || continue
   catalog="$mp_dir/.claude-plugin/marketplace.json"
   [[ -f "$catalog" ]] || continue
-  # The "@<marketplace>" suffix is stripped by length rather than by sub():
-  # the name is interpolated text, and sub() would read any regex
-  # metacharacter in it as syntax.
+  # Strip "@<marketplace>" by length: jq sub() always reads its argument as a regex.
+  # https://jqlang.org/manual/#sub
   missing=$(jq -r --arg mp "$mp_name" --slurpfile s "$repo_src" --slurpfile f "$declared_from" '
     [.plugins[]?.name] as $names
     | [(($f[0].enabledPlugins // {}) + ($s[0].enabledPlugins // {}))
