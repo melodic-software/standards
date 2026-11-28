@@ -40,7 +40,8 @@ relative to this directory.
 | deterministic-work-execution | counts, diffs, sorting, arithmetic, inventories; composing shell commands an agent runs | engineering/deterministic-work-execution.md |
 | documentation-and-citations | citing upstream docs; recording an external default or version; labeling the basis of a recommendation | engineering/documentation-and-citations.md |
 | filing-prs-and-issues | opening a pull request or filing an issue: the title rule, body sections, linkage line, issue fields per type, and the routing labels | process/filing-prs-and-issues.md |
-| issue-tracker | filing, titling, triaging or closing an issue; adding, renaming or deleting a label, issue field or milestone; choosing labels versus fields | process/issue-tracker.md |
+| github-actions-workflows | authoring or updating GitHub Actions workflows: `actions.lock`, `uses: $/...`, `parallel:` steps, `upload-artifact@v7` `archive: false`, and `actions/cache@v6` | engineering/github-actions-workflows.md |
+| issue-tracker | filing, titling, triaging or closing an issue; choosing native Issue Statuses, `Work status`, labels, fields, Issue Artifacts, `"Relates to"` links, or milestones | process/issue-tracker.md |
 | reference-dont-duplicate | a fact, value, or rule appearing in more than one place; origin or history notes in code or docs | engineering/reference-dont-duplicate.md |
 | simpler-code | writing or reviewing code; proposing a new check, process, document, or dependency; serializing work; keeping an existing mechanism | engineering/simpler-code.md |
 | source-authority-tiers | grounding a recommendation, option, or decision; judging how much a source is worth | engineering/source-authority-tiers.md |

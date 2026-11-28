@@ -54,8 +54,10 @@ const validatePolicyStructure = SCHEMA_VALIDATOR.compile(POLICY_SCHEMA);
 const validateRepositoryPolicyStructure = SCHEMA_VALIDATOR.compile(REPOSITORY_POLICY_SCHEMA);
 const MATRIX_OUTPUT = /^\$\{\{ matrix\.([A-Za-z0-9_-]+) }}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const LOCKFILE_COMMIT_SHA = /^(?:sha1-[0-9a-f]{40}|sha256-[0-9a-f]{64})$/i;
+const ACTIONS_LOCK_PATH = ".github/workflows/actions.lock";
 const MAIN_FLOAT_PREFIX = "melodic-software/ci-workflows/";
-const LOCAL_REUSABLE_WORKFLOW = /^\.\/\.github\/workflows\/([A-Za-z0-9_.-]+\.ya?ml)$/;
+const LOCAL_REUSABLE_WORKFLOW = /^(?:\.|\$)\/\.github\/workflows\/([A-Za-z0-9_.-]+\.ya?ml)$/;
 const GITHUB_REPOSITORY = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\/[A-Za-z0-9_.-]+$/;
 const EXACT_GITHUB_TOKEN_EXPRESSIONS = new Set([
   `\${{ secrets.GITHUB_TOKEN }}`,
@@ -439,14 +441,14 @@ function parseWorkflow(source, file) {
   return workflow;
 }
 
-function parseYamlMapping(source, file) {
+function parseYamlMapping(source, file, noun = "workflow") {
   const document = parseDocument(source, YAML_PARSE_OPTIONS);
   if (document.errors.length > 0) {
     throw new Error(document.errors.map((error) => error.message).join("; "));
   }
   const value = document.toJS({ maxAliasCount: 0 });
   if (!isMapping(value)) {
-    throw new Error(`${file} must contain a workflow mapping`);
+    throw new Error(`${file} must contain a ${noun} mapping`);
   }
   return value;
 }
@@ -504,7 +506,7 @@ function reusableWorkflowContract(uses, policy) {
 }
 
 function parseLocalReusableWorkflowReference(value) {
-  if (typeof value !== "string" || !value.startsWith("./")) {
+  if (typeof value !== "string" || (!value.startsWith("./") && !value.startsWith("$/"))) {
     return { attempted: false };
   }
   const match = LOCAL_REUSABLE_WORKFLOW.exec(value);
@@ -512,7 +514,7 @@ function parseLocalReusableWorkflowReference(value) {
     return {
       attempted: true,
       reason:
-        "repository-local reusable workflows must use the exact path ./.github/workflows/<file>.yml without traversal or subdirectories",
+        "repository-local reusable workflows must use the exact path ./.github/workflows/<file>.yml or $/.github/workflows/<file>.yml without traversal or subdirectories",
     };
   }
   return { attempted: true, file: `.github/workflows/${match[1]}` };
@@ -1498,6 +1500,62 @@ function grantedSecretName(value, secretNames) {
   return match !== null && secretNames.has(match[1]) ? match[1] : undefined;
 }
 
+function flattenSteps(steps) {
+  if (!Array.isArray(steps)) {
+    return [];
+  }
+  const result = [];
+  for (const step of steps) {
+    result.push(step);
+    if (isMapping(step) && Array.isArray(step.parallel)) {
+      result.push(...flattenSteps(step.parallel));
+    }
+  }
+  return result;
+}
+
+function isActionLockedInWorkflow(actionsLock, file, uses) {
+  if (
+    !actionsLock?.present ||
+    actionsLock.error ||
+    !isMapping(actionsLock.lock) ||
+    typeof file !== "string" ||
+    typeof uses !== "string"
+  ) {
+    return false;
+  }
+  const { workflows, dependencies } = actionsLock.lock;
+  if (!isMapping(workflows) || !isMapping(dependencies)) {
+    return false;
+  }
+  const workflowEntries = workflows[file];
+  if (!Array.isArray(workflowEntries)) {
+    return false;
+  }
+  const target = uses.toLowerCase();
+  const separator = uses.lastIndexOf("@");
+  if (separator < 1) {
+    return false;
+  }
+  const expectedRef = uses.slice(separator + 1);
+  for (const entry of workflowEntries) {
+    if (typeof entry !== "string" || entry.toLowerCase() !== target) {
+      continue;
+    }
+    const dependency = dependencies[entry];
+    if (
+      isMapping(dependency) &&
+      typeof dependency.commit === "string" &&
+      LOCKFILE_COMMIT_SHA.test(dependency.commit) &&
+      typeof dependency.ref === "string" &&
+      dependency.ref === expectedRef
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function localCredentialRequirement(
   workflow,
   job,
@@ -1559,11 +1617,17 @@ function localCredentialRequirement(
   if (!Array.isArray(steps)) {
     return undefined;
   }
-  for (const step of steps) {
+  for (const step of flattenSteps(steps)) {
     if (!isMapping(step)) {
+      if (containsCredentialExpression(step)) {
+        return "a credential expression outside a narrow step env/with value";
+      }
       continue;
     }
-    const { env, if: stepCondition, with: inputs, ...stepWithoutCredentialMappings } = step;
+    const { env, if: stepCondition, with: inputs, ...rest } = step;
+    const stepWithoutCredentialMappings = Array.isArray(step.parallel)
+      ? Object.fromEntries(Object.entries(rest).filter(([name]) => name !== "parallel"))
+      : rest;
     if (conditionContainsCredentialReference(stepCondition)) {
       return "a credential expression in a step condition";
     }
@@ -1592,7 +1656,16 @@ function withoutSecrets(job) {
   return Object.fromEntries(Object.entries(job).filter(([name]) => name !== "secrets"));
 }
 
-function privilegedHostedRequirement(workflow, job, target, policy, localCall, grant, grantUsage) {
+function privilegedHostedRequirement(
+  workflow,
+  job,
+  target,
+  policy,
+  localCall,
+  grant,
+  grantUsage,
+  { file, actionsLock } = {},
+) {
   const reusable = reusableWorkflowStatus(job, policy, workflow);
   const reviewedCallerPermissions =
     locallyRoutedTarget(target) &&
@@ -1679,20 +1752,25 @@ function privilegedHostedRequirement(workflow, job, target, policy, localCall, g
   }
 
   const usedCredentialActions = new Set();
-  if (Array.isArray(job.steps)) {
-    for (const step of job.steps) {
-      const uses = credentialActionUses(step, policy);
-      if (uses === undefined) {
-        continue;
-      }
-      const reference = uses.toLowerCase();
-      if (!(grantApplies && (grant.credentialActions ?? []).includes(reference))) {
-        return privilegedControlPlane(
-          `credential-minting action ${uses.split("@", 1)[0].toLowerCase()}`,
-        );
-      }
-      usedCredentialActions.add(reference);
+  for (const step of flattenSteps(job.steps)) {
+    const uses = credentialActionUses(step, policy);
+    if (uses === undefined) {
+      continue;
     }
+    const reference = uses.toLowerCase();
+    if (!(grantApplies && (grant.credentialActions ?? []).includes(reference))) {
+      return privilegedControlPlane(
+        `credential-minting action ${uses.split("@", 1)[0].toLowerCase()}`,
+      );
+    }
+    const separator = uses.lastIndexOf("@");
+    const refPart = separator === -1 ? "" : uses.slice(separator + 1);
+    if (!FULL_SHA.test(refPart) && !isActionLockedInWorkflow(actionsLock, file, uses)) {
+      return privilegedControlPlane(
+        `credential-minting action ${reference} without a matching full-SHA entry in ${ACTIONS_LOCK_PATH}`,
+      );
+    }
+    usedCredentialActions.add(reference);
   }
 
   if (grantApplies && grantUsage !== undefined) {
@@ -1792,6 +1870,21 @@ function isShaClaim(token) {
   return token.length === 40 || (/[0-9]/u.test(token) && /[a-f]/iu.test(token));
 }
 
+function collectStepUsesPaths(steps, prefix, paths) {
+  if (!Array.isArray(steps)) {
+    return;
+  }
+  for (const [index, step] of steps.entries()) {
+    if (!isMapping(step)) {
+      continue;
+    }
+    paths.push([...prefix, index, "uses"]);
+    if (Array.isArray(step.parallel)) {
+      collectStepUsesPaths(step.parallel, [...prefix, index, "parallel"], paths);
+    }
+  }
+}
+
 function pinnedUsesEntries(source, workflow) {
   const document = parseDocument(source, YAML_PARSE_OPTIONS);
   const lineStarts = [0];
@@ -1815,11 +1908,7 @@ function pinnedUsesEntries(source, workflow) {
       continue;
     }
     const paths = [["jobs", jobId, "uses"]];
-    if (Array.isArray(job.steps)) {
-      for (const index of job.steps.keys()) {
-        paths.push(["jobs", jobId, "steps", index, "uses"]);
-      }
-    }
+    collectStepUsesPaths(job.steps, ["jobs", jobId, "steps"], paths);
     for (const parts of paths) {
       const node = document.getIn(parts, true);
       const pinned =
@@ -1860,6 +1949,37 @@ function pinProvenanceFindings(source, file, workflow) {
     }
   }
   return findings;
+}
+
+async function readActionsLock(root) {
+  const absoluteFile = path.join(root, ".github", "workflows", "actions.lock");
+  let stat;
+  try {
+    stat = await lstat(absoluteFile);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return { present: false };
+    }
+    return { present: true, error: `${ACTIONS_LOCK_PATH} could not be read: ${error.message}` };
+  }
+  if (stat.isSymbolicLink()) {
+    return {
+      present: true,
+      error: `${ACTIONS_LOCK_PATH} must be a regular file; workflow symlinks are forbidden`,
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      present: true,
+      error: `${ACTIONS_LOCK_PATH} must be a regular file`,
+    };
+  }
+  try {
+    const source = await readFile(absoluteFile, "utf8");
+    return { present: true, lock: parseYamlMapping(source, ACTIONS_LOCK_PATH, "lockfile") };
+  } catch (error) {
+    return { present: true, error: error.message };
+  }
 }
 
 async function repositoryWorkflowIndex(root) {
@@ -1961,6 +2081,10 @@ export async function auditRepository({
   const consumedLocalRoutingGrants = new Set();
   const consumedRequiredReusableCallInputs = new Set();
   const workflowIndex = await repositoryWorkflowIndex(resolvedRoot);
+  const actionsLock = await readActionsLock(resolvedRoot);
+  if (actionsLock.error) {
+    findings.push(finding("actions-lock-parse", ACTIONS_LOCK_PATH, undefined, actionsLock.error));
+  }
   const policyFile = path.relative(resolvedRoot, resolvedPolicy) || path.basename(resolvedPolicy);
   findings.push(
     ...visibilityScopedReusableContractFindings(policy.approvedReusableWorkflowContracts, {
@@ -2025,7 +2149,10 @@ export async function auditRepository({
       }
       const grantUsage = grant ? { unused: [] } : undefined;
       const privilegedHosted = routingEnabled
-        ? privilegedHostedRequirement(workflow, job, target, policy, localCall, grant, grantUsage)
+        ? privilegedHostedRequirement(workflow, job, target, policy, localCall, grant, grantUsage, {
+            file,
+            actionsLock,
+          })
         : undefined;
       const structuralHosted = structuralHostedRequirement(job);
       const hostedRequirement =

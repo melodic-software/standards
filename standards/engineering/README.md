@@ -27,5 +27,6 @@ Agent-agnostic engineering standards that no linter can decide for you: the auth
 | [progressive-disclosure.md](progressive-disclosure.md) | layering information so a reader pays only for the depth they reach |
 | [secrets-lifecycle.md](secrets-lifecycle.md) | rotation cadence, issuer-enforced expiry, rotate-then-purge, revocation on exposure, store choice by key owner |
 | [container-supply-chain.md](container-supply-chain.md) | Dockerfile, build-context, image-scanning, artifact-identity, and runtime assurance boundaries |
+| [github-actions-workflows.md](github-actions-workflows.md) | workflow dependency lockfiles (`actions.lock`), `uses: $/...`, `parallel:` steps, `upload-artifact@v7` `archive: false` naming, and `actions/cache@v6` |
 | [legacy-and-migration-debt.md](legacy-and-migration-debt.md) | describing the current form; the exposure classifier for old paths |
 | [enforceability-tiers.md](enforceability-tiers.md) | deterministic vs detect-then-judge vs reasoning-only; why this directory exists |

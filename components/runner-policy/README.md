@@ -301,7 +301,7 @@ An unconsumed entry fails as `required-reusable-call-input-drift`, exactly like
 exception and local-routing grant inventory drift.
 
 Repository-local calls use only the canonical
-`./.github/workflows/<file>.yml` form. The policy resolves the regular checked-in
+`./.github/workflows/<file>.yml` or `$/.github/workflows/<file>.yml` form. The policy resolves the regular checked-in
 file directly: traversal, subdirectories, symlinks, missing files, parse
 failures, recursion, undeclared/required inputs, undeclared/required secrets,
 and `secrets: inherit` fail closed. A local runner-input workflow has the same
@@ -393,7 +393,8 @@ layers is not detected by any repository check and shows up as an admitted job
 queuing against a label no host answers to.
 
 The analyzer also reports `pin-provenance-drift`: when the trailing comment on
-a 40-character `uses:` pin contains a token that reads as a short commit SHA
+a 40-character `uses:` pin (at job level, top-level step, or inside a nested
+`parallel:` step block) contains a token that reads as a short commit SHA
 (mixed hex digits and letters, or a full 40-character SHA), it must be a
 prefix of the pinned commit. Version tags, prose, dates, and hex-only English
 words are not treated as SHA claims. Update the comment in the same change as
@@ -490,15 +491,21 @@ require hosted execution. A grant is keyed by
   here; transformed expressions, workflow-level env values, `run:`
   interpolation, and conditions stay privileged-hosted.
 - `credentialActions` (optional): exact `owner/action@ref` references the
-  job's steps may invoke, whose action name must be a central
-  `localCredentialActions` entry (for example
-  `actions/create-github-app-token@v3`). The ref is a full 40-hex SHA, `@main`
-  for a `melodic-software` action, or a `vN`, `vN.N` or `vN.N.N` tag for an
-  official-vendor owner (`actions`, `github`, `dependabot`, `microsoft`,
+  job's steps (including steps nested inside `parallel:` blocks) may invoke,
+  whose action name must be a central `localCredentialActions` entry (for
+  example `actions/create-github-app-token@v3`). The ref is a full 40-hex SHA,
+  `@main` for a `melodic-software` action, or a `vN`, `vN.N` or `vN.N.N` tag
+  for an official-vendor owner (`actions`, `github`, `dependabot`, `microsoft`,
   `azure`, `anthropics`, `openai`), per the owner decision that first-party and
   vendor refs run unpinned (architecture owner-decisions L351). The step must
   name the granted ref exactly; any other ref of the same action stays
   privileged-hosted, and actions outside the central list cannot be granted.
+  When the granted ref is not a full 40-hex SHA, `.github/workflows/actions.lock`
+  must also be present as a regular file and lock that exact workflow and action
+  reference to a full commit SHA (`sha1-<40-hex>` or `sha256-<64-hex>`) with a
+  matching `ref` field; otherwise the job stays privileged-hosted. That binds
+  tag-pinned credential actions to reviewed full-SHA lock entries that
+  Dependabot updates in place without churning `.github/runner-policy.json`.
 
 A grant applies only while the job genuinely routes to the managed fleet, that
 is while it names the fleet

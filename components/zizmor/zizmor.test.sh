@@ -40,6 +40,41 @@ for input in . .github .github/workflows; do
   assert_not_contains "no unpinned-uses finding (input $input)" "$out" 'unpinned-uses'
 done
 
+cat <<'EOF' >"$project/.github/workflows/locked-parallel.yml"
+name: locked-parallel
+on: push
+permissions: {}
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - parallel:
+          - name: First check
+            run: exit 0
+          - name: Second check
+            run: exit 0
+EOF
+cat <<'EOF' >"$project/.github/workflows/actions.lock"
+version: 'v0.0.3'
+workflows:
+  '.github/workflows/locked-parallel.yml':
+    - 'actions/checkout@v7'
+dependencies:
+  'actions/checkout@v7':
+    ref: 'v7'
+    commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
+    owner_id: 44036562
+    repo_id: 197814629
+EOF
+out="$(audit .)"
+rc=$?
+assert_exit 'workflow with actions.lock and parallel steps audits clean with the config' 0 "$rc"
+assert_not_contains 'no unpinned-uses finding on locked parallel workflow' "$out" 'unpinned-uses'
+rm "$project/.github/workflows/locked-parallel.yml" "$project/.github/workflows/actions.lock"
+
 cp "$fixtures/bad/third-party-tag.yml" "$project/.github/workflows/"
 out="$(audit .)"
 rc=$?

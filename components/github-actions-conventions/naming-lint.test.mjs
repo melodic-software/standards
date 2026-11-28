@@ -510,3 +510,35 @@ test("bad arguments are configuration errors", () => {
   assert.equal(parseArguments([], { GITHUB_ACTIONS: "true" }).format, "github");
   assert.equal(parseArguments([], {}).format, "text");
 });
+
+test("step names inside parallel blocks are checked recursively", async () => {
+  const root = await repository({
+    workflows: {
+      "pr-run-checks.yml": `name: PR Run Checks
+on: pull_request
+permissions: {}
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-24.04
+    steps:
+      - parallel:
+          - name: Run unit tests
+            run: "true"
+          - name: Run Bad Title Case
+            run: "true"
+          - parallel:
+              - name: lowercase start
+                run: "true"
+`,
+    },
+  });
+  const findings = await lintRepository({ root, vocabulary, mode: "enforcing" });
+  assert.deepEqual(
+    findings.map(({ rule, line }) => ({ rule, line })),
+    [
+      { rule: "step-name", line: 12 },
+      { rule: "step-name", line: 15 },
+    ],
+  );
+});
