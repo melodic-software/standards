@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests the PSScriptAnalyzer component: the root-canonical ruleset passes
-# the good fixture and flags the bad fixture. This asserts the config only;
-# Invoke-ScriptAnalyzer is called directly. The Lefthook adapter's one-pass
-# error behavior has a separate focused regression test. Skips cleanly when the
-# engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -19,13 +14,9 @@ pwsh -NoProfile -NonInteractive -Command \
   'if (Get-Module -ListAvailable PSScriptAnalyzer | Where-Object { $_.Version -ge [version]"1.25.0" }) { exit 0 } else { exit 1 }' \
   >/dev/null 2>&1 || skip_suite 'PSScriptAnalyzer >= 1.25.0 not installed'
 
-# pwsh is a native Windows process under Git Bash; convert POSIX paths to
-# Windows form there. On Linux cygpath is absent and the path passes through.
 to_native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 settings_n="$(to_native "$settings")"
 
-# Analyze one fixture file against the ruleset: print rule names, exit 1 on any
-# finding. Single file per call, so the multi-file analyzer race never applies.
 # shellcheck disable=SC2016
 run_pssa() {
   PSSA_FILE="$(to_native "$1")" PSSA_SETTINGS="$settings_n" \
@@ -40,8 +31,6 @@ run_pssa "$root/components/psscriptanalyzer/fixtures/good/Clean.ps1" >/dev/null
 rc=$?
 assert_exit 'good fixture has no findings' 0 "$rc"
 
-# Stored with a .txt suffix so shared PowerShell formatter hooks leave the
-# deliberately malformed fixture untouched; materialized as .ps1 below.
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cp "$root/components/psscriptanalyzer/fixtures/bad/Violations.ps1.txt" "$tmp/Violations.ps1"

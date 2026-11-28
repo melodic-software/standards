@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-// Generates the org issue forms from contract.json. `check` (the default) fails when a committed
-// form differs from what the contract generates; `write` regenerates them. The sync materializes
-// the committed forms byte-exact into melodic-software/.github, so a form is changed here, in the
-// contract, and nowhere else.
-
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -36,7 +31,6 @@ export function validateContract(contract) {
         fail(`${at}.form must be a kebab-case .yml name or null`);
       if (forms.has(type.form)) fail(`${at}.form ${type.form} is used twice`);
       forms.add(type.form);
-      // A public form applies exactly the floor: role labels are granted at triage.
       if (JSON.stringify(type.labels) !== floor)
         fail(`${at}.labels must equal floorLabels ${floor}`);
     } else if (!Array.isArray(type.labels)) {
@@ -70,6 +64,7 @@ export function validateContract(contract) {
   }
   if (forms.size === 0) fail("types must declare at least one form");
   // GitHub's community profile counts no issue template when every form sets `type:`.
+  // https://github.com/orgs/community/discussions/188484
   const formTypes = Object.values(types).filter((type) => type.form !== null);
   if (formTypes.every((type) => type.nativeType !== null)) {
     fail(

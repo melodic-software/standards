@@ -1,6 +1,5 @@
 #!/bin/sh
 # shellcheck shell=sh
-# Lefthook runs a script from every source dir that holds it, so only the fetched remote copy acts.
 src=$(printf '%s\n' "$0" | tr '\134' '/')
 case "$src" in
   */info/lefthook-remotes/*) ;;
@@ -11,6 +10,7 @@ command -v editorconfig-checker >/dev/null 2>&1 || {
   exit 1
 }
 # editorconfig-checker reads one config: the repository's own replaces this one whole.
+# https://github.com/editorconfig-checker/editorconfig-checker#configuration
 if [ -f .editorconfig-checker.json ]; then
   exec editorconfig-checker -config .editorconfig-checker.json "$@"
 fi

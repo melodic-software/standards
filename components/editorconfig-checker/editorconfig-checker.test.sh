@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Tests the editorconfig-checker component: the checker passes the good fixture
-# and flags the bad fixture against the repo-root .editorconfig. Skips cleanly
-# when the engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -10,9 +7,6 @@ source "$root/harness/shell/lib.sh"
 cd "$root" || exit 1
 config='.editorconfig-checker.json'
 
-# Binary name varies by install method: npm installs `editorconfig-checker`
-# with an `ec` alias, the ci-workflows CI action installs `ec`, and the
-# winget package ships `ec-windows-amd64`.
 if command -v editorconfig-checker >/dev/null 2>&1; then
   run_ec() { editorconfig-checker "$@"; }
 elif command -v ec >/dev/null 2>&1; then

@@ -1,4 +1,3 @@
-// Package suppressionblanket supplies an invalid blanket suppression.
 package suppressionblanket
 
 import "strings"

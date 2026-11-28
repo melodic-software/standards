@@ -1,4 +1,3 @@
-// Package vet supplies the suspicious-construct fixture.
 package vet
 
 import "fmt"

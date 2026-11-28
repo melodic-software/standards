@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Good fixture: conforms to the shellcheck ruleset (passes self-lint).
 set -euo pipefail
 
 greet() {

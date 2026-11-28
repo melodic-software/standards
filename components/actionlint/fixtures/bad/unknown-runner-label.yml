@@ -1,5 +1,3 @@
-# A fleet-shaped label the config does not declare, proving the allowlist is
-# exact rather than a blanket amnesty for anything named `melodic-*`.
 name: unknown-runner-label fixture
 on: push
 jobs:

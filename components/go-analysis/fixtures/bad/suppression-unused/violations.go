@@ -1,4 +1,3 @@
-// Package suppressionunused supplies a suppression that has no effect.
 package suppressionunused
 
 import "strings"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Tests the Go analysis component: official Go checks plus the exact root
-# golangci-lint v2 contract accept good code and reject focused violations.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -36,9 +34,6 @@ assert_eq 'golangci-lint config is the exact reviewed allowlist' \
 version_out="$(golangci-lint version 2>&1)"
 rc=$?
 assert_exit 'golangci-lint reports its version' 0 "$rc"
-# The pin matches GOLANGCI_LINT_VERSION in .github/workflows/pr-require-checks.yml.
-# A mismatch here is a local environment problem (for example a tool manager
-# that floated to a newer release), not a contract defect: name it as such.
 pinned_golangci='2.12.2'
 installed_golangci=''
 if [[ "$version_out" =~ version\ v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
@@ -60,8 +55,6 @@ assert_exit 'golangci-lint accepts the v2 config' 0 "$rc"
 assert_silent 'config verification has no diagnostics' "$out"
 
 good="$root/components/go-analysis/fixtures/good"
-# Stored with a .txt suffix so shared Go formatter hooks leave the deliberately
-# unformatted fixture untouched; materialized as .go below.
 bad_format_src="$root/components/go-analysis/fixtures/bad/format/violations.go.txt"
 bad_tidy="$root/components/go-analysis/fixtures/bad/tidy"
 bad_vet="$root/components/go-analysis/fixtures/bad/vet"
@@ -117,7 +110,6 @@ else
   skip_case 'go test -race requires cgo and the configured C compiler'
 fi
 
-# lint_module <dir> — golangci-lint every package of the module at <dir>.
 lint_module() { (cd "$1" && golangci-lint run --config "$config" ./... 2>&1); }
 
 lint_module "$good" >/dev/null
