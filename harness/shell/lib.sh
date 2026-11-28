@@ -32,7 +32,7 @@ require_min_version() {
     printf 'ERROR: %s reported an unparsable version: %q (fix the --version parse)\n' "$label" "$have" >&2
     exit 1
   fi
-  # awk, not `sort -V`: POSIX sort has no -V, and BSD/macOS sort lacks it:
+  # awk, not `sort -V`: POSIX sort has no -V, and this must run on any POSIX sort:
   # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/sort.html
   if awk -v a="$have" -v b="$min" 'BEGIN {
     na = split(a, aa, "."); nb = split(b, bb, ".");

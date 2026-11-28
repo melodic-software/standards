@@ -35,8 +35,8 @@ function runNpx(npxArgs) {
   const npxBinary = path.join(nodeDir, isWindows ? "npx.cmd" : "npx");
   let child;
   if (isWindows) {
-    // A .cmd needs cmd.exe; windowsVerbatimArguments stops Node re-quoting, and `shell: true` is DEP0190:
-    // https://nodejs.org/api/child_process.html#spawning-bat-and-cmd-files-on-windows
+    // A .cmd needs cmd.exe; windowsVerbatimArguments stops Node re-quoting, and an args array with `shell: true` is DEP0190:
+    // https://nodejs.org/api/deprecations.html#dep0190-passing-args-to-nodechild_process-execfilespawn-with-shell-option
     const inner = `"${npxBinary}" ${npxArgs.map(escapeCmdShimArg).join(" ")}`;
     child = spawn("cmd.exe", ["/d", "/s", "/c", `"${inner}"`], {
       stdio: "inherit",

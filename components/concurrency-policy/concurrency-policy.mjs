@@ -40,14 +40,14 @@ const CONTRACT_ONLY_PREDICATE_TEXT = `github.event.pull_request.head.repo.full_n
 
 const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(${CONTRACT_ONLY_PREDICATE_TEXT}) }}`;
 
-// GitHub cancels a pending run in the same group even with `cancel-in-progress: false`, hence the branched group:
-// https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#concurrency
 const FALLBACK_TERMS = ["github.ref", "github.run_id"];
 
 function literalPattern(text) {
   return text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 }
 
+// GitHub cancels a pending run in the same group even with `cancel-in-progress: false`, hence the branched group:
+// https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#concurrency
 const BRANCHED_GROUP_BY_FALLBACK = new Map(
   FALLBACK_TERMS.map((term) => [
     term,
