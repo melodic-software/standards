@@ -1,26 +1,4 @@
 #!/usr/bin/env bash
-# Contract tests for the two managed-files-guard caller components: the
-# hosted `managed-files-guard-caller`
-# (.github/workflows/pr-check-managed-files-hosted.yml) and the fleet-routed
-# `managed-files-guard-fleet-caller` (.github/workflows/pr-check-managed-files.yml).
-#
-# Three layers, in order:
-#   1. Shape: each parsed YAML carries exactly the locked design: pull_request
-#      trigger with no paths filter (the action resolves the managed
-#      destinations at run time), read-only token, the canonical concurrency block, one job on
-#      its approved label, one step (no caller checkout), and the composite action
-#      at `@main` with `standards-ref: main` for the soak, and a workflow name equal to the
-#      destination stem in Title Case. The two files differ only in `runs-on`,
-#      the workflow name and comments.
-#   2. Manifest wiring: each component maps to its locked destination; a
-#      target that manages a `components/claude-lanes/`-sourced caller takes
-#      the fleet sibling, never the hosted caller; no target manages both;
-#      ci-workflows owns the guard locally; every target is accounted for.
-#   3. Materialization: the engine writes the bytes where the manifest says,
-#      byte-identical, and (when actionlint is present) they lint clean there.
-#
-# yq v4 parses the YAML so the assertions are about the tree, not about text
-# a comment could imitate.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -49,8 +27,6 @@ trap 'rm -rf -- "$scratch"' EXIT
 
 mapfile -t all_targets < <(yq -r '.targets | keys[]' "$manifest")
 
-# The action resolves each target's managed destinations through this engine
-# command at run time.
 dest_paths_failures=''
 for t in "${all_targets[@]}"; do
   bash distribution/sync-manifest.sh dest-paths --source-root "$root" --target "$t" >/dev/null ||
@@ -85,9 +61,6 @@ check_shape() {
   stem="${destination##*/}"
   assert_eq "$p workflow name is the destination stem in Title Case" "$(title_case "${stem%.yml}")" "$(q '.name')"
   assert_eq "$p triggers on pull_request only" 'pull_request' "$(q '.on | keys | join(",")')"
-  # No paths filter: the action decides from the manifest at run time, and a
-  # list here would have to name every target's destinations, so any manifest
-  # change would re-sync this file to every target.
   assert_eq "$p pull_request carries types only (no paths filter)" 'types' \
     "$(q '.on.pull_request | keys | join(",")')"
   assert_eq "$p pull_request types are the diff-changing default" 'opened,synchronize,reopened' \
@@ -114,8 +87,6 @@ check_shape() {
   assert_eq "$p no job-level permissions block (the workflow grant is the whole grant)" '0' \
     "$(q '[.jobs[] | select(has("permissions"))] | length')"
 
-  # The action checks out the repository itself (ci-workflows#881), so the
-  # caller carries no checkout and no third-party pin.
   assert_eq "$p one step: the guard" '1' "$(q "$job.steps | length")"
 
   local guard_uses
@@ -133,8 +104,6 @@ check_shape() {
 check_shape "$hosted_source" "$hosted_component" 'ubuntu-24.04' "$hosted_destination"
 check_shape "$fleet_source" "$fleet_component" 'melodic-ubuntu-24.04-x64' "$fleet_destination"
 
-# Beyond comments, the workflow name and `runs-on`, the siblings are the same
-# bytes, so one review covers both.
 strip() { grep -vE '^([[:space:]]*(#|runs-on:)|name:)' "$1"; }
 if diff <(strip "$hosted_source") <(strip "$fleet_source") >/dev/null; then
   pass 'the fleet sibling equals the hosted caller apart from comments, the workflow name and runs-on'
@@ -179,9 +148,6 @@ for target in "${all_targets[@]}"; do
   done
   [[ "$has_hosted" -eq 1 && "$has_fleet" -eq 1 ]] &&
     fail "$target manages at most one guard caller" 'manages both the hosted and the fleet-routed caller'
-  # A target that manages a fleet-routed lane caller is a private repo
-  # enrolled for local routing, where a fixed hosted job fails runner-policy:
-  # it takes the fleet sibling, never the hosted caller.
   if [[ "$routes_fleet" -eq 1 ]]; then
     assert_eq "$target manages a fleet-routed lane caller, so it manages the fleet guard" '1' "$has_fleet"
     assert_eq "$target manages a fleet-routed lane caller, so not the hosted guard" '0' "$has_hosted"
@@ -241,7 +207,6 @@ done
 for target in "${fleet_targets[@]}"; do
   materialize "$target" "$fleet_source" "$fleet_destination" "$hosted_destination"
 done
-# A target that owns the guard locally must receive neither caller.
 for target in "${locally_owned_targets[@]}"; do
   materialize "$target" '' '' "$hosted_destination"
   assert_file_absent "$target (locally-owned) receives no fleet caller" \

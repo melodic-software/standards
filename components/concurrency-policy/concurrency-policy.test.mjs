@@ -24,21 +24,14 @@ const PUSH_AND_PULL_REQUEST = "on:\n  push:\n    branches: [main]\n  pull_reques
 const JOBS = 'jobs:\n  build:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "true"\n';
 const temporaryRoots = [];
 
-// The ci-perf contract-only predicate, spelled out here rather than imported so
-// the analyzer's copy is compared against an independent literal.
 const PREDICATE = `github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))`;
 const CONTRACT_BRANCH = `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.run_id)`;
-// One space added inside the fromJSON array literal, and separately the
-// base-edit clause dropped: the drift the byte-identity rule exists to catch.
 const SPACED_PREDICATE = PREDICATE.replace('"labeled","unlabeled"', '"labeled", "unlabeled"');
 const CLAUSE_DROPPED_PREDICATE = PREDICATE.replace(
   "(github.event.action == 'edited' && !github.event.changes.base)",
   "github.event.action == 'edited'",
 );
 
-// The branched group as one line, and as the folded scalar the design writes.
-// Both spellings reach the analyzer as a single string; the folded one keeps a
-// newline and the continuation indent at each of the two operator joins.
 function branchedSingleLine(fallback, contractBranch = CONTRACT_BRANCH, predicate = PREDICATE) {
   return `concurrency:
   group: \${{ (${predicate}) && ${contractBranch} || format('{0}-{1}', github.workflow, github.event.pull_request.number || ${fallback}) }}
@@ -76,14 +69,11 @@ async function repository({ config, workflows = {} } = {}) {
   return root;
 }
 
-// Audits a repository whose only workflow is ci.yml.
 async function auditCi(concurrencyYaml, onYaml = "on: pull_request") {
   const root = await repository({ workflows: { "ci.yml": workflow(onYaml, concurrencyYaml) } });
   return auditRepository({ root });
 }
 
-// Blocking findings only. Info findings never fail the gate, so every
-// accept-case assertion below reads them through `fallbacks` instead.
 function rules(findings) {
   return findings
     .filter((item) => item.level !== "info")
@@ -178,9 +168,6 @@ test("the ci-perf branched group passes single-line and folded, with either fall
       `.github/workflows/ci.yml:concurrency-group-fallback:${fallback}`,
     ]);
 
-    // The folded scalar the design writes. Its continuation lines are
-    // more-indented, so the parser keeps a newline and that indent at each
-    // join; only the joins and the `${{ }}` delimiters tolerate it.
     const foldedFindings = await auditCi(branchedFolded(fallback), PUSH_AND_PULL_REQUEST);
     assert.deepEqual(rules(foldedFindings), []);
     assert.deepEqual(fallbacks(foldedFindings), [
@@ -197,7 +184,6 @@ test("the branched group pairs with either accepted cancel-in-progress value", a
 });
 
 test("a branched group whose predicate drifts by one byte is rejected", async () => {
-  // The composite compares its own default against this text.
   const bare = `\${{ ${PREDICATE} && ${CONTRACT_BRANCH} || format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}`;
   for (const predicate of [SPACED_PREDICATE, CLAUSE_DROPPED_PREDICATE]) {
     assert.notEqual(predicate, PREDICATE);
@@ -207,9 +193,6 @@ test("a branched group whose predicate drifts by one byte is rejected", async ()
     );
   }
 
-  // The predicate stripped of its surrounding parentheses. `&&` binds tighter
-  // than `||` in GitHub expressions, so this happens to evaluate the same way,
-  // but it is not the shape the grammar admits.
   assert.deepEqual(
     rules(await auditCi(`concurrency:\n  group: ${bare}\n  cancel-in-progress: true\n`)),
     [".github/workflows/ci.yml:concurrency-group-drift"],
@@ -230,10 +213,6 @@ test("a fallback term other than github.ref or github.run_id is rejected", async
 });
 
 test("a contract branch without github.run_id is rejected", async () => {
-  // Without run_id the contract-only branch is shared across every
-  // contract-only run of the pull request, so one can evict another and leave
-  // the check suite with no ci-status check run: the failure mode the branch
-  // exists to remove.
   const branches = [
     `format('ci-contract-{0}', github.event.pull_request.number)`,
     `format('ci-contract-{0}-{1}', github.event.pull_request.number, github.sha)`,
@@ -285,16 +264,10 @@ test("the ci-perf contract-only cancel expression passes, and only byte-identica
     auditCi(`${CANONICAL_GROUP}  cancel-in-progress: \${{ !(${predicate}) }}\n`);
   assert.deepEqual(rules(await withCancel(PREDICATE)), []);
 
-  // One space added inside the fromJSON array literal. The composite compares
-  // its own default against this text, so a reformatted copy is drift, not a
-  // stylistic variant.
   assert.deepEqual(rules(await withCancel(SPACED_PREDICATE)), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
   ]);
 
-  // The base-edit clause dropped. This one is not cosmetic: without it an
-  // `edited` event that changed the base branch would be treated as
-  // contract-only, so the lanes would never re-test the new merge commit.
   assert.deepEqual(rules(await withCancel(CLAUSE_DROPPED_PREDICATE)), [
     ".github/workflows/ci.yml:concurrency-cancel-missing",
   ]);

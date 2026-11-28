@@ -1,6 +1,3 @@
-// Behavioral tests for launcher.js --vault, on Windows and Linux. A stub
-// vault-exec under a temporary home and a stub server in a temporary git repo
-// stand in for the real ones; no test reads a real secret.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -66,7 +63,6 @@ function run(box, args, env = {}) {
   return { ...result, calls };
 }
 
-// Every case: the server's stdout is the input, byte for byte, and its exit code survives.
 function assertPassthrough(result) {
   assert.equal(result.stdout, INPUT);
   assert.equal(result.status, 7, result.stderr);
@@ -166,7 +162,6 @@ for (const spec of ["KEY_A", "KEY_A=", "1KEY=secret", "BAD-NAME=secret"]) {
   });
 }
 
-// cmd strips one ^ layer per parse; after both, what remains is the C runtime form.
 const { escapeCmdShimArg } = createRequire(import.meta.url)("./dispatch.js");
 const uncaret = (s) => s.replace(/\^(.)/g, "$1");
 

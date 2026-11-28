@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Contract tests for the two dependabot-automerge caller components:
-# `dependabot-automerge-caller`
-# (.github/workflows/pr-automerge-dependabot-hosted.yml) and
-# `dependabot-automerge-fleet-caller`
-# (.github/workflows/pr-automerge-dependabot.yml).
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh

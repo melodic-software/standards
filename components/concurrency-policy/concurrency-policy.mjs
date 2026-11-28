@@ -32,64 +32,22 @@ const SCHEMA_VALIDATOR = new Ajv2020({
 });
 const validateConfigStructure = SCHEMA_VALIDATOR.compile(CONFIG_SCHEMA);
 
-// The canonical top-level concurrency group for a pull-request-triggered
-// workflow. github.workflow keys the run per workflow; github.event.pull_request.number
-// supersedes an in-flight run of the same pull request; and because that number
-// is empty on push and schedule events, those runs fall back to the unique
-// github.run_id and are never canceled. The pull-request number (not
-// github.head_ref) is used deliberately: head_ref is a fork-controllable branch
-// name that collides across same-named branches from different head repositories
-// on pull_request_target, whereas the number is unique and trusted. Internal
-// expression whitespace is tolerated; the token order and identity are exact.
 const CANONICAL_GROUP =
   /^\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.run_id\s*\}\}$/u;
 const CANONICAL_GROUP_TEXT = `\${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}`;
 
-// The ci-perf contract-only predicate. A workflow whose required check carries
-// the pull-request contract re-runs on `edited`, `labeled` and `unlabeled`,
-// events that change the contract answer without a new commit. Those runs gate
-// every lane off and carry the recorded lane verdict forward. The predicate is
-// the one the `ci-status` composite in ci-workflows carries as its
-// `contract-only` default at v0.20.0, and it must match that default exactly:
-// a drifted copy would gate lanes off while the composite still aggregates.
-// Both places it can appear here, `cancel-in-progress` and the branched
-// `group`, therefore hold it byte for byte, with none of the whitespace
-// tolerance the canonical `group` tokens enjoy.
 const CONTRACT_ONLY_PREDICATE_TEXT = `github.event.pull_request.head.repo.full_name == github.repository && (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || (github.event.action == 'edited' && !github.event.changes.base))`;
 
-// The contract-only `cancel-in-progress` text, kept for repositories not yet
-// reshaped onto the branched group. Expressed as `!(<predicate>)`, cancellation
-// stays on for every full-run event and switches off only for the events that
-// carry forward. This is a fail-closed allow-list of two values, the literal
-// `true` and this string.
 const CONTRACT_ONLY_CANCEL_TEXT = `\${{ !(${CONTRACT_ONLY_PREDICATE_TEXT}) }}`;
 
-// The ci-perf branched group (github-iac#378, Phase 6b). Two runs of the
-// required workflow on one head SHA share one concurrency group, and GitHub
-// evicts a pending run unconditionally, so `cancel-in-progress: false` does not
-// protect the contract-only run that queues behind the full run it reads. The
-// branched group puts contract-only runs in their own per-run group keyed on
-// github.run_id: no contract-only run can be canceled, evicted, or evict
-// anything, and the composite's bounded carry-forward wait replaces the queue.
-// The full branch keeps the canonical shape, and its fallback term is the
-// per-repository push decision: `github.ref` keeps push-side burst collapse,
-// `github.run_id` gives none because every push lands in its own group. Exactly
-// those two terms are admitted.
+// GitHub cancels a pending run in the same group even with `cancel-in-progress: false`, hence the branched group:
+// https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#concurrency
 const FALLBACK_TERMS = ["github.ref", "github.run_id"];
 
-// Escape a literal for embedding in a RegExp source, so the predicate and the
-// two format() calls are matched byte for byte rather than as patterns.
 function literalPattern(text) {
   return text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 }
 
-// Whitespace is tolerated only where the design's folded scalar puts it: the
-// `${{ }}` delimiters and the two operator joins. Written as `group: >-` with
-// the continuation lines more-indented, the YAML parser preserves a newline and
-// the extra indent at each join, so the folded and single-line spellings differ
-// only there. Everything else, above all the predicate, is exact. One pattern
-// per admitted fallback term, so a match names the term without a capture
-// group and an unlisted term matches nothing.
 const BRANCHED_GROUP_BY_FALLBACK = new Map(
   FALLBACK_TERMS.map((term) => [
     term,
@@ -109,10 +67,6 @@ function finding(rule, file, message, extra = {}) {
   return { level: "error", rule, file, message, ...extra };
 }
 
-// Classify a conforming group and name the fallback term it carries. The
-// canonical form has one by construction, `github.run_id`; the branched form
-// carries the repository's own decision. A group that matches neither returns
-// undefined and is reported as drift.
 function classifyGroup(group) {
   if (typeof group !== "string") {
     return undefined;
@@ -150,9 +104,6 @@ function parseWorkflow(source) {
   return workflow;
 }
 
-// A workflow's `on:` may be a single event string, an array of event strings,
-// or a mapping of event names to filters. YAML 1.2 keeps `on` a string key, so
-// no true/false coercion occurs.
 function triggerNames(on) {
   if (typeof on === "string") {
     return new Set([on]);
@@ -171,9 +122,6 @@ function isPullRequestTriggered(workflow) {
   return triggers.has("pull_request") || triggers.has("pull_request_target");
 }
 
-// Read the top-level concurrency declaration. `concurrency: <string>` is the
-// group-only shorthand and leaves cancel-in-progress false; the mapping form
-// carries an explicit group and cancel-in-progress.
 function topLevelConcurrency(workflow) {
   const concurrency = workflow.concurrency;
   if (concurrency === undefined) {
@@ -233,9 +181,6 @@ function concurrencyFindings(file, workflow) {
       ),
     );
   } else {
-    // Informational, never blocking: the fallback term is a per-repository
-    // decision, not drift, and reporting it lets a fleet check list which
-    // repositories keep push-side burst collapse.
     findings.push(
       finding(
         "concurrency-group-fallback",
@@ -261,9 +206,6 @@ function concurrencyFindings(file, workflow) {
       ),
     );
   }
-  // The canonical block is exactly group and cancel-in-progress. GitHub also
-  // accepts `queue`, but a pending queue is meaningless once cancel-in-progress
-  // supersedes the in-flight run, so any extra key is drift from the standard.
   const extraKeys = concurrency.keys.filter((key) => !ALLOWED_CONCURRENCY_KEYS.has(key));
   if (extraKeys.length > 0) {
     findings.push(
@@ -350,10 +292,6 @@ export async function auditRepository({
     }
     if (Object.hasOwn(exceptions, record.file)) {
       consumedExceptions.add(record.file);
-      // A delegated-job-level exception waives only the missing top-level block.
-      // A present block is still active, so it is validated regardless of the
-      // exception, and the now-unnecessary exception is reported: an exception
-      // must never license an unsafe or non-canonical block.
       if (topLevelConcurrency(record.workflow).present) {
         findings.push(
           finding(
@@ -384,8 +322,6 @@ export async function auditRepository({
         ),
       );
     } else if (!record.error) {
-      // A workflow that could not be parsed already has its unparsable finding,
-      // so its exception is left unconsumed without a second report.
       findings.push(
         finding(
           "exception-inventory-drift",
@@ -439,8 +375,6 @@ async function main() {
     if (json) {
       process.stdout.write(`${JSON.stringify({ findings, ok: !blocked }, null, 2)}\n`);
     } else {
-      // Info findings are reported on stdout and never fail the gate; blocking
-      // findings keep the stderr channel and the non-zero exit status.
       for (const item of findings) {
         const line = `${item.file}: ${item.level}: ${item.rule}: ${item.message}\n`;
         if (item.level === "info") {

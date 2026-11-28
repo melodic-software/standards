@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Test double for ~/.local/bin/vault-exec: same argv contract, no vault.
-// Appends its argv to $STUB_VAULT_LOG, sets each NAME to `stub-<secret>`
-// (or leaves it unset when STUB_VAULT_MODE=empty, like an --optional miss),
-// then runs the command with stdio inherited and exits with its code.
-// A nested call exits 99 at once, so a broken loop guard fails fast
-// instead of recursing.
 const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
 

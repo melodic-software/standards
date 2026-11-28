@@ -1,8 +1,3 @@
-# Test double for %USERPROFILE%\.local\bin\vault-exec.ps1: same argv contract, no vault.
-# Appends its argv to $env:STUB_VAULT_LOG, sets each NAME to stub-<secret> (or leaves
-# it unset when STUB_VAULT_MODE=empty, like an --optional miss), then runs the command
-# the way the real script does: ProcessStartInfo, stdio inherited, its exit code.
-# A nested call exits 99 at once, so a broken loop guard fails fast instead of recursing.
 Add-Content -LiteralPath $env:STUB_VAULT_LOG -Value ($args -join ' ')
 if ($env:STUB_VAULT_DEPTH) { exit 99 }
 $split = [array]::IndexOf($args, '--')
