@@ -18,4 +18,4 @@
 
 ## Build and operate
 
-- Once a rule has earned its place on a recurring problem, not one person's slip, enforce it with an automated check if it needs no judgment. A blocking check must be actionable, near-zero false positives, and about correctness; an advisory check keeps few false positives and is retired when unhelpful. The rule's owners decide to make a check required. Rules that need judgment, and social rules, stay with people. Cut duplicate, contradictory and no-op lines. Mine corrections from sessions and review comments on a schedule.
+- Once a rule has earned its place on a recurring problem, not one person's slip, enforce it with an automated check if it needs no judgment. A blocking check must be actionable, near-zero false positives, and about correctness; an advisory check keeps few false positives and is retired when unhelpful. The rule's owners decide to make a check required. Rules that need judgment, and social rules, stay with people. Cut duplicate, contradictory and no-op lines, and keep in prose only what needs judgment. Mine corrections from sessions and review comments on a schedule.

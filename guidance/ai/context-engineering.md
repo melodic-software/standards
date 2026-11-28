@@ -4,7 +4,7 @@
 
 - Keep always-loaded context to what every session needs and load the rest on demand by concern as the conversation evolves. A convention must load from an always-present surface, not depend on a skill being invoked. Load surface-specific instructions only where they work, detected at run time. Place context by audience (personal stores versus a shared home).
 - Put detailed agent instructions in a failing check's error message so they load only when needed, feed long documents section by section, and prefer a question-keyed summary cache for large docs pages.
-- Enforce rate limits, spend and turn caps in the harness. Show the agent a budget it can plan against, such as tool calls or a task budget; withhold raw rate-limit or plan-usage figures it cannot act on. Where context figures are shown, pair them with the continuation mechanism and a reminder not to stop early. Guards state facts and never push an agent to stop early, run fewer agents or pick weaker models. Agents get the current date and time.
+- Enforce rate limits, spend and turn caps in the harness. Show the agent a budget it can plan against, such as tool calls or a task budget; withhold raw rate-limit or plan-usage figures it cannot act on. Where context figures are shown, pair them with the continuation mechanism and a reminder not to stop early. Guards state facts advisorily and never push an agent to stop early, run fewer agents or pick weaker models. Agents get the current date and time.
 
 ## Design and operate
 
