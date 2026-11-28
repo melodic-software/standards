@@ -7,30 +7,30 @@ preview = true
 explicit-preview-rules = true
 
 select = [
-  "F",        # Pyflakes — correctness
-  "E", "W",   # pycodestyle — style errors/warnings
-  "I",        # isort — import ordering
-  "N",        # pep8-naming
-  "UP",       # pyupgrade — modernize syntax (bounded by requires-python)
-  "B",        # flake8-bugbear — likely bugs
-  "C4",       # flake8-comprehensions
-  "SIM",      # flake8-simplify
-  "PTH",      # flake8-use-pathlib
-  "S",        # flake8-bandit — security
-  "ASYNC",    # flake8-async — blocking calls in async code
-  "DTZ",      # flake8-datetimez — naive datetimes (owns the datetime checks)
-  "ARG",      # flake8-unused-arguments
-  "RET",      # flake8-return
-  "TID",      # flake8-tidy-imports — relative-import + banned-api rules below
-  "PIE",      # flake8-pie — misc anti-patterns
-  "PERF",     # Perflint — performance anti-patterns
-  "LOG",      # flake8-logging
-  "G",        # flake8-logging-format
-  "PLE",      # Pylint errors — high-value, low-noise
-  "PLW1514",  # Pylint: unspecified-encoding on open() (preview)
-  "FIX",      # flake8-fixme — surface TODO/FIXME/HACK markers
-  "ERA",      # eradicate — commented-out code
-  "RUF",      # Ruff-specific rules
+  "F",
+  "E", "W",
+  "I",
+  "N",
+  "UP",
+  "B",
+  "C4",
+  "SIM",
+  "PTH",
+  "S",
+  "ASYNC",
+  "DTZ",
+  "ARG",
+  "RET",
+  "TID",
+  "PIE",
+  "PERF",
+  "LOG",
+  "G",
+  "PLE",
+  "PLW1514",
+  "FIX",
+  "ERA",
+  "RUF",
 ]
 
 ignore = [
