@@ -107,6 +107,8 @@ fi
   git fetch --quiet origin "+main:refs/remotes/origin/main" 2>/dev/null ||
     toolchain_warn 'could not fetch origin/main'
 
+  # Cloud sessions don't author commits as the connected account; set author only, remove once fixed upstream.
+  # https://github.com/anthropics/claude-code/issues/104719
   gh_user="$(gh api user --jq 'select((.login // "") != "" and (.id // "" | tostring) != "")
     | [.login, (.id | tostring), (.name // "")] | @tsv' 2>/dev/null)" || gh_user=''
   IFS=$'\t' read -r gh_login gh_id gh_name <<<"$gh_user"
