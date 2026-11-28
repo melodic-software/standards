@@ -1,20 +1,5 @@
 #!/bin/bash
 # melodic-software/standards cloud-environment vault-exec
-#
-# Cloud-session Key Vault resolver, installed by setup.sh to
-# ~/.local/bin/vault-exec. Same argv contract as the workstation resolver:
-#
-#   vault-exec [--optional] --env NAME=secret-name [--env ...] -- <command> [args...]
-#
-# Each secret is read from https://$VAULT_EXEC_VAULT.vault.azure.net (default
-# kv-melo-devtools-prod) with no auth header: the environment's OAuth
-# client-credentials API credential makes the agent proxy add the bearer token.
-# NAME is set in the command's environment, then the command is exec'd, so its
-# stdin, stdout and exit code pass through. A secret that cannot be resolved
-# exits 1 without running the command; with --optional, NAME is left unset and
-# the command still runs. Bad usage exits 2. Diagnostics go to stderr and name
-# the secret and HTTP status, never the value. No value is ever in argv.
-# Transient failures are retried; all reads together stop after about 45 seconds.
 set -u
 
 usage() {
@@ -56,20 +41,15 @@ shift
 vault="${VAULT_EXEC_VAULT:-kv-melo-devtools-prod}"
 [[ "$vault" =~ ^[A-Za-z][A-Za-z0-9-]{1,22}[A-Za-z0-9]$ ]] ||
   usage "invalid VAULT_EXEC_VAULT '$vault': 3-24 alphanumerics and hyphens"
+# No auth header: the agent proxy adds the environment's secret to the request:
+# https://code.claude.com/docs/en/cloud-environments#add-network-secrets
 
-# One deadline covers every secret, so a slow or failing vault hands control
-# back well inside a 60 s launcher startup timeout. The overrides exist for
-# tests.
 budget="${VAULT_EXEC_BUDGET_SEC:-45}"
 delay="${VAULT_EXEC_RETRY_DELAY_SEC:-1}"
 deadline=$((SECONDS + budget))
 
-# fetch <url>: one attempt, capped by the time left. Sets resp (the body, then
-# the status on its last line) and curl_rc. curl reads /dev/null, never this
-# script's stdin, which belongs to the command; the body stays in memory.
-# -q must stay first: it stops curl reading a .curlrc from CURL_HOME,
-# XDG_CONFIG_HOME or HOME, which could add a url, proxy or trace line and send
-# the response, or the token the proxy adds, somewhere else.
+# -q must stay first: only then does curl skip every .curlrc, which could redirect
+# the response or the proxy's token: https://curl.se/docs/manpage.html#-q
 fetch() {
   local max=$((deadline - SECONDS))
   [[ $max -le 10 ]] || max=10
@@ -86,8 +66,6 @@ for i in "${!names[@]}"; do
   resp=''
   curl_rc=0
   status=''
-  # Up to three attempts, each a separate curl call. Only a transport error or
-  # HTTP 408, 429 or 5xx is retried, and only the last response is parsed.
   for attempt in 1 2 3; do
     if [[ $((deadline - SECONDS)) -lt 1 ]]; then
       status="${status:-none}, time budget spent"
@@ -104,10 +82,8 @@ for i in "${!names[@]}"; do
   body="${resp%$'\n'*}"
   value=''
   if [[ $curl_rc -eq 0 && "$status" == 200 ]]; then
-    # The trailing sentinel keeps a value's own trailing newlines intact
-    # through the command substitution. -I keeps the working directory and
-    # PYTHON* variables off the import path, so a planted json.py cannot forge
-    # the value.
+    # The x sentinel survives the trailing-newline strip of $(...); -I keeps the cwd and
+    # PYTHON* off sys.path: https://docs.python.org/3/using/cmdline.html#cmdoption-I
     if value="$(printf '%s' "$body" | python3 -I -c '
 import json, sys
 v = json.load(sys.stdin).get("value")

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests the rendered-views SessionStart hook against a stub vault-exec placed
-# beside a copy of the script, the way setup.sh installs the pair: it runs only
-# in a cloud session, writes a non-empty secret value, leaves the file alone
-# otherwise, never sees a caller's VAULT_EXEC_VAULT, and always exits 0 with
-# nothing on stdout.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,9 +9,6 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/config"
 cp "$root/components/cloud-environment/rendered-views-sync" "$tmp/bin/"
 dest="$tmp/config/rendered-views.md"
-# The stub logs its argv and the VAULT_EXEC_VAULT it sees, then acts on
-# STUB_MODE: value sets RV_MD to STUB_VALUE and runs the command, absent runs
-# it with RV_MD unset (what --optional does on a failed read), and fail exits 1.
 cat >"$tmp/bin/vault-exec" <<'STUB'
 #!/usr/bin/env bash
 printf 'argv=%s vault=%s\n' "$*" "${VAULT_EXEC_VAULT-unset}" >>"$STUB_LOG"
@@ -31,7 +23,6 @@ STUB
 chmod +x "$tmp/bin/vault-exec"
 export STUB_LOG="$tmp/stub.log"
 
-# run <remote> <mode> [value]: sets out, err, rc.
 run() {
   : >"$STUB_LOG"
   out="$(CLAUDE_CODE_REMOTE="$1" STUB_MODE="$2" STUB_VALUE="${3:-}" \

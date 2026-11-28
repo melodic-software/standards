@@ -31,8 +31,6 @@ test.after(async () => {
   await Promise.all(temporaryRoots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-// The workflow name is given as a stem and written in its Title Case form;
-// `{ raw: "..." }` writes it as given. Each job is named for its id.
 function workflow(name, jobIds) {
   const written =
     typeof name === "string" ? titleCaseName(name, vocabulary.displayWords) : name?.raw;
@@ -59,8 +57,6 @@ runs:
       shell: bash
 `;
 
-// workflows: { "file.yml": source }, actions: ["dir", "lane/unit"] or
-// { "dir": source }
 async function repository({ workflows = {}, actions = [] }) {
   const root = await mkdtemp(path.join(tmpdir(), "naming-lint-"));
   temporaryRoots.push(root);
@@ -153,7 +149,6 @@ test("each convention breach is reported under its own rule", async () => {
     "warning job-id-verb-first .github/workflows/pr-review.yml",
   ]);
   const kebab = findings.find((item) => item.rule === "job-id-kebab");
-  // workflow({ raw: "Claude Review" }, ...) puts the first job key on line 5.
   assert.equal(kebab.line, 5);
 });
 
@@ -185,7 +180,6 @@ test("annotations escape the characters the workflow command syntax reserves", (
   );
 });
 
-// The vocabulary holds no exemption today; these tests exercise the mechanism.
 const NAME_EXEMPTION = {
   path: ".github/workflows/release-deploy-oidc-negative-test.yml",
   repository: "melodic-software/github-iac",
@@ -474,7 +468,6 @@ test("the vocabulary loader rejects cross-field drift the schema cannot express"
 test("a malformed vocabulary file is a configuration error that names the file", async () => {
   const root = await repository({});
   const file = path.join(root, "vocabulary.json");
-  // YAML's JSON schema accepts a single-quoted string; JSON.parse does not.
   await writeFile(file, `{"stages": 'x'}`);
   await assert.rejects(
     loadVocabulary(file),
