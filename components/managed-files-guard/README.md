@@ -115,7 +115,7 @@ trigger change.
 ## The two refs
 
 **The action ref** is `@main` of ci-workflows: first-party actions float on
-`main` (owner decision, architecture owner-decisions L351), so a ci-workflows
+`main` (owner decision), so a ci-workflows
 change reaches every caller without a pin move or a sync.
 
 **`standards-ref: main`** for the soak, per the action's input contract

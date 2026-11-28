@@ -35,9 +35,9 @@ Per [component lifecycle](../../docs/component-lifecycle.md#admission-evidence):
 
 - **Live consumers**: 3 public targets (`melodic-software/.github`,
   `ci-runner`, `claude-code-account-rotation`) for `dependabot-automerge-caller`,
-  and 7 private fleet-enrolled targets (`architecture`,
-  `claude-code-proxy`, `dotfiles`, `github-iac`, `knowledge-corpus`,
-  `provisioning`, `songwriting`) for `dependabot-automerge-fleet-caller`.
+  and 6 private fleet-enrolled targets (`claude-code-proxy`, `dotfiles`,
+  `github-iac`, `knowledge-corpus`, `provisioning`, `songwriting`) for
+  `dependabot-automerge-fleet-caller`.
   `ci-workflows` (hosts the reusable itself) and `medley` (carries an extra
   repo-local `automerge` job) stay `locally-owned`. `standards` is the manifest
   source, not a target, and keeps its repo-local caller with explicit

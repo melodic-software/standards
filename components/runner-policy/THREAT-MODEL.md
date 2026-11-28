@@ -112,7 +112,7 @@ not duplicate those changing inventories.
   control for that content, accepted by the owner's decision to float
   first-party reusable workflows.
 - First-party composite actions a caller names directly float on `@main` too
-  (owner decision, architecture owner-decisions L351), with the same residual
+  (owner decision), with the same residual
   risk: a ci-workflows action change reaches every caller with no standards
   review.
 - `approvedShas` is migration-only: it keeps callers pinned to a previously

@@ -17,7 +17,7 @@ repositories. It sets two rules:
   OpenAI's `openai`. zizmor matches owners case-sensitively, so each spelling
   in use has its own entry and any other spelling falls to `hash-pin`. A SHA
   pin also satisfies `ref-pin`. First-party refs use `@main` and vendor refs
-  the vendor's major tag (owner decision, architecture owner-decisions L351).
+  the vendor's major tag (owner decision).
 
 Both rules only relax zizmor's defaults, so reading this file cannot add a
 finding to a repository.

@@ -66,8 +66,7 @@ outside Dependabot. Each `updates` entry in `.github/dependabot.yml` must:
 lists the `accepted` intervals for an ecosystem that differs, with the date
 it was `reviewed` and its `basis`. The `github-actions` entry returns to
 weekly (owner decision, 2026-11-23); only `weekly` is accepted. First-party actions float on `main` and
-official-vendor actions on their major tag (owner decision, architecture
-owner-decisions L351), so Dependabot moves no first-party ref; the entry
+official-vendor actions on their major tag (owner decision), so Dependabot moves no first-party ref; the entry
 carries vendor major-tag bumps and the full-commit-SHA pins of third-party
 actions. Those keep their cooldown and grouping, and
 `open-pull-requests-limit` still caps the entry.
@@ -126,7 +125,7 @@ These safeguards remain on a fast-tracked update:
 - every third-party action stays pinned to a full commit SHA, so its update
   is one reviewable diff that moves a pin; first-party and official-vendor
   actions (`anthropics/*` included) float on `main` or the vendor's major tag
-  (owner decision, architecture owner-decisions L351);
+  (owner decision);
 - `CI Status` must pass before any merge, and the merge lanes' gates
   (non-major rule, `reviewOnly`, readable `updated-dependencies` metadata)
   apply unchanged;
