@@ -1,29 +1,4 @@
 #!/usr/bin/env bash
-# Checks that a repository's root AGENTS.md carries the `## Code Review Rules`
-# section the convention in this directory's README.md defines: the heading,
-# the inherited intro line verbatim, and exactly one org-wide REVIEW.md pointer
-# whose target matches whether the repository has a root REVIEW.md.
-#
-# Usage:
-#   code-review-rules.sh file  [--root DIR]
-#   code-review-rules.sh fleet [--org OWNER] [--repos FILE] [--fixtures DIR]
-#   code-review-rules.sh names <REPOSITORIES.json
-#
-# `file` checks DIR/AGENTS.md against DIR/REVIEW.md (default DIR: `.`).
-# `fleet` checks the default branch of every repository named in FILE (one
-# name per line), reading each repository's AGENTS.md and REVIEW.md through
-# the GitHub contents API with the GH_TOKEN in the environment. Without
-# --repos it checks the org's public, non-archived repositories without the
-# `sandbox` topic, which any token can read. --fixtures DIR reads
-# DIR/<repo>/AGENTS.md and DIR/<repo>/REVIEW.md instead of the API (tests
-# only).
-# `names` reads GitHub repository objects on stdin (a JSON array or a stream
-# of objects) and prints the name of each one the fleet audits: not archived
-# and without the `sandbox` topic. The scheduled workflow pipes its private
-# installation listing through it, so both listings apply one filter.
-#
-# Exits 0 when every repository checked conforms, 1 when any does not (one
-# `MISSING:` line per repository), 2 on a usage or query error.
 set -euo pipefail
 
 org='melodic-software'
@@ -37,12 +12,36 @@ pointer_label='- Org-wide criteria:'
 # shellcheck disable=SC2016 # literal Markdown backticks, not an expansion
 pointer_prefix='- Org-wide criteria: [`REVIEW.md`]('
 canonical_url='https://github.com/melodic-software/standards/blob/main/REVIEW.md'
-# The repository objects the fleet audits: not archived, and not a disposable
-# test bed carrying the `sandbox` topic (pr-pipeline-sandbox).
 audited='select((.archived | not) and (any(.topics[]?; . == "sandbox") | not)) | .name'
 
 usage() {
-  sed -n '2,/^set -euo pipefail/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+Checks that a repository's root AGENTS.md carries the `## Code Review Rules`
+section the convention in this directory's README.md defines: the heading,
+the inherited intro line verbatim, and exactly one org-wide REVIEW.md pointer
+whose target matches whether the repository has a root REVIEW.md.
+
+Usage:
+  code-review-rules.sh file  [--root DIR]
+  code-review-rules.sh fleet [--org OWNER] [--repos FILE] [--fixtures DIR]
+  code-review-rules.sh names <REPOSITORIES.json
+
+`file` checks DIR/AGENTS.md against DIR/REVIEW.md (default DIR: `.`).
+`fleet` checks the default branch of every repository named in FILE (one
+name per line), reading each repository's AGENTS.md and REVIEW.md through
+the GitHub contents API with the GH_TOKEN in the environment. Without
+--repos it checks the org's public, non-archived repositories without the
+`sandbox` topic, which any token can read. --fixtures DIR reads
+DIR/<repo>/AGENTS.md and DIR/<repo>/REVIEW.md instead of the API (tests
+only).
+`names` reads GitHub repository objects on stdin (a JSON array or a stream
+of objects) and prints the name of each one the fleet audits: not archived
+and without the `sandbox` topic. The scheduled workflow pipes its private
+installation listing through it, so both listings apply one filter.
+
+Exits 0 when every repository checked conforms, 1 when any does not (one
+`MISSING:` line per repository), 2 on a usage or query error.
+EOF
 }
 
 die() {
@@ -90,16 +89,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# problems <agents-text> <has-review: true|false> — prints one reason per
-# line for each way the text misses the convention; prints nothing when it
-# conforms.
 problems() {
   local text="$1" has_review="$2"
   local count section pointers expected unclosed
-  # Fenced code is an example, never an operative line: drop it first. As in
-  # CommonMark, a fence closes only on a bare run of its own character at
-  # least as long as the opening run, and an unclosed fence runs to the end of
-  # the document.
   # shellcheck disable=SC2016 # awk program text, not a shell expansion
   local fences='
     match($0, /^[[:space:]]*(```+|~~~+)/) {
@@ -122,15 +114,11 @@ problems() {
     return
   fi
   [[ "$count" -eq 1 ]] || echo "${count} '${heading}' headings, expected one"
-  # The section runs from the heading to the next level-1 or level-2 heading.
   section="$(printf '%s\n' "$text" | awk -v h="$heading" '
     $0 == h { inside = 1; next }
     inside && /^##? / { exit }
     inside { print }')"
   printf '%s\n' "$section" | grep -qxF -- "$intro" || echo "the inherited intro line is missing"
-  # Every line naming the org-wide criteria counts, linked or not and at any
-  # indentation (an indented bullet is still a list item), so a stale second
-  # pointer beside the correct one cannot pass.
   pointers="$(printf '%s\n' "$section" | awk -v p="$pointer_label" '{ s = $0; sub(/^[[:space:]]+/, "", s) } index(s, p) == 1')"
   if [[ -z "$pointers" ]]; then
     echo "the inherited REVIEW.md pointer line is missing"
@@ -141,7 +129,6 @@ problems() {
     echo "${count} org-wide criteria pointer lines, expected one"
     return
   fi
-  # The inherited block is copied verbatim, so the one pointer is unindented.
   if [[ "$pointers" == [[:space:]]* ]]; then
     echo "the org-wide criteria pointer line must not be indented"
     return
@@ -171,9 +158,6 @@ fi
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
-# fetch <repo> <path> — writes the file's content to $scratch/content and sets
-# `exists` to true, or sets it to false when the file does not exist. Any
-# other failure is a query error.
 fetch() {
   local repo="$1" path="$2"
   exists=true

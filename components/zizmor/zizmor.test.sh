@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Tests the zizmor component: with the root-canonical config, first-party and
-# official-vendor refs on a branch or tag, a SHA-pinned third-party action and a
-# 3-day Dependabot cooldown audit clean, a third-party tag still fails
-# unpinned-uses, and a configless control run flags the first-party reusable,
-# the vendor tags and the cooldown.
-# Skips when zizmor is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -17,13 +11,11 @@ fixtures='components/zizmor/fixtures'
 if ! command -v zizmor >/dev/null 2>&1; then
   skip_suite 'zizmor not installed'
 fi
-# Discovery from the repository root holds from 1.29.0; actions.lock and
-# parallel: step support hold from 1.33.1.
 version_output="$(zizmor --version)"
 require_min_version zizmor "${version_output##* }" 1.33.1
 
-# zizmor discovers .github/zizmor.yml from the Git root, so the fixtures run
-# inside a scratch repo mirroring a consumer checkout.
+# zizmor discovers .github/zizmor.yml from the Git root, so fixtures run in a
+# scratch repo: https://docs.zizmor.sh/configuration/
 project="$(mktemp -d)"
 trap 'rm -rf -- "$project"' EXIT
 make_repo "$project"
@@ -49,9 +41,6 @@ assert_contains 'the third-party tag is rejected' "$out" 'third-party-tag.yml:'
 assert_not_contains 'first-party refs stay admitted' "$out" 'first-party-float.yml:'
 assert_not_contains 'vendor refs stay admitted' "$out" 'vendor-float.yml:'
 
-# Locking the same third-party tag in actions.lock clears the unpinned-uses
-# finding that just failed above, proving zizmor actually reads actions.lock;
-# a parallel: step block also audits clean under the shipped config.
 cat <<'EOF' >"$project/.github/workflows/parallel-steps.yml"
 name: parallel-steps
 on: push
@@ -84,8 +73,6 @@ assert_exit 'third-party tag locked in actions.lock and parallel steps audit cle
 assert_not_contains 'actions.lock clears unpinned-uses for the third-party tag' "$out" 'unpinned-uses'
 rm "$project/.github/workflows/parallel-steps.yml" "$project/.github/workflows/actions.lock"
 
-# Control: without the config zizmor's default hash-pins every ref and wants a
-# 7-day cooldown. When this fails, the default changed; recheck the policy.
 rm "$project/.github/zizmor.yml" "$project/.github/workflows/third-party-tag.yml"
 out="$(audit .)"
 rc=$?

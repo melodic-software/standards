@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Contract tests for .cursor/install.sh: the PATH-link helpers must not abort
-# when nvm already owns the first writable directory, and the four Lefthook
-# hygiene-engine pins must match the ci-workflows action defaults at the ref
-# (main, or a full SHA) pr-require-checks.yml uses.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -24,8 +20,6 @@ for bin in node npm npx; do
   chmod +x "$nvm_bin/$bin"
 done
 
-# Codex finding: nvm use prepends $node_bin_dir, so a naive walk picks that
-# directory and GNU ln aborts on a same-file self-link.
 PATH="$nvm_bin:/exec-daemon:/usr/bin"
 found="$(cursor_install::choose_link_dir "$nvm_bin")"
 assert_eq 'nvm bin dir is skipped when it is the first writable PATH entry' '' "$found"
@@ -39,7 +33,6 @@ assert_eq 'node link target is the nvm binary' "$nvm_bin/node" "$(readlink "$oth
 assert_eq 'npm link target is the nvm binary' "$nvm_bin/npm" "$(readlink "$other_bin/npm")"
 assert_eq 'npx link target is the nvm binary' "$nvm_bin/npx" "$(readlink "$other_bin/npx")"
 
-# Second pass must be a no-op, not a GNU ln same-file abort.
 cursor_install::link_bins "$nvm_bin" "$nvm_bin"
 self_link_rc=$?
 assert_exit 'self-link into the nvm bin dir does not abort' 0 "$self_link_rc"

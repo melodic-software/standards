@@ -1,38 +1,5 @@
 #!/usr/bin/env bash
-# Cursor Cloud Agent install for the Melodic Software standards repository.
-#
-# Idempotent and non-interactive. It provisions the toolchain the repository's
-# documented local workflow and its always-on Lefthook pre-commit lanes need:
-#
-#   * the Node runtime pinned in .node-version (via nvm), plus every npm
-#     dependency root the repository carries. The root package.json declares no
-#     workspaces, so the component and distribution projects each own a lockfile
-#     a root install does not reach (the roots ci.yml installs with its own
-#     `npm ci --prefix` steps);
-#   * the cross-cutting hygiene engines the base Lefthook config invokes on
-#     every commit with assert_lefthook_installed (a missing engine fails the
-#     hook rather than skipping): shellcheck, typos, gitleaks, and
-#     editorconfig-checker. Versions and checksums match the ci-workflows
-#     actions this repository pins, so a local commit and CI agree.
-#
-# Language-specific engines (.NET, Python/ruff, PowerShell, Go, lychee,
-# yq) are provisioned by CI; the component contract tests skip cleanly when
-# their engine is absent locally, matching this repository's own design.
-#
-# Node selection note: the exec daemon ships its own `node` on PATH ahead of
-# the nvm-managed one, so this script links the pinned node/npm/npx into the
-# earliest writable PATH directory that precedes the daemon. That makes the
-# pinned toolchain win for a bare `node` invocation without depending on nvm
-# being sourced in every shell.
-#
-# Engine version+SHA-256 pins stay in lockstep with the ci-workflows composite
-# action defaults at the SHA `ci.yml` already pins. `.cursor/install.test.sh`
-# fetches those action.yml files and fails on drift.
 
-# cursor_install::choose_link_dir <node-bin-dir>
-# Print the first writable PATH directory that precedes /exec-daemon and is
-# not the nvm bin dir itself. nvm use prepends that dir; GNU ln then treats a
-# self-link as an error and, under set -e, aborts before npm ci / engines.
 cursor_install::choose_link_dir() {
   local node_bin="$1" dir="" saved_ifs="$IFS"
   IFS=:
@@ -54,9 +21,6 @@ cursor_install::choose_link_dir() {
   IFS="$saved_ifs"
 }
 
-# cursor_install::link_bins <node-bin-dir> <link-dir>
-# Symlink node/npm/npx into link-dir, skipping a pair that already is the
-# same inode so GNU ln cannot abort the install.
 cursor_install::link_bins() {
   local node_bin="$1" link_dir="$2" bin
   for bin in node npm npx; do
@@ -71,7 +35,6 @@ cursor_install::link_bins() {
   done
 }
 
-# Sourced by .cursor/install.test.sh for the PATH-link helpers only.
 if [[ "${CURSOR_INSTALL_LIBONLY:-}" == 1 ]]; then
   return 0
 fi
@@ -104,8 +67,6 @@ if [[ ! -x "$node_bin_dir/node" ]]; then
   exit 1
 fi
 
-# Link node/npm/npx into the first writable PATH directory that comes before
-# /exec-daemon, whose bundled node would otherwise shadow the pinned one.
 link_dir="$(cursor_install::choose_link_dir "$node_bin_dir")"
 if [[ -n "$link_dir" ]]; then
   cursor_install::link_bins "$node_bin_dir" "$link_dir"
@@ -124,9 +85,6 @@ for lock in package-lock.json components/*/package-lock.json distribution/packag
   npm ci --no-audit --no-fund --ignore-scripts --prefix "$dir"
 done
 
-# Install scripts are off (root .npmrc and --ignore-scripts), so install the
-# Lefthook hooks through `prepare`, skipped under the same condition as
-# Lefthook's postinstall: CI set and LEFTHOOK unset ("", 0 or false).
 hooks_skipped=false
 case "${CI:-}" in
   '' | 0 | false) ;;

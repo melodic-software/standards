@@ -1,19 +1,4 @@
 #!/usr/bin/env bash
-# Audits repository checkouts for zizmor `unpinned-uses` findings under one
-# config, so a ref the policy does not admit is caught wherever it landed.
-#
-# Usage:
-#   sweep.sh --config FILE DIR...
-#
-# Each DIR is a checkout of one repository; its basename names the repository
-# in the output. zizmor runs offline over the workflows and composite actions
-# it collects under DIR, with ignore comments disabled, so a repository cannot
-# suppress a finding. Findings of every other audit are dropped. A DIR holding
-# no workflow or action file prints `NO-INPUTS:` and is skipped.
-#
-# Prints one `UNPINNED: <repo>: <path>:<line>: <ref>` line per finding.
-# Exits 0 when no DIR has a finding, 1 when any does, 2 on a usage or tool
-# error (findings found before the error are still printed).
 set -euo pipefail
 
 die() {

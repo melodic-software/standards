@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# Tests the gitleaks component against the root-canonical base config.
-#
-# Secret inputs are CONSTRUCTED AT RUNTIME from concatenated parts and written
-# to a temp dir — no secret-shaped bytes are committed to this repo, so neither
-# gitleaks' own dogfood scan nor an external secret scanner (GitGuardian, GitHub
-# secret scanning) flags the test scaffolding. The literal joined token never
-# appears in this file's source.
-#
-# Each scan sets -i to its scan target (no .gitleaksignore there) so nothing
-# masks the detection under test. Skips cleanly when the engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -25,18 +15,15 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bad" "$tmp/allow" "$tmp/reports" "$tmp/stateless" "$tmp/words"
 
-# scan_dir <dir> [flag...] — scan <dir> with the component config and -i <dir>.
 scan_dir() {
   local dir="$1"
   shift
   gitleaks dir "$dir" --config "$config" --no-banner --redact "$@" -i "$dir"
 }
 
-# Real-shape token built from parts — the joined string is never a source literal.
 gh_prefix='ghp_'
 gh_token="${gh_prefix}1A2b3C4d5E6f7G8h9I0jK1l2M3n4O5p6Q7r8"
 
-# A bare token is flagged.
 printf 'GITHUB_TOKEN=%s\n' "$gh_token" >"$tmp/bad/leak.env"
 out="$(scan_dir "$tmp/bad" 2>&1)"
 rc=$?
@@ -44,7 +31,6 @@ assert_exit 'constructed secret is flagged (exit 1)' 1 "$rc"
 assert_contains 'reports leaks' "$out" 'leaks found'
 assert_not_contains 'detected value is redacted' "$out" "$gh_token"
 
-# Machine-readable reports must contain the finding without retaining the value.
 for format in json sarif; do
   report="$tmp/reports/gitleaks.$format"
   out="$(scan_dir "$tmp/bad" --report-format "$format" --report-path "$report" 2>&1)"
@@ -58,9 +44,6 @@ for format in json sarif; do
   assert_not_contains "$format report command output omits the detected value" "$out" "$gh_token"
 done
 
-# A stateless App installation token (ghs_<appid>_<jwt>) is flagged by the
-# component's own rule: no default rule matches past the `_` after the app id.
-# The values are placeholders built from parts, not a real token.
 app_prefix='ghs_'
 app_token="${app_prefix}1234567_eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjAwMDAwMDB9.c2lnbmF0dXJlLXBsYWNlaG9sZGVy"
 printf 'GITHUB_TOKEN=%s\n' "$app_token" >"$tmp/stateless/app.env"
@@ -72,7 +55,6 @@ assert_contains 'stateless token report names the rule' "$report_content" 'githu
 assert_not_contains 'stateless token is redacted in output' "$out" "$app_token"
 assert_not_contains 'stateless token is redacted in the report' "$report_content" "$app_token"
 
-# Words that end in "ghs" followed by a long snake_case tail are not tokens.
 printf 'label = highs_and_lows_of_the_market_over_the_year\nmood = laughs_out_loud_at_the_whole_long_meeting_today\n' \
   >"$tmp/words/words.txt"
 scan_dir "$tmp/words" >/dev/null 2>&1
@@ -85,12 +67,10 @@ scan_dir "$tmp/allow" >/dev/null 2>&1
 rc=$?
 assert_exit 'gitleaks:allow silences the finding (exit 0)' 0 "$rc"
 
-# The committed clean fixture scans clean.
 scan_dir components/gitleaks/fixtures/good >/dev/null 2>&1
 rc=$?
 assert_exit 'good fixture exits 0' 0 "$rc"
 
-# --all must include a secret reachable only from a non-HEAD local branch.
 history_repo="$tmp/history"
 make_repo "$history_repo"
 git -C "$history_repo" config core.autocrlf false

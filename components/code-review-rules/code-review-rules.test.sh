@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Tests code-review-rules.sh offline: every repository is a fixture directory,
-# so no test needs a GitHub credential or the network.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -22,8 +20,6 @@ synced='- Org-wide criteria: [`REVIEW.md`](REVIEW.md), synced from `melodic-soft
 # shellcheck disable=SC2016 # literal Markdown backticks, not an expansion
 remote='- Org-wide criteria: [`REVIEW.md`](https://github.com/melodic-software/standards/blob/main/REVIEW.md) in `melodic-software/standards`.'
 
-# repo <name> <agents-body|-> [review] — a fixture repository; `-` writes no
-# AGENTS.md, and a third argument writes a root REVIEW.md.
 repo() {
   mkdir -p "$work/fleet/$1"
   [[ "$2" == - ]] || printf '%s\n' "$2" >"$work/fleet/$1/AGENTS.md"
@@ -67,7 +63,6 @@ repo nested-fence "$(
   printf '%s`\n' "$fence"
 )" review
 
-# check_file <fixture repo> — `file` mode over one fixture, stderr merged.
 check_file() { bash "$script" file --root "$work/fleet/$1" 2>&1; }
 
 out="$(check_file synced)"
@@ -153,9 +148,6 @@ assert_contains 'fleet names a repo with the wrong pointer' "$out" 'MISSING: wro
 assert_contains 'fleet names a repo with a duplicate pointer' "$out" 'MISSING: duplicate-stale: 2 org-wide criteria pointer lines'
 assert_contains 'fleet still lists the conforming repo' "$out" 'OK: synced'
 
-# The listing filter both fleet listings apply, over repository objects shaped
-# like the GitHub API's: sandbox anywhere in the topics, archived, and absent
-# or null topics.
 listing='[
   {"name": "kept", "archived": false, "topics": ["testing"]},
   {"name": "sandbox-first", "archived": false, "topics": ["sandbox", "testing"]},
