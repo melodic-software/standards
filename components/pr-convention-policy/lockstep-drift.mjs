@@ -1,30 +1,5 @@
 #!/usr/bin/env node
 
-// Lockstep drift check (ADR-0008): `policy.json` is the canonical record of
-// the fleet PR convention, but other copies of the contract exist and must
-// change in lockstep with it — the ci-workflows `check-contract` composite
-// (the live gate every consumer runs inside its `ci-status` job), the
-// source-control plugin's PreToolUse validator, and the org `.github` PR
-// template. Letting any copy drift is exactly the
-// failure #393 recorded (and claude-code-plugins#3205 repeated). This check
-// also dereferences every consumer's pinned artifact and validates the
-// contract AT THAT PIN, because a stale pin enforcing an older contract (the
-// codex-plugins v0.9.1 case) is drift no source-copy diff can see.
-//
-// Phase 3 of the ci-perf program (github-iac#396) moves the fleet from the
-// `pr-issue-linkage.yml` reusable to the `check-contract` composite, one
-// repository at a time. A consumer therefore runs one artifact or the other,
-// never both, for the days that transition takes: the fleet scan detects
-// which one a repository uses and checks the contract with the matching
-// extractor, so a mixed fleet passes and a drifted artifact of either kind
-// still fails.
-//
-// The CLI takes one mode, `copies` or `pins` (see MODES), fetches live
-// sources over the GitHub contents API and exits
-// non-zero on drift; every network failure is a distinct `fetch-error`
-// failure, never a skip. Parsing and comparison logic is exported for the
-// hermetic fixture tests in `lockstep-*.test.mjs`.
-
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -44,10 +19,6 @@ import { parseUniqueJson } from "./pr-convention-policy.mjs";
 const MODULE_DIRECTORY = import.meta.dirname;
 const POLICY_PATH = path.join(MODULE_DIRECTORY, "policy.json");
 
-// Contents-API URLs, not raw.githubusercontent: several consumers are private
-// repositories, and the API honors the token `LOCKSTEP_GITHUB_TOKEN` (or
-// `GITHUB_TOKEN`). The pin audit mints that token from the org GitHub App;
-// the copy check reads only public sources, with the workflow token or none.
 const API_BASE = "https://api.github.com/repos/melodic-software";
 const contentsUrl = (repo, ref, filePath) => `${API_BASE}/${repo}/contents/${filePath}?ref=${ref}`;
 
@@ -63,9 +34,6 @@ export const COPY_SOURCES = {
   orgTemplate: contentsUrl(".github", "main", ".github/PULL_REQUEST_TEMPLATE.md"),
 };
 
-// Every repository whose gate caller the scan checks. A repository listed here
-// with no gate caller is a drift finding, so add a repository once it runs the
-// gate and the standards-sync App installation can read it.
 export const CONSUMER_REPOSITORIES = [
   ".github",
   "azure-iac",
@@ -83,13 +51,6 @@ export const CONSUMER_REPOSITORIES = [
   "standards",
 ];
 
-// There is no exemption: every repository above must run one of the two
-// contract artifacts, and running neither is drift. Fail closed.
-
-// The composite is called from the `ci-status` job, which lives in
-// `pr-require-checks.yml` after the rename, `ci.yml` before it, and
-// `ci-status.yml` in medley. Scanning these first, in this order, lets the
-// common case short-circuit instead of reading a whole workflow directory.
 const WORKFLOW_SCAN_PRIORITY = ["pr-require-checks.yml", "ci.yml", "ci-status.yml"];
 
 export class DriftError extends Error {
@@ -113,17 +74,12 @@ function collect(errors, fn) {
     if (!(error instanceof DriftError)) {
       throw error;
     }
-    // Checks that share a parser can raise its finding verbatim; report it once.
     if (!errors.includes(error.message)) {
       errors.push(error.message);
     }
   }
 }
 
-// The `check-contract` composite (the live gate, and every migrated consumer).
-//
-// `run.sh` states the section list as data: the analyzer's END block calls
-// `section_report("<name>")` once per required section, in contract order.
 export function parseCompositeSections(runShText, location) {
   const names = [...runShText.matchAll(/section_report\("([^"]+)"\)/g)].map((m) => m[1]);
   if (names.length === 0) {
@@ -132,20 +88,6 @@ export function parseCompositeSections(runShText, location) {
   return names;
 }
 
-// The composite's keyword and marker enforcement are executable awk regex
-// literals, so they are validated FUNCTIONALLY the same way the reusable's
-// were: extract each declared pattern and probe it with every policy
-// keyword/marker. A keyword that survives only in a comment or an error
-// message no longer passes.
-//
-// Before ci-workflows#733 the keyword scan is an inline `/.../` literal. From
-// #733 on it is `closing_regex`, assembled in the analyzer's BEGIN block from
-// the keyword alternation, a separator (custom pattern or default), and the
-// reference pattern; the default-pattern form is the one rebuilt here, since
-// it is what runs for every caller that leaves `issue-ref-pattern` unset.
-// From ci-workflows#815 `scan_line` finds the matches with one
-// `gsub(closing_regex, ...)` pass over the lowercased line instead of a
-// `match(chunk, closing_regex)` loop; either form applies `closing_regex`.
 function compositeKeywordPattern(runShText, location) {
   const literal = runShText.match(/match\(chunk, \/(.+)\/\)\) break/);
   if (literal) {
@@ -177,13 +119,6 @@ export function parseCompositePatterns(runShText, location) {
       `${location}: closing-keyword / no-issue-marker match expressions not found in run.sh`,
     );
   }
-  // Both awk patterns are lowercase and match against text the analyzer has
-  // already lowercased (`lower = tolower(line)` for the keyword scan,
-  // `tolower(body)` in the anchor above for the marker). The probes below
-  // lowercase to mirror that. If the lowercasing ever went away the extracted
-  // pattern would become case-sensitive against raw text and reject the
-  // documented capitalized forms, so its presence is asserted rather than
-  // assumed — the composite's equivalent of the reusable's `i` flag.
   if (!/lower = tolower\(line\)/.test(runShText)) {
     throw new DriftError(
       `${location}: the closing-keyword scan no longer lowercases the line (\`lower = tolower(line)\`), so the extracted pattern is not the one the gate applies`,
@@ -200,11 +135,6 @@ function parseActionYml(actionYmlText, location) {
   }
 }
 
-// `action.yml`'s `inputs.types.default` is the composite's copy of
-// `policy.json`'s `allowedTypes`: the title regex is built from it at runtime,
-// and no caller in the fleet overrides it. Parsed as YAML rather than by
-// regex so the anchor is the data key, not the shape of the description block
-// above it.
 export function parseCompositeTypes(actionYmlText, location) {
   const document = parseActionYml(actionYmlText, location);
   const declared = document?.inputs?.types?.default;
@@ -221,13 +151,6 @@ export function parseCompositeTypes(actionYmlText, location) {
   return types;
 }
 
-// `inputs.require-scope.default` is the composite's copy of `policy.json`'s
-// `title.requireScope`, and the title regex makes the scope group mandatory
-// when it is `true`. A composite release that flipped it would reject every
-// unscoped title fleet-wide while the section and type checks still reported
-// agreement. YAML gives back a string for the quoted `'false'` the composite
-// declares and a boolean for a bare `false`; both are accepted, anything else
-// is drift rather than a coerced guess.
 export function parseCompositeRequireScope(actionYmlText, location) {
   const document = parseActionYml(actionYmlText, location);
   const declared = document?.inputs?.["require-scope"]?.default;
@@ -245,11 +168,6 @@ export function parseCompositeRequireScope(actionYmlText, location) {
   );
 }
 
-// The behavioral check runs the analyzer with run.sh's DEFAULT_ISSUE_REF_PATTERN.
-// A caller that leaves `issue-ref-pattern` unset gets action.yml's default
-// instead, and any value other than run.sh's own default switches the analyzer
-// to its custom-pattern rules (a mandatory keyword separator), so the two
-// defaults must agree for the behavioral verdict to describe the gate.
 export function assertCompositeIssueRefDefault(runShText, actionYmlText, location) {
   const issueRef = parseCompositeIssueRef(runShText, location);
   if (issueRef === null) {
@@ -263,12 +181,6 @@ export function assertCompositeIssueRefDefault(runShText, actionYmlText, locatio
   }
 }
 
-// The `pr-issue-linkage.yml` reusable (the predecessor, still pinned by every
-// consumer that has not taken its Phase 3 pull request yet).
-//
-// The reusable declares its contract as a `requiredSections` array of
-// `{ name: "...", guidance: "..." }` literals inside an actions/github-script
-// step. The array literal is the narrowest stable surface to parse.
 export function parseGateSections(workflowText, location) {
   const arrayMatch = workflowText.match(/const requiredSections = \[([\s\S]*?)\n\s*\];/);
   if (!arrayMatch) {
@@ -282,16 +194,6 @@ export function parseGateSections(workflowText, location) {
 }
 
 export function parseGatePatterns(workflowText, location) {
-  // Accept any declared flag set rather than a literal `/i;`: ci-workflows made
-  // CLOSING_KEYWORD global (`/gi;`, so every occurrence on a line can be
-  // classified) and the old literal match turned a healthy gate into
-  // "declarations not found" — a parse failure wearing a drift error's clothes.
-  //
-  // Flags are CAPTURED, not discarded, because they are behavior. Both bodies are
-  // lowercase and depend on `i` to accept the documented capitalized keyword forms;
-  // rebuilding the probe with a hardcoded `i` would silently pass a gate that had
-  // dropped it and become case-sensitive, which is exactly the enforcement drift this check
-  // exists to catch. `g` and `y` are the one exception, stripped below.
   const keyword = workflowText.match(/const CLOSING_KEYWORD =\s*\/(.+)\/([dgimsuvy]*);/);
   const marker = workflowText.match(/const NO_ISSUE_MARKER =\s*\/(.+)\/([dgimsuvy]*);/);
   if (!keyword || !marker) {
@@ -299,10 +201,8 @@ export function parseGatePatterns(workflowText, location) {
       `${location}: CLOSING_KEYWORD / NO_ISSUE_MARKER regex declarations not found`,
     );
   }
-  // `g` and `y` make `.test()` stateful via lastIndex, and assertPatternsEnforce
-  // probes each pattern once per policy keyword, so a retained `g` would make
-  // every probe after the first read a moved cursor instead of the pattern.
-  // Neither flag changes WHAT the pattern matches, so dropping them is safe.
+  // `g` and `y` make `.test()` stateful via lastIndex, so repeated probes would read a moved cursor.
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/test
   const probeFlags = (flags) => flags.replaceAll(/[gy]/g, "");
   return {
     keyword: new RegExp(keyword[1], probeFlags(keyword[2])),
@@ -310,7 +210,6 @@ export function parseGatePatterns(workflowText, location) {
   };
 }
 
-// The hook validator declares `REQUIRED_SECTIONS=(Summary Fix ...)`.
 export function parseValidatorSections(shellText, location) {
   const match = shellText.match(/REQUIRED_SECTIONS=\(([^)]*)\)/);
   if (!match) {
@@ -327,14 +226,6 @@ export function parseMarkdownHeadings(markdownText) {
   return [...markdownText.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
 }
 
-// The hook validator's enforcement is a pair of POSIX ERE strings, its
-// `scan_linkage` transcription of the composite's `scan_line`; translate the
-// POSIX classes they use and probe them the same way. The probes pad with
-// spaces because NO_ISSUE_ERE guards with [^a-z0-9_] boundary classes. Both
-// EREs are lowercase, so every `=~` against them must read a lowercased
-// operand, as the composite's `tolower` is asserted: CLOSING_ERE only on
-// `$chunk` (a slice of `lower="${line,,}"`), NO_ISSUE_ERE only on `$lower`
-// (`${1,,}` wrapped in newlines). A match on the raw line is drift.
 const VALIDATOR_OPERANDS = {
   // biome-ignore lint/suspicious/noTemplateCurlyInString: bash parameter expansions, not JS placeholders
   CLOSING_ERE: { operand: "chunk", sources: ['lower="${line,,}"', 'chunk="${lower:off}"'] },
@@ -359,7 +250,6 @@ const ereToJs = (ere) =>
   new RegExp(ere.replaceAll("[[:space:]]", "\\s").replaceAll("[[:blank:]]", "[ \\t]"));
 
 export function parseValidatorPatterns(shellText, location) {
-  // Line-anchored, so the sibling NON_CLOSING_ERE declaration never matches.
   const keyword = shellText.match(/^CLOSING_ERE='([^']+)'/m);
   const marker = shellText.match(/^NO_ISSUE_ERE='([^']+)'/m);
   if (!keyword || !marker) {
@@ -370,19 +260,6 @@ export function parseValidatorPatterns(shellText, location) {
   return { keyword: ereToJs(keyword[1]), marker: ereToJs(marker[1]) };
 }
 
-// Non-closing references and negated closers (`body.nonClosingMarkers` and
-// `body.negatedClosers`). Two layers: the static extractors below diff the
-// DATA each copy declares (marker alternation, trigger words, suffix,
-// affirmative phrase, window) against policy, so a drifted list is named
-// precisely; `lockstep-behavior.mjs` then RUNS each copy on sample bodies
-// generated from policy, which proves the rule is wired from declaration to
-// verdict whatever shape the code takes. The behavioral layer replaced a chain
-// of source-shape regexes that every review round found one more gap in.
-
-// The marker alternation is the first group of the pattern, after the `^`
-// anchor and the hook's `{0,3}` indent allowance (the composite strips that
-// indent before matching). A multi-word marker spells its gap as a blank-class
-// run; it is read back as one space so it compares to the policy's spelling.
 function nonClosingAlternation(pattern, location) {
   const group = pattern.match(/^\^(?: \{0,3\})?\(([^()]+)\):/);
   if (!group) {
@@ -403,8 +280,6 @@ export function parseValidatorNonClosing(shellText, location) {
   return { markers: nonClosingAlternation(declaration[1], location) };
 }
 
-// The marker test is an inline literal before ci-workflows#733 and
-// `non_closing_regex` (its marker prefix, then the reference) from #733 on.
 export function parseCompositeNonClosing(runShText, location) {
   const declaration =
     runShText.match(/rest ~ \/(.+)\/\) \{\s*has_non_closing = 1/) ??
@@ -419,16 +294,7 @@ export function parseCompositeNonClosing(runShText, location) {
   return { markers: nonClosingAlternation(declaration[1], location) };
 }
 
-// The behavioral layer runs the composite's analyzer, not the bash around it:
-// the rest of run.sh calls the GitHub API and cannot run here. The two lines
-// that turn the analyzer's `non-closing` and `negated` reports into the
-// verdict are therefore checked as source. They are the only links of the
-// chain left static.
 export function assertCompositeVerdictReads(runShText, location) {
-  // The behavioral check runs analyze_body on its own, so the wiring from the
-  // PR body through analyze_body into the report run.sh reads is checked here:
-  // the body file holds the PR body, the report is analyze_body's output, and
-  // nothing else writes the report.
   const reportWrites = runShText.match(/>>?\s*"\$analysis"/g) ?? [];
   const links = [
     [
@@ -440,10 +306,6 @@ export function assertCompositeVerdictReads(runShText, location) {
       /analysis="\$scratch\/analysis\.txt"\s*\n\s*analyze_body <"\$scratch\/body\.txt" >"\$analysis"\n/,
     ],
     ["nothing else writes the report", { test: () => reportWrites.length === 1 }],
-    // Each consumer below is bound to its input (the report) and to the error
-    // it raises, so redirecting a loop or dropping its error is caught.
-    // Two shapes are live: one loop per report kind (ci-workflows up to
-    // v0.75.0) and one loop over the report with a case per kind (#1129).
     [
       "a missing or empty section report is a linkage error",
       new RegExp(
@@ -480,8 +342,6 @@ export function assertCompositeVerdictReads(runShText, location) {
 }
 
 export function parseValidatorNegation(shellText, location) {
-  // The last N words: a forward pass keeps them with `first = n - N`; the
-  // bounded scan walks backward until it holds N (`${#words[@]} < N`).
   const window =
     shellText.match(/\(\(n > (\d+)\)\) && first=\$\(\(n - (\d+)\)\)/) ??
     shellText.match(/i >= 0 && \$\{#words\[@\]\} < (\d+);/);
@@ -516,13 +376,6 @@ export function parseValidatorNegation(shellText, location) {
   };
 }
 
-// The window is the last N words before the keyword, cut at the nearest
-// sentence punctuation. Before ci-workflows#815 `negation_trigger` cuts the
-// preceding text at the punctuation, then keeps the last N words
-// (`first = (count > N) ? ...`). From #815 it scans backward and stops at the
-// Nth word boundary (`++seen == N`) or the punctuation, whichever comes first,
-// and the window is the slice from there to the keyword. The punctuation set
-// itself is left to the behavioral layer, which runs it.
 function compositeNegationWindow(runShText) {
   const lastWords = runShText.match(/first = \(count > (\d+)\) \? count - (\d+) : 1/);
   if (lastWords) {
@@ -559,29 +412,15 @@ export function parseCompositeNegation(runShText, location) {
   };
 }
 
-// Every pattern below anchors on a `uses:` entry with no `#` earlier on the
-// line, so only a live call site counts. The same paths appear elsewhere in
-// ci-workflows' own `ci.yml` as a lint `paths:` list and as a
-// `bash .github/actions/pr-require-checks/check-contract/run.test.sh` command,
-// and a migration leaves commented-out call sites behind; either one would
-// otherwise select an artifact the repository does not run and suppress the
-// one it does.
 const USES_PREFIX = String.raw`^[^#\n]*\buses:\s*`;
-// A caller runs `check-contract` directly or through `report-ci-status`, which
-// calls it through `$/` at the same commit, so either call site names the
-// commit whose `check-contract` gates.
 export const REPORT_DIRECTORY = ".github/actions/pr-require-checks/report-ci-status";
 const COMPOSITE_DIRECTORY_PATTERN = `(?:${[COMPOSITE_DIRECTORY, REPORT_DIRECTORY]
   .map((directory) => directory.replaceAll(".", "\\."))
   .join("|")})`;
-// A `uses:` of either composite at `main` or a 40-hex ci-workflows SHA.
 const COMPOSITE_PIN_PATTERN = new RegExp(
   `${USES_PREFIX}melodic-software/ci-workflows/${COMPOSITE_DIRECTORY_PATTERN}@([0-9a-f]{40}|main)(?=[\\s"']|$)`,
   "m",
 );
-// ci-workflows dogfoods its own composite through a local `./` or `$/`
-// (self-repository) reference, which carries no SHA — the artifact is that
-// repository's own tree at `main`.
 const COMPOSITE_LOCAL_PATTERN = new RegExp(
   `${USES_PREFIX}[.$]/${COMPOSITE_DIRECTORY_PATTERN}(?=\\s|$)`,
   "m",
@@ -591,9 +430,6 @@ const REUSABLE_PIN_PATTERN = new RegExp(
   "m",
 );
 
-// The composite wins over the reusable: during the Phase 3 transition
-// ci-workflows carries both (its `pr-issue-linkage-self.yml` caller stays
-// until 3.4), and the artifact that gates is the one inside `ci-status`.
 export function detectArtifactPin(workflowText) {
   const pinned = workflowText.match(COMPOSITE_PIN_PATTERN);
   if (pinned) {
@@ -648,9 +484,6 @@ function setDifference(actual, expected) {
   return parts.join("; ");
 }
 
-// The declared marker alternation must be exactly the policy's set. How the
-// pattern behaves (own line, indent, case, trailing text) is the behavioral
-// layer's job.
 function assertNonClosing({ markers }, policy, location) {
   const expected = policy.body.nonClosingMarkers.map((marker) => marker.toLowerCase());
   const difference = setDifference(markers, expected);
@@ -684,9 +517,6 @@ function assertExactSections(actual, expected, location) {
   }
 }
 
-// Order is not behavior here — the composite builds a regex alternation from
-// the list — so the comparison is set-wise and the message names the exact
-// divergence rather than printing two lists to diff by eye.
 function assertAllowedTypes(actual, expected, location) {
   const difference = setDifference(actual, expected);
   if (difference === "") {
@@ -719,23 +549,6 @@ function assertMentions(text, terms, location) {
   }
 }
 
-// The `check-contract` composite masks fenced and indented code blocks and inline
-// code spans before matching a PR body, so an escape an author copies verbatim
-// from a backticked template is invisible to the gate and the PR draws the
-// advisory `needs-issue-linkage` label with no visible cause (.github#135). The
-// composite's masker cannot be shared: it is an awk program embedded in a bash
-// composite in ci-workflows, read here only as fetched text, and it also masks
-// HTML comments — which the org template uses as its guidance surface by
-// design. This mirrors the composite's code-span and code-block rules only,
-// deliberately leaving HTML comments rendered.
-//
-// Inline spans follow the composite's `has_closing_run`: a run of N backticks
-// opens a span only when a run of exactly N appears later on the same line; an
-// unmatched run is literal text. Block detection is suppressed inside an HTML
-// comment, as the composite suppresses it, so a fenced example in the
-// template's guidance comment cannot open a fence that swallows the rest of
-// the file. Inline spans are still masked there, because that is where the
-// backticked escape .github#135 removed was written.
 export function maskCode(text) {
   let fenceChar = "";
   let fenceLength = 0;
@@ -745,8 +558,6 @@ export function maskCode(text) {
     .map((raw) => {
       const line = raw.replace(/\r$/, "");
       const blocksApply = !commentOpen;
-      // Spaces only, as the composite counts them: a tab-indented line is
-      // indented code to it, never a fence marker.
       const indent = /^ */.exec(line)[0].length;
       const rest = line.slice(indent);
       const markerChar = rest[0];
@@ -776,8 +587,6 @@ export function maskCode(text) {
       }
 
       let rendered = "";
-      // The same line with code-span content blanked rather than removed, so
-      // its offsets still line up with the raw line's.
       let scan = "";
       let position = 0;
       let inlineTicks = 0;
@@ -807,11 +616,6 @@ export function maskCode(text) {
         position = stop;
       }
 
-      // Comment state is tracked only on lines that reach here, because the
-      // composite tracks it in the same character loop it never runs on a line
-      // inside a code block. It is also asymmetric there, and mirrored as such:
-      // an opener is honored only outside a code span, a closer anywhere. Both
-      // offsets are read in the raw line's coordinate space so they compare.
       const lastOpen = scan.lastIndexOf("<!--");
       const lastClose = line.lastIndexOf("-->");
       if (lastOpen > lastClose) commentOpen = true;
@@ -851,9 +655,6 @@ function assertMentionsAnyRendered(text, terms, location) {
   }
 }
 
-// The composite's contract checks, in the order both callers report them.
-// `labeled` adds each static check's own suffix to `location`, as the copy
-// check names its findings; a pin reports them all under its one location.
 function compositeChecks(policy, runShText, actionYmlText, location, { labeled }) {
   const label = (suffix) => (labeled ? `${location} (${suffix})` : location);
   return {
@@ -900,8 +701,6 @@ function compositeChecks(policy, runShText, actionYmlText, location, { labeled }
   };
 }
 
-// One drift verdict per copy; every check runs so a single invocation reports
-// the whole divergence set instead of the first hit.
 export function checkCopies(policy, texts) {
   const errors = [];
   const sections = policy.body.requiredSections;
@@ -923,12 +722,6 @@ export function checkCopies(policy, texts) {
   run(() =>
     assertContainsSections(parseMarkdownHeadings(texts.orgTemplate), sections, "org PR template"),
   );
-  // The org PR template is guidance, not enforcement: it must steer an author
-  // to at least one accepted opt-out marker, not enumerate every accepted
-  // phrasing. Naming more than one gives the author a choice the gate never
-  // asked for, and `policy.json` keeps the full accepted set for the artifacts
-  // that do enforce it. The template is copied verbatim, so its marker is
-  // matched after masking.
   run(() => assertMentions(texts.orgTemplate, ["Closes"], "org PR template (closing keyword)"));
   run(() =>
     assertMentionsAnyRendered(
@@ -972,13 +765,6 @@ function pinLabel(sha) {
   return sha === "main" ? "at main" : `pin ${sha.slice(0, 7)}`;
 }
 
-// Validates the full contract at the pin — sections AND the executable
-// keyword/marker patterns — so a pinned reusable whose section list matches
-// current policy but whose keyword or marker enforcement is stale still
-// reports drift. The non-closing and negated-closer rules are not checked
-// here: the reusable is the transition-only predecessor, it gained them only
-// late (ci-workflows#544) and states them in JavaScript this module has no
-// extractor for, and the composite carries them at every pin since v0.20.0.
 export function checkPinnedReusable(policy, repo, sha, reusableText) {
   const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
@@ -994,13 +780,6 @@ export function checkPinnedReusable(policy, repo, sha, reusableText) {
   return errors;
 }
 
-// The composite's equivalent: sections, enforcement patterns, the non-closing
-// marker test and the negation rule from `run.sh`, allowed title types and
-// `require-scope` from `action.yml`. Both title axes
-// are checked at the pin because a consumer pinned to a pre-`security`
-// composite would reject a `security:` title that policy allows, and one
-// pinned to a `require-scope: true` composite would reject every unscoped
-// title — drift the source-copy check on `main` cannot see.
 export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText) {
   const location = `caller ${repo} ${pinLabel(sha)}`;
   const errors = [];
@@ -1011,10 +790,6 @@ export function checkPinnedComposite(policy, repo, sha, runShText, actionYmlText
   return errors;
 }
 
-// One verdict per consumer over a resolved fleet. `kind: "none"` is a drift
-// finding for every repository, with no exemption; `kind: "unresolved"` means
-// the live loop already recorded a fetch failure for that repository and this
-// pass adds nothing.
 export function checkFleet(policy, resolutions) {
   const errors = [];
   for (const repo of CONSUMER_REPOSITORIES) {
@@ -1066,8 +841,6 @@ async function fetchWithRetry(url, accept, { notFoundIsNull = false } = {}) {
       if (response.ok) {
         return response;
       }
-      // A missing `.github/workflows` directory is a fact about the fleet, not
-      // a transport failure: the repository simply runs no workflows.
       if (notFoundIsNull && response.status === 404) {
         return null;
       }
@@ -1094,8 +867,6 @@ async function fetchTextOrNull(url) {
   return response === null ? null : await response.text();
 }
 
-// The live gate on ci-workflows `main`. `readOrNull` returns null for a
-// missing file.
 export async function readGateComposite(readOrNull) {
   const read = async (file) => {
     const url = contentsUrl("ci-workflows", "main", `${COMPOSITE_DIRECTORY}/${file}`);
@@ -1133,10 +904,6 @@ async function listWorkflowNames(repo) {
     .map((entry) => entry.name);
 }
 
-// Reads a repository's workflow directory and returns the artifact it runs.
-// The composite short-circuits the scan; a reusable pin is remembered but the
-// scan continues, because a repository mid-transition can carry both and the
-// composite is the one that gates.
 export async function resolveConsumerArtifact(repo, cachedText, listNames = listWorkflowNames) {
   const names = await listNames(repo);
   let reusable = null;
@@ -1154,10 +921,6 @@ export async function resolveConsumerArtifact(repo, cachedText, listNames = list
   return reusable ?? { kind: "none" };
 }
 
-// The copy check and the pin scan run separately. The copies live in public
-// repositories and need no token beyond a public read, so they run on every
-// pull request; the pin scan reads private gate callers and needs the
-// standards-sync App token, which only a `main` run can mint.
 export const MODES = ["copies", "pins"];
 
 export function parseMode(argv) {
@@ -1167,8 +930,6 @@ export function parseMode(argv) {
   return argv[0];
 }
 
-// A tokenless pin scan could read only the public callers; fail it rather
-// than let it pass on part of the fleet.
 export function requirePinScanToken(env) {
   if (!(env.LOCKSTEP_GITHUB_TOKEN || env.GITHUB_TOKEN)) {
     throw new FetchError(
@@ -1191,11 +952,6 @@ function cachedFetcher(fetcher) {
   };
 }
 
-// The org template is a sync-managed copy of the file contract-docs.mjs generates. It must equal
-// this branch's render or a version of the generated template committed on standards `main`
-// (`committedTemplates`, newest first). The live copy lags both while a template change waits
-// for its merge, and then for the reviewed sync pull request in `melodic-software/.github`, so
-// any committed version passes; a byte matching none of them is a hand edit there.
 export function checkGeneratedTemplate(policy, orgTemplate, committedTemplates) {
   return orgTemplate === renderTemplate(policy) || committedTemplates.includes(orgTemplate)
     ? []
@@ -1207,8 +963,6 @@ export function checkGeneratedTemplate(policy, orgTemplate, committedTemplates) 
 const GENERATED_TEMPLATE_PATH = "components/pr-convention-policy/PULL_REQUEST_TEMPLATE.md";
 const TEMPLATE_HISTORY_DEPTH = 10;
 
-// The last TEMPLATE_HISTORY_DEPTH versions of the generated template on standards `main`; none
-// before the template is first merged.
 async function readCommittedTemplates() {
   const response = await fetchWithRetry(
     `${API_BASE}/standards/commits?sha=main&path=${GENERATED_TEMPLATE_PATH}&per_page=${TEMPLATE_HISTORY_DEPTH}`,
@@ -1242,9 +996,6 @@ export async function runPinScan(env = process.env) {
   const cachedText = cachedFetcher(fetchText);
   const errors = [];
 
-  // A consumer whose fetch fails is reported and the loop continues, so one
-  // unreachable private repository cannot mask drift findings collected from
-  // the rest; any fetch-error still fails the run.
   const resolutions = new Map();
   for (const repo of CONSUMER_REPOSITORIES) {
     try {
@@ -1254,7 +1005,6 @@ export async function runPinScan(env = process.env) {
         continue;
       }
       if (found.kind === "composite") {
-        // A local `./` or `$/` reference reads that repository's own tree.
         const source = found.local ? repo : "ci-workflows";
         const ref = found.sha;
         resolutions.set(repo, {
@@ -1285,10 +1035,6 @@ export async function runPinScan(env = process.env) {
   return errors;
 }
 
-// This block is the CLI entrypoint of a shebang script whose entire contract is
-// what it prints and what it exits with, so stdout/stderr are the interface
-// rather than stray debugging. noConsole is suppressed per call rather than
-// repo-wide, which would blind the rule everywhere else in this component.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
     const mode = parseMode(process.argv.slice(2));

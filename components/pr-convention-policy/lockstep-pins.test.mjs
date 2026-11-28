@@ -81,7 +81,6 @@ test("a hook validator with the bounded negation scan passes", () => {
   );
 });
 
-// Each static anchor of the ci-workflows#815 shape, mutated away, is drift.
 test("a bounded-scan composite that drifts from its static anchors is drift", () => {
   for (const [from, to, expected] of [
     [
@@ -112,8 +111,6 @@ test("a bounded-scan composite that drifts from its static anchors is drift", ()
   }
 });
 
-// From ci-workflows#733 the analyzer reads its reference grammar from the
-// environment, so each link from run.sh's default to the analyzer is checked.
 test("an issue-ref-pattern composite that loses its default is drift", () => {
   for (const [from, to] of [
     [/^DEFAULT_ISSUE_REF_PATTERN=.*$/m, "DEFAULT_ISSUE_REF_PATTERN="],
@@ -123,7 +120,6 @@ test("an issue-ref-pattern composite that loses its default is drift", () => {
     assert.deepEqual(errors, [
       "gate composite: run.sh reads ISSUE_REF_PATTERN but does not declare and export DEFAULT_ISSUE_REF_PATTERN as its fallback",
     ]);
-    // Three checks read the default; a consumer pin reports the finding once.
     const pinned = checkConsumerPin(GOOD_COMPOSITE_RUN.replace(from, to));
     assert.equal(pinned.length, 1, pinned.join("; "));
     assert.match(pinned[0], /^caller ci-runner pin ddddddd: .*DEFAULT_ISSUE_REF_PATTERN/);

@@ -15,8 +15,6 @@ test("stale reusable pin enforcing an older contract is reported", () => {
               { name: "Related", guidance: "r" },
             ];
 `;
-  // Two findings: the stale section list AND the missing enforcement-pattern
-  // declarations (pre-pattern-era reusables lack the const declarations).
   const errors = checkPinnedReusable(POLICY, "ci-runner", "c".repeat(40), oldReusable);
   assert.equal(errors.length, 2);
   assert.match(errors[0], /caller ci-runner/);
@@ -55,8 +53,6 @@ test("validator CLOSING_ERE is read from its own declaration, not NON_CLOSING_ER
 });
 
 test("validator that matches its EREs against un-lowercased text is drift", () => {
-  // Each mutation is caught statically by name; running the hook confirms it
-  // where a capitalized sample actually changes verdict.
   const mutations = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash parameter expansion, not a JS placeholder
     ['    lower="${line,,}"', '    lower="$line"', "CLOSING_ERE", true],
@@ -81,7 +77,6 @@ test("validator that matches its EREs against un-lowercased text is drift", () =
       `${from}: ${errors.join("; ")}`,
     );
   }
-  // An extra raw-line match alongside the lowercased one is drift too.
   const texts = goodTexts();
   texts.hookValidator += '[[ "$line" =~ $CLOSING_ERE ]] || true\n';
   assert.equal(checkCopies(POLICY, texts).length, 1);

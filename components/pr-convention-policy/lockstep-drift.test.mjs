@@ -75,8 +75,6 @@ test("parsers extract the narrow surfaces", () => {
   );
 });
 
-// Mutation probes: one mutated copy per source must produce exactly that
-// source's drift finding (the acceptance criterion's red-under-mutation).
 test("mutated composite section list is reported", () => {
   const texts = goodTexts();
   texts.gateRun = texts.gateRun.replace('section_report("Fix")', 'section_report("Patch")');
@@ -105,8 +103,6 @@ test("a composite type list that adds a type policy does not allow is reported",
   assert.match(errors[0], /unexpected wip/);
 });
 
-// A composite that flipped `require-scope` would reject every unscoped title
-// fleet-wide while the section and type checks still reported agreement.
 test("a composite that flips require-scope away from policy is reported", () => {
   const texts = goodTexts();
   texts.gateAction = texts.gateAction.replace("default: 'false'", "default: 'true'");
@@ -115,9 +111,6 @@ test("a composite that flips require-scope away from policy is reported", () => 
   assert.match(errors[0], /require-scope is true, policy says false/);
 });
 
-// YAML gives a string for the quoted `'false'` the composite declares and a
-// boolean for a bare `false`; both mean the same thing to Actions, and anything
-// else is drift rather than a coerced guess.
 test("require-scope accepts either YAML spelling and refuses a non-boolean", () => {
   assert.equal(
     parseCompositeRequireScope(
@@ -176,15 +169,10 @@ test("a template naming one accepted no-issue marker is not drift; naming none i
   );
 });
 
-// The failure .github#135 removed: a marker present only inside an inline code
-// span is masked away by the gate, so an author who copies it verbatim draws
-// `needs-issue-linkage` with no visible cause. A substring check cannot see it.
 test("a template whose only markers sit in code spans or code blocks is drift", () => {
   assert.equal(templateMarkerErrors(BACKTICKED_TEMPLATE).length, 1);
   assert.match(templateMarkerErrors(BACKTICKED_TEMPLATE)[0], /outside an inline code span/);
 
-  // Code blocks only count outside the guidance comment, as they do for the
-  // composite, so these two move the escape out of it.
   const outside = GOOD_TEMPLATE.replace("No related issue: <reason>", "").replace(
     "## Summary",
     "PLACEHOLDER\n\n## Summary",
@@ -195,44 +183,23 @@ test("a template whose only markers sit in code spans or code blocks is drift", 
   const indented = outside.replace("PLACEHOLDER", "    No related issue: <reason>");
   assert.equal(templateMarkerErrors(indented).length, 1);
 
-  // The same escape on a plain line there is not drift, so the two above fail
-  // for the code block and nothing else.
   assert.deepEqual(templateMarkerErrors(outside.replace("PLACEHOLDER", "No related issue: x")), []);
 });
 
 test("the masker follows the composite's code-span rules", () => {
-  // A run of N backticks opens a span only when a run of exactly N closes it
-  // later on the same line; an unmatched run is literal text.
   assert.equal(maskCode("a `b` c"), "a  c");
   assert.equal(maskCode("a ` b c"), "a ` b c");
   assert.equal(maskCode("a ``b ` c`` d"), "a  d");
-  // Indentation is counted in spaces only, as the composite counts it: a
-  // tab-indented marker run is indented code, not a fence.
   assert.equal(maskCode("\t```\nkept\n```"), "\nkept\n");
-  // HTML comments are deliberately left rendered: the org template's guidance
-  // lives inside one, and that is where its escape is named.
   assert.match(maskCode("<!--\nNo related issue: <reason>\n-->"), /No related issue/);
-  // Block detection is suppressed inside a comment, as it is for the composite:
-  // an odd fence line in the guidance must not swallow the rest of the file.
   assert.match(maskCode("<!--\n```\n-->\nNo related issue: x\n"), /No related issue/);
-  // A backticked escape inside a comment is still masked. That is the .github#135
-  // shape, and the comment is where the old template wrote it.
   assert.doesNotMatch(maskCode("<!--\n`No related issue: x`\n-->"), /No related issue/);
-  // A `<!--` inside a code span does not open a comment, so it cannot suppress
-  // the block detection that masks the marker below it.
   assert.doesNotMatch(maskCode("a `<!--` b\n```\nNo related issue: x\n"), /No related issue/);
-  // Nor does one inside a fence: the fence still closes on its own marker, and
-  // the marker after it is ordinary text.
   assert.match(maskCode("```\n<!--\n```\nNo related issue: x\n"), /No related issue/);
-  // A closer is asymmetric to an opener, as it is for the composite: it counts
-  // even inside a code span, so the fence below it still opens.
   assert.doesNotMatch(
     maskCode("<!--\ntext `-->` more\n```\nNo related issue: x\n"),
     /No related issue/,
   );
-  // Both delimiter offsets are read in the raw line's coordinate space, so a
-  // masked span before them cannot make a closer look later than an opener
-  // that follows it. Here the comment stays open and the fence never fires.
   assert.match(
     maskCode("<!--\n`example` --> <!--\n```\nNo related issue: x\n"),
     /No related issue/,
@@ -240,8 +207,6 @@ test("the masker follows the composite's code-span rules", () => {
 });
 
 test("composite keyword/marker regressions are caught functionally, not by mention", () => {
-  // Keyword stem removed from the DECLARED pattern while the word survives in
-  // prose: a mention check would pass; the functional probe must not.
   const noResolve = goodTexts();
   noResolve.gateRun = noResolve.gateRun
     .replace("|resolve|resolves|resolved", "")
@@ -258,23 +223,14 @@ test("composite keyword/marker regressions are caught functionally, not by menti
   );
 });
 
-// The composite's awk patterns are lowercase and match text the analyzer has
-// already lowercased. Probing them with lowercased input is only correct while
-// that lowercasing is there; a composite that dropped it would become
-// case-sensitive against raw text and reject the capitalized keyword forms the
-// contract documents. The extractor must
-// refuse to certify it rather than probe a pattern the gate no longer applies.
 test("a composite that stops lowercasing the line is drift, not a pass", () => {
   const texts = goodTexts();
   texts.gateRun = texts.gateRun.replace("lower = tolower(line)", "lower = line");
   const errors = checkCopies(POLICY, texts).filter((e) => e.includes("gate composite"));
   assert.equal(errors.length, 2, errors.join("; "));
   assert.match(errors[0], /no longer lowercases the line/);
-  // Running it agrees: a capitalized keyword no longer closes.
   assert.match(errors[1], /^gate composite \(behavior\): .*"Closes #12" should be closing/);
 });
-
-// The composite's findings at one consumer pin, with the good action.yml.
 
 const COMPOSITE_DIRECTORY = ".github/actions/pr-require-checks/check-contract";
 const COMPOSITE_STEP = `      - uses: melodic-software/ci-workflows/${COMPOSITE_DIRECTORY}@1234567890abcdef1234567890abcdef12345678 # v0.34.0`;
@@ -311,8 +267,6 @@ test("a reusable consumer is detected at its pin", () => {
   });
 });
 
-// `report-ci-status` runs `check-contract` through `$/` at the commit the caller
-// pins, so its pin names the `check-contract` to check.
 test("a consumer on report-ci-status is detected at its pin", () => {
   const step = `      - uses: melodic-software/ci-workflows/${REPORT_DIRECTORY}@ebd0e3bed99ae1365fcb4ef47ce97cfa745fcf2f # v0.76.0`;
   assert.deepEqual(detectArtifactPin(`jobs:\n  ci-status:\n${step}\n`), {
@@ -335,10 +289,6 @@ test("the composite wins when a repository carries both mid-transition", () => {
   assert.equal(detectArtifactPin(both).kind, "composite");
 });
 
-// ci-workflows dogfoods its own composite through a local `./` or `$/` reference,
-// which carries no SHA. The same path appears in that workflow as a lint
-// `paths:` entry and as a `bash .../run.test.sh` command; neither is a call
-// site, so the detector anchors on `uses:`.
 test("a local composite reference resolves to main, and a bare path does not", () => {
   assert.deepEqual(
     detectArtifactPin(`      - name: Contract\n        uses: ./${COMPOSITE_DIRECTORY}\n`),
@@ -357,10 +307,6 @@ test("a workflow with neither artifact detects nothing", () => {
   assert.equal(detectArtifactPin("jobs:\n  build:\n    runs-on: ubuntu-24.04\n"), null);
 });
 
-// A migration leaves commented-out call sites behind. Selecting an artifact a
-// repository does not run would suppress detection of the one it does, and a
-// repository that had lost its last live caller would validate an unused
-// artifact instead of reporting that it runs neither.
 test("a commented-out call site is not a call site", () => {
   assert.equal(detectArtifactPin(`      # ${COMPOSITE_STEP.trim()}\n`), null);
   assert.equal(detectArtifactPin(`    # ${REUSABLE_CALL.trim()}\n`), null);
@@ -371,10 +317,6 @@ test("a commented-out call site is not a call site", () => {
   assert.equal(detectArtifactPin(`      # - uses: $/${COMPOSITE_DIRECTORY}\n`), null);
 });
 
-// The ci-workflows rename moves the gate from `ci.yml` to
-// `pr-require-checks.yml`. The scan reads that file before any other, so a
-// repository calling the composite from there costs one read.
-// Resolves ci-workflows over the given workflow files, recording each one read.
 async function resolveWorkflows(files) {
   const reads = [];
   const found = await resolveConsumerArtifact(
@@ -408,7 +350,6 @@ test("pr-require-checks.yml is read before ci.yml when both exist mid-rename", a
   assert.deepEqual(reads, ["pr-require-checks.yml"]);
 });
 
-// Serves the composite's files at `directory`; any other path reads as missing.
 function gateReader(directory, files = ["run.sh", "action.yml"]) {
   return async (url) => {
     const file = files.find((name) => url.includes(`/${directory}/${name}?`));
@@ -439,7 +380,6 @@ function fleetResolutions(overrides = {}) {
   for (const repo of CONSUMER_REPOSITORIES) {
     resolutions.set(repo, { kind: "reusable", sha: "a".repeat(40), reusable: GOOD_GATE });
   }
-  // ci-workflows dogfoods the composite from its own tree.
   resolutions.set("ci-workflows", {
     kind: "composite",
     sha: "main",
@@ -470,9 +410,6 @@ test("a mixed fleet of composite and reusable consumers passes", () => {
   assert.deepEqual(errors, []);
 });
 
-// Fail-closed, with no per-repository exemption: every repository in the roster
-// sits under the org `ci-gate` ruleset, so a repository running neither artifact
-// is a gate removal wherever it happens.
 test("a repository running neither artifact fails the fleet, whichever repository it is", () => {
   for (const repo of ["dotfiles", "ci-runner", "claude-code-proxy", "songwriting"]) {
     const errors = checkFleet(POLICY, fleetResolutions({ [repo]: { kind: "none" } }));
@@ -542,10 +479,6 @@ test("consumer roster covers all fourteen gated repositories", () => {
   }
 });
 
-// Regression: ci-workflows made CLOSING_KEYWORD global so every occurrence on a
-// line can be classified. The parser pinned the declaration to a literal `/i;`,
-// so a healthy gate reported "declarations not found" — a parse failure that
-// reads as drift.
 test("a global declaration parses and still probes", () => {
   const globalGate = GOOD_GATE.replaceAll("/i;", "/gi;");
   const patterns = parseGatePatterns(globalGate, "gate");
@@ -559,10 +492,6 @@ test("a global declaration parses and still probes", () => {
   );
 });
 
-// Tolerating flags must not blind the check to losing one. Both declared bodies
-// are lowercase and rely on `i` to accept the documented capitalized keyword
-// forms, so a gate that dropped `i` would silently become case-sensitive.
-// Probing with a hardcoded `i` would pass it; the DECLARED flags catch it.
 test("a reusable that drops the i flag is enforcement drift, not a pass", () => {
   const caseSensitiveGate = GOOD_GATE.replaceAll("/i;", "/g;");
   const patterns = parseGatePatterns(caseSensitiveGate, "gate");
@@ -573,16 +502,12 @@ test("a reusable that drops the i flag is enforcement drift, not a pass", () => 
   assert.match(errors[0], /closing keyword "Closes"/);
 });
 
-// `g`/`y` are stripped because they make .test() advance lastIndex, and
-// assertPatternsEnforce probes each pattern once per policy keyword.
 test("a global probe does not go stateful across repeated keyword probes", () => {
   const patterns = parseGatePatterns(GOOD_GATE.replaceAll("/i;", "/gi;"), "gate");
   for (const keyword of POLICY.body.closingKeywords) {
     assert.ok(patterns.keyword.test(` ${keyword} #12 `), `${keyword} probes on every call`);
   }
 });
-
-// Mode selection: the copy check and the pin scan run separately.
 
 test("the CLI takes exactly one known mode", () => {
   assert.deepEqual(MODES, ["copies", "pins"]);
@@ -606,8 +531,6 @@ test("the pin scan needs a token and fails without one", async () => {
   requirePinScanToken({ GITHUB_TOKEN: "workflow-token" });
 });
 
-// End to end through the CLI: no mode, or a tokenless pin scan, exits non-zero
-// before any network read, so neither can pass by skipping.
 test("the CLI fails a missing mode and a tokenless pin scan", () => {
   const script = path.join(MODULE_DIRECTORY, "lockstep-drift.mjs");
   const run = (args) =>
@@ -640,9 +563,7 @@ test("a template change passes before its merge and while its sync is pending", 
     ...base,
     body: { ...base.body, sectionGuidance: { ...base.body.sectionGuidance, Fix: "Reworded." } },
   };
-  // Before the merge: the branch renders the change; main and the org still hold the old bytes.
   assert.deepEqual(checkGeneratedTemplate(changed, previous, [previous]), []);
-  // After the merge, before the .github sync lands: main holds both versions, the org the old one.
   assert.deepEqual(
     checkGeneratedTemplate(changed, previous, [renderTemplate(changed), previous]),
     [],
