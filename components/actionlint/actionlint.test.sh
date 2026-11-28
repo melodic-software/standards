@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Tests the actionlint component: the root-canonical config lets the declared
-# self-hosted fleet labels lint clean while an undeclared fleet-shaped label
-# still fails. Skips cleanly when the engine is absent.
 set -uo pipefail
 root="$(git rev-parse --show-toplevel)"
 # shellcheck source=harness/shell/lib.sh
@@ -14,8 +11,8 @@ if ! command -v actionlint >/dev/null 2>&1; then
   skip_suite 'actionlint not installed'
 fi
 
-# actionlint resolves the config and workflows from the project root, so the
-# fixtures run inside a scratch repo mirroring a consumer checkout.
+# actionlint resolves the config and workflows from the project root, so the fixtures run in a
+# scratch repo: https://github.com/rhysd/actionlint/blob/main/docs/config.md
 project="$(mktemp -d)"
 trap 'rm -rf -- "$project"' EXIT
 make_repo "$project"
@@ -74,9 +71,6 @@ assert_nonzero 'an undeclared fleet-shaped label still fails with the config' "$
 assert_contains 'an undeclared fleet-shaped label is still rejected' "$out" "$undeclared_message"
 assert_not_contains 'the declared fleet label stays admitted' "$out" "$fleet_message"
 
-# Control: without the config both fleet labels must be rejected. When this
-# case fails, the fleet label became built-in; drop it from the config instead
-# of patching this test.
 rm "$project/.github/actionlint.yaml" \
   "$project/.github/workflows/unknown-runner-label.yml"
 out="$(lint)"

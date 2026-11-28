@@ -1,5 +1,3 @@
-# Mirrors the Phase 4 three-job shape: the self-hosted fleet labels the
-# ci-perf program writes literally in `runs-on`, one job per label.
 name: fleet-runner-labels fixture
 on: push
 jobs:

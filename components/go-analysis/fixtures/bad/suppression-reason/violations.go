@@ -1,4 +1,3 @@
-// Package suppressionreason supplies an unexplained suppression.
 package suppressionreason
 
 import "strings"

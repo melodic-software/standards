@@ -1,4 +1,3 @@
-// Package analyzer supplies focused violations for the enabled analyzers.
 package analyzer
 
 import (

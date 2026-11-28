@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 
-// ajv comes from the distribution package's install (`npm ci --prefix distribution`).
 const Ajv2020 = createRequire(new URL("../../distribution/package.json", import.meta.url))(
   "ajv/dist/2020",
 ).default;
@@ -51,9 +50,6 @@ test("chatgpt-codex-connector[bot] is not trusted", () => {
   assert.equal(listed(199175422), false);
 });
 
-// The code-review callers pass the list's people as pr-review's
-// allowed-author-ids, written out because not every target that receives a
-// caller receives this file.
 test("every code-review caller passes the list's human ids as allowed-author-ids", () => {
   const humanIds = list.actors
     .filter((actor) => actor.kind === "human")
