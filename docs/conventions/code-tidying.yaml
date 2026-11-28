@@ -3,3 +3,5 @@ comment_posture: necessary
 comment_lint: block
 comment_lint_allow:
   - '^(#|//)[[:space:]]*cant-fail-ok:[[:space:]]*[^[:space:]]'
+comment_lint_exclude:
+  - components/comment-hygiene/fixtures/**
