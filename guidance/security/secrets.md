@@ -11,7 +11,7 @@
 
 ## Design and operate
 
-- Give each distinct workload its own least-privilege identity and budget, preferring short-lived federated credentials; resources that need identical access may share one. In production name one specific credential, never a chain that silently tries another identity. A second credential with the same scope exists for rotation overlap, and an automated lane may declare one fallback with the same scope, used only when the primary is throttled, exhausted or failing, with every switch logged. Keep the count small for people through federation and by deleting unused credentials; name each credential by purpose and make its usage visible.
+- Give each distinct workload its own least-privilege identity and budget, preferring short-lived federated credentials; resources that need identical access may share one. In production name one specific credential, never a chain that silently tries another identity. A second credential with the same scope exists for rotation overlap, and an automated lane may declare one fallback with the same scope, used only when the primary is throttled, exhausted or failing, with every switch logged. For people, keep credentials few (one general-purpose key per account, one login token per environment) through federation and by deleting unused ones; name each by purpose, make its usage and assignment visible, and make swapping or reassigning it a few clicks.
 
 ## Build and operate
 
