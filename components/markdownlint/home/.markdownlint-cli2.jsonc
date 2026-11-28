@@ -2,22 +2,22 @@
   "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/main/schema/markdownlint-cli2-config-schema.json",
   "ignores": ["**/node_modules/**", "**/.venv/**"],
   "config": {
-    "MD003": { "style": "atx" }, // ATX headings (# Heading)
-    "MD004": { "style": "dash" }, // Dash unordered-list bullets
-    "MD049": { "style": "asterisk" }, // *emphasis*
-    "MD050": { "style": "asterisk" }, // **strong**
-    "MD046": { "style": "fenced" }, // Fenced (not indented) code blocks
-    "MD048": { "style": "backtick" }, // Backtick (not tilde) code fences
-    "MD024": { "siblings_only": true }, // Allow duplicate headings under different parents
-    "MD060": false, // Table column style — disabled; allows any pipe spacing (its default flags tables matching no supported style)
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    "MD049": { "style": "asterisk" },
+    "MD050": { "style": "asterisk" },
+    "MD046": { "style": "fenced" },
+    "MD048": { "style": "backtick" },
+    "MD024": { "siblings_only": true },
+    "MD060": false,
 
-    "MD013": false, // No hard line-length limit (tables and code exceed 80)
-    "MD025": false, // Allow multiple top-level (H1) sections
-    "MD028": false, // Allow blank lines between adjacent blockquotes
-    "MD033": false, // Allow inline HTML (<details>, <summary>, <br>, ...)
-    "MD034": false, // Allow bare URLs (GFM autolinks them)
-    "MD036": false, // Allow bold text used as a pseudo-heading
-    "MD040": false, // Fenced code need not declare a language
-    "MD041": false // First line need not be a top-level heading (frontmatter)
+    "MD013": false,
+    "MD025": false,
+    "MD028": false,
+    "MD033": false,
+    "MD034": false,
+    "MD036": false,
+    "MD040": false,
+    "MD041": false
   }
 }

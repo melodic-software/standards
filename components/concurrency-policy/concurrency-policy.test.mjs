@@ -394,7 +394,7 @@ test("workflow symlinks are forbidden", async () => {
       path.join(root, ".github", "workflows", "link.yml"),
     );
   } catch {
-    return; // Platform without symlink support (e.g. unprivileged Windows).
+    return;
   }
   const findings = await auditRepository({ root });
   assert.deepEqual(
